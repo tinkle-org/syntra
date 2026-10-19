@@ -14,13 +14,16 @@ permissions:
 
 jobs:
   docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+
+      - name: Install validator dependencies
+        run: pip install pyyaml
 
       - name: A1 markdown validation (hygiene, fences, EOF newlines)
         run: python3 scripts/validate-repo.py markdown
@@ -43,7 +46,7 @@ jobs:
         run: python3 scripts/validate-repo.py boundary
 
   buf:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
@@ -67,13 +70,16 @@ jobs:
         run: buf breaking --against 'compatibility/v1-initial/image.json'
 
   conformance:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+
+      - name: Install validator dependencies
+        run: pip install pyyaml
 
       - uses: bufbuild/buf-setup-action@v1
         with:

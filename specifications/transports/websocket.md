@@ -29,7 +29,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WS-003** — This profile is plaintext and restricted-development only (SYN-ARCH-030, SNTR-TSEC-001/005). Distributions MUST disable it by default in any build claiming production readiness, MUST emit an explicit insecure-mode warning when enabled, MUST document that it provides no confidentiality, integrity, or endpoint authentication, and MUST NOT accept production credentials over it.
 
-**SNTR-WS-004** — Stable profile identifiers are `SNTR-WS-V1` (this profile: RFC 6455 over HTTP/1.1 carrying Syntra v1 envelopes) and `SNTR-WSS-V1` (defined in `secure-websocket.md`: the same framing over a TLS 1.3 session). The `-V1` suffix marks profile identifiers and distinguishes them from requirement IDs (`SNTR-WS-###`). Implementations MUST document which identifiers they support per SYN-ARCH-050; insecure-only implementations MUST NOT claim production conformance.
+**SNTR-WS-004** — Stable profile identifiers are `SNTR-WS-V1` (this profile: RFC 6455 over HTTP/1.1 carrying Syntra v1 envelopes) and `SNTR-WSS-H1-V1` (defined in `secure-websocket.md`: the same framing over a TLS 1.3 session). The `-V1` suffix marks profile identifiers and distinguishes them from requirement IDs (`SNTR-WS-###`). Implementations MUST document which identifiers they support per SYN-ARCH-050; insecure-only implementations MUST NOT claim production conformance.
 
 ### 1B. Endpoint
 

@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   preflight:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       module: ${{ steps.resolve.outputs.module }}
       release_label: ${{ steps.resolve.outputs.release_label }}
@@ -43,7 +43,7 @@ jobs:
 
   publish:
     needs: preflight
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment: bsr-publish  # manual approval gate; holds the BUF_TOKEN secret
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
     # Post-publish verification: read-only checks that the published module
     # is publicly accessible and generates SDKs. No credentials in this job.
     needs: [preflight, publish]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     environment: bsr-publish  # same gate: no verification without approval
     permissions:
       contents: read

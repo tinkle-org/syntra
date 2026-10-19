@@ -77,7 +77,7 @@ POST /syntra/v1/rpc
   mapping over HTTP/1.1, plaintext or with TLS terminated before the
   host). The `-V1` suffix marks profile identifiers and distinguishes
   them from requirement IDs (`SNTR-HTTP-###`), consistent with
-  `SNTR-WS-V1` / `SNTR-WSS-V1`. Secure H1/H2 identifiers live in
+  `SNTR-WS-V1` / `SNTR-WSS-H1-V1`. Secure H1/H2 identifiers live in
   `https.md`. Implementations MUST document which identifiers they
   support per SYN-ARCH-050; insecure-only implementations MUST NOT
   claim production conformance.

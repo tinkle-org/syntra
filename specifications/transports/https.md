@@ -44,8 +44,8 @@ and MUST carry the same insecure-mode warning as plaintext H1.
 **SNTR-HTTPS-002** — Stable profile identifiers: `SNTR-HTTPS-H1-V1`
 (§1D binding) and `SNTR-HTTPS-H2-V1` (§1E binding). The `-V1` suffix
 marks profile identifiers and distinguishes them from requirement IDs
-(`SNTR-HTTPS-###`), consistent with `SNTR-HTTP-V1`, `SNTR-WS-V1`, and
-`SNTR-WSS-V1`. Implementations MUST document which identifiers they
+  (`SNTR-HTTPS-###`), consistent with `SNTR-HTTP-V1`, `SNTR-WS-V1`, and
+`SNTR-WSS-H1-V1`. Implementations MUST document which identifiers they
 support per SYN-ARCH-050.
 
 **SNTR-HTTPS-003** — No custom Syntra handshake exists at the TLS or

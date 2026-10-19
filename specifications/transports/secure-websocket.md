@@ -28,7 +28,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WSS-002** — Exclusions (same as WS plus TLS): WebSocket over HTTP/2 Extended CONNECT, WebSocket over HTTP/3, QUIC, and any non-RFC-6455 framing MUST NOT be claimed as Syntra v1 WSS (SYN-ARCH-051). No custom TLS, cipher, or handshake implementation SHALL be introduced (SNTR-TSEC-002/011).
 
-**SNTR-WSS-004** — Stable profile identifier is `SNTR-WSS-V1`: TCP, then a TLS 1.3 session, then HTTP/1.1 Upgrade to RFC 6455 carrying Syntra v1 envelopes per `websocket.md` §1C–§1L (default maximum 1,048,576 bytes; `syntra.v1` subprotocol; one binary message per `Frame`). TLS records are transport segmentation only and MUST NOT be treated as Syntra envelopes. Implementations MUST document `SNTR-WSS-V1` support per SYN-ARCH-050 to claim production-capable WSS conformance.
+**SNTR-WSS-004** — Stable profile identifier is `SNTR-WSS-H1-V1`: TCP, then a TLS 1.3 session, then HTTP/1.1 Upgrade to RFC 6455 carrying Syntra v1 envelopes per `websocket.md` §1C–§1L (default maximum 1,048,576 bytes; `syntra.v1` subprotocol; one binary message per `Frame`). TLS records are transport segmentation only and MUST NOT be treated as Syntra envelopes. Implementations MUST document `SNTR-WSS-H1-V1` support per SYN-ARCH-050 to claim production-capable WSS conformance.
 
 **SNTR-WSS-003** — Production posture: this is a production-capable secure profile (SYN-ARCH-030, SNTR-TSEC-001). Public deployments MUST use this profile (or another secure profile), MUST NOT fall back to plaintext WS for public traffic, and MUST follow every rule in §1M. Conformance claims for public use MUST cite this profile, not WS.
 
