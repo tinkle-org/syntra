@@ -1,0 +1,199 @@
+# Portable HTTPS cases (Section I/HTTPS). Profiles: SNTR-HTTPS-H1-V1 + SNTR-HTTPS-H2-V1.
+# Prose companion: conformance/requirements/https.md (CONF-HTTPS-001…014).
+# Every envelope assertion reuses test-vectors/http fixtures; only framing differs between H1 and H2.
+format_version: "1.0"
+profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+cases:
+  - id: CONF-HTTPS-001
+    requirement: [SNTR-HTTPS-001, SNTR-HTTPS-010, SNTR-HTTPS-030]
+    profile: SNTR-HTTPS-H1-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: https_h1_exchange, alpn: "http/1.1", body_ref: "http/V-HTTP-REQ-01" }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 200, body_ref: "http/V-HTTP-RES-OK-01" }
+    notes: "HTTPS/H1 success: chain+hostname+expiry verified before any credential byte; harness asserts no credential preceded validation."
+
+  - id: CONF-HTTPS-002
+    requirement: [SNTR-HTTPS-001, SNTR-HTTPS-020, SNTR-HTTPS-040]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: https_h2_exchange, alpn: "h2", stream_id: 1, body_ref: "http/V-HTTP-REQ-01" }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 200, body_ref: "http/V-HTTP-RES-OK-01" }
+    notes: "HTTPS/H2 success: :method/:path/headers per fixtures; single response ends the stream; identical logical result to H1 (profile SNTR-HTTPS-H2-V1)."
+
+  - id: CONF-HTTPS-003
+    requirement: [SNTR-HTTPS-041, SNTR-HTTPS-042, SNTR-HTTPS-043]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: https_h2_concurrent_streams, streams: [{ id: 1, request_id: 7 }, { id: 3, request_id: 8 }], complete_second_first: true }
+      credentials: "fixture:opaque-valid-A"
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Concurrent H2 streams, out-of-order completion: correlate by echoed request_id only; stream IDs never appear in any Syntra field (negative wire-trace check)."
+
+  - id: CONF-HTTPS-004
+    requirement: [SNTR-HTTPS-010, SNTR-HTTPS-011, SNTR-TSEC-003]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, invalid_chain]
+    input:
+      transport: { action: tls_handshake, version: TLS1_3, pki: test-pki-untrusted }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "Invalid chain (self-signed-untrusted / wrong-chain / malformed rows): TLS fails; no HTTP request and no credential bytes sent (packet-capture proof); no plaintext fallback."
+
+  - id: CONF-HTTPS-005
+    requirement: [SNTR-HTTPS-012, SNTR-TSEC-004]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, wrong_hostname]
+    input:
+      transport: { action: tls_handshake, version: TLS1_3, pki: test-pki-wrong-san }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Wrong hostname + expired rows: rejection before credential presentation in both; chain-validity alone never suffices."
+
+  - id: CONF-HTTPS-006
+    requirement: [SNTR-HTTPS-010, SNTR-HTTPS-013, SNTR-TSEC-002, SNTR-TSEC-007]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, weak_tls_only]
+    input:
+      transport: { action: tls_handshake, version: TLS1_2_only }
+      faults: { observe_retry_after_failure: true }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "TLS below 1.3 refused; no plaintext or weaker-version retry by the implementation — fail closed, credentials undisclosed."
+
+  - id: CONF-HTTPS-007
+    requirement: [SNTR-HTTPS-020, SNTR-HTTPS-021]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: alpn_mismatch_probe }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "ALPN mismatch fails closed (http/1.1-only vs h2-only rows plus non-TLS bytes on the TLS port); ALPN plays no auth role."
+
+  - id: CONF-HTTPS-008
+    requirement: [SNTR-HTTPS-014, SNTR-TSEC-006]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: rotation_window_probe, pki: test-pki-rotation-overlap }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Rotation accepted; pinning absent: handshakes before/during/after rotation with currently valid chains succeed; no hard-coded-leaf rejection; no protocol version change."
+
+  - id: CONF-HTTPS-009
+    requirement: [SNTR-HTTPS-051, SNTR-HTTP-080, SNTR-HTTP-082]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: h2_reset_probe }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "REFUSED_STREAM is safe (fresh stream MAY report definitely-not-executed and retry with fresh request_id + same op key); other mid-response resets are unknown-outcome UNAVAILABLE. The two MUST NOT be conflated."
+
+  - id: CONF-HTTPS-010
+    requirement: [SNTR-HTTPS-051]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: h2_goaway_probe }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "GOAWAY drains: in-flight streams report UNAVAILABLE (unknown outcome); no new streams on the draining connection; reconnect uses fresh streams/IDs/repeated op keys."
+
+  - id: CONF-HTTPS-011
+    requirement: [SNTR-HTTPS-060, SNTR-TSEC-008]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: proxy_mismatch_probe }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Proxy/termination mismatch rejected (insecure backend leg, SNI/:authority mismatch rows fail); X-Forwarded-* headers ignored for auth (per-request Authorization alone decides)."
+
+  - id: CONF-HTTPS-012
+    requirement: [SNTR-HTTPS-045, SNTR-HTTPS-070, SNTR-HTTP-130]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: push_and_cross_profile_probe }
+      credentials: "fixture:opaque-valid-A"
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Push refused (PUSH_PROMISE -> RST_STREAM, nothing parsed as Frame/event); cross-profile continuity (H1 context on H2 and vice versa) rejected as unnegotiated resumption."
+
+  - id: CONF-HTTPS-013
+    requirement: [SNTR-HTTPS-052, SNTR-HTTP-040, SNTR-HTTP-042]
+    profile: SNTR-HTTPS-H2-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: h2_layering_probe }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { synthesized_result: false }
+    notes: "Response-authenticated layering holds on H2: unknown-method RPC stays :status 200 + result{error{UNIMPLEMENTED}}; bad :path stays 404 with no envelope; bit-flipped 200 discarded as UNAVAILABLE, never success."
+
+  - id: CONF-HTTPS-014
+    requirement: [SNTR-HTTPS-031, SNTR-HTTPS-043, SNTR-HTTP-064, SNTR-HTTP-071]
+    profile: [SNTR-HTTPS-H1-V1, SNTR-HTTPS-H2-V1]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, valid_chain]
+    input:
+      transport: { action: per_stream_auth_isolation_probe }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Per-stream/exchange auth isolation: streams/exchanges with P, Q, and no credential evaluated independently; TLS/connection reuse implies no principal and no session."

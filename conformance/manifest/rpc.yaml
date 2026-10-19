@@ -1,0 +1,214 @@
+# Portable RPC cases (Section G). Profile: SNTR-RPC-V1. All Mandatory.
+# Prose companion: conformance/rpc/rpc.md (CONF-RPC-001…012).
+format_version: "1.0"
+profile: SNTR-RPC-V1
+cases:
+  - id: CONF-RPC-001
+    requirement: [SNTR-RPC-001, SNTR-RPC-002, SNTR-RPC-003, SNTR-RPC-006]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGVsbG8=", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 7, body: result, payload_b64: "aGVsbG8=" }
+    notes: "Request/response correlation with bit-identical payload. Repeat with empty and arbitrary non-UTF-8 payloads."
+    vector_refs: ["protobuf/GOLD-PROT-REQ-01", "protobuf/GOLD-PROT-RES-OK-01"]
+
+  - id: CONF-RPC-002
+    requirement: [SNTR-RPC-002, SNTR-RPC-008, SNTR-REL-007]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "YQ==", timeout_ms: 2000 }
+        - { request_id: 8, body: request, method: "/example.KV/Get", payload_b64: "Yg==", timeout_ms: 2000 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 7, body: result }
+        - { request_id: 8, body: result }
+    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs unless a lower bound was negotiated."
+
+  - id: CONF-RPC-003
+    requirement: [SNTR-RPC-002]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "c2xvdy0=", timeout_ms: 5000 }
+        - { request_id: 8, body: request, method: "/example.KV/Get", payload_b64: "ZmFzdA==", timeout_ms: 5000 }
+      faults: { complete_second_first: true }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 8, body: result }
+        - { request_id: 7, body: result }
+    notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO."
+
+  - id: CONF-RPC-004
+    requirement: [SNTR-RPC-002, SNTR-ERR-003]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "Zmlyc3Q=", timeout_ms: 5000 }
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "c2Vjb25k", timeout_ms: 5000 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: FAILED_PRECONDITION }
+      frames:
+        - { request_id: 7, body: result }
+    notes: "Duplicate request ID: new attempt rejected with FAILED_PRECONDITION; the original continues to exactly one terminal result; no double dispatch."
+
+  - id: CONF-RPC-005
+    requirement: [SNTR-RPC-001, SNTR-RPC-030, SNTR-ERR-003]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 11, body: request, method: "/example.Unknown/Call", payload_b64: "eA==", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: UNIMPLEMENTED, message_pattern: "NEGATIVE:panic" }
+    notes: "Unknown method: RPC error (connection stays usable), no handler dispatch. Distinct from malformed-method INVALID_ARGUMENT."
+
+  - id: CONF-RPC-006
+    requirement: [SNTR-RPC-002]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 99, body: result, payload_b64: "b3JwaGFu" }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+    notes: "Result for unknown ID: locally ignored with a diagnostic; no error storm, no state change, no completion signaled."
+
+  - id: CONF-RPC-007
+    requirement: [SNTR-RPC-004, SNTR-REL-006]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 9, body: request, method: "/example.Echo/Echo", payload_b64: "c2xvdy0=", timeout_ms: 100 }
+      faults: { handler_delay_ms: 1000 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: DEADLINE_EXCEEDED }
+    notes: "Deadline: responder enforces the effective deadline; initiator timer <= requested budget; expiry surfaces DEADLINE_EXCEEDED; handler effects unknown."
+
+  - id: CONF-RPC-008
+    requirement: [SNTR-RPC-005, SNTR-RPC-021, SNTR-RPC-031]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 12, body: request, method: "/example.Echo/Echo", payload_b64: "Y2FuY2VsLW1l", timeout_ms: 5000 }
+        - { request_id: 12, body: cancel }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: CANCELLED }
+    notes: "Cancellation supported (best-effort): cancel-before-completion yields CANCELLED; completion-wins and unknown-ID-ignore rows run as sub-cases; exactly one terminal result in every run; cancel-vs-deadline tie-break is NOT asserted (open tie-break B10)."
+
+  - id: CONF-RPC-009
+    requirement: [SNTR-RPC-006, SNTR-ERR-002, SNTR-ERR-003]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 13, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 500 }
+      faults: { handler_outcome: rpc_error, code: INTERNAL }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: INTERNAL, message_pattern: "NEGATIVE:SELECT" }
+    notes: "RpcError propagation: failures use result{error{code,message}} with known nonzero code and generic message. ProtocolError (connection-level, e.g. zero-ID request) is asserted in CONF-CORE-009."
+
+  - id: CONF-RPC-010
+    requirement: [SNTR-RPC-002, SNTR-ERR-004]
+    profile: SNTR-RPC-V1
+    roles: [client]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 14, body: result }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: INVALID_ARGUMENT }
+    notes: "Harness first establishes outstanding RPC 14, then the responder emits this result with neither payload nor error selected. The client MUST report local INVALID_ARGUMENT for that RPC, never success; no error response on the wire is required."
+
+  - id: CONF-RPC-011
+    requirement: [SNTR-RPC-007, SNTR-RPC-010, SNTR-REL-003, SNTR-REL-004]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 100, body: request, method: "/example.Echo/Echo", payload_b64: "b3AtQUJD", timeout_ms: 2000 }
+      faults: { transport_loss_before_result: true }
+      replay:
+        new_connection: true
+        frames:
+          - { request_id: 201, body: request, method: "/example.Echo/Echo", payload_b64: "b3AtQUJD", timeout_ms: 2000 }
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      retry: "request_ids differ (201 != 100); operation-key bytes bit-preserved; server behavior matches its documented dedup policy; core never deduplicates by request_id"
+    notes: "Idempotent retry: fresh request_id on the new connection, same application operation key inside the opaque payload. Unknown-outcome loss retries only idempotent/with-key operations."
+
+  - id: CONF-RPC-012
+    requirement: [SNTR-HS-014, SNTR-REL-009, SNTR-CORE-005]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      faults: { abrupt_transport_loss: true, in_flight_request_ids: [7, 8] }
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE, message_pattern: "NEGATIVE:success" }
+    notes: "Ambiguous transport failure: loss before any result maps to UNAVAILABLE with unknown outcome; MUST NOT be reported as success or as proof of non-execution."

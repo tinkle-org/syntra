@@ -36,11 +36,21 @@ Related: [`GOVERNANCE.md`](GOVERNANCE.md) (who approves what),
 - **Normative changes** (any MUST/SHOULD, wire field, state machine,
   error code, transport mapping, security requirement): **RFC required.**
   Open an RFC per `rfcs/README.md` before or alongside the PR.
-- **Schemas (`schema/**/*.proto`)**: RFC required for any field change.
+- **Schemas (`proto/syntra/v1/*.proto`)**: RFC required for any field change.
   Run Buf lint + breaking-change detection (see Sec. 5).
-- **Conformance tests and fixtures**: encouraged with every normative
-  PR. Use deterministic fixtures.
+- **Conformance tests and fixtures** (`conformance/`): encouraged with
+  every normative PR. Use deterministic fixtures. Protocol behavior
+  changes go under `specifications/`; conformance changes go under
+  `conformance/`.
 - **Docs and examples**: welcome; must stay generic per Sec. 1.
+- **Generated language bindings**: do NOT commit generated Go, Rust, or
+  other language bindings — no `bindings/`, `gen/`, or `generated/`
+  directories, no `*.pb.go` / `*_grpc.pb.go` files, no checked-in
+  `buf.gen.yaml`. Codec smoke tests generate into the ignored `.tmp/`
+  directory via `scripts/validate-schema.py`; the repository-boundary
+  check (`scripts/validate-repo.py boundary`, CI-enforced) fails if
+  generated bindings return. Obtain language bindings from the Buf
+  Schema Registry instead (see `docs/schema-registry.md`).
 
 ## 3. Proposing a change
 
@@ -86,8 +96,13 @@ Summary:
 
 Before requesting review:
 
-- [ ] `buf lint` and `buf breaking --against` pass for schema changes
-      (Buf v2; config forthcoming — do not weaken checks to pass).
+- [ ] Run `python3 scripts/validate-schema.py` for schema changes
+      (Buf v2 STANDARD/FILE; do not weaken checks to pass). The initial FILE
+      baseline is `compatibility/v1-initial/image.json`. RFC 0001 records
+      the user-directed layout decision and separate, known historical
+      FILE/source break. Historical comparisons read the hash-verified
+      `compatibility/v1-initial/historical.json` archive, without a Git
+      checkout or duplicate schema tree.
 - [ ] Markdown uses BCP 14 keywords correctly (capitalized only for
       normative force).
 - [ ] No private dependency or domain-specific term introduced
@@ -101,8 +116,9 @@ Before requesting review:
       justification; no panics on untrusted input; bounds checked.
 - [ ] `CHANGELOG.md` updated under `Unreleased` for user-visible changes.
 
-To execute tests, run the documented suite command in the PR (forthcoming
-conformance harness). Never report tests as passed unless executed;
+Schema/codec commands and pins are in `specifications/schema/generation.md`;
+`proto/syntra/v1` is the sole source of truth; the old schema tree is removed.
+The runtime conformance harness is still forthcoming. Never report tests as passed unless executed;
 paste command + result summary in the PR.
 
 ## 6. Sign-off (DCO)
@@ -136,7 +152,9 @@ follows this guide.
 - Do not resolve wire-compat or security questions by implementation
   choice alone — open an RFC or record a blocker.
 - Do not delete or silently rewrite working code; propose migration in
-  `MIGRATION.md` style (inventory → classification → plan).
+  `MIGRATION.md` style (inventory → classification → plan), except for the
+  explicit user-directed sole-source IDL migration recorded in `MIGRATION.md`
+  Sec. 8 and RFC 0001 B9.
 
 Questions? See [`SUPPORT.md`](SUPPORT.md). For vulnerabilities, see
 [`SECURITY.md`](SECURITY.md) — never file public issues for them.

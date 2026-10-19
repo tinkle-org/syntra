@@ -1,0 +1,270 @@
+# Portable HTTP/1.1 cases (Section I/HTTP). Profile: SNTR-HTTP-V1. All Mandatory.
+# Prose companion: conformance/requirements/http.md (CONF-HTTP-001…018).
+# Development-only profile. Every envelope assertion MUST hold as equal decoded logical Frames
+# over HTTPS/H1 per SNTR-WIRE-901.
+format_version: "1.0"
+profile: SNTR-HTTP-V1
+cases:
+  - id: CONF-HTTP-001
+    requirement: [SNTR-HTTP-001, SNTR-HTTP-010, SNTR-HTTP-020, SNTR-HTTP-030]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_type: "application/vnd.syntra.v1+protobuf" }, body_ref: "http/V-HTTP-REQ-01" }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 200, content_type: "application/vnd.syntra.v1+protobuf", body_ref: "http/V-HTTP-RES-OK-01" }
+    notes: "Valid request: one envelope in, one envelope out; per-request independence; no Syntra state retained."
+
+  - id: CONF-HTTP-002
+    requirement: [SNTR-HTTP-002]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: GET, path: "/syntra/v1/rpc" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 405, allow: POST }
+    notes: "Invalid method (GET/PUT/OPTIONS-without-deployment rows): 405 with Allow: POST; empty-or-ignored body; no dispatch. PUT and OPTIONS rows repeat."
+
+  - id: CONF-HTTP-003
+    requirement: [SNTR-HTTP-002]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc/" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 404 }
+    notes: "Wrong path/trailing slash: /rpc2, case-variant, and trailing-slash rows all 404 with no normalization and no dispatch."
+
+  - id: CONF-HTTP-004
+    requirement: [SNTR-HTTP-003, SNTR-HTTP-005]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc?credential=AAAA" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 400 }
+      hygiene: { absent_from: ["AAAA"] }
+    notes: "Query rejection: 400, no dispatch, query material never logged as credential."
+
+  - id: CONF-HTTP-005
+    requirement: [SNTR-HTTP-011]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_type: "application/octet-stream" }, body_ref: "http/V-HTTP-REQ-01" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 415 }
+    notes: "Invalid media type (missing/octet-stream/suffixed rows): 415 before body parsing in all three."
+
+  - id: CONF-HTTP-006
+    requirement: [SNTR-HTTP-020, SNTR-HTTP-021, SNTR-SER-007]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_type: "application/vnd.syntra.v1+protobuf" }, body_hex: "ff" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 400 }
+    notes: "Malformed body (truncated varint / non-request variant / trailing-bytes rows): 400, no dispatch, no panic, no unbounded allocation."
+
+  - id: CONF-HTTP-007
+    requirement: [SNTR-HTTP-110, SNTR-HTTP-111, SNTR-WIRE-006]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_length: 1048577 } }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 413 }
+    notes: "Oversized body (MAX+1 declared and chunked-streaming rows): 413; server MUST NOT read the declared body; exactly-MAX boundary accepted."
+
+  - id: CONF-HTTP-008
+    requirement: [SNTR-HTTP-030, SNTR-HTTP-031]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { syntra_min_version: 2, syntra_max_version: 3 }, body_ref: "http/V-HTTP-REQ-01" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 400 }
+    notes: "Version mismatch/bad headers (disjoint, inverted, missing, envelope-disagree rows): 400 without credential evaluation or dispatch."
+
+  - id: CONF-HTTP-009
+    requirement: [SNTR-HTTP-060, SNTR-HTTP-061, SNTR-HTTP-064]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: {}, body_ref: "http/V-HTTP-REQ-01" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 401 }
+    notes: "Missing credential row (anonymous sub-runs): accept-anonymous hosts bind least-privilege for that exchange only; deny-anonymous hosts 401 with WWW-Authenticate. Both rows run."
+
+  - id: CONF-HTTP-010
+    requirement: [SNTR-HTTP-060, SNTR-HTTP-062, SNTR-HTTP-063]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      credentials: "fixture:opaque-invalid"
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_type: "application/vnd.syntra.v1+protobuf" }, body_ref: "http/V-HTTP-REQ-01" }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 401 }
+      hygiene: { absent_from: [credential, token] }
+    notes: "Invalid/malformed/expired credential (unknown-opaque, foreign-scheme, bad-base64, expired, revoked rows): 401 with WWW-Authenticate and generic text in all five."
+
+  - id: CONF-HTTP-011
+    requirement: [SNTR-HTTP-040, SNTR-HTTP-041]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: http_request, method: POST, path: "/syntra/v1/rpc", headers: { content_type: "application/vnd.syntra.v1+protobuf" }, body_ref: "http/V-HTTP-REQ-UNKNOWN-METHOD" }
+      credentials: "fixture:opaque-valid-A"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 200, body_ref: "http/V-HTTP-RES-ERR-01" }
+    notes: "Normal RpcError over 200: unknown-method/unauthorized/deadline rows all 200 with result{error{...}} bodies; 4xx/5xx never carry handler verdicts; 500 never appears."
+
+  - id: CONF-HTTP-012
+    requirement: [SNTR-HTTP-040, SNTR-HTTP-042, SNTR-HTTP-043]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: force_each_binding_status, statuses: [400, 401, 404, 405, 413, 415, 429, 503] }
+      faults: { corrupt_200_body: true }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { synthesized_result: false }
+    notes: "Binding-status layering: every non-200 and the corrupted-200 report a local transport failure (UNAVAILABLE for corruption — unknown outcome, never success); the initiator synthesizes NO RpcResult."
+
+  - id: CONF-HTTP-013
+    requirement: [SNTR-HTTP-070, SNTR-HTTP-071, SNTR-HTTP-072]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: two_exchanges_distinct_request_ids, request_ids: [7, 8] }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Concurrent exchanges independent and unordered: results correlated by echoed request_id only; sequential ID reuse is a new unrelated correlation; no state leaks between exchanges."
+
+  - id: CONF-HTTP-014
+    requirement: [SNTR-HTTP-080, SNTR-HTTP-081, SNTR-HTTP-082]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: loss_then_retry_same_opkey, opkey_b64: "b3AtQUJD" }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Retry/idempotency discipline: same op-key bytes bit-exact on retry; server matches its documented dedup policy; 503 retried, 400 corrected as a new decision, identical-401 never tight-looped."
+
+  - id: CONF-HTTP-015
+    requirement: [SNTR-HTTP-090, SNTR-HTTP-100]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: redirect_and_cache_probe }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "Redirect non-following + cache discipline: 307 terminates with UNAVAILABLE without re-sending; Cache-Control: no-store both directions; no ETag/304."
+
+  - id: CONF-HTTP-016
+    requirement: [SNTR-HTTP-120, SNTR-HTTP-121]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: compression_probe }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 415 }
+    notes: "Compression rejected by default: Content-Encoding: gzip yields 415; no Content-Encoding on responses; documented-compression deployments instead pass the capped-bomb (decompressed past bound -> 413) row."
+
+  - id: CONF-HTTP-017
+    requirement: [SNTR-HTTP-130, SNTR-HTTP-131]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: upgrade_and_push_probe }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { status: 400 }
+    notes: "No event push: Upgrade: websocket refused with 400; exactly one response per request — no Notification, SSE, or second response. Polling-via-RPC is an ordinary second exchange."
+
+  - id: CONF-HTTP-018
+    requirement: [SNTR-HTTP-140, SNTR-HTTP-141]
+    profile: SNTR-HTTP-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: cors_probe, origin: "https://evil.example" }
+    expected: { connection_state: CLOSED, session_state: none }
+    notes: "CORS is policy, never authorization: no wildcard-with-credentials or off-list reflection; preflight only where documented; CORS headers alone authorize nothing (still 401/anonymous-per-policy)."

@@ -1,0 +1,184 @@
+# Syntra v1 Core — Logical Sessions
+
+- Identifier: `specifications/core/sessions.md`
+- Title: Logical Sessions and Connection Binding
+- Status: Draft (pending maintainer approval via RFC)
+- Version: 1.0.0-draft.1 (2026-10-19)
+- Normative references: BCP 14; `proto/syntra/v1/handshake.proto` (`ServerReady.connection_id`); `protocol.md`; `handshake.md`; `authentication.md`; ADR-005; charter SYN-ARCH-013
+- Scope: What a logical session is, how it relates to transport connections, establishment/closure/expiration, resumption eligibility, auth binding, and reconnect behavior. Cross-transport resumption with security/state guarantees is explicitly NOT promised in v1 unless a future RFC fully defines it.
+- Terminology: Per `protocol.md` + ADR-005. **Connection** = disposable transport instance with `connection_id`. **Session** = application-scoped association of a principal with one or more sequential connections (only if resumption is defined and negotiated).
+
+The key words "MUST", "MUST NOT", etc. are per BCP 14.
+
+## 1. Protocol requirements
+
+**SNTR-SESS-001** — Session establishment: a session is established implicitly when a connection reaches ACTIVE (principal bound). No separate session handshake exists in v1. Applications MAY layer session tokens above ACTIVE via generic RPC; the core MUST NOT interpret them.
+
+**SNTR-SESS-002** — Session identifier semantics: `ServerReady.connection_id` is a connection diagnostic, NOT a session identifier. It MUST be opaque, unguessable (≥128-bit entropy), single-connection scoped, and MUST NOT be accepted as an authentication credential, resumption token, or session handle. Session identifiers, if any, belong to the application above Syntra.
+
+**SNTR-SESS-003** — Connection vs session lifetime: by default (no resumption capability negotiated) the session lifetime EQUALS the connection lifetime. Connection close (graceful or abrupt) terminates the session; no state survives except application-defined durable state outside Syntra.
+
+**SNTR-SESS-004** — Session closure: graceful transport close (see `handshake.md` CLOSING) terminates the session normally. Abrupt loss terminates it abnormally; in-flight RPCs receive `UNAVAILABLE`. Peers MUST discard per-connection state on CLOSED.
+
+**SNTR-SESS-005** — Expiration: hosts MAY impose session/connection max lifetimes. Expiry MUST be signaled as `UNAUTHENTICATED` (auth binding withdrawn) or `UNAVAILABLE` (host shutdown), and MUST NOT be silent.
+
+**SNTR-SESS-006** — Resumption eligibility: resumption across connections (same or different transport) MUST NOT be attempted unless BOTH (a) an RFC-defined resumption capability was negotiated for the original session AND (b) the resumption token/lifetime/replay rules of that RFC are satisfied. Otherwise the client MUST start a fresh handshake with a fresh credential; the host MUST reject any `connection_id` or stale token presented as resumption with `FAILED_PRECONDITION` or `UNAUTHENTICATED`.
+
+**SNTR-SESS-007** — Authentication binding: a session is bound to exactly the principal authenticated at `ServerReady`. Principal change REQUIRES a new connection + handshake. Mid-connection principal revocation terminates the session per SNTR-AUTH-008.
+
+**SNTR-SESS-008** — Behavior after reconnecting: after any close/loss, the client MUST assume no session continuity (no in-flight RPC survives, no subscription survives, no cursor valid) unless resumption per SNTR-SESS-006 was negotiated AND confirmed. Subscriptions/notifications MUST be re-established explicitly after reconnect.
+
+## 1A. Three distinct concepts (see `protocol.md` §1, ADR-005)
+
+A **transport connection** is one disposable transport instance (TCP, TLS 1.3/TCP, HTTP request or persistent HTTP connection, WebSocket, Secure WebSocket) carrying a Syntra handshake followed by envelopes. A **Syntra session** is the logical protocol context that, by default, equals exactly one connection's lifetime (SNTR-SESS-003) and MAY span sequential connections only where a resumption capability is negotiated and validated (SNTR-SESS-006). An **authenticated principal** is the opaque identity bound at `ServerReady` for that session (SNTR-AUTH-007). The three MUST NOT be treated as interchangeable: closing a connection ends the default session but does not by itself revoke the principal's long-term credential; re-authenticating creates a new binding; and presenting a `connection_id` never resumes anything (SNTR-SESS-002/020).
+
+```mermaid
+flowchart LR
+  A[Connection A] --> X[Session X]
+  X --> P[Principal P]
+  A -.terminates.-> ClosedA[Connection A closed<br/>Session X ends by default]
+  B[Connection B] -.fresh hello + credential.-> Y[Session Y<br/>new session, same or different principal]
+  B -.resumes Session X<br/>ONLY if resumption negotiated + validated.-> X
+  X -.still.-> P
+```
+
+Only the last arrow (resumption) requires the capability in §1C. In default v1 every new connection starts a new session even when the credential authenticates the same principal.
+
+## 1B. Session identifier semantics (v1: none exists)
+
+v1 defines **no session identifier**. `ServerReady.connection_id` is a per-connection diagnostic and MUST NOT be used as one (SNTR-SESS-002). Any session handle belongs to the application above `ACTIVE` via generic RPC and the core MUST NOT interpret it (SNTR-SESS-001).
+
+| Question | v1 answer |
+|---|---|
+| Who generates it? | Nobody at the protocol layer. The host generates a fresh `connection_id` per connection (SNTR-SESS-020), which is not a session identifier. |
+| Uniqueness scope? | `connection_id`: single connection. No session scope exists. |
+| Secret? | `connection_id` is unguessable (≥128-bit entropy) but is a diagnostic, not key material; it MUST NOT grant authority (SNTR-SESS-002, SNTR-ASEC-010). |
+| In logs? | `connection_id` MAY appear in diagnostics; it MUST NOT encode principal or session information (SNTR-HS-004). Principal handles MUST be redacted/pseudonymized (SNTR-ASEC-004). |
+| Persists across reconnects? | No. Peers MUST discard per-connection state on `CLOSED` (SNTR-HS-006) and MUST re-authenticate per connection (SNTR-SESS-010). |
+| Client-controlled? | No. Hosts MUST NOT accept client-chosen session state (SNTR-ASEC-010, SNTR-SESS-020). |
+| Reusable? | No. Fresh `connection_id` per connection; reuse as credential or token MUST be rejected (SNTR-SESS-006/020). |
+| Expires? | With the connection. Hosts MAY also impose session/connection max lifetimes, signaled per SNTR-SESS-005. |
+| Exposed over HTTP profiles? | `connection_id` travels only inside `ServerReady` like any envelope field; it gains no extra meaning on HTTP profiles and MUST NOT be placed in URLs (SNTR-ASEC-003). |
+
+A public session identifier MUST NOT automatically grant authorization. This holds vacuously in v1 (none exists) and constrains any future design: resumption tokens are reference handles whose privileges MUST be re-evaluated at resumption (SNTR-ASEC-007).
+
+## 1C. Session resumption (Deferred/Optional — not mandatory)
+
+**Decision: resumption is an OPTIONAL negotiated capability and is deferred.** Default v1 has no resumption: session lifetime equals connection lifetime (SNTR-SESS-003), and any resumption attempt without a negotiated RFC capability MUST be rejected (SNTR-SESS-006/020). This matches `capabilities.md` (resumption is optional), ADR-005, and core `open-questions.md` blocker 2. Resumption MUST NOT be treated as mandatory for interop (SNTR-CAP-003).
+
+If a future RFC defines resumption, it MUST specify at least the following at the protocol-abstraction level (mechanism details owned by that RFC; no proprietary token cryptography may be invented — implementations MUST use an appropriate cryptographically secure construction without Syntra defining one, per SYN-ARCH-031 and SNTR-TMOD-051):
+
+- **Resume credential format (abstraction only):** opaque, single-purpose resumption handle; never a bare `connection_id` (SNTR-SESS-002). Token syntax, issuance RPC, and presentation point are defined by the RFC, not guessed by peers.
+- **Opacity:** the core treats the token as bytes and MUST NOT interpret privilege content (SNTR-ASEC-007).
+- **Expiration:** bounded lifetime with explicit not-before/not-after; expired tokens rejected per §4.
+- **Rotation:** single-use-or-rotated (SNTR-ASEC-008); reuse of a rotated/consumed token is suspected replay (SNTR-RPL-011/031).
+- **Single-use vs reusable:** defined by the RFC; default expectation is single-use-or-rotated. Reusable bearer tokens MUST NOT be introduced without replay-window analysis.
+- **Replay resistance:** freshness/validity re-checked on every presentation (SNTR-RPL-011/030); TLS alone is insufficient (SNTR-RPL-002).
+- **Principal binding:** tokens are audience- and principal-bound; resumption MUST NOT change principals or weaken authentication relative to the original (SNTR-SESS-007, §4).
+- **Capability binding:** a token is valid only under the resumption capability version negotiated for the original session; capability withdrawal ends resumption eligibility.
+- **Protocol-version binding:** tokens are bound to the negotiated wire version; cross-version resumption is forbidden unless the RFC explicitly defines migration.
+- **State restored on resume:** only what the RFC explicitly lists — at minimum the principal binding re-established after re-validation. In-flight RPCs, subscriptions, event cursors, and `request_id` spaces are NEVER implicitly restored (SNTR-SESS-008); the new connection uses fresh correlation IDs.
+- **State that MUST NOT be restored:** completed or in-flight RPC outcomes, subscription registrations, event stream positions, and any revoked/expired authorization.
+- **Failure behavior:** unknown, expired, forged, audience-mismatched, or rotated-reuse tokens → `UNAUTHENTICATED` or `FAILED_PRECONDITION` + close (see §4).
+- **Revocation:** issuers MUST be able to revoke tokens promptly; revocation invalidates the token and, per policy, the session (SNTR-ASEC-006).
+
+```mermaid
+sequenceDiagram
+  participant C as Initiator
+  participant H as Host
+  C->>H: new transport + hello{fresh credential}
+  H->>H: no resumption capability → evaluate as fresh auth
+  alt resumption capability negotiated + valid token presented per RFC
+    H->>H: validate token, principal, capability, version bindings
+    H-->>C: ready (principal re-bound; subscriptions/RPCs NOT restored)
+  else no capability or invalid token
+    H-->>C: handshake error UNAUTHENTICATED/FAILED_PRECONDITION + close
+  end
+```
+
+## 1D. Cross-transport resumption (Not allowed in v1)
+
+**Decision: not allowed in v1 (option 3 of the task).** A session established over TLS/TCP MUST NOT resume over Secure WebSocket (or any different profile) in default v1. Cross-transport resumption is permitted ONLY when ALL of the following hold: (a) a resumption RFC explicitly allows the named profile pair and defines the token's cross-transport binding; (b) both profiles were negotiated and both endpoints document support; (c) endpoint identity (certificate, hostname, SNI/ALPN consistency per SNTR-TSEC-004/008/010) is re-validated on the new profile; (d) secure-channel requirements are not weakened (no downgrade to plaintext, SNTR-TSEC-007/009). Until such an RFC exists, hosts MUST reject cross-transport presentations exactly like any unnegotiated resumption attempt. Security consequence of getting this wrong: channel-confusion attacks that transplant a session onto a weaker or misidentified channel.
+
+## 1E. HTTP/HTTPS session semantics (transport details owned by future profiles)
+
+Transport specifications own byte bindings; the following principles constrain them and MUST NOT be weakened there:
+
+- Authentication MUST NOT be inferred from the lifetime of an underlying TCP connection or an HTTP/2 connection. Only a completed Syntra `hello`→`ready` on that logical connection establishes a principal binding.
+- Each logical Syntra connection carried over HTTP profiles performs its own handshake; HTTP keep-alive, pooling, or multiplexing MUST NOT merge Syntra state across logical connections.
+- A logical session MAY span multiple HTTP requests ONLY via an RFC-defined resumption token. Otherwise each HTTP-carried Syntra connection is an independent session that ends when its transport binding ends.
+- Sessions are identified ONLY by the resumption token where one exists — never by source IP/port, TLS session ID, HTTP cookies, or `connection_id`, unless a resumption RFC explicitly defines the binding.
+- HTTP/2 connection or stream identity does not imply Syntra authentication. Connection reuse across origins or principals MUST NOT share principal state.
+- Credentials travel only in `ClientHello.credential` (and RFC-defined follow-up RPC payloads after `ACTIVE`), never in URLs, regardless of profile (SNTR-ASEC-003, SNTR-TSEC-021).
+
+## 1F. Termination distinctions
+
+There is no `CloseSession` message in v1. Graceful close is: stop new RPCs, observe the transport profile's close grace period, then teardown `CLOSING`→`CLOSED` (SNTR-HS-006/013). A `ProtocolError` is the typed error where an RPC or handshake context exists (SNTR-ERR-004); otherwise termination is connection closure with local reporting.
+
+| Condition | Invalidates session? | Leaves resumable? | Invalidates resume credentials? | Cancels outstanding RPC? | Cancels subscriptions? | CloseSession message? | ProtocolError? |
+|---|---|---|---|---|---|---|---|
+| Graceful session close (either peer, from ACTIVE) | Yes (default) | Only if resumption RFC + token still valid | No (token lifetime unchanged) | Yes — in-flight get `UNAVAILABLE`/`CANCELLED` | Yes — MUST re-subscribe after reconnect | No (no such message; transport teardown per profile) | No (clean close); errors only for failing RPCs |
+| Transport disconnect (abrupt loss) | Yes (default) | Only if resumption RFC + token valid | No | Yes — `UNAVAILABLE`, outcome unknown | Yes | No | No new message; `UNAVAILABLE` to in-flight RPCs |
+| Session expiration (max lifetime) | Yes | No (expired tokens rejected) | Yes (expired) | Yes — `UNAUTHENTICATED`/`UNAVAILABLE` | Yes | No | Yes (`UNAUTHENTICATED`, or `UNAVAILABLE` for shutdown) |
+| Authentication revocation (credential/principal withdrawn) | Yes | No | Yes | Yes — `UNAUTHENTICATED` + close by default | Yes (terminated with typed signal where possible) | No | Yes (`UNAUTHENTICATED`) |
+| Protocol violation | Yes (connection) | No | No (unrelated tokens unchanged) | Yes — affected RPC fails; handshake-phase fails connection | Yes (connection state discarded) | No | Yes (typed code per tables) |
+| Administrative revocation (operator action) | Yes | No | Yes | Yes — `UNAUTHENTICATED` + close by default | Yes | No | Yes (`UNAUTHENTICATED`) |
+| Idle timeout (no activity) | Yes, per documented policy | Only if resumption RFC + token valid | Only on expiry/revocation | Yes — `DEADLINE_EXCEEDED`/`UNAVAILABLE` | Yes | No | Yes (timeout code) |
+| Server shutdown | Yes | Only if resumption RFC + token valid | No | Yes — `UNAVAILABLE` | Yes | No | `UNAVAILABLE` to in-flight RPCs |
+
+```mermaid
+stateDiagram-v2
+  [*] --> ACTIVE_CONN: handshake success (session = connection)
+  ACTIVE_CONN --> CLOSING: graceful close / expiry / revocation / violation / idle / shutdown
+  CLOSING --> CLOSED_CONN: teardown; RPCs get terminal errors; state discarded
+  CLOSED_CONN --> ACTIVE_CONN: new handshake (fresh credential, fresh connection_id)
+  note right of CLOSED_CONN: Resumption path exists ONLY under an RFC capability
+```
+
+## 1G. Timeouts (concepts; numeric defaults owned where stated)
+
+| Timeout | Normative concept? | Default / configurability |
+|---|---|---|
+| Transport connection timeout | Transport concern, not Syntra. Profiles MAY bound TCP/TLS/WS establishment; Syntra MUST NOT depend on its value. | Per transport implementation; documented per deployment. |
+| Handshake timeout | Yes (SNTR-HS-002/011). Bounded; expiry aborts with `DEADLINE_EXCEEDED`. | Default 5 s unless transport profile states otherwise. |
+| Authentication timeout | No separate timer. Authentication runs inside the handshake deadline. | Same as handshake timeout. |
+| Session idle timeout | Deployment-defined; meaningful with resumption. Hosts MAY close idle sessions; MUST signal per SNTR-SESS-005, MUST document the value. | No v1 default; bounded and documented where enforced. |
+| Session absolute lifetime | Deployment-defined (SNTR-SESS-005). Expiry MUST be signaled, never silent. | No v1 default; bounded and documented where enforced. |
+| Graceful close timeout (grace period) | Yes, profile-bound (SNTR-HS-006/013). Peers stop new RPCs, allow the grace window, then teardown. | Per transport profile; documented per deployment. |
+
+Per-RPC deadlines (`timeout_ms` or bounded host default) and slow-client/inter-frame bounds are governed by SNTR-RPC-004, SNTR-REL-006, and SNTR-ASEC-021.
+
+## 2. Client behavior
+
+- **SNTR-SESS-010** — The client MUST NOT send `connection_id` as a credential or resumption token, MUST NOT cache it beyond diagnostics for the connection lifetime, and MUST re-authenticate on every new connection.
+- **SNTR-SESS-011** — After reconnect, the client MUST re-issue unacknowledged RPCs only per `reliability.md` retry rules (idempotent or explicitly marked), and MUST re-subscribe explicitly.
+
+## 3. Server behavior
+
+- **SNTR-SESS-020** — The server MUST generate fresh `connection_id` per connection, MUST NOT accept it back as auth, and MUST treat any resumption attempt without a negotiated capability as a protocol violation.
+- **SNTR-SESS-021** — The server MUST document whether it supports any resumption capability; default deployments MUST document "no resumption — sessions are connection-bound".
+
+## 4. Failure handling
+
+Stale/unknown/forged resumption attempts → `UNAUTHENTICATED` or `FAILED_PRECONDITION` + close. Expired sessions → `UNAUTHENTICATED`. Hosts MUST NOT resume with weaker authentication than the original.
+
+## 5. Security considerations
+
+Confusing `connection_id` with a session/auth token enables fixation and replay. Unguessability, single-use scope, and refusal to honor it as auth are security boundaries. Any future resumption RFC MUST define token confidentiality, lifetime, replay windows, and cross-transport binding; until then, prohibition (SNTR-SESS-006) is the safe default.
+
+## 6. Compatibility considerations
+
+Adding resumption is a minor-additive capability (new RPCs + tokens), never a silent behavior change. Clients that do not implement it remain conformant; hosts MUST NOT require it.
+
+## 7. Conformance requirements
+
+- **SNTR-SESS-900** — Fixtures: fresh `connection_id` per connection; `connection_id`-as-credential rejected; reconnect loses subscriptions/RPCs; resumption attempt without capability rejected; expiry signaled correctly.
+- **SNTR-SESS-901** — No-promise proof: an implementation claiming v1 MUST document that cross-transport resumption is unsupported unless an RFC-defined capability is negotiated and tested.
+
+```mermaid
+stateDiagram-v2
+  [*] --> ACTIVE_CONN: handshake success (session=connection)
+  ACTIVE_CONN --> CLOSED_CONN: graceful close / loss / expiry
+  CLOSED_CONN --> ACTIVE_CONN: new handshake (fresh credential, fresh connection_id)
+  note right of CLOSED_CONN: No implicit resumption in v1
+```

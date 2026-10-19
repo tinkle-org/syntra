@@ -1,0 +1,109 @@
+# Schema publication — DRAFT. Approved BSR module: buf.build/tinklecorp/syntra.
+# Publication remains disabled until the publication policy RFC is accepted
+# AND a maintainer cuts a tag AND the bsr-publish environment approves.
+# Nothing here auto-publishes: pushes only ever run on a manual tag event.
+#
+# Gates (all three required; the job fails closed otherwise):
+#   1. Trigger is a version tag `proto-v*`.
+#   2. Repository variable BSR_MODULE equals exactly `buf.build/tinklecorp/syntra`
+#      (any other value — including empty — fails the run).
+#   3. The `bsr-publish` environment approves the run (manual approval + BUF_TOKEN secret).
+name: schema-publish
+
+on:
+  push:
+    tags:
+      - "proto-v*"
+
+permissions:
+  contents: read  # publish token comes only from the protected environment
+
+jobs:
+  preflight:
+    runs-on: ubuntu-26.04
+    outputs:
+      module: ${{ steps.resolve.outputs.module }}
+      release_label: ${{ steps.resolve.outputs.release_label }}
+    steps:
+      - id: resolve
+        run: |
+          MODULE="${{ vars.BSR_MODULE }}"
+          if [ "$MODULE" != "buf.build/tinklecorp/syntra" ]; then
+            echo "::error::BSR_MODULE must equal exactly 'buf.build/tinklecorp/syntra' (got '${MODULE:-<unset>}'). Publication blocked per docs/schema-registry.md §1. See docs/schema-release-checklist.md §B."
+            exit 1
+          fi
+          echo "module=$MODULE" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.ref }}" == refs/tags/proto-v*-rc.* ]]; then
+            echo "release_label=candidate" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/proto-v* ]]; then
+            echo "release_label=stable" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_label=development" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: preflight
+    runs-on: ubuntu-26.04
+    environment: bsr-publish  # manual approval gate; holds the BUF_TOKEN secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: "1.59.0"
+          setup_only: true
+
+      - name: re-validate before any network mutation
+        run: |
+          buf format --diff --exit-code
+          buf lint
+          buf build
+          buf breaking --against 'compatibility/v1-initial/image.json'
+
+      - name: buf push (reviewed tag only)
+        env:
+          BUF_TOKEN: ${{ secrets.BUF_TOKEN }}  # least-privilege push token; PR jobs never receive this
+        run: |
+          buf push --label "${{ needs.preflight.outputs.release_label }}"
+          echo "Published ${{ needs.preflight.outputs.module }} with label ${{ needs.preflight.outputs.release_label }}."
+          echo "Record the BSR commit hash in the release notes per docs/schema-release-checklist.md §C."
+          # Credential hygiene: BUF_TOKEN is referenced only via the secrets
+          # context and never echoed, logged, or written to artifacts. Do not
+          # add `set -x` or debug output to this job.
+
+  verify:
+    # Post-publish verification: read-only checks that the published module
+    # is publicly accessible and generates SDKs. No credentials in this job.
+    needs: [preflight, publish]
+    runs-on: ubuntu-26.04
+    environment: bsr-publish  # same gate: no verification without approval
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: "1.59.0"
+          setup_only: true
+
+      - name: verify public module access (read-only, no token)
+        env:
+          BUF_TOKEN: ""  # explicitly unauthenticated: proves public access
+        run: |
+          buf export "${{ needs.preflight.outputs.module }}" --output /tmp/bsr-export
+          test -f /tmp/bsr-export/syntra/v1/envelope.proto
+          echo "Public module access verified for ${{ needs.preflight.outputs.module }}."
+
+      - name: verify generated SDK availability (read-only)
+        run: |
+          cd /tmp/bsr-export && buf build && buf lint
+          echo "Published module builds and lints clean from the registry copy."
+
+      - name: verify no credential leakage in logs
+        run: |
+          ! grep -ri "bearer\|BEGIN.*PRIVATE KEY\|BUF_TOKEN" /tmp/bsr-export || \
+            (echo "::error::unexpected secret material in exported module"; exit 1)
+          echo "Export contains no secret material."

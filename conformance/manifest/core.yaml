@@ -1,0 +1,170 @@
+# Portable core/envelope cases (Section E). Profile: SNTR-CORE-V1. All Mandatory.
+# Prose companion: specifications/core/conformance.md + framing/serialization/handshake docs.
+format_version: "1.0"
+profile: SNTR-CORE-V1
+cases:
+  - id: CONF-CORE-001
+    requirement: [SNTR-WIRE-001, SNTR-WIRE-002, SNTR-RPC-002, SNTR-RPC-003, SNTR-RPC-006]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGVsbG8=", timeout_ms: 500 }
+        - { request_id: 8, body: request, method: "/example.Echo/Echo", payload_b64: "", timeout_ms: 500 }
+        - { request_id: 9, body: request, method: "/example.KV/Get", payload_b64: "AAEC//8=", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 7, body: result, payload_b64: "aGVsbG8=" }
+        - { request_id: 8, body: result, payload_b64: "" }
+        - { request_id: 9, body: result, payload_b64: "AAEC//8=" }
+    notes: "Valid envelope per variant (request path shown; ready/notification/hello validity asserted in CONF-SESS-001 and CONF-EVT-003). Empty and arbitrary non-UTF-8 payloads are meaningful, not errors."
+    vector_refs: ["protobuf/GOLD-PROT-REQ-01", "protobuf/GOLD-PROT-RES-OK-01"]
+
+  - id: CONF-CORE-002
+    requirement: [SNTR-WIRE-002, SNTR-WIRE-003, SNTR-ERR-003]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { raw_b64: "CAEQBA==" }  # Frame{version:1, request_id:4} with no body set (bodyless envelope)
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: INVALID_ARGUMENT }
+      hygiene: { absent_from: [credential, token, stack, ".pem", SELECT] }
+    notes: "Invalid envelope (empty body) rejected before dispatch; connection stays usable in ACTIVE."
+
+  - id: CONF-CORE-003
+    requirement: [SNTR-SER-003, SNTR-SER-004, SNTR-SER-900]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500, unknown_fields: [{ number: 90, wire_type: 2, value_b64: "eA==" }] }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 7, body: result, payload_b64: "aGk=" }
+    notes: "Unknown Protobuf field (90, never allocated) tolerated and skipped; mandatory interop unaffected. Sender never emits unknown fields."
+
+  - id: CONF-CORE-004
+    requirement: [SNTR-ERR-005, SNTR-ERR-010]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { inject_raw_result_error_code: 99, request_id: 7 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: UNKNOWN, message_pattern: "NEGATIVE:panic" }
+    notes: "Codec-level fixture: synthetic RpcError with future numeric code 99 MUST map to UNKNOWN for application reporting, preserve the number diagnostically where possible, and MUST NOT crash or report success."
+
+  - id: CONF-CORE-005
+    requirement: [SNTR-HS-003, SNTR-HS-010, SNTR-VER-002]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      frames:
+        - { request_id: 0, body: hello, min_version: 2, max_version: 3 }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNIMPLEMENTED }
+    notes: "Unsupported protocol version (disjoint range against v1-only host): handshake failure carrying UNIMPLEMENTED or FAILED_PRECONDITION + close; no credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
+
+  - id: CONF-CORE-006
+    requirement: [SNTR-CAP-002, SNTR-CAP-004, SNTR-CAP-011]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      frames:
+        - { request_id: 0, body: hello, min_version: 1, max_version: 1, desired_capabilities: ["x-future-optional/9"] }
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+    notes: "Unknown capability advertised as optional-by-peer MUST be ignored with a diagnostic; handshake MUST NOT fail. Contrast CONF-CORE-007."
+
+  - id: CONF-CORE-007
+    requirement: [SNTR-CAP-002, SNTR-CAP-011]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 21, body: request, method: "/example.KV/Get", payload_b64: "eA==", timeout_ms: 500, requires_unconfirmed_capability: "events-v1" }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: FAILED_PRECONDITION }
+    notes: "Use of an unconfirmed optional capability MUST fail with FAILED_PRECONDITION; the connection stays usable."
+
+  - id: CONF-CORE-008
+    requirement: [SNTR-HS-012, SNTR-CORE-011, SNTR-WIRE-003]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [handshake_started]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: FAILED_PRECONDITION, message_pattern: "NEGATIVE:result" }
+    notes: "Invalid handshake ordering: request before ACTIVE. Handshake failure + close; no dispatch; MUST NOT emit a zero-request_id result. Variants: second hello, cancel/notification pre-ACTIVE."
+
+  - id: CONF-CORE-009
+    requirement: [SNTR-CORE-030, SNTR-WIRE-003, SNTR-RPC-001]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 0, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+        - { request_id: 11, body: request, method: "example.Echo", payload_b64: "aGk=", timeout_ms: 500 }
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: INVALID_ARGUMENT }
+    notes: "Protocol errors: zero request_id with request is connection-level (close); malformed method shape is per-RPC INVALID_ARGUMENT. Harness runs both rows; the zero-ID row determines the terminal state."
+
+  - id: CONF-CORE-010
+    requirement: [SNTR-HS-006, SNTR-HS-013, SNTR-SESS-004]
+    profile: SNTR-CORE-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      transport: { action: graceful_close, stop_new_rpcs: true }
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_normally
+    notes: "Graceful close: no new RPCs, observe profile grace period, teardown CLOSING->CLOSED, in-flight RPCs get UNAVAILABLE or CANCELLED, per-connection state discarded."

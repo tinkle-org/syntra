@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-19
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)
-- Relates to: `specifications/architecture.md` Sec. 4, 12; `schema/syntra/v1/session.proto`
+- Relates to: `specifications/architecture.md` Sec. 4, 12; `proto/syntra/v1/handshake.proto` (originally `schema/syntra/v1/session.proto` at acceptance)
 
 ## Context
 

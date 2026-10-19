@@ -24,10 +24,17 @@ If unsure, open an RFC. Maintainers will fast-track it if no RFC was needed.
 ## Lifecycle
 
 ```text
-Draft → Discussion → Accepted | Rejected | Withdrawn
+Draft → Discussion → Review → Accepted | Rejected | Withdrawn
 Accepted → Implementing → Implemented (spec + schema + tests landed)
+Accepted → Superseded (by a newer accepted RFC)
 Breaking RFCs additionally → Major version + migration notes
 ```
+
+Only an **Accepted** RFC may modify normative behavior (MUST/SHOULD,
+wire fields, state machines, error codes, transport mappings, security
+requirements, conformance assertions). Draft, Discussion, and Review
+RFCs are proposals: implementations MUST NOT ship behavior from them,
+and no test, claim, or release may cite them as authority.
 
 1. **Draft.** Copy `template.md` to `rfcs/NNNN-short-title.md` (next
    number; short kebab-case title). Open a PR with the `rfc` label where
@@ -36,14 +43,23 @@ Breaking RFCs additionally → Major version + migration notes
    where relevant). Discussion happens on the PR. Expect requests for
    requirement IDs, client/server obligations, diagrams, bounds, and
    negative tests.
-3. **Accepted / Rejected / Withdrawn.** Maintainers record the decision
+3. **Review.** When discussion converges, maintainers move the RFC to
+   formal review: the proposal is frozen except for editorial fixes, and
+   reviewers verify the review bar below plus `GOVERNANCE.md` Sec. 3
+   quorum. Unresolved normative objections block acceptance.
+4. **Accepted / Rejected / Withdrawn.** Maintainers record the decision
    on the PR per `GOVERNANCE.md` Sec. 3 (quorum for normative; security
    review where applicable). Accepted RFCs get a number and stay in
    `rfcs/` as history — they are not deleted after implementation.
-4. **Implementing → Implemented.** Land the spec/schema/test diffs
+   Withdrawn RFCs stay in `rfcs/` as history with the reason recorded.
+5. **Implementing → Implemented.** Land the spec/schema/test diffs
    referencing the RFC. Update `CHANGELOG.md` (`Unreleased`). Mark the
    RFC implemented when conformance coverage exists or a tracked
    placeholder issue is filed.
+6. **Superseded.** An Accepted RFC replaced in whole by a newer Accepted
+   RFC is marked Superseded (with a pointer to the successor). The
+   successor carries the normative force; the superseded RFC remains for
+   history and MUST NOT be cited for new behavior.
 
 ## Review bar
 

@@ -24,8 +24,11 @@ reporting for this repository are the authoritative channels.
 
 - The charter, ADRs, RFC process, and governance documents on the
   `main` branch.
-- `schema/syntra/v1/*.proto` as checked in (field numbers, reserved
-  values, comments).
+- `proto/syntra/v1/*.proto` as the sole Protobuf source of truth (field
+  numbers, reserved values, comments). The removed schema tree is retained
+  only as historical provenance and an archived descriptor in
+  [`compatibility/v1-initial`](compatibility/v1-initial/README.md); the
+  FILE/source migration is a known breaking difference.
 - Forthcoming normative specifications, transport profiles, conformance
   suite, and Rust reference implementation — support scope for each will
   be stated in its README and `CHANGELOG.md` when published.

@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-10-19
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)
-- Relates to: `specifications/architecture.md` Sec. 5, 8; `schema/syntra/v1/*.proto`
+- Relates to: `specifications/architecture.md` Sec. 5, 8; `proto/syntra/v1/*.proto`
 
 ## Context
 
@@ -17,7 +17,7 @@ binary envelope.
 Syntra uses Protocol Buffers (proto3) as the sole public Interface
 Definition Language:
 
-1. `schema/syntra/v1/*.proto` is the authoritative data representation.
+1. `proto/syntra/v1/*.proto` is the authoritative data representation (sole source; original `schema/syntra/v1/` tree removed after user-directed migration, declarations preserved).
 2. Schema governance uses Buf v2 (lint + breaking-change detection).
 3. Transport framing is kept separate from Protobuf encoding (see ADR-003).
 4. No replacement binary IDL will be invented.
@@ -50,4 +50,4 @@ Definition Language:
 
 ## Status
 
-Accepted. The two existing v1 protos are preserved unchanged under this ADR.
+Accepted. The existing v1 declarations are preserved unchanged under this ADR, now distributed across `proto/syntra/v1/` as the sole source.

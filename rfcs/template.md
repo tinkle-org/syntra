@@ -3,7 +3,8 @@
 - RFC: NNNN
 - Title: <concise, neutral, e.g., "Handshake timeouts and retry bounds">
 - Author(s): <GitHub handle(s)>
-- Status: Draft | Discussion | Accepted | Rejected | Withdrawn | Implementing | Implemented
+- Status: Draft | Discussion | Review | Accepted | Rejected | Withdrawn | Superseded | Implementing | Implemented
+  (Only Accepted RFCs may modify normative behavior; see rfcs/README.md Lifecycle.)
 - Date: YYYY-MM-DD
 - Target version: v1 minor | v1 patch/clarification | vNext major
 - Relates to: <ADRs, spec sections, requirement IDs, schema files>
