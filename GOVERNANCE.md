@@ -32,19 +32,47 @@ release becomes stable.
 Maintainer decisions are recorded on the relevant RFC or PR. Absence of
 a published maintainer list does not block non-normative contributions.
 
+### Maintainer responsibilities
+
+In addition to the approval authority above, maintainers are responsible
+for:
+
+- Triaging issues and RFCs (assigning protocol/security reviewers,
+  moving RFCs through Draft → Discussion → Review → decision).
+- Enforcing the review bar (`rfcs/README.md`): requirement IDs, client/
+  server obligations, bounded resources, unknown-field handling, security
+  and compatibility considerations, testable acceptance criteria.
+- Tagging releases and publishing notes per Sec. 5; no other role may
+  tag a release or push to the schema registry.
+- Custody of publication and reporting secrets (BSR push token, private
+  vulnerability reports): least privilege, no exposure in logs or PR
+  jobs, rotation on suspected exposure.
+- Keeping `CHANGELOG.md`, `MIGRATION.md`, and the conformance suite
+  consistent with every normative merge.
+
 ## 3. Who approves normative changes
 
 - **Non-normative** (typos, clarifications with no behavioral change,
   docs, examples): one maintainer approval may merge.
-- **Normative** (any MUST/SHOULD, wire field, state machine, error code,
-  transport mapping, security requirement, conformance assertion):
-  - REQUIRES an RFC (`rfcs/README.md`) with a test plan.
-  - REQUIRES maintainer approval with quorum: at least two maintainer
-    approvals and no unresolved normative objection from a maintainer.
-  - REQUIRES security review if the change touches handshake, auth,
-    credentials, transport policy, resource limits, errors, or streams.
-  - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
-    to conformance tests (or tracked placeholders).
+ - **Normative** (any MUST/SHOULD, wire field, state machine, error code,
+   transport mapping, security requirement, conformance assertion):
+   - REQUIRES an RFC (`rfcs/README.md`) with a test plan. Only an
+     **Accepted** RFC may modify normative behavior; Draft, Discussion,
+     Review, Withdrawn, and Superseded RFCs are proposals or history.
+   - REQUIRES maintainer approval with quorum: at least two maintainer
+     approvals and no unresolved normative objection from a maintainer.
+   - REQUIRES security review if the change touches handshake, auth,
+     credentials, transport policy, resource limits, errors, or streams.
+     Security fixes with exploitation risk are developed privately per
+     `SECURITY.md` and disclosed via advisory + `CHANGELOG.md` entry;
+     embargo details MUST NOT appear in public issues or PRs.
+   - Schema changes (field addition/deprecation/option change, `buf.yaml`
+     rule changes) follow this same bar, plus a clean `buf lint`,
+     `buf build`, and `buf breaking` gate. Wire-incompatible schema
+     changes are breaking (Sec. 4). BSR publication happens only on
+     reviewed version tags via the gated publish workflow.
+   - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
+     to conformance tests (or tracked placeholders).
 - **Governance / process changes** (this file, `CONTRIBUTING.md`,
   `rfcs/README.md`): same bar as normative.
 
@@ -68,6 +96,23 @@ breaks interop.
 
 Minor additive changes (new optional fields, new optional capabilities,
 clarifications) MUST remain backward compatible per ADR-009.
+
+### Deprecation
+
+Deprecation follows `SNTR-VER-006` (and `SNTR-CAP-007` for optional
+capabilities); this subsection states who approves and records it:
+
+1. Marking a field, capability, transport profile, or requirement
+   deprecated REQUIRES a normative RFC with a notice period, a documented
+   alternative path, and a removal version. The RFC states whether removal
+   is major (mandatory feature) or minor-with-notice (optional feature).
+2. Deprecated features MUST remain functional until their documented
+   removal version. Removal without the documented notice is a breaking
+   change handled under Sec. 4.
+3. `reserved` field numbers/names are never reused, including after
+   removal (see `SNTR-VER-005`).
+4. The RFC MUST update the conformance suite (deprecation-notice
+   presence fixtures) and `CHANGELOG.md` (Deprecated section).
 
 ## 5. How a protocol release becomes stable
 

@@ -1,0 +1,46 @@
+# Schema validation — runs on every PR and on main. Credential-less: validates only, never publishes.
+name: schema-validation
+
+on:
+  pull_request:
+    paths:
+      - "proto/**"
+      - "buf.yaml"
+      - "buf.lock"
+      - "compatibility/v1-initial/**"
+      - ".github/workflows/schema-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "proto/**"
+      - "buf.yaml"
+      - "buf.lock"
+      - "compatibility/v1-initial/**"
+
+permissions:
+  contents: read  # no secrets, no write, no publish
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4  # pinned major; see docs/schema-registry.md §14 for SHA-pinning hardening
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+
+      - name: buf format check
+        run: buf format --diff --exit-code
+
+      - name: buf lint (STANDARD, no exceptions)
+        run: buf lint
+
+      - name: buf build
+        run: buf build
+
+      - name: buf breaking against stable baseline
+        # Bootstrap baseline: the committed initial snapshot. Replace with the
+        # stable BSR commit once the first release is published (reviewed PR;
+        # see docs/schema-registry.md §9). Never an arbitrary branch.
+        run: buf breaking --against 'compatibility/v1-initial/image.json'

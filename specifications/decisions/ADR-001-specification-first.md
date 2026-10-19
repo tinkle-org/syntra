@@ -9,8 +9,7 @@
 
 Syntra must be implementable by independent parties without access to
 Rust source code or any private repository. Early protocol work produced
-two Protobuf files (`schema/syntra/v1/error.proto`,
-`schema/syntra/v1/session.proto`) with behavior described only in code
+two Protobuf files (originally `schema/syntra/v1/error.proto`, `schema/syntra/v1/session.proto`; now sole source in `proto/syntra/v1/`) with behavior described only in code
 comments. Without an explicit authority, implementers cannot tell whether
 a comment, a Rust behavior, or a test is normative, and wire compatibility
 cannot be audited.

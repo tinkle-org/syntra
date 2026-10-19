@@ -7,9 +7,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
 development, changes land under `Unreleased`.
 
+## [v1.0.0-rc.1] - TBD (pending; do not treat as released)
+
+First release candidate scope (protocol v1). This section is a release
+plan, not a release announcement: the tag MUST NOT be created until
+`RELEASE.md` §1 is fully evidenced and `audits/v1-release-readiness.md`
+shows no BLOCKED area in RC scope. Known blockers: P0 findings F-01–F-06
+(`audits/v1-consistency-review.md`), SESSION-OPEN-QUESTIONS items 1–11,
+pending RFCs 0001–0005, unaccepted BSR publication policy, no `LICENSE` file.
+The BSR module identity is approved as `buf.build/tinklecorp/syntra`
+(`buf.yaml`, `README.md` §BSR schema location, `docs/schema-registry.md` §1).
+
+### Added
+
+- Public IDL: `proto/syntra/v1` (envelope, handshake, rpc, errors,
+  events, session + capabilities documentation-only files), package
+  `syntra.v1`, Buf v2 STANDARD/FILE governance with zero external
+  dependencies.
+- Core specifications: protocol model, serialization, framing,
+  six-state handshake with version negotiation, opaque-credential
+  authentication interface, connection-bound sessions, generic RPC
+  (correlation, deadlines, cancellation, idempotency discipline),
+  optional event streams, reliability/backpressure rules, 17-value `ErrorCode`
+  registry (0–16, including 16 nonzero failure codes), capability negotiation,
+  five-dimension versioning.
+- Transport profiles: TCP, TLS 1.3/TCP, HTTP/1.1 (dev-only), HTTPS/H1,
+  HTTPS/H2, WS/H1 (dev-only), WSS/H1 — each with framing, handshake
+  binding, auth carriage, and failure mapping.
+- Security specifications: threat model (T1–T10), transport security,
+  authentication security, replay protection (5 classes), opaque
+  payloads, security test plan (STEST-001…011).
+- Executable conformance suite: 130 machine-readable cases across 11
+  profiles, 498 requirement traceability rows (473 SNTR-* + 25 SYN-ARCH-*),
+  golden protobuf vectors, TCP byte vectors, HTTP/WebSocket fixtures,
+  result model, implementation declarations, claim wording.
+- Repository validation: `scripts/validate-repo.py` (requirements,
+  manifests, vectors, links, RFC metadata, markdown) plus
+  `.github/workflows/repo-validation.yml` (11 CI items); RFC lifecycle
+  with Review/Superseded statuses; release process (`RELEASE.md`).
+
+### Changed
+
+- Requirement registry extended with the SYN-ARCH-* charter namespace
+  (25 rows; mostly `manual` charter attestation).
+- `GOLD-PROT-UNKNOWN-FIELD-01` fixture corrected to unknown field 90
+  (was field 86 on the wire).
+- Manifest schema `requirement_id` pattern extended to accept
+  `SYN-ARCH-*` alongside `SNTR-*`.
+
+### Deprecated
+
+- None.
+
+### Removed
+
+- None (no stable release exists to remove from).
+
+### Security
+
+- No wire or behavioral change in this entry. Security posture unchanged:
+  secure transports required for public production; plaintext profiles
+  restricted to trusted environments; credentials opaque and never logged;
+  negative security cases enforced via STEST fixtures.
+
 ## [Unreleased]
 
 ### Added
+
+- Seven-file public IDL in `proto/syntra/v1`, preserving the
+  existing message names, field numbers, oneofs, enum registry and reservations.
+  Session control/capability messages and requested extensions remain deferred
+  pending normative definitions; see Draft RFC 0001.
+- Buf v2 STANDARD/FILE configuration, pinned remote Rust/Go generation,
+  initial seven-file descriptor baseline with historical provenance,
+  schema reference/compatibility/generation documentation, and codec tests.
+  The historical layout comparison is WIRE-compatible but FILE-breaking;
+  the user-directed layout decision is implemented, with no stable release
+  or formal maintainer/RFC approval claimed.
+- Immutable `compatibility/v1-initial/historical.json` FileDescriptorSet
+  generated before removal from the actual unchanged historical sources at
+  commit `92e5f281aa7c3adac9ba78588c1140b12d55c1d9`. The manifest retains
+  `historical_sources` path/hash provenance and adds `historical_image_sha256`;
+  `image.json` remains unchanged. Historical comparisons read the archive
+  without a Git checkout or duplicate source tree; a sole-source regression
+  check is added to the descriptor/tooling suite (13 checks, executed —
+  see the [validation record](specifications/schema/validation.md)).
+- Auth/session lifecycle precision without wire change: three-concept
+  separation, six-state lifecycle table with suggested-name mapping,
+  seven handshake orderings with sequence diagrams, opaque-credential
+  baseline with generic principal and authorization boundary, no v1
+  session identifier, deferred optional resumption with cross-transport
+  prohibition, HTTP principles, termination/timeout tables, and
+  `conformance/auth-session/` cases (`CONF-SESS-001…010`,
+  `CONF-AUTH-001…006`). Draft RFC 0002 records conflicts and blockers;
+  `SESSION-OPEN-QUESTIONS.md` lists release blockers. No new normative
+  IDs, no `.proto` change.
+- RPC/error precision without wire change: six-stage RPC model with
+  receipt-vs-execution distinction, outstanding-only `request_id` model,
+  canonical method syntax, opaque-payload rules with explicit
+  any-encoding decision, out-of-order concurrency, relative deadlines
+  with stated start points, best-effort cancellation with race rules,
+  `request_id`-vs-operation-key idempotency with worked example,
+  retry table, seven-category error taxonomy mapped to the existing
+  17-value registry, detail limits, protocol-vs-RPC table, transport-loss
+  outcomes, and HTTP layering.   `conformance/rpc/` (`CONF-RPC-001…012`)
+  and `conformance/errors/` (`CONF-ERR-001…004`) with sequence diagrams.
+  No new normative IDs, no `.proto` change.
+- Transport profiles `SNTR-TCP-V1` (restricted plaintext) and
+  `SNTR-TLS-TCP-V1` (production-capable) in
+  `specifications/transports/tcp.md` and `tls-tcp.md`: 4-byte
+  big-endian length-prefixed framing with strict stream-loop semantics,
+  1 MiB default bound with fail-closed pre-allocation checks, no magic
+  bytes, plaintext restrictions with server-may-reject-auth, TLS 1.3
+  with chain/hostname verification and deferred ALPN
+  (no `syntra/1` registered), close/backpressure/keepalive/intermediary
+  rules, exact byte vectors (`conformance/test-vectors/tcp/`), and
+  `conformance/requirements/tcp.md` (`CONF-TCP-001…008`) plus
+  `tls-tcp.md` (`CONF-TLS-001…004`). New requirement IDs `SNTR-TCP-*`
+  and `SNTR-TLS-*` only; no `.proto` change.
+- Event/replay precision without wire change: optional-only event
+  delivery with proposed (unallocated) `syntra.events/1` and
+  `syntra.events.replay/1` identifiers, wire-vs-payload field model,
+  duplicate-tolerant identity rules, stream lifecycle, generic-RPC
+  subscription pattern (no `SubscribeRequest` wire messages, no filter
+  grammar), at-most-once default with per-stream at-least-once only,
+  ordering scope, absent core ACKs, capability-gated replay with cursor
+  rules, live+replay coordination strategies, HTTP push requirements
+  (no delivery over plain request/response; no polling/long-polling or
+  HTTP/2 push approved), backpressure, session-loss table, and
+  `conformance/events/` (`CONF-EVT-001…015`, `UNSUPPORTED`/`SKIP` when
+  unadvertised) with subscribe/reconnect/replay/coordination diagrams.
+  `events.proto`/`capabilities.proto` reviewed: no changes proposed.
+  No new normative IDs, no `.proto` change.
 
 - Project charter: `specifications/architecture.md` (what Syntra is/is not,
   design goals, roles, boundaries, transports, threat assumptions, ownership
@@ -21,17 +150,20 @@ development, changes land under `Unreleased`.
 - Open-source foundation: `README.md`, `CONTRIBUTING.md`,
   `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, `GOVERNANCE.md`,
   `rfcs/README.md`, `rfcs/template.md`.
-- Repository audit and migration plan: `MIGRATION.md` (inventory of
-  `schema/syntra/v1/*.proto`, independence verification, no-code-deletion
-  guarantee).
+- Repository audit and migration plan: `MIGRATION.md` (historical inventory
+  of `schema/syntra/v1/*.proto`, independence verification, and original
+  preservation plan, now explicitly superseded by the layout decision).
 - Requirement ownership matrix (Protobuf → representation; core specs →
   behavior; transport specs → mappings; security specs → requirements;
   conformance suite → verification; Rust → non-normative).
 
 ### Changed
 
-- None (existing `schema/syntra/v1/error.proto` and `session.proto`
-  preserved unchanged; `reserved` values intact).
+- `proto/syntra/v1` is the sole authoritative schema root by explicit user
+  direction, recorded in RFC 0001 B9. Imports, declaration-owning files and
+  generated file-level APIs change; the historical FILE break remains
+  documented and tested. Binary declarations and `reserved` values are
+  preserved. Remaining behavioral/security blockers keep RFC 0001 Draft.
 
 ### Deprecated
 
@@ -39,7 +171,18 @@ development, changes land under `Unreleased`.
 
 ### Removed
 
-- None (no production code deleted or rewritten).
+- Old `schema/syntra/v1/error.proto` and `session.proto` source tree;
+  historical declarations survive in the immutable descriptor archive and
+  original path/hash provenance. This supersedes the original additive-only
+  preservation plan without adding wire types or changing protocol semantics.
+- Local generated language bindings and their scaffolding: `bindings/`
+  (Go/Rust generated output plus binding manifests), `gen/` (stale
+  duplicate generated output), and root `buf.gen.yaml` (whose only
+  purpose was producing those repository-local bindings). No wire or
+  behavioral change; `go_package` options are unchanged. Codec smoke
+  tests now generate into the ignored `.tmp/` directory via
+  `scripts/validate-schema.py`; consumers obtain bindings from the Buf
+  Schema Registry instead (see `docs/schema-registry.md` §11).
 
 ### Fixed
 

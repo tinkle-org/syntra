@@ -1,0 +1,12 @@
+{
+  "baseline_id": "v1-initial",
+  "status": "initial seven-file layout snapshot, sole source proto/syntra/v1; not a release",
+  "buf_version": "1.59.0",
+  "image_sha256": "48b3206c0f2e0371c9506da4f1e2b312be20f37d409bbe9beb66dc34daa8bae5",
+  "historical_commit": "92e5f281aa7c3adac9ba78588c1140b12d55c1d9",
+  "historical_sources": {
+    "schema/syntra/v1/error.proto": "eed4f02e8f68b6a6ac2bb3e5af81a996fda82ad307eac4f52f82501bbb9420ff",
+    "schema/syntra/v1/session.proto": "a877be5022bde7770c0910e60e77d38db52dbccf5a6ef42fdb5bac212e3d27a7"
+  },
+  "historical_image_sha256": "c046e4f8e22b2fdbc316e4fb4f83b9e1ee3960fe7a083bbdb4f6edd2dc39ec0b"
+}

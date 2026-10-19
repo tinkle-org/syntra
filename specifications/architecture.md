@@ -24,7 +24,7 @@ communication protocol.
 
 Syntra defines:
 
-- Wire envelopes and Protobuf serialization (`schema/syntra/v1/*.proto`)
+- Wire envelopes and Protobuf serialization (`proto/syntra/v1/*.proto`)
 - Protocol framing separate from Protobuf encoding
 - Connection establishment
 - Handshake and version negotiation
@@ -181,7 +181,7 @@ encrypts, encryption and decryption occur above Syntra.
   compatible. See `GOVERNANCE.md` and `rfcs/README.md`.
 
 **SYN-ARCH-020** — Implementations MUST preserve and respect `reserved`
-field numbers and names in `schema/syntra/v1/session.proto`.
+field numbers and names in `proto/syntra/v1/envelope.proto` (`Frame` reservations).
 
 **SYN-ARCH-021** — Implementations MUST ignore unknown Protobuf fields
 and MUST reject unknown `Frame.body` variants with
@@ -234,7 +234,7 @@ informative for that concern.
 
 | Concern | Authoritative source | Non-authoritative mirrors |
 |---------|----------------------|---------------------------|
-| Data representation (fields, numbers, types, reserved values) | `schema/syntra/v1/*.proto` (Protobuf schemas, Buf v2 governed) | Spec text summaries, code comments, wiki pages |
+| Data representation (fields, numbers, types, reserved values) | `proto/syntra/v1/*.proto` (Protobuf schemas, Buf v2 governed) | Spec text summaries, code comments, wiki pages |
 | Behavior (state machines, handshake, RPC, cancellation, errors, streams) | `specifications/*.md` — core specifications | Proto comments, READMEs, implementation docs |
 | Network mappings (framing, TLS profile, HTTP/WS binding, limits on the wire) | `specifications/transports/*.md` — transport specifications (forthcoming) | Core specs, code |
 | Security requirements (threat model, auth interfaces, transport policy, limits) | `specifications/security/*.md` — security specifications (forthcoming) | Architecture overview, code |
@@ -400,5 +400,4 @@ SYN-ARCH-001, 002 (independence) · 010–013 (layering) · 020, 021
 - Protocol Buffers (proto3), Buf v2 — IDL and schema governance.
 - TLS 1.3 (RFC 8446), HTTP/1.1, HTTP/2, WebSocket over HTTP/1.1 —
   transport profiles (details in forthcoming transport specs).
-- Existing schemas: `schema/syntra/v1/error.proto`,
-  `schema/syntra/v1/session.proto`.
+- Original schemas (historical commit `92e5f28`, now sole source in `proto/syntra/v1/`): `schema/syntra/v1/error.proto`, `schema/syntra/v1/session.proto` (removed; see `compatibility/v1-initial/` and pinned blob links in `specifications/schema/`).

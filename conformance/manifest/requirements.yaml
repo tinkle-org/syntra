@@ -1,0 +1,874 @@
+# Requirement traceability matrix (Section D). Every SNTR-* normative ID maps to
+# automated conformance cases, or to a human-review disposition with a reason.
+# automation_status: automated | partially_automated | manual | not_testable.
+# No normative requirement silently has zero coverage: every entry names test_ids
+# and, where automation is incomplete, states why in notes.
+format_version: "1.0"
+requirements:
+  # ---- Core model: specifications/core/protocol.md ----
+  - { requirement_id: SNTR-CORE-001, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-002, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-003, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-004, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-CORE-006, CONF-CORE-007], automation_status: automated }
+  - { requirement_id: SNTR-CORE-005, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-RPC-012, CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-006, specification: specifications/core/protocol.md, section: "§2", test_ids: [CONF-SEC-009], automation_status: partially_automated,
+      notes: "Deployment posture (public production uses secure transports) needs human review of distribution defaults plus the automated downgrade-refusal cases." }
+  - { requirement_id: SNTR-CORE-010, specification: specifications/core/protocol.md, section: "§3", test_ids: [CONF-CORE-008, CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-011, specification: specifications/core/protocol.md, section: "§3", test_ids: [CONF-CORE-008, CONF-SESS-003], automation_status: automated }
+  - { requirement_id: SNTR-CORE-012, specification: specifications/core/protocol.md, section: "§3", test_ids: [CONF-RPC-002], automation_status: automated }
+  - { requirement_id: SNTR-CORE-020, specification: specifications/core/protocol.md, section: "§4", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-CORE-021, specification: specifications/core/protocol.md, section: "§4", test_ids: [CONF-EVT-014, CONF-RPC-005], automation_status: automated }
+  - { requirement_id: SNTR-CORE-022, specification: specifications/core/protocol.md, section: "§4", test_ids: [CONF-RPC-011, CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-CORE-030, specification: specifications/core/protocol.md, section: "§5", test_ids: [CONF-CORE-009], automation_status: automated }
+  - { requirement_id: SNTR-CORE-031, specification: specifications/core/protocol.md, section: "§5", test_ids: [CONF-CORE-002, CONF-SEC-003], automation_status: automated }
+  - { requirement_id: SNTR-CORE-900, specification: specifications/core/protocol.md, section: "§8", test_ids: [CONF-CORE-001], automation_status: automated }
+  - requirement_id: SNTR-CORE-901
+    specification: specifications/core/protocol.md
+    section: "§8"
+    test_ids: [CONF-CORE-001]
+    automation_status: manual
+    notes: "Evidence-citation rule (IDs cited, implementation not normative): verified by human review of the declaration, not by wire bytes."
+
+  # ---- Serialization: specifications/core/serialization.md ----
+  - { requirement_id: SNTR-SER-001, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-SER-002, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-TCP-002], automation_status: automated }
+  - { requirement_id: SNTR-SER-003, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-004, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-005, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-SER-006, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-SEC-002, CONF-TCP-006], automation_status: automated }
+  - { requirement_id: SNTR-SER-007, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-SEC-003, CONF-HTTP-006], automation_status: automated }
+  - { requirement_id: SNTR-SER-008, specification: specifications/core/serialization.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-SER-010, specification: specifications/core/serialization.md, section: "§2", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-011, specification: specifications/core/serialization.md, section: "§2", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-020, specification: specifications/core/serialization.md, section: "§3", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-021, specification: specifications/core/serialization.md, section: "§3", test_ids: [CONF-CORE-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-900, specification: specifications/core/serialization.md, section: "§7", test_ids: [CONF-CORE-003, CONF-SEC-003], automation_status: automated }
+  - { requirement_id: SNTR-SER-901, specification: specifications/core/serialization.md, section: "§7", test_ids: [CONF-TCP-002], automation_status: automated }
+
+  # ---- Framing: specifications/core/framing.md ----
+  - { requirement_id: SNTR-WIRE-001, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-002, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-CORE-002], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-003, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-CORE-009], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-004, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-005, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-006, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-SEC-002], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-007, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-008, specification: specifications/core/framing.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-010, specification: specifications/core/framing.md, section: "§2", test_ids: [CONF-CORE-001, CONF-RPC-006], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-011, specification: specifications/core/framing.md, section: "§2", test_ids: [CONF-CORE-001, CONF-RPC-006], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-020, specification: specifications/core/framing.md, section: "§3", test_ids: [CONF-TCP-007], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-021, specification: specifications/core/framing.md, section: "§3", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-WIRE-900, specification: specifications/core/framing.md, section: "§7", test_ids: [CONF-CORE-001, CONF-TCP-002], automation_status: automated }
+  - requirement_id: SNTR-WIRE-901
+    specification: specifications/core/framing.md
+    section: "§7"
+    test_ids: [CONF-TCP-004, CONF-HTTP-001]
+    automation_status: partially_automated
+    notes: "Transport-independence proof needs the same logical Frames over two profiles; the runner automates each leg, a human confirms the pair ran with only adapter changes (see interoperability/matrix.yaml)."
+
+  # ---- Handshake: specifications/core/handshake.md ----
+  - { requirement_id: SNTR-HS-001, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-CORE-010], automation_status: automated }
+  - { requirement_id: SNTR-HS-002, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-003, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-SESS-010], automation_status: automated }
+  - { requirement_id: SNTR-HS-004, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-005, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-006, specification: specifications/core/handshake.md, section: "§1", test_ids: [CONF-CORE-010], automation_status: automated }
+  - { requirement_id: SNTR-HS-010, specification: specifications/core/handshake.md, section: "§2", test_ids: [CONF-SESS-010], automation_status: automated }
+  - requirement_id: SNTR-HS-011
+    specification: specifications/core/handshake.md
+    section: "§2"
+    test_ids: [CONF-SEC-011]
+    automation_status: partially_automated
+    notes: "Handshake deadline (default 5 s): asserted with a harness-held peer that stays silent; timing margins must be generous and documented, never flaky."
+  - { requirement_id: SNTR-HS-012, specification: specifications/core/handshake.md, section: "§2", test_ids: [CONF-CORE-008], automation_status: automated }
+  - { requirement_id: SNTR-HS-013, specification: specifications/core/handshake.md, section: "§2", test_ids: [CONF-CORE-010], automation_status: automated }
+  - { requirement_id: SNTR-HS-014, specification: specifications/core/handshake.md, section: "§2", test_ids: [CONF-SESS-007], automation_status: automated }
+  - { requirement_id: SNTR-HS-020, specification: specifications/core/handshake.md, section: "§3", test_ids: [CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-021, specification: specifications/core/handshake.md, section: "§3", test_ids: [CONF-SEC-011], automation_status: partially_automated,
+      notes: "Client timer enforcement needs a silent-peer harness; same timing-margin rule as SNTR-HS-011." }
+  - { requirement_id: SNTR-HS-030, specification: specifications/core/handshake.md, section: "§4", test_ids: [CONF-SESS-001, CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-HS-031, specification: specifications/core/handshake.md, section: "§4", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-HS-040, specification: specifications/core/handshake.md, section: "§5", test_ids: [CONF-CORE-008], automation_status: automated }
+  - { requirement_id: SNTR-HS-900, specification: specifications/core/handshake.md, section: "§8", test_ids: [CONF-CORE-008, CONF-SESS-001], automation_status: automated }
+  - requirement_id: SNTR-HS-901
+    specification: specifications/core/handshake.md
+    section: "§8"
+    test_ids: [CONF-SESS-001, CONF-CORE-008]
+    automation_status: partially_automated
+    notes: "Sequence proof (mermaid in spec §8): runner executes accept/reject/timeout/mismatch rows; a human confirms the state diagram transitions match."
+
+  # ---- Authentication: specifications/core/authentication.md ----
+  - { requirement_id: SNTR-AUTH-001, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-002, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-002], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-003, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - requirement_id: SNTR-AUTH-004
+    specification: specifications/core/authentication.md
+    section: "§1"
+    test_ids: [CONF-SESS-001]
+    automation_status: partially_automated
+    notes: "Optional challenge/response above ACTIVE via generic RPCs: single-round opaque carriage is automated; multi-round mechanism agility needs the application-defined RPC flow plus human review (blocker 4 in open-questions.md)."
+  - { requirement_id: SNTR-AUTH-005, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-006, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-002], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-007, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-008, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-004], automation_status: partially_automated,
+      notes: "Expiry/revocation timing uses short-lived fixture credentials or injected clocks; propagation windows are documented per deployment." }
+  - { requirement_id: SNTR-AUTH-009, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-002, CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-010, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SEC-010], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-020, specification: specifications/core/authentication.md, section: "§2", test_ids: [CONF-SESS-002], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-021, specification: specifications/core/authentication.md, section: "§2", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-030, specification: specifications/core/authentication.md, section: "§3", test_ids: [CONF-SESS-002, CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-031, specification: specifications/core/authentication.md, section: "§3", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-900, specification: specifications/core/authentication.md, section: "§7", test_ids: [CONF-SESS-001, CONF-SESS-002], automation_status: automated }
+  - { requirement_id: SNTR-AUTH-901, specification: specifications/core/authentication.md, section: "§7", test_ids: [CONF-SESS-001], automation_status: automated }
+
+  # ---- Sessions: specifications/core/sessions.md ----
+  - { requirement_id: SNTR-SESS-001, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-SESS-002, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-005], automation_status: automated }
+  - { requirement_id: SNTR-SESS-003, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-007], automation_status: automated }
+  - { requirement_id: SNTR-SESS-004, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-006], automation_status: automated }
+  - { requirement_id: SNTR-SESS-005, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-004], automation_status: partially_automated,
+      notes: "Session max-lifetime signalling uses injected clocks or short-lived fixtures; pass criteria are timing-agnostic (signalled code + close, never silent)." }
+  - { requirement_id: SNTR-SESS-006, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-008, CONF-SESS-R01], automation_status: automated }
+  - { requirement_id: SNTR-SESS-007, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
+  - { requirement_id: SNTR-SESS-008, specification: specifications/core/sessions.md, section: "§1", test_ids: [CONF-EVT-011], automation_status: automated }
+  - { requirement_id: SNTR-SESS-010, specification: specifications/core/sessions.md, section: "§2", test_ids: [CONF-SESS-007], automation_status: automated }
+  - { requirement_id: SNTR-SESS-011, specification: specifications/core/sessions.md, section: "§2", test_ids: [CONF-EVT-011], automation_status: automated }
+  - { requirement_id: SNTR-SESS-020, specification: specifications/core/sessions.md, section: "§3", test_ids: [CONF-SESS-008], automation_status: automated }
+  - { requirement_id: SNTR-SESS-021, specification: specifications/core/sessions.md, section: "§3", test_ids: [CONF-SESS-008], automation_status: automated }
+  - { requirement_id: SNTR-SESS-900, specification: specifications/core/sessions.md, section: "§7", test_ids: [CONF-SESS-001, CONF-SESS-008], automation_status: automated }
+  - requirement_id: SNTR-SESS-901
+    specification: specifications/core/sessions.md
+    section: "§7"
+    test_ids: [CONF-SESS-008]
+    automation_status: manual
+    notes: "No-promise proof (cross-transport resumption unsupported in default v1): verified by human review of the declaration's documented resumption posture plus the automated rejection rows."
+
+  # ---- RPC: specifications/core/rpc.md ----
+  - { requirement_id: SNTR-RPC-001, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-002, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-001, CONF-RPC-002, CONF-RPC-003], automation_status: automated }
+  - { requirement_id: SNTR-RPC-003, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-RPC-004, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-007], automation_status: partially_automated,
+      notes: "Deadline expiry uses injected-slow handlers or generous margins with explicit DEADLINE_EXCEEDED assertion; never flaky wall-clock races." }
+  - { requirement_id: SNTR-RPC-005, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-008], automation_status: automated }
+  - { requirement_id: SNTR-RPC-006, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-009], automation_status: automated }
+  - { requirement_id: SNTR-RPC-007, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPC-008, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-002, CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPC-010, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPC-020, specification: specifications/core/rpc.md, section: "§2", test_ids: [CONF-RPC-010, CONF-RPC-001], automation_status: automated }
+  - { requirement_id: SNTR-RPC-021, specification: specifications/core/rpc.md, section: "§2", test_ids: [CONF-RPC-008], automation_status: automated }
+  - { requirement_id: SNTR-RPC-030, specification: specifications/core/rpc.md, section: "§3", test_ids: [CONF-RPC-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-031, specification: specifications/core/rpc.md, section: "§3", test_ids: [CONF-RPC-008], automation_status: automated }
+  - { requirement_id: SNTR-RPC-032, specification: specifications/core/rpc.md, section: "§3", test_ids: [CONF-SEC-007], automation_status: automated }
+  - { requirement_id: SNTR-RPC-900, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001], automation_status: automated }
+  - { requirement_id: SNTR-RPC-901, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001, CONF-RPC-004], automation_status: automated }
+
+  # ---- Events: specifications/core/events.md ----
+  - { requirement_id: SNTR-EVENT-001, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-001, CONF-EVT-002], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-002, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-003], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-003, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-004, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-001, CONF-EVT-004], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-005, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-003, CONF-EVT-014], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-006, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-006], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-007, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-005], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-008, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-008], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-009, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-009], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-010, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-004], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-011, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-012], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-020, specification: specifications/core/events.md, section: "§2", test_ids: [CONF-EVT-011], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-021, specification: specifications/core/events.md, section: "§2", test_ids: [CONF-EVT-005], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-030, specification: specifications/core/events.md, section: "§3", test_ids: [CONF-EVT-007, CONF-EVT-013], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-031, specification: specifications/core/events.md, section: "§3", test_ids: [CONF-EVT-013], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-900, specification: specifications/core/events.md, section: "§7", test_ids: [CONF-EVT-001, CONF-EVT-002], automation_status: automated }
+  - { requirement_id: SNTR-EVENT-901, specification: specifications/core/events.md, section: "§7", test_ids: [CONF-EVT-015], automation_status: automated }
+
+  # ---- Reliability: specifications/core/reliability.md ----
+  - { requirement_id: SNTR-REL-001, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-012], automation_status: automated }
+  - { requirement_id: SNTR-REL-002, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-003, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-004, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-005, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-EVT-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-006, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-007], automation_status: partially_automated,
+      notes: "Timeout margins must be generous and documented; same non-flaky rule as SNTR-RPC-004." }
+  - { requirement_id: SNTR-REL-007, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-008, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-009, specification: specifications/core/reliability.md, section: "§1", test_ids: [CONF-RPC-012], automation_status: automated }
+  - requirement_id: SNTR-REL-010
+    specification: specifications/core/reliability.md
+    section: "§1"
+    test_ids: [CONF-RPC-011]
+    automation_status: partially_automated
+    notes: "No-exactly-once attestation is half automated (retry discipline) and half human (declaration documents the operation-key approach or at-most-once-only stance)."
+  - { requirement_id: SNTR-REL-020, specification: specifications/core/reliability.md, section: "§2", test_ids: [CONF-RPC-011, CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-021, specification: specifications/core/reliability.md, section: "§2", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-030, specification: specifications/core/reliability.md, section: "§3", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-031, specification: specifications/core/reliability.md, section: "§3", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-900, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012, CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-REL-901, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012], automation_status: automated }
+
+  # ---- Capabilities: specifications/core/capabilities.md ----
+  - { requirement_id: SNTR-CAP-001, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-002, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-CORE-007], automation_status: automated }
+  - { requirement_id: SNTR-CAP-003, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-EVT-002], automation_status: automated }
+  - { requirement_id: SNTR-CAP-004, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-CORE-006], automation_status: automated }
+  - { requirement_id: SNTR-CAP-005, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-CORE-007], automation_status: automated }
+  - requirement_id: SNTR-CAP-006
+    specification: specifications/core/capabilities.md
+    section: "§1"
+    test_ids: [CONF-EVT-001]
+    automation_status: manual
+    notes: "No experimental capability is defined in default v1; verified by human review that no identifier containing 'exp' is advertised and mandatory interop is unaffected."
+  - requirement_id: SNTR-CAP-007
+    specification: specifications/core/capabilities.md
+    section: "§1"
+    test_ids: [CONF-EVT-002]
+    automation_status: manual
+    notes: "No optional capability has been withdrawn in v1; verified by human review of the capability registry and RFC history."
+  - { requirement_id: SNTR-CAP-010, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-011, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-CORE-007], automation_status: automated }
+  - { requirement_id: SNTR-CAP-020, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-021, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-900, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-CORE-006, CONF-EVT-002], automation_status: automated }
+  - requirement_id: SNTR-CAP-901
+    specification: specifications/core/capabilities.md
+    section: "§7"
+    test_ids: [CONF-EVT-001]
+    automation_status: partially_automated
+    notes: "Negotiation trace: the runner automates confirmation of advertised identifiers; a human confirms each cited identifier has an RFC reference."
+
+  # ---- Errors: specifications/core/errors.md ----
+  - { requirement_id: SNTR-ERR-001, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-RPC-010], automation_status: automated }
+  - { requirement_id: SNTR-ERR-002, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-003, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-004, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-CORE-009], automation_status: automated }
+  - { requirement_id: SNTR-ERR-005, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-CORE-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-006, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-ERR-010, specification: specifications/core/errors.md, section: "§2", test_ids: [CONF-CORE-004, CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-011, specification: specifications/core/errors.md, section: "§2", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-020, specification: specifications/core/errors.md, section: "§3", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-021, specification: specifications/core/errors.md, section: "§3", test_ids: [CONF-RPC-009], automation_status: automated }
+  - { requirement_id: SNTR-ERR-900, specification: specifications/core/errors.md, section: "§7", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ERR-901, specification: specifications/core/errors.md, section: "§7", test_ids: [CONF-CORE-009, CONF-SESS-007], automation_status: automated }
+
+  # ---- Versioning: specifications/core/versioning.md ----
+  - { requirement_id: SNTR-VER-001, specification: specifications/core/versioning.md, section: "§1", test_ids: [CONF-SESS-010, CONF-WS-002], automation_status: automated }
+  - { requirement_id: SNTR-VER-002, specification: specifications/core/versioning.md, section: "§1", test_ids: [CONF-SESS-010], automation_status: automated }
+  - requirement_id: SNTR-VER-003
+    specification: specifications/core/versioning.md
+    section: "§1"
+    test_ids: [CONF-CORE-003]
+    automation_status: partially_automated
+    notes: "Compatibility classes: additive tolerance is automated (unknown-field/unknown-code rows); the breaking-vs-additive classification of any change needs human RFC review."
+  - { requirement_id: SNTR-VER-004, specification: specifications/core/versioning.md, section: "§1", test_ids: [CONF-CORE-003, CONF-CORE-004], automation_status: automated }
+  - { requirement_id: SNTR-VER-005, specification: specifications/core/versioning.md, section: "§1", test_ids: [CONF-TCP-007], automation_status: automated }
+  - requirement_id: SNTR-VER-006
+    specification: specifications/core/versioning.md
+    section: "§1"
+    test_ids: [CONF-EVT-001]
+    automation_status: manual
+    notes: "No deprecation exists in v1; verified by human review of the RFC/change log for notice period, alternative path, and removal version."
+  - { requirement_id: SNTR-VER-007, specification: specifications/core/versioning.md, section: "§1", test_ids: [CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-VER-010, specification: specifications/core/versioning.md, section: "§2", test_ids: [CONF-SESS-010], automation_status: automated }
+  - { requirement_id: SNTR-VER-011, specification: specifications/core/versioning.md, section: "§2", test_ids: [CONF-CORE-003, CONF-CORE-004], automation_status: automated }
+  - { requirement_id: SNTR-VER-020, specification: specifications/core/versioning.md, section: "§3", test_ids: [CONF-SESS-010], automation_status: automated }
+  - { requirement_id: SNTR-VER-021, specification: specifications/core/versioning.md, section: "§3", test_ids: [CONF-SESS-010], automation_status: automated }
+  - { requirement_id: SNTR-VER-900, specification: specifications/core/versioning.md, section: "§7", test_ids: [CONF-SESS-010, CONF-CORE-003], automation_status: automated }
+  - requirement_id: SNTR-VER-901
+    specification: specifications/core/versioning.md
+    section: "§7"
+    test_ids: [CONF-TCP-004]
+    automation_status: partially_automated
+    notes: "Dimension-independence proof (same wire version over two transports; same transport over two releases): runner automates each leg; a human confirms the pair."
+
+  # ---- Threat model: specifications/security/threat-model.md ----
+  - requirement_id: SNTR-TMOD-001
+    specification: specifications/security/threat-model.md
+    section: "§1"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Asset inventory is a review artifact; wire coverage of asset-handling rules lives in the cited cases."
+  - requirement_id: SNTR-TMOD-002
+    specification: specifications/security/threat-model.md
+    section: "§2"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Attacker model is a review artifact; exercised attacker behaviors are automated in the cited cases."
+  - requirement_id: SNTR-TMOD-010
+    specification: specifications/security/threat-model.md
+    section: "§3"
+    test_ids: [CONF-SEC-008, CONF-WSS-008]
+    automation_status: manual
+    notes: "Trust-boundary placement verified by human review of the deployment diagram plus the automated proxy/termination cases."
+  - requirement_id: SNTR-TMOD-020
+    specification: specifications/security/threat-model.md
+    section: "§5"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "In-scope threat list is a review artifact; each threat maps to STEST groups per specifications/security/test-plan.md §3."
+  - requirement_id: SNTR-TMOD-030
+    specification: specifications/security/threat-model.md
+    section: "§5"
+    test_ids: [CONF-SEC-001, CONF-SEC-008]
+    automation_status: manual
+    notes: "Mitigation mapping verified by human review of the traceability table plus the automated cases."
+  - requirement_id: SNTR-TMOD-040
+    specification: specifications/security/threat-model.md
+    section: "§4"
+    test_ids: [CONF-SESS-001]
+    automation_status: manual
+    notes: "Assumptions (e.g., trusted randomness, clock behavior) verified by human review of deployment documentation."
+  - requirement_id: SNTR-TMOD-050
+    specification: specifications/security/threat-model.md
+    section: "§6"
+    test_ids: [CONF-EVT-015]
+    automation_status: manual
+    notes: "Out-of-scope list verified by human review; nothing out-of-scope is asserted as tested."
+  - requirement_id: SNTR-TMOD-051
+    specification: specifications/security/threat-model.md
+    section: "§6"
+    test_ids: [CONF-EVT-015]
+    automation_status: manual
+    notes: "Same out-of-scope review as SNTR-TMOD-050 (second out-of-scope clause)."
+  - requirement_id: SNTR-TMOD-060
+    specification: specifications/security/threat-model.md
+    section: "§7"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Requirement summary duplicates no normative force; verified by human review that the summary matches the owning documents."
+  - requirement_id: SNTR-TMOD-061
+    specification: specifications/security/threat-model.md
+    section: "§13"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Conformance summary in the threat model is informative; the binding mapping is this file."
+  - requirement_id: SNTR-TMOD-900
+    specification: specifications/security/threat-model.md
+    section: "§13"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Traceability of the threat model itself is a human review of this matrix."
+  - requirement_id: SNTR-TMOD-901
+    specification: specifications/security/threat-model.md
+    section: "§13"
+    test_ids: [CONF-SEC-001]
+    automation_status: manual
+    notes: "Residual-risk appendix reviewed by a human; residual risks MUST be listed in the declaration, never hidden by automation."
+
+  # ---- Transport security: specifications/security/transport-security.md ----
+  - { requirement_id: SNTR-TSEC-001, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-002, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TLS-004, CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-003, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TLS-002, CONF-SEC-001], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-004, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TLS-003, CONF-SEC-008], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-005, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TCP-001], automation_status: partially_automated,
+      notes: "Permitted-plaintext scoping needs human confirmation of loopback/isolation plus the automated insecure-mode warning check." }
+  - { requirement_id: SNTR-TSEC-006, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-HTTPS-008, CONF-WSS-009], automation_status: partially_automated,
+      notes: "Rotation windows need a harness-controlled PKI rotation; overlap acceptance is automated, rotation procedure review is human." }
+  - { requirement_id: SNTR-TSEC-007, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-008, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-HTTPS-011, CONF-WSS-008], automation_status: partially_automated,
+      notes: "Proxy/termination binding needs a misconfigured-proxy harness; the securely-configured success path is human-confirmed per deployment." }
+  - { requirement_id: SNTR-TSEC-009, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TLS-001, CONF-SEC-001], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-010, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-HTTPS-007], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-011, specification: specifications/security/transport-security.md, section: "§1", test_ids: [CONF-TLS-001], automation_status: partially_automated,
+      notes: "Cipher-suite posture (secure defaults, no deprecated/weak suites) is checked by human review of the TLS configuration plus the automated version-floor cases." }
+  - { requirement_id: SNTR-TSEC-020, specification: specifications/security/transport-security.md, section: "§2", test_ids: [CONF-TLS-002], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-021, specification: specifications/security/transport-security.md, section: "§2", test_ids: [CONF-TLS-003], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-030, specification: specifications/security/transport-security.md, section: "§3", test_ids: [CONF-TLS-001, CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-031, specification: specifications/security/transport-security.md, section: "§3", test_ids: [CONF-HTTPS-011, CONF-WSS-008], automation_status: partially_automated,
+      notes: "Backend-binding validation behind proxies needs deployment-specific harness setup plus human review." }
+  - { requirement_id: SNTR-TSEC-900, specification: specifications/security/transport-security.md, section: "§7", test_ids: [CONF-TLS-001, CONF-SEC-001], automation_status: automated }
+  - { requirement_id: SNTR-TSEC-901, specification: specifications/security/transport-security.md, section: "§7", test_ids: [CONF-SEC-009], automation_status: automated }
+
+  # ---- Authentication security: specifications/security/authentication-security.md ----
+  - { requirement_id: SNTR-ASEC-001, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-002, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-003, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-HTTP-004, CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-004, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-005, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SEC-005], automation_status: partially_automated,
+      notes: "Expiry enforcement timing uses short-lived fixtures or injected clocks." }
+  - { requirement_id: SNTR-ASEC-006, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SEC-004, CONF-SEC-005], automation_status: partially_automated,
+      notes: "Revocation propagation windows are deployment-documented; the automated rows assert termination, the window itself is human-reviewed." }
+  - { requirement_id: SNTR-ASEC-007, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SESS-008], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-008, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SESS-009], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-009, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SESS-005], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-010, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SESS-005, CONF-SESS-008], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-011, specification: specifications/security/authentication-security.md, section: "§1", test_ids: [CONF-SESS-002, CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-020, specification: specifications/security/authentication-security.md, section: "§2", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-021, specification: specifications/security/authentication-security.md, section: "§2", test_ids: [CONF-SEC-011], automation_status: partially_automated,
+      notes: "Slow-client/inter-frame windows are timing-sensitive; margins must be generous and documented." }
+  - { requirement_id: SNTR-ASEC-022, specification: specifications/security/authentication-security.md, section: "§2", test_ids: [CONF-SEC-007], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-023, specification: specifications/security/authentication-security.md, section: "§2", test_ids: [CONF-SEC-007], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-024, specification: specifications/security/authentication-security.md, section: "§2", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-030, specification: specifications/security/authentication-security.md, section: "§4", test_ids: [CONF-SESS-002], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-031, specification: specifications/security/authentication-security.md, section: "§4", test_ids: [CONF-SEC-004], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-040, specification: specifications/security/authentication-security.md, section: "§4", test_ids: [CONF-SEC-010], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-041, specification: specifications/security/authentication-security.md, section: "§4", test_ids: [CONF-SEC-005], automation_status: partially_automated,
+      notes: "Mid-connection revocation propagation window is deployment-documented (see SNTR-ASEC-006)." }
+  - { requirement_id: SNTR-ASEC-900, specification: specifications/security/authentication-security.md, section: "§8", test_ids: [CONF-SEC-004, CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-ASEC-901, specification: specifications/security/authentication-security.md, section: "§8", test_ids: [CONF-SESS-001], automation_status: partially_automated,
+      notes: "Generic-principal proof automates service-key/device-token flows; the no-human-assumption review of logs and errors is human-confirmed via negative grep." }
+
+  # ---- Replay protection: specifications/security/replay-protection.md ----
+  - { requirement_id: SNTR-RPL-001, specification: specifications/security/replay-protection.md, section: "§1", test_ids: [CONF-SESS-009], automation_status: automated }
+  - { requirement_id: SNTR-RPL-002, specification: specifications/security/replay-protection.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPL-010, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-SEC-005], automation_status: automated }
+  - { requirement_id: SNTR-RPL-011, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-SESS-009, CONF-SEC-006], automation_status: automated }
+  - { requirement_id: SNTR-RPL-012, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-RPC-004], automation_status: automated }
+  - { requirement_id: SNTR-RPL-013, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPL-014, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-EVT-005], automation_status: automated }
+  - { requirement_id: SNTR-RPL-020, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPL-021, specification: specifications/security/replay-protection.md, section: "§2", test_ids: [CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPL-030, specification: specifications/security/replay-protection.md, section: "§4", test_ids: [CONF-SESS-009], automation_status: automated }
+  - { requirement_id: SNTR-RPL-031, specification: specifications/security/replay-protection.md, section: "§4", test_ids: [CONF-SESS-009], automation_status: automated }
+  - { requirement_id: SNTR-RPL-900, specification: specifications/security/replay-protection.md, section: "§8", test_ids: [CONF-SESS-009, CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPL-901, specification: specifications/security/replay-protection.md, section: "§8", test_ids: [CONF-RPC-011], automation_status: automated }
+
+  # ---- Opaque payloads: specifications/security/opaque-payloads.md ----
+  - { requirement_id: SNTR-OPQ-001, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-002, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-003, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-004, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-005, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-006, specification: specifications/security/opaque-payloads.md, section: "§1", test_ids: [CONF-SEC-002], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-010, specification: specifications/security/opaque-payloads.md, section: "§2", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-020, specification: specifications/security/opaque-payloads.md, section: "§3", test_ids: [CONF-CORE-001], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-900, specification: specifications/security/opaque-payloads.md, section: "§7", test_ids: [CONF-CORE-001, CONF-SEC-002], automation_status: automated }
+  - { requirement_id: SNTR-OPQ-901, specification: specifications/security/opaque-payloads.md, section: "§7", test_ids: [CONF-CORE-001], automation_status: automated }
+
+  # ---- Security test plan: specifications/security/test-plan.md ----
+  - { requirement_id: SNTR-STEST-001, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-001], automation_status: automated }
+  - { requirement_id: SNTR-STEST-002, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-008], automation_status: automated }
+  - { requirement_id: SNTR-STEST-003, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-005], automation_status: partially_automated,
+      notes: "Expiry timing uses short-lived fixtures or injected clocks." }
+  - { requirement_id: SNTR-STEST-004, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-004, CONF-SEC-005], automation_status: partially_automated,
+      notes: "Revocation propagation windows are deployment-documented (see SNTR-ASEC-006)." }
+  - { requirement_id: SNTR-STEST-005, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-007], automation_status: automated }
+  - { requirement_id: SNTR-STEST-006, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-006], automation_status: automated }
+  - { requirement_id: SNTR-STEST-007, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-002], automation_status: automated }
+  - { requirement_id: SNTR-STEST-008, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-003, CONF-TCP-008], automation_status: automated }
+  - { requirement_id: SNTR-STEST-009, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-STEST-010, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-009], automation_status: automated }
+  - { requirement_id: SNTR-STEST-011, specification: specifications/security/test-plan.md, section: "§1", test_ids: [CONF-SEC-006], automation_status: automated }
+  - { requirement_id: SNTR-STEST-900, specification: specifications/security/test-plan.md, section: "§2", test_ids: [CONF-SEC-001, CONF-SEC-004], automation_status: automated }
+  # ---- TCP transport: specifications/transports/tcp.md ----
+  - { requirement_id: SNTR-TCP-001, specification: specifications/transports/tcp.md, section: "§1", test_ids: [CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-TCP-002, specification: specifications/transports/tcp.md, section: "§2", test_ids: [CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-TCP-003, specification: specifications/transports/tcp.md, section: "§2", test_ids: [CONF-TCP-002, CONF-TCP-003], automation_status: automated }
+  - { requirement_id: SNTR-TCP-004, specification: specifications/transports/tcp.md, section: "§3", test_ids: [CONF-TCP-002], automation_status: automated }
+  - { requirement_id: SNTR-TCP-005, specification: specifications/transports/tcp.md, section: "§4", test_ids: [CONF-TCP-006], automation_status: automated }
+  - { requirement_id: SNTR-TCP-006, specification: specifications/transports/tcp.md, section: "§5", test_ids: [CONF-TCP-003, CONF-TCP-005], automation_status: automated }
+  - { requirement_id: SNTR-TCP-007, specification: specifications/transports/tcp.md, section: "§6", test_ids: [CONF-TCP-001], automation_status: automated }
+  - { requirement_id: SNTR-TCP-008, specification: specifications/transports/tcp.md, section: "§8", test_ids: [CONF-TCP-001], automation_status: partially_automated,
+      notes: "Plaintext scoping (loopback/isolated only, insecure-mode warning, no production credentials) needs human review of distribution defaults plus the automated framing rows." }
+  - { requirement_id: SNTR-TCP-009, specification: specifications/transports/tcp.md, section: "§9", test_ids: [CONF-TCP-008], automation_status: automated }
+  - { requirement_id: SNTR-TCP-010, specification: specifications/transports/tcp.md, section: "§9", test_ids: [CONF-TCP-008], automation_status: automated }
+  - { requirement_id: SNTR-TCP-011, specification: specifications/transports/tcp.md, section: "§10", test_ids: [CONF-TCP-008], automation_status: automated }
+  - requirement_id: SNTR-TCP-012
+    specification: specifications/transports/tcp.md
+    section: "§11"
+    test_ids: [CONF-TCP-008]
+    automation_status: partially_automated
+    notes: "No-heartbeat rule: the runner observes that no Syntra heartbeat exists and liveness comes from handshake/RPC timers; absence is confirmed over a held-idle connection with generous margins."
+  - requirement_id: SNTR-TCP-013
+    specification: specifications/transports/tcp.md
+    section: "§12"
+    test_ids: [CONF-TCP-008]
+    automation_status: manual
+    notes: "Intermediary behavior (NAT transparency, no reframing, idle-drop handling) is deployment-specific; verified by human review of the deployment's path documentation plus the automated loss/close rows."
+  - { requirement_id: SNTR-TCP-900, specification: specifications/transports/tcp.md, section: "§14", test_ids: [CONF-TCP-001, CONF-TCP-006], automation_status: automated }
+  - requirement_id: SNTR-TCP-901
+    specification: specifications/transports/tcp.md
+    section: "§14"
+    test_ids: [CONF-TCP-004]
+    automation_status: partially_automated
+    notes: "Two-implementation interop proof (V1–V3 exchange): each leg automated; the cross-implementation pairing is human-witnessed (see interoperability/matrix.yaml)."
+
+  # ---- TLS transport: specifications/transports/tls-tcp.md ----
+  - { requirement_id: SNTR-TLS-001, specification: specifications/transports/tls-tcp.md, section: "§1", test_ids: [CONF-TLS-001], automation_status: automated }
+  - { requirement_id: SNTR-TLS-002, specification: specifications/transports/tls-tcp.md, section: "§2", test_ids: [CONF-TLS-004], automation_status: automated }
+  - { requirement_id: SNTR-TLS-003, specification: specifications/transports/tls-tcp.md, section: "§3", test_ids: [CONF-TLS-002], automation_status: automated }
+  - { requirement_id: SNTR-TLS-004, specification: specifications/transports/tls-tcp.md, section: "§4", test_ids: [CONF-TLS-003], automation_status: automated }
+  - { requirement_id: SNTR-TLS-005, specification: specifications/transports/tls-tcp.md, section: "§5", test_ids: [CONF-TLS-001, CONF-TLS-004], automation_status: automated }
+  - { requirement_id: SNTR-TLS-006, specification: specifications/transports/tls-tcp.md, section: "§6", test_ids: [CONF-TLS-001], automation_status: partially_automated,
+      notes: "Termination/proxy binding needs a harness-controlled proxy; the direct (no-proxy) path is fully automated." }
+  - { requirement_id: SNTR-TLS-007, specification: specifications/transports/tls-tcp.md, section: "§7", test_ids: [CONF-TLS-001], automation_status: automated }
+  - { requirement_id: SNTR-TLS-008, specification: specifications/transports/tls-tcp.md, section: "§8", test_ids: [CONF-TLS-001], automation_status: manual,
+      notes: "Mutual TLS is an explicitly deferred extension (not defined in v1); verified by human review that no mTLS behavior is asserted or required." }
+  - { requirement_id: SNTR-TLS-009, specification: specifications/transports/tls-tcp.md, section: "§9", test_ids: [CONF-TLS-001], automation_status: automated }
+  - { requirement_id: SNTR-TLS-010, specification: specifications/transports/tls-tcp.md, section: "§10", test_ids: [CONF-TCP-008], automation_status: automated }
+  - { requirement_id: SNTR-TLS-011, specification: specifications/transports/tls-tcp.md, section: "§13", test_ids: [CONF-SEC-011], automation_status: automated }
+  - { requirement_id: SNTR-TLS-020, specification: specifications/transports/tls-tcp.md, section: "§11", test_ids: [CONF-TLS-002, CONF-TLS-003], automation_status: automated }
+  - { requirement_id: SNTR-TLS-030, specification: specifications/transports/tls-tcp.md, section: "§12", test_ids: [CONF-TLS-001], automation_status: automated }
+  - { requirement_id: SNTR-TLS-900, specification: specifications/transports/tls-tcp.md, section: "§14", test_ids: [CONF-TLS-001, CONF-TLS-002], automation_status: automated }
+  - requirement_id: SNTR-TLS-901
+    specification: specifications/transports/tls-tcp.md
+    section: "§14"
+    test_ids: [CONF-TLS-001]
+    automation_status: partially_automated
+    notes: "Interop proof over TLS with only adapter changes: each leg automated; the cross-implementation pairing is human-witnessed."
+
+  # ---- HTTP transport: specifications/transports/http.md ----
+  - { requirement_id: SNTR-HTTP-001, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-001], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-002, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-002, CONF-HTTP-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-003, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-004], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-004, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-005, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-004], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-006, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-010, specification: specifications/transports/http.md, section: "§1A", test_ids: [CONF-HTTP-001], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-011, specification: specifications/transports/http.md, section: "§1B", test_ids: [CONF-HTTP-005], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-012, specification: specifications/transports/http.md, section: "§1B", test_ids: [CONF-HTTP-005], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-013, specification: specifications/transports/http.md, section: "§1B", test_ids: [CONF-HTTP-005], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-020, specification: specifications/transports/http.md, section: "§1C", test_ids: [CONF-HTTP-001, CONF-HTTP-006], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-021, specification: specifications/transports/http.md, section: "§1C", test_ids: [CONF-HTTP-006], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-022, specification: specifications/transports/http.md, section: "§1C", test_ids: [CONF-HTTP-006], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-030, specification: specifications/transports/http.md, section: "§1D", test_ids: [CONF-HTTP-008], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-031, specification: specifications/transports/http.md, section: "§1D", test_ids: [CONF-HTTP-008], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-032, specification: specifications/transports/http.md, section: "§1D", test_ids: [CONF-HTTP-008], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-040, specification: specifications/transports/http.md, section: "§1E", test_ids: [CONF-HTTP-011, CONF-HTTP-012], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-041, specification: specifications/transports/http.md, section: "§1E", test_ids: [CONF-HTTP-011], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-042, specification: specifications/transports/http.md, section: "§1E", test_ids: [CONF-HTTP-012], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-043, specification: specifications/transports/http.md, section: "§1E", test_ids: [CONF-HTTP-012], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-050, specification: specifications/transports/http.md, section: "§1F", test_ids: [CONF-HTTP-011], automation_status: partially_automated,
+      notes: "HTTP timeout/cancellation mapping uses injected-slow handlers with generous margins." }
+  - { requirement_id: SNTR-HTTP-051, specification: specifications/transports/http.md, section: "§1F", test_ids: [CONF-HTTP-011], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-052, specification: specifications/transports/http.md, section: "§1F", test_ids: [CONF-HTTP-011], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-055, specification: specifications/transports/http.md, section: "§1F", test_ids: [CONF-HTTP-011], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-060, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-009, CONF-HTTP-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-061, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-062, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-063, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-064, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-009], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-065, specification: specifications/transports/http.md, section: "§1H", test_ids: [CONF-HTTP-009], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-070, specification: specifications/transports/http.md, section: "§1I", test_ids: [CONF-HTTP-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-071, specification: specifications/transports/http.md, section: "§1I", test_ids: [CONF-HTTP-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-072, specification: specifications/transports/http.md, section: "§1I", test_ids: [CONF-HTTP-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-073, specification: specifications/transports/http.md, section: "§1I", test_ids: [CONF-HTTP-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-074, specification: specifications/transports/http.md, section: "§1I", test_ids: [CONF-HTTP-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-080, specification: specifications/transports/http.md, section: "§1J", test_ids: [CONF-HTTP-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-081, specification: specifications/transports/http.md, section: "§1J", test_ids: [CONF-HTTP-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-082, specification: specifications/transports/http.md, section: "§1J", test_ids: [CONF-HTTP-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-083, specification: specifications/transports/http.md, section: "§1J", test_ids: [CONF-HTTP-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-090, specification: specifications/transports/http.md, section: "§1K", test_ids: [CONF-HTTP-015], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-091, specification: specifications/transports/http.md, section: "§1K", test_ids: [CONF-HTTP-015], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-100, specification: specifications/transports/http.md, section: "§1L", test_ids: [CONF-HTTP-015], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-101, specification: specifications/transports/http.md, section: "§1L", test_ids: [CONF-HTTP-015], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-110, specification: specifications/transports/http.md, section: "§1M", test_ids: [CONF-HTTP-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-111, specification: specifications/transports/http.md, section: "§1M", test_ids: [CONF-HTTP-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-112, specification: specifications/transports/http.md, section: "§1M", test_ids: [CONF-HTTP-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-113, specification: specifications/transports/http.md, section: "§1M", test_ids: [CONF-HTTP-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-114, specification: specifications/transports/http.md, section: "§1M", test_ids: [CONF-HTTP-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-120, specification: specifications/transports/http.md, section: "§1N", test_ids: [CONF-HTTP-016], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-121, specification: specifications/transports/http.md, section: "§1N", test_ids: [CONF-HTTP-016], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-130, specification: specifications/transports/http.md, section: "§1O", test_ids: [CONF-HTTP-017], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-131, specification: specifications/transports/http.md, section: "§1O", test_ids: [CONF-HTTP-017], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-140, specification: specifications/transports/http.md, section: "§1P", test_ids: [CONF-HTTP-018], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-141, specification: specifications/transports/http.md, section: "§1P", test_ids: [CONF-HTTP-018], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-150, specification: specifications/transports/http.md, section: "§2", test_ids: [CONF-HTTP-001], automation_status: partially_automated,
+      notes: "Plaintext-profile scoping (loopback/isolated only, warning, no production credentials) needs human review of distribution defaults." }
+  - { requirement_id: SNTR-HTTP-160, specification: specifications/transports/http.md, section: "§3", test_ids: [CONF-HTTP-001, CONF-HTTP-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-170, specification: specifications/transports/http.md, section: "§4", test_ids: [CONF-HTTP-001, CONF-HTTP-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTP-900, specification: specifications/transports/http.md, section: "§8", test_ids: [CONF-HTTP-001, CONF-HTTP-011], automation_status: automated }
+  - requirement_id: SNTR-HTTP-901
+    specification: specifications/transports/http.md
+    section: "§8"
+    test_ids: [CONF-HTTP-001]
+    automation_status: partially_automated
+    notes: "HTTP interop proof (same logical Frames over HTTP/1.1 and a second profile, byte-identical assertions): each leg automated; the pair is human-confirmed."
+
+  # ---- HTTPS transport: specifications/transports/https.md ----
+  - { requirement_id: SNTR-HTTPS-001, specification: specifications/transports/https.md, section: "§1A", test_ids: [CONF-HTTPS-001, CONF-HTTPS-002], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-002, specification: specifications/transports/https.md, section: "§1A", test_ids: [CONF-HTTPS-001], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-003, specification: specifications/transports/https.md, section: "§1A", test_ids: [CONF-HTTPS-001, CONF-HTTPS-002], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-010, specification: specifications/transports/https.md, section: "§1B", test_ids: [CONF-HTTPS-004, CONF-HTTPS-006], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-011, specification: specifications/transports/https.md, section: "§1B", test_ids: [CONF-HTTPS-004], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-012, specification: specifications/transports/https.md, section: "§1B", test_ids: [CONF-HTTPS-005], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-013, specification: specifications/transports/https.md, section: "§1B", test_ids: [CONF-HTTPS-006], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-014, specification: specifications/transports/https.md, section: "§1B", test_ids: [CONF-HTTPS-008], automation_status: partially_automated,
+      notes: "Rotation overlap needs a harness-controlled PKI rotation (see SNTR-TSEC-006)." }
+  - { requirement_id: SNTR-HTTPS-020, specification: specifications/transports/https.md, section: "§1C", test_ids: [CONF-HTTPS-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-021, specification: specifications/transports/https.md, section: "§1C", test_ids: [CONF-HTTPS-007], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-030, specification: specifications/transports/https.md, section: "§1D", test_ids: [CONF-HTTPS-001], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-031, specification: specifications/transports/https.md, section: "§1D", test_ids: [CONF-HTTPS-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-040, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-002, CONF-HTTPS-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-041, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-042, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-003], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-043, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-003, CONF-HTTPS-014], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-044, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-002], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-045, specification: specifications/transports/https.md, section: "§1E", test_ids: [CONF-HTTPS-012], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-050, specification: specifications/transports/https.md, section: "§1F", test_ids: [CONF-HTTPS-009, CONF-HTTPS-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-051, specification: specifications/transports/https.md, section: "§1F", test_ids: [CONF-HTTPS-009, CONF-HTTPS-010], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-052, specification: specifications/transports/https.md, section: "§1F", test_ids: [CONF-HTTPS-013], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-060, specification: specifications/transports/https.md, section: "§1G", test_ids: [CONF-HTTPS-011], automation_status: partially_automated,
+      notes: "Proxy/termination binding needs a misconfigured-proxy harness plus deployment-specific review (see SNTR-TSEC-008)." }
+  - { requirement_id: SNTR-HTTPS-061, specification: specifications/transports/https.md, section: "§1G", test_ids: [CONF-HTTPS-011], automation_status: partially_automated,
+      notes: "Same proxy-harness requirement as SNTR-HTTPS-060 (second proxy clause)." }
+  - { requirement_id: SNTR-HTTPS-070, specification: specifications/transports/https.md, section: "§1H", test_ids: [CONF-HTTPS-012], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-080, specification: specifications/transports/https.md, section: "§2", test_ids: [CONF-HTTPS-001, CONF-HTTPS-009], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-081, specification: specifications/transports/https.md, section: "§2", test_ids: [CONF-HTTPS-009], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-090, specification: specifications/transports/https.md, section: "§3", test_ids: [CONF-HTTPS-001], automation_status: automated }
+  - { requirement_id: SNTR-HTTPS-900, specification: specifications/transports/https.md, section: "§8", test_ids: [CONF-HTTPS-001, CONF-HTTPS-004], automation_status: automated }
+  - requirement_id: SNTR-HTTPS-901
+    specification: specifications/transports/https.md
+    section: "§8"
+    test_ids: [CONF-HTTPS-001, CONF-HTTPS-002]
+    automation_status: partially_automated
+    notes: "HTTPS interop proof (identical logical Frames over H1 and H2 with only framing changed): each leg automated; the pair is human-confirmed."
+
+  # ---- WebSocket transport: specifications/transports/websocket.md ----
+  - { requirement_id: SNTR-WS-001, specification: specifications/transports/websocket.md, section: "§1B", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-002, specification: specifications/transports/websocket.md, section: "§1B", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-003, specification: specifications/transports/websocket.md, section: "§1B", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-004, specification: specifications/transports/websocket.md, section: "§1B", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-010, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-011, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-012, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-013, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-014, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-020, specification: specifications/transports/websocket.md, section: "§1C", test_ids: [CONF-WS-002], automation_status: automated }
+  - { requirement_id: SNTR-WS-021, specification: specifications/transports/websocket.md, section: "§1C", test_ids: [CONF-WS-003], automation_status: automated }
+  - { requirement_id: SNTR-WS-022, specification: specifications/transports/websocket.md, section: "§1C", test_ids: [CONF-WS-004], automation_status: automated }
+  - { requirement_id: SNTR-WS-023, specification: specifications/transports/websocket.md, section: "§1C", test_ids: [CONF-WS-002], automation_status: automated }
+  - { requirement_id: SNTR-WS-024, specification: specifications/transports/websocket.md, section: "§1C", test_ids: [CONF-WS-002], automation_status: automated }
+  - { requirement_id: SNTR-WS-030, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WS-031, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-005, CONF-WS-006], automation_status: automated }
+  - { requirement_id: SNTR-WS-032, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WS-033, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-007], automation_status: automated }
+  - { requirement_id: SNTR-WS-034, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-007], automation_status: automated }
+  - { requirement_id: SNTR-WS-035, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-008], automation_status: automated }
+  - { requirement_id: SNTR-WS-036, specification: specifications/transports/websocket.md, section: "§1D", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WS-040, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001, CONF-WS-016], automation_status: automated }
+  - { requirement_id: SNTR-WS-041, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-042, specification: specifications/transports/websocket.md, section: "§1F", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-050, specification: specifications/transports/websocket.md, section: "§1G", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-051, specification: specifications/transports/websocket.md, section: "§1G", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-052, specification: specifications/transports/websocket.md, section: "§1G", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-060, specification: specifications/transports/websocket.md, section: "§1H", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-061, specification: specifications/transports/websocket.md, section: "§1H", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-062, specification: specifications/transports/websocket.md, section: "§1H", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-070, specification: specifications/transports/websocket.md, section: "§1I", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WS-071, specification: specifications/transports/websocket.md, section: "§1I", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WS-072, specification: specifications/transports/websocket.md, section: "§1I", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WS-073, specification: specifications/transports/websocket.md, section: "§1I", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WS-080, specification: specifications/transports/websocket.md, section: "§1J", test_ids: [CONF-WS-010], automation_status: automated }
+  - { requirement_id: SNTR-WS-081, specification: specifications/transports/websocket.md, section: "§1J", test_ids: [CONF-WS-010, CONF-WS-011], automation_status: automated }
+  - { requirement_id: SNTR-WS-082, specification: specifications/transports/websocket.md, section: "§1J", test_ids: [CONF-WS-011], automation_status: automated }
+  - { requirement_id: SNTR-WS-090, specification: specifications/transports/websocket.md, section: "§4", test_ids: [CONF-WS-011], automation_status: automated }
+  - { requirement_id: SNTR-WS-091, specification: specifications/transports/websocket.md, section: "§4", test_ids: [CONF-WS-011], automation_status: automated }
+  - { requirement_id: SNTR-WS-092, specification: specifications/transports/websocket.md, section: "§4", test_ids: [CONF-WS-011], automation_status: automated }
+  - { requirement_id: SNTR-WS-100, specification: specifications/transports/websocket.md, section: "§1L", test_ids: [CONF-WS-017, CONF-WS-015], automation_status: automated }
+  - { requirement_id: SNTR-WS-101, specification: specifications/transports/websocket.md, section: "§1L", test_ids: [CONF-WS-017], automation_status: automated }
+  - { requirement_id: SNTR-WS-102, specification: specifications/transports/websocket.md, section: "§1L", test_ids: [CONF-WS-017], automation_status: automated }
+  - { requirement_id: SNTR-WS-110, specification: specifications/transports/websocket.md, section: "§1L", test_ids: [CONF-WS-017], automation_status: automated }
+  - { requirement_id: SNTR-WS-120, specification: specifications/transports/websocket.md, section: "§1N", test_ids: [CONF-WS-013, CONF-WS-014], automation_status: automated }
+  - { requirement_id: SNTR-WS-200, specification: specifications/transports/websocket.md, section: "§2", test_ids: [CONF-WS-001], automation_status: automated }
+  - { requirement_id: SNTR-WS-201, specification: specifications/transports/websocket.md, section: "§2", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WS-202, specification: specifications/transports/websocket.md, section: "§2", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WS-210, specification: specifications/transports/websocket.md, section: "§3", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WS-211, specification: specifications/transports/websocket.md, section: "§3", test_ids: [CONF-WS-008], automation_status: automated }
+  - { requirement_id: SNTR-WS-212, specification: specifications/transports/websocket.md, section: "§3", test_ids: [CONF-WS-017], automation_status: automated }
+  - { requirement_id: SNTR-WS-220, specification: specifications/transports/websocket.md, section: "§3", test_ids: [CONF-WS-016], automation_status: automated }
+  - { requirement_id: SNTR-WS-900, specification: specifications/transports/websocket.md, section: "§7", test_ids: [CONF-WS-001, CONF-WS-005], automation_status: automated }
+  - requirement_id: SNTR-WS-901
+    specification: specifications/transports/websocket.md
+    section: "§7"
+    test_ids: [CONF-WS-015]
+    automation_status: partially_automated
+    notes: "WS interop proof (same Frames over WS and a second profile, plus two-implementation exchange): each leg automated; the pairing is human-witnessed."
+
+  # ---- Secure WebSocket transport: specifications/transports/secure-websocket.md ----
+  - { requirement_id: SNTR-WSS-001, specification: specifications/transports/secure-websocket.md, section: "§1B", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-002, specification: specifications/transports/secure-websocket.md, section: "§1B", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-003, specification: specifications/transports/secure-websocket.md, section: "§1B", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-004, specification: specifications/transports/secure-websocket.md, section: "§1B", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-010, specification: specifications/transports/secure-websocket.md, section: "§1C", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-011, specification: specifications/transports/secure-websocket.md, section: "§1C", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-012, specification: specifications/transports/secure-websocket.md, section: "§1C", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-013, specification: specifications/transports/secure-websocket.md, section: "§1C", test_ids: [CONF-WSS-007], automation_status: automated }
+  - { requirement_id: SNTR-WSS-020, specification: specifications/transports/secure-websocket.md, section: "§1F", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-021, specification: specifications/transports/secure-websocket.md, section: "§1F", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-030, specification: specifications/transports/secure-websocket.md, section: "§1D", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-031, specification: specifications/transports/secure-websocket.md, section: "§1E", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-040, specification: specifications/transports/secure-websocket.md, section: "§1F", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-041, specification: specifications/transports/secure-websocket.md, section: "§1F", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-050, specification: specifications/transports/secure-websocket.md, section: "§1G", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-051, specification: specifications/transports/secure-websocket.md, section: "§1H", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-060, specification: specifications/transports/secure-websocket.md, section: "§1I", test_ids: [CONF-WS-009], automation_status: automated }
+  - { requirement_id: SNTR-WSS-070, specification: specifications/transports/secure-websocket.md, section: "§1J", test_ids: [CONF-WS-010], automation_status: automated }
+  - { requirement_id: SNTR-WSS-080, specification: specifications/transports/secure-websocket.md, section: "§1K", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-081, specification: specifications/transports/secure-websocket.md, section: "§1K", test_ids: [CONF-WS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-090, specification: specifications/transports/secure-websocket.md, section: "§1L", test_ids: [CONF-WS-017], automation_status: automated }
+  - { requirement_id: SNTR-WSS-100, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-002, CONF-WSS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-110, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-002, CONF-WSS-005], automation_status: automated }
+  - { requirement_id: SNTR-WSS-111, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-002, CONF-WSS-004], automation_status: automated }
+  - { requirement_id: SNTR-WSS-112, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-003], automation_status: automated }
+  - { requirement_id: SNTR-WSS-113, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-005, CONF-WSS-006], automation_status: automated }
+  - { requirement_id: SNTR-WSS-114, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-008], automation_status: partially_automated,
+      notes: "Proxy/termination binding needs a misconfigured-proxy harness plus deployment-specific review (see SNTR-TSEC-008)." }
+  - { requirement_id: SNTR-WSS-115, specification: specifications/transports/secure-websocket.md, section: "§1M", test_ids: [CONF-WSS-009], automation_status: partially_automated,
+      notes: "Rotation overlap needs a harness-controlled PKI rotation (see SNTR-TSEC-006)." }
+  - { requirement_id: SNTR-WSS-120, specification: specifications/transports/secure-websocket.md, section: "§1N", test_ids: [CONF-WSS-010], automation_status: automated }
+  - { requirement_id: SNTR-WSS-200, specification: specifications/transports/secure-websocket.md, section: "§2", test_ids: [CONF-WSS-002, CONF-WSS-003], automation_status: automated }
+  - { requirement_id: SNTR-WSS-201, specification: specifications/transports/secure-websocket.md, section: "§2", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-210, specification: specifications/transports/secure-websocket.md, section: "§3", test_ids: [CONF-WSS-001], automation_status: automated }
+  - { requirement_id: SNTR-WSS-211, specification: specifications/transports/secure-websocket.md, section: "§3", test_ids: [CONF-WS-008], automation_status: automated }
+  - { requirement_id: SNTR-WSS-220, specification: specifications/transports/secure-websocket.md, section: "§4", test_ids: [CONF-WS-012], automation_status: automated }
+  - { requirement_id: SNTR-WSS-900, specification: specifications/transports/secure-websocket.md, section: "§7", test_ids: [CONF-WSS-001, CONF-WSS-002], automation_status: automated }
+  - requirement_id: SNTR-WSS-901
+    specification: specifications/transports/secure-websocket.md
+    section: "§7"
+    test_ids: [CONF-WSS-006]
+    automation_status: partially_automated
+    notes: "Downgrade proof under active-attacker harness: the refusal rows are automated; the attacker-model review is human (see SNTR-TMOD-002)."
+
+  # ---- Charter: specifications/architecture.md (SYN-ARCH-* namespace) ----
+  # Charter IDs are normative (GOVERNANCE.md, ADR-001). Rows below trace each
+  # to exercising conformance cases or to manual charter attestation by review.
+  # Added for v1 RC (audit v1-conformance-coverage §3.1 recommendation).
+  - requirement_id: SYN-ARCH-001
+    specification: specifications/architecture.md
+    section: "§2"
+    test_ids: [CONF-EVT-015]
+    automation_status: manual
+    notes: "Independence (no private product/company/infrastructure references): exercised by the neutral-fixture generic proof; attested by human review of specs, schemas, and fixtures."
+  - requirement_id: SYN-ARCH-002
+    specification: specifications/architecture.md
+    section: "§2"
+    test_ids: [CONF-EVT-015]
+    automation_status: manual
+    notes: "No domain-specific concepts: exercised by neutral fixtures; attested by human review (negative grep for domain terms)."
+  - requirement_id: SYN-ARCH-010
+    specification: specifications/architecture.md
+    section: "§5"
+    test_ids: []
+    automation_status: manual
+    notes: "Core independent of socket libraries: structural property attested by review of core specs (no socket/TLS content) and adapter separation."
+  - requirement_id: SYN-ARCH-011
+    specification: specifications/architecture.md
+    section: "§5"
+    test_ids: []
+    automation_status: manual
+    notes: "Adapters independent of application logic: structural property attested by review (adapters route opaque bytes only)."
+  - requirement_id: SYN-ARCH-012
+    specification: specifications/architecture.md
+    section: "§5"
+    test_ids: []
+    automation_status: manual
+    notes: "Framing separate from Protobuf encoding: structural property attested by review (TCP prefix vs Frame schema evolve independently)."
+  - requirement_id: SYN-ARCH-013
+    specification: specifications/architecture.md
+    section: "§5"
+    test_ids: [CONF-CORE-001]
+    automation_status: automated
+    notes: "Opaque carriage exercised by bit-identical payload round-trips (incl. ciphertext bytes); core never parses payload semantics."
+  - requirement_id: SYN-ARCH-020
+    specification: specifications/architecture.md
+    section: "§6"
+    test_ids: [CONF-TCP-007]
+    automation_status: automated
+    notes: "Reserved values preserved: exercised by reserved-number rejection rows."
+  - requirement_id: SYN-ARCH-021
+    specification: specifications/architecture.md
+    section: "§6"
+    test_ids: [CONF-CORE-003]
+    automation_status: automated
+    notes: "Unknown-field tolerance + unknown-variant rejection exercised by injection and variant rows."
+  - requirement_id: SYN-ARCH-030
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: [CONF-SEC-009]
+    automation_status: partially_automated
+    notes: "Secure-transport-only production: downgrade-refusal cases automated; distribution-default posture needs human review."
+  - requirement_id: SYN-ARCH-031
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: []
+    automation_status: manual
+    notes: "Established TLS only, no custom crypto: absence attested by review of proto imports, dependencies, and transport specs."
+  - requirement_id: SYN-ARCH-032
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: [CONF-SEC-004]
+    automation_status: partially_automated
+    notes: "Credential opacity: hygiene negative-grep runs in the harness; no-log/no-persist handling attested by review."
+  - requirement_id: SYN-ARCH-033
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: [CONF-SESS-003, CONF-SEC-007]
+    automation_status: automated
+    notes: "No protected operations before authentication: exercised by pre-ACTIVE rejection and per-method authorization rows."
+  - requirement_id: SYN-ARCH-034
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: [CONF-SEC-002, CONF-SEC-011]
+    automation_status: automated
+    notes: "Bounded buffers, explicit limits, deterministic failure: exercised by oversize/exhaustion rows."
+  - requirement_id: SYN-ARCH-035
+    specification: specifications/architecture.md
+    section: "§7"
+    test_ids: [CONF-RPC-012]
+    automation_status: automated
+    notes: "Transport receipt proves nothing: exercised by loss-before-result mapping to UNAVAILABLE with unknown outcome."
+  - requirement_id: SYN-ARCH-040
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Schema authority: attested by review (single proto source of truth; prose never redefines fields)."
+  - requirement_id: SYN-ARCH-041
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Core-spec authority: attested by review (implementations conform; none is normative)."
+  - requirement_id: SYN-ARCH-042
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Transport-spec authority for mappings: attested by review (core embeds no socket/TLS detail)."
+  - requirement_id: SYN-ARCH-043
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Security-spec authority: attested by review (no weakening elsewhere)."
+  - requirement_id: SYN-ARCH-044
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Conformance suite as verification authority: self-referential by nature; attested by review that claims cite suite results."
+  - requirement_id: SYN-ARCH-045
+    specification: specifications/architecture.md
+    section: "§8"
+    test_ids: []
+    automation_status: manual
+    notes: "Reference implementation non-normative: attested by review (no implementation defines behavior)."
+  - requirement_id: SYN-ARCH-050
+    specification: specifications/architecture.md
+    section: "§9"
+    test_ids: []
+    automation_status: manual
+    notes: "Profile support documented per implementation: wording rules in conformance/claims.md verified by review of declarations."
+  - requirement_id: SYN-ARCH-051
+    specification: specifications/architecture.md
+    section: "§9"
+    test_ids: []
+    automation_status: manual
+    notes: "Deferred profiles not described as implemented: attested by review (no UDP/DTLS/QUIC/HTTP-3/QUIC-DATAGRAM/WS-H2 claims)."
+  - requirement_id: SYN-ARCH-060
+    specification: specifications/architecture.md
+    section: "§11"
+    test_ids: []
+    automation_status: manual
+    notes: "Implementable without Rust/private repos: attested by review (spec + IDL + YAML manifests suffice; see implementer guide)."
+  - requirement_id: SYN-ARCH-061
+    specification: specifications/architecture.md
+    section: "§11"
+    test_ids: []
+    automation_status: manual
+    notes: "Reference conforms to spec: attested on delivery (non-normative implementation checked against suite)."
+  - requirement_id: SYN-ARCH-062
+    specification: specifications/architecture.md
+    section: "§11"
+    test_ids: []
+    automation_status: manual
+    notes: "No private-product/company/infrastructure dependency: attested by review (see independence verification; F-05 tracks the go_package exception)."

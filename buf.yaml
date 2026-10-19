@@ -1,0 +1,19 @@
+# Syntra schema module (Buf v2). Reviewed for BSR publication in
+# docs/schema-registry.md §3: single module rooted at proto (the sole source
+# of truth), STANDARD lint and FILE breaking with no exceptions, and zero
+# external dependencies (all imports resolve inside the module), so no
+# buf.lock is required. Any lint/breaking exception MUST cite its RFC.
+version: v2
+modules:
+  - path: proto
+    # BSR module identity, approved per docs/schema-registry.md §1.
+    # Required for `buf push` and `--against-registry` breaking checks.
+    # Do not change without a maintainer decision recorded on the
+    # publication RFC.
+    name: buf.build/tinklecorp/syntra
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE

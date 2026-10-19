@@ -1,0 +1,92 @@
+# Repository validation for v1 release candidacy. Credential-less: validates
+# only, never publishes. Fails closed: any error blocks the RC checklist
+# (RELEASE.md). Network use is limited to pinned Buf remote plugins invoked
+# by scripts/validate-schema.py; no credentials are required or read.
+name: repo-validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read  # no secrets, no write, no publish
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: A1 markdown validation (hygiene, fences, EOF newlines)
+        run: python3 scripts/validate-repo.py markdown
+
+      - name: A2 internal link validation (files, anchors)
+        run: python3 scripts/validate-repo.py links
+
+      - name: A10 schema/spec cross-references (IDs, profiles)
+        run: python3 scripts/validate-repo.py links manifests
+        # links: anchors/files/RFC targets + requirement & profile refs.
+        # manifests: profile/requirement/capability reference integrity.
+
+      - name: A11 RFC metadata validation (statuses, required fields)
+        run: python3 scripts/validate-repo.py rfcs
+
+      - name: Repository boundary guard (no committed bindings/SDKs)
+        # Fails if generated language bindings, their directories, or the
+        # removed root buf.gen.yaml return. Temp .tmp/ smoke-test output
+        # is ignored by design and never flagged.
+        run: python3 scripts/validate-repo.py boundary
+
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+
+      - name: A3 buf format check
+        run: buf format --diff --exit-code
+
+      - name: A4 buf lint (STANDARD, no exceptions)
+        run: buf lint
+
+      - name: A5 buf build
+        run: buf build
+
+      - name: A6 buf breaking change validation against stable baseline
+        # Bootstrap baseline: the committed initial snapshot. Replace with the
+        # stable BSR commit once the first release is published (reviewed PR;
+        # see docs/schema-registry.md §9). Never an arbitrary branch.
+        run: buf breaking --against 'compatibility/v1-initial/image.json'
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"
+
+      - name: A7 requirement ID validation (uniqueness, naming, registry refs)
+        run: python3 scripts/validate-repo.py requirements
+
+      - name: A8 conformance manifest validation (IDs, profiles, expected blocks)
+        run: python3 scripts/validate-repo.py manifests
+
+      - name: A9 test vector validation (hex, protobuf decode, TCP lengths)
+        run: python3 scripts/validate-repo.py vectors
+
+      - name: full repository validation gate
+        run: python3 scripts/validate-repo.py all

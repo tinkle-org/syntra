@@ -9,6 +9,15 @@ target/
 dist/
 *.log
 
+# Reproducible schema tooling outputs (baselines under compatibility are tracked)
+# Codecs smoke tests generate language bindings into .tmp/ only; generated
+# source is never committed (see scripts/validate-schema.py and the
+# repository-boundary validator). No bindings/, gen/, or generated/
+# directories may exist in the repository.
+.tmp/
+.tools/
+__pycache__/
+
 # Editor
 .vscode/
 .idea/
