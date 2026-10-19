@@ -1,0 +1,15 @@
+# Local tooling and OS metadata — never published to tinklehq/syntra
+.agents/
+.opencode/
+.DS_Store
+**/.DS_Store
+
+# Build outputs (forthcoming Rust reference / conformance)
+target/
+dist/
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
