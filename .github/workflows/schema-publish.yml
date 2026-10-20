@@ -6,12 +6,15 @@
 # environment), leaving the BSR repo empty with no commits.
 #
 # Behavior with the default buf-action config:
-# - push to main (proto/**, buf.yaml, buf.lock) -> validates and `buf push`
-#   the named module from buf.yaml (buf.build/tinklecorp/syntra).
+# - push to main (proto/**, buf.yaml, buf.lock, this workflow) -> validates
+#   and `buf push` the named module from buf.yaml (buf.build/tinklecorp/syntra).
 #   First push auto-creates the BSR repo; push_create_visibility makes it public.
+#   This workflow file itself is in paths so workflow-only fixes still trigger
+#   the first publish instead of silently skipping it.
 # - pull_request -> validates only (lint, format, breaking) + PR summary comment.
 # - delete branch/tag -> archives the corresponding BSR label.
 # - push tag proto-v* -> pushes that revision so it can be labeled stable/candidate.
+# - workflow_dispatch -> manual retry for the empty-BSR bootstrap without a schema change.
 #
 # Required secret: BUF_TOKEN (BSR API token for the tinklecorp org), already
 # present as a repository secret. No repository variables or environments required.
@@ -26,6 +29,8 @@ on:
       - "proto/**"
       - "buf.yaml"
       - "buf.lock"
+      - ".github/workflows/schema-publish.yml"
+  workflow_dispatch:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
