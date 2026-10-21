@@ -43,14 +43,16 @@ Related: [`GOVERNANCE.md`](GOVERNANCE.md) (who approves what),
   changes go under `specifications/`; conformance changes go under
   `conformance/`.
 - **Docs and examples**: welcome; must stay generic per Sec. 1.
-- **Generated language bindings**: do NOT commit generated Go, Rust, or
-  other language bindings — no `bindings/`, `gen/`, or `generated/`
-  directories, no `*.pb.go` / `*_grpc.pb.go` files, no checked-in
-  `buf.gen.yaml`. Codec smoke tests generate into the ignored `.tmp/`
-  directory via `scripts/validate-schema.py`; the repository-boundary
-  check (`scripts/validate-repo.py boundary`, CI-enforced) fails if
-  generated bindings return. Obtain language bindings from the Buf
-  Schema Registry instead (see `docs/schema-registry.md`).
+- **Generated language types**: committed under `crates/` (Rust prost
+  output) and `bindings/go/` (Go protobuf output, incl. `*.pb.go`) — no
+  `gen/`, `generated/`, or `bindings/` roots outside `bindings/go/`, no
+  tracked `.tmp/` output. Regenerate with the pinned template and commit
+  the result in the same PR (`scripts/validate-schema.py --drift-only`
+  must stay green; the repository-boundary check,
+  `scripts/validate-repo.py boundary`, fails on legacy trees, tracked
+  `.tmp/`, or drift). Consumers use the committed tree or the GitHub
+  Release assets (see `docs/schema-registry.md`); there is no registry
+  publication.
 
 ## 3. Proposing a change
 
@@ -102,7 +104,13 @@ Before requesting review:
       the user-directed layout decision and separate, known historical
       FILE/source break. Historical comparisons read the hash-verified
       `compatibility/v1-initial/historical.json` archive, without a Git
-      checkout or duplicate schema tree.
+      checkout or duplicate schema tree. Regenerate committed types in the
+      same PR (`--drift-only` must pass); default + fixture `cargo test`
+      (`--workspace` plus `-p syntra-ffi --features test-fixture` and
+      `build_contract.py`), default-tag `go test` (no `-tags syntranative`),
+      and WASM checks (non-FFI success plus expected `syntra-ffi does not
+      support WASM` failure; no browser WASM archive) run in CI (see
+      `repo-validation.yml`).
 - [ ] Markdown uses BCP 14 keywords correctly (capitalized only for
       normative force).
 - [ ] No private dependency or domain-specific term introduced
@@ -131,8 +139,8 @@ Signed-off-by: Your Name <you@example.com>
 ```
 
 Use `git commit -s`. By signing off you certify you have the right to
-contribute the change under the project's future license (see
-`GOVERNANCE.md` Sec. 7 — license pending) and that the contribution
+contribute the change under the project's license (Apache-2.0, see
+`LICENSE` and `GOVERNANCE.md` Sec. 7) and that the contribution
 follows this guide.
 
 ## 7. Style
@@ -147,8 +155,8 @@ follows this guide.
 ## 8. What not to do
 
 - Do not invent contact addresses, endpoints, or credentials in docs.
-- Do not select a license on behalf of maintainers (see `GOVERNANCE.md`
-  Sec. 7).
+- Do not select a different license on behalf of maintainers (project is
+  Apache-2.0; see `LICENSE` and `GOVERNANCE.md` Sec. 7).
 - Do not resolve wire-compat or security questions by implementation
   choice alone — open an RFC or record a blocker.
 - Do not delete or silently rewrite working code; propose migration in

@@ -14,9 +14,11 @@ plan, not a release announcement: the tag MUST NOT be created until
 `RELEASE.md` §1 is fully evidenced and `audits/v1-release-readiness.md`
 shows no BLOCKED area in RC scope. Known blockers: P0 findings F-01–F-06
 (`audits/v1-consistency-review.md`), SESSION-OPEN-QUESTIONS items 1–11,
-pending RFCs 0001–0005, unaccepted BSR publication policy, no `LICENSE` file.
-The BSR module identity is approved as `buf.build/tinklecorp/syntra`
-(`buf.yaml`, `README.md` §BSR schema location, `docs/schema-registry.md` §1).
+pending RFCs 0001–0005, no stable release tagged yet. Distribution is
+per-crate tags `<crate>-vX.Y.Z` with crates.io publication plus GitHub
+Release assets (no BSR, no GHCR); license is Apache-2.0
+(`LICENSE`, `GOVERNANCE.md` §7). Where this plan differs from `Unreleased`,
+the crates.io model governs.
 
 ### Added
 
@@ -74,6 +76,25 @@ The BSR module identity is approved as `buf.build/tinklecorp/syntra`
 
 ### Added
 
+- Apache-2.0 `LICENSE`; all Rust packages are Apache-2.0 and publish
+  to crates.io via release-plz Trusted Publishing (OIDC, with scoped
+  `CARGO_REGISTRY_TOKEN` bootstrap fallback).
+- `release-plz.toml` (Rust workspace versioning + Release PRs, crates.io
+  publish enabled, per-crate tags on Release PR merge) and
+  `.github/workflows/release.yml` (schema/source/crate/Go archives,
+  descriptor/manifests/vectors, SHA256SUMS attached to the syntra-core
+  GitHub Release; nested `bindings/go/vX.Y.Z` tag created-or-verified at
+  the same revision by the release workflow; no native/header/browser-WASM
+  assets).
+- `crates/syntra-ffi` is default-empty (no C ABI exports) with an explicit
+  native `test-fixture` feature only for tests; all WASM targets are
+  rejected at compile time. CI runs default workspace tests plus
+  `--features test-fixture` tests and `build_contract.py`, and asserts the
+  expected WASM failure alongside non-FFI WASM checks.
+- Committed generated types under `crates/` (Rust) and `bindings/go/` (Go,
+  incl. `*.pb.go`), drift-checked by `scripts/validate-schema.py
+  --drift-only` and CI jobs (default + fixture `cargo test`, default-tag
+  `go test`, expected-failure WASM check).
 - Seven-file public IDL in `proto/syntra/v1`, preserving the
   existing message names, field numbers, oneofs, enum registry and reservations.
   Session control/capability messages and requested extensions remain deferred
@@ -175,14 +196,19 @@ The BSR module identity is approved as `buf.build/tinklecorp/syntra`
   historical declarations survive in the immutable descriptor archive and
   original path/hash provenance. This supersedes the original additive-only
   preservation plan without adding wire types or changing protocol semantics.
-- Local generated language bindings and their scaffolding: `bindings/`
-  (Go/Rust generated output plus binding manifests), `gen/` (stale
-  duplicate generated output), and root `buf.gen.yaml` (whose only
-  purpose was producing those repository-local bindings). No wire or
-  behavioral change; `go_package` options are unchanged. Codec smoke
-  tests now generate into the ignored `.tmp/` directory via
-  `scripts/validate-schema.py`; consumers obtain bindings from the Buf
-  Schema Registry instead (see `docs/schema-registry.md` §11).
+- BSR publication path: deleted `.github/workflows/schema-publish.yml`, removed
+  the `buf.build/tinklecorp/syntra` registry identity from `buf.yaml`, and
+  retired `proto-v*` tags / BSR labels. Releases are per-crate tags
+  `<crate>-vX.Y.Z` (+ nested `bindings/go/vX.Y.Z` at the syntra-core
+  revision) with crates.io publication plus GitHub Release assets (source,
+  crate, Go-bindings archives, descriptor, manifests, vectors, SHA256SUMS);
+  no native/header/browser-WASM assets, no GHCR, no `buf push`. Go servers
+  use the default pure-Go module; `syntranative` is unsupported and
+  withheld.
+- `.tmp/`-only generation model: committed generated types now live under
+  `crates/` (Rust) and `bindings/go/` (Go, incl. `*.pb.go`), drift-checked
+  by `scripts/validate-schema.py --drift-only` (CI-enforced). No wire or
+  behavioral change; `go_package` options are unchanged.
 
 ### Fixed
 

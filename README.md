@@ -15,8 +15,8 @@ data model, or internal architecture.
 - Protocol version: Syntra v1 (in development — core/security drafts and
   public IDL tooling present; behavioral acceptance pending, see
   [Status](#current-protocol-status) and `SESSION-OPEN-QUESTIONS.md`)
-- IDL: Protocol Buffers (proto3), governed by Buf v2, published via the
-  Buf Schema Registry (see [BSR and schema](#bsr-schema-location))
+- IDL: Protocol Buffers (proto3), governed by Buf v2, distributed via
+  crates.io, nested Go module tags, and GitHub Releases (see [Schema distribution](#schema-distribution))
 - Reference implementation: Rust (forthcoming, non-normative)
 - Methodology: Specification-Driven Development — specifications first,
   code second
@@ -143,10 +143,11 @@ specifications/schema/         — IDL reference, generation, compatibility,
   validation records
 specifications/decisions/      — ADRs 001–010 (each with an owner)
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
-buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking)
+buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
-tests/schema/                  — descriptor and codec validation (smoke tests
-                               generate into ignored .tmp/ only; nothing committed)
+crates/                        — Rust workspace (schema types; syntra-ffi is default-empty with test-fixture only, no production FFI, WASM unsupported; committed prost output, drift-checked)
+bindings/go/                   — committed Go protobuf types + unsupported CGO adapter proposal + supported pure-Go core (drift-checked; default tags only)
+tests/schema/                  — descriptor and codec validation (committed generation drift-checked; .tmp/ holds disposable repro only)
 conformance/                   — executable conformance suite (manifests,
   profiles, test vectors, claims, declarations)
 docs/                          — implementer guides, glossary, FAQ, registry docs
@@ -161,27 +162,27 @@ ordered reading path.
 
 ## Repository boundary
 
-This repository is a specification-only public protocol repository. It
-contains normative sources and the tooling that validates them — no
-protocol implementations and no generated language bindings.
+This repository is the authoring authority for the Syntra protocol: normative
+sources plus the Rust/Go generated types and the tooling that validates them.
+Rust crates are published to crates.io by release-plz after a reviewed Release
+PR merges. Go modules are fetched through the Go proxy using nested module
+tags. There is no Buf Schema Registry publication or GHCR image.
 
 ```text
 Syntra Git repository
         │
-        │ contains source schemas + specifications
+        │ contains source schemas + committed generated types
         ▼
-Buf Schema Registry
+Per-crate tags (<crate>-vX.Y.Z) + crates.io + GitHub Releases
         │
-        ├── generated Go schema package
-        ├── generated Rust schema package
-        ├── generated SDKs for supported ecosystems
+        ├── Rust source / crate archives + SHA256SUMS (syntra-core release)
+        ├── descriptor (image.json) + manifests + test vectors
         │       │
         │       ▼
-        │   External Syntra protocol implementations
-        │       (separate projects; consume BSR SDKs)
+        │   Rust consumers pin crates.io versions or exact Git revisions
         │
-        ▼ (consumed by)
-Applications (define their own methods/payloads; never redefine core schemas)
+        └── Go consumers use bindings/go/vX.Y.Z at the syntra-core revision
+            (default pure-Go mode; native CGO mode is unsupported)
 ```
 
 Normative (the specification):
@@ -196,12 +197,21 @@ Supporting (validation, process, explanation):
 - `docs/`, `rfcs/`, `audits/`
 - `scripts/`, `tests/` — repository validation tooling only (requirement
   linter, manifest and vector validators, descriptor and codec checks;
-  never a Syntra client/server implementation). Codec smoke tests
-  generate into the ignored `.tmp/` directory and commit nothing
+  never a Syntra client/server implementation). Committed generation is
+  drift-checked (`scripts/validate-schema.py --drift-only`, CI-enforced);
+  `.tmp/` holds only disposable reproducibility output and must never be
+  committed
 
 Distribution:
 
-- Buf Schema Registry — publishes schema versions and generated SDKs
+- release-plz creates `<crate>-vX.Y.Z` tags and crates.io releases. The
+  `syntra-core-vX.Y.Z` tag anchors schema assets and the nested Go module tag
+  `bindings/go/vX.Y.Z` at the same commit. Global `vX.Y.Z` tags are not used.
+- The syntra-core GitHub Release carries source/crate archives,
+  descriptor/manifests/vectors, and SHA256SUMS (see `RELEASE.md` §5).
+- `release-plz.yml` calls `release.yml` directly after publishing syntra-core;
+  `release.yml` creates or verifies the nested Go tag and warms the Go proxy.
+  Maintainers authorize releases through reviewed Release PRs.
 
 External and non-normative (never in this repository):
 
@@ -209,31 +219,40 @@ External and non-normative (never in this repository):
 - Generated SDK consumers
 - Applications using Syntra
 
-Generated Go/Rust bindings are **not** committed here: there is no
-`bindings/`, `gen/`, or `generated/` directory, and CI fails if generated
-binding files return. BSR-generated packages provide message types only —
-they do not implement the handshake, session lifecycle, authentication,
-RPC correlation, idempotency, retries, event streams, TCP framing, HTTP
-transport, or WebSocket transport (see
+Generated Go/Rust types ARE committed here under `crates/` (Rust prost
+output) and `bindings/go/` (Go protobuf output, incl. `*.pb.go`): there is
+no `gen/` or `generated/` directory and no `bindings/` root outside
+`bindings/go/`, and CI fails if legacy trees return, if `.tmp/` output is
+tracked, or if committed types drift from a pinned regeneration. Generated
+packages provide message types only — they do not implement the handshake,
+session lifecycle, authentication, RPC correlation, idempotency, retries,
+event streams, TCP framing, HTTP transport, or WebSocket transport (see
 [`docs/schema-registry.md`](docs/schema-registry.md) §6).
 
-## BSR schema location
+## Schema distribution
 
-Schemas are published from this repository to the Buf Schema Registry:
+Schemas and generated types ship via crates.io, Git-backed Go modules, and
+GitHub Releases — there is no Buf Schema Registry module and no
+`buf push` (see `buf.yaml`: no registry `name:` by design):
 
-- Module: `buf.build/tinklecorp/syntra` (approved module identity —
-  see `docs/schema-registry.md` §1)
-- Package consumed: `syntra.v1` (`proto/syntra/v1/*.proto`)
-- Consumer contract, pinning, version mapping, and publication policy:
+- Schema tag consumed: `syntra-core-vX.Y.Z` (and `-rc.N` prereleases) plus nested Go
+  module tag `bindings/go/vX.Y.Z` at the same revision
+- Package defined: `syntra.v1` (`proto/syntra/v1/*.proto`)
+- Consumer contract, pinning, version mapping, and release policy:
   [`docs/schema-registry.md`](docs/schema-registry.md)
 
-BSR-generated packages contain **data structures only**. They do not
+Committed generated packages contain **data structures only**. They do not
 implement the handshake, session lifecycle, authentication behavior, RPC
 correlation, idempotency, retries, event streams, TCP framing, HTTP
 transport, or WebSocket transport — that is your implementation's job
 (see [`docs/implementer-guide.md`](docs/implementer-guide.md) and the
 [FAQ](docs/faq.md)). See [Repository boundary](#repository-boundary)
-for what lives where.
+for what lives where. Pin Rust crate versions or exact Git revisions; Go
+consumers use the default pure-Go module. **Go native mode (`syntranative`)
+is unsupported:** its session ABI does not match the Rust C ABI. No native
+library or browser WASM release asset is currently promised. Restoring that
+distribution requires matching ABI/header ownership and cross-language
+link/runtime tests; a Rust compile check alone is insufficient.
 
 ## Conformance model
 
@@ -322,7 +341,9 @@ MIGRATION.md                   — historical audit + implemented layout migrati
 SESSION-OPEN-QUESTIONS.md      — release-blocking open questions
 rfcs/                          — public RFC process, template, RFCs 0001–0005
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
-buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking)
+buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
+crates/                        — Rust workspace (schema types; syntra-ffi default-empty fixture, test-fixture only; committed generation)
+bindings/go/                   — committed Go protobuf types + supported pure-Go core (syntranative adapter unsupported)
 specifications/                — charter, core, transports, security, schema, ADRs
 specifications/schema/         — IDL reference, generation and compatibility docs
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
@@ -357,9 +378,9 @@ In case of conflict, the listed owner prevails. See
 ### Public IDL tooling
 
 See the [schema documentation](specifications/schema/README.md) for pinned
-toolchains and `python3 scripts/validate-schema.py` (codec smoke tests
-generate into the ignored `.tmp/` directory only; generated source is
-never committed).
+toolchains and `python3 scripts/validate-schema.py` (committed generation
+into `crates/` + `bindings/go/`, drift-checked; `.tmp/` holds only
+disposable reproducibility output).
 [RFC 0001](rfcs/0001-public-idl-layout.md) records the implemented layout
 decision, known FILE/source break, and missing capability/session/error
 bindings. Tests use the immutable archived historical descriptor, without a
@@ -381,11 +402,8 @@ Do **not** open public issues for vulnerabilities. Use GitHub's private
 vulnerability reporting for this repository as described in
 [`SECURITY.md`](SECURITY.md).
 
-## License — pending maintainer decision
+## License
 
-No license has been selected. There is **no `LICENSE` file** in this
-repository yet. All rights are reserved pending maintainer approval.
-See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7 for the license alternatives
-under consideration (e.g., Apache-2.0, MIT, BSD-3-Clause) and their
-implications. Do not assume any license until a `LICENSE` file is added
-by maintainers.
+Apache-2.0 — see [`LICENSE`](LICENSE). Rust packages inherit
+`license = "Apache-2.0"` and are eligible for crates.io publication through
+release-plz. See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7.

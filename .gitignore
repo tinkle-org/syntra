@@ -10,10 +10,12 @@ dist/
 *.log
 
 # Reproducible schema tooling outputs (baselines under compatibility are tracked)
-# Codecs smoke tests generate language bindings into .tmp/ only; generated
-# source is never committed (see scripts/validate-schema.py and the
-# repository-boundary validator). No bindings/, gen/, or generated/
-# directories may exist in the repository.
+# Committed generated types live in the tree and ARE tracked:
+#   crates/**/src/generated/*.rs (Rust prost output, drift-checked)
+#   bindings/go/**/*.pb.go (Go protobuf output, drift-checked)
+# See scripts/validate-schema.py (committed-generation model) and the
+# repository-boundary validator. Disposable smoke-test / packaging output
+# below is never committed (boundary check fails if .tmp/ is tracked).
 .tmp/
 .tools/
 __pycache__/

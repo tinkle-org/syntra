@@ -1,0 +1,258 @@
+# Schema/Go artifacts belong to syntra-core's per-crate release tag.
+# Called directly after release-plz publishes; maintainer tag pushes and manual
+# dispatch support recovery. No release-event recursion or global v* tags.
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing syntra-core-vX.Y.Z tag to finish or recover
+        required: true
+        type: string
+  push:
+    tags:
+      - "syntra-core-v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-artifacts-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    if: github.repository == 'tinklehq/syntra'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.info.outputs.tag }}
+      version: ${{ steps.info.outputs.version }}
+      sha: ${{ steps.info.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Authorize recovery dispatch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          PERM="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR/permission" --jq .permission)"
+          case "$PERM" in
+            admin|maintain) ;;
+            *) echo "error: workflow_dispatch recovery requires maintainer (admin/maintain); actor $ACTOR has permission $PERM" >&2; exit 1;;
+          esac
+
+      - name: Resolve tag identity
+        id: info
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${REQUESTED_TAG:-${GITHUB_REF#refs/tags/}}"
+          if [[ ! "$TAG" =~ ^syntra-core-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$ ]]; then
+            echo "error: expected syntra-core-vX.Y.Z or syntra-core-vX.Y.Z-rc.N" >&2
+            exit 1
+          fi
+          SHA="$(git rev-parse --verify "refs/tags/$TAG^{commit}")"
+          git checkout --detach "$SHA"
+          # A release cannot be made from an unmerged branch or PR revision.
+          git merge-base --is-ancestor "$SHA" origin/main
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#syntra-core-v}"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Validate package version and Go module identity
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, pathlib, tomllib
+          root = tomllib.loads(pathlib.Path('Cargo.toml').read_text())
+          package = tomllib.loads(pathlib.Path('crates/syntra-core/Cargo.toml').read_text())['package']
+          version = package['version']
+          if isinstance(version, dict) and version.get('workspace') is True:
+              version = root['workspace']['package']['version']
+          if package['name'] != 'syntra-core' or version != os.environ['VERSION']:
+              raise SystemExit('syntra-core package version must equal the release tag')
+          # Go v2+ needs an explicit module-path migration before pairing tags.
+          if os.environ['VERSION'].split('.')[0] not in ('0', '1'):
+              raise SystemExit('Go v2+ module-path migration required before release')
+          lines = pathlib.Path('bindings/go/go.mod').read_text().splitlines()
+          modules = [line.split('//', 1)[0].split() for line in lines if line.strip().startswith('module ')]
+          if modules != [['module', 'github.com/tinklehq/syntra/bindings/go']]:
+              raise SystemExit('unexpected nested Go module identity')
+          PY
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"
+          github_token: ${{ github.token }}
+      - name: Install validator dependencies
+        run: pip install pyyaml
+      - name: Release tooling regression tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Schema gates
+        run: |
+          set -euo pipefail
+          buf format --diff --exit-code
+          buf lint
+          buf build
+          buf breaking --against 'compatibility/v1-initial/image.json'
+          python3 scripts/validate-repo.py boundary links markdown
+          python3 scripts/validate-schema.py --drift-only
+
+  package-and-release:
+    needs: validate
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"
+          github_token: ${{ github.token }}
+
+      - name: Assemble release payload
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          OUT="release-staging/syntra-$TAG"
+          mkdir -p "$OUT/descriptor" "$OUT/manifests" "$OUT/test-vectors" "$OUT/assets"
+          buf build -o "$OUT/descriptor/image.json"
+          buf export -o "$OUT/descriptor/proto"
+          cp conformance/manifest/*.yaml "$OUT/manifests/"
+          cp -r conformance/test-vectors/. "$OUT/test-vectors/"
+          for file in CHANGELOG.md RELEASE.md GOVERNANCE.md LICENSE; do
+            cp "$file" "$OUT/assets/"
+          done
+          # Archive the exact source snapshot, including build scripts/protos.
+          # Dependencies are not vendored: this is not an offline build bundle.
+          git archive --format=tar.gz --output="$OUT/assets/syntra-source-$TAG.tar.gz" HEAD
+          tar --exclude-vcs -czf "$OUT/assets/syntra-go-bindings-$TAG.tar.gz" bindings/go
+          # Packaging failures are fatal, and stale runner output cannot mask them.
+          # syntra-ffi default builds export no C ABI (empty fixture crate by
+          # design); its archive is expected noise, not native support.
+          rm -rf target/package
+          cargo package --workspace --locked --no-verify
+          cp target/package/*.crate "$OUT/assets/"
+          tar -czf "$OUT/assets/syntra-schema-$TAG.tar.gz" -C "$OUT" descriptor manifests test-vectors
+          cp "$OUT/descriptor/image.json" "$OUT/assets/"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+
+      - name: Write SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd "$OUT/assets"
+          SUMS="$(mktemp)"
+          for asset in *; do
+            if [ "$asset" != SHA256SUMS ]; then
+              shasum -a 256 -- "$asset"
+            fi
+          done | LC_ALL=C sort -k 2 > "$SUMS"
+          mv "$SUMS" SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create or verify nested Go tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          GO_TAG="bindings/go/v$VERSION"
+          # Query the remote even on reruns; compare peeled commits, not tag objects.
+          if git ls-remote --exit-code --tags origin "refs/tags/$GO_TAG" >/dev/null; then
+            git fetch origin "refs/tags/$GO_TAG:refs/tags/$GO_TAG"
+          else
+            # The API only creates missing refs; it never force-updates a tag.
+            # A concurrent creation is checked by the fetch/commit comparison.
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$GO_TAG" -f "sha=$SHA" || {
+                git ls-remote --exit-code --tags origin "refs/tags/$GO_TAG" >/dev/null
+              }
+            git fetch origin "refs/tags/$GO_TAG:refs/tags/$GO_TAG"
+          fi
+          GO_SHA="$(git rev-parse "refs/tags/$GO_TAG^{commit}")"
+          test "$GO_SHA" = "$SHA" || {
+            echo "error: $GO_TAG resolves to $GO_SHA, expected $SHA ($TAG); never move a published tag" >&2
+            exit 1
+          }
+
+      - name: Attach to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$OUT"/assets/* --clobber
+          else
+            set --
+            if [[ "$TAG" =~ -rc\.[0-9]+$ ]]; then
+              set -- --prerelease
+            fi
+            gh release create "$TAG" --verify-tag --title "Syntra schema $TAG" \
+              --notes-file CHANGELOG.md "$@" "$OUT"/assets/*
+          fi
+
+  go-proxy-warmup:
+    needs: [validate, package-and-release]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.4"
+          cache: false
+      - name: Warm Go module proxy and request pkg.go.dev indexing
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          MOD="github.com/tinklehq/syntra/bindings/go"
+          cd "$(mktemp -d)"
+          for i in 1 2 3 4 5; do
+            # Proxy only: a direct fallback would hide a failed proxy warmup.
+            if GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org go mod download "$MOD@v$VERSION"; then
+              # Documentation indexing is asynchronous and best-effort.
+              curl -fsSL "https://pkg.go.dev/$MOD@v$VERSION" -o /dev/null || \
+                echo "pkg.go.dev indexing pending"
+              exit 0
+            fi
+            if [ "$i" -lt 5 ]; then sleep 30; fi
+          done
+          echo "error: Go proxy did not resolve $MOD@v$VERSION after 5 attempts" >&2
+          exit 1

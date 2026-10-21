@@ -2,6 +2,7 @@
 # only, never publishes. Fails closed: any error blocks the RC checklist
 # (RELEASE.md). Network use is limited to pinned Buf remote plugins invoked
 # by scripts/validate-schema.py; no credentials are required or read.
+# Publishing and tag creation belong to release-plz.yml/release.yml.
 name: repo-validation
 
 on:
@@ -14,7 +15,7 @@ permissions:
 
 jobs:
   docs:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +25,14 @@ jobs:
 
       - name: Install validator dependencies
         run: pip install pyyaml
+
+      - name: Release and validator regression tests (offline)
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
 
       - name: A1 markdown validation (hygiene, fences, EOF newlines)
         run: python3 scripts/validate-repo.py markdown
@@ -39,20 +48,24 @@ jobs:
       - name: A11 RFC metadata validation (statuses, required fields)
         run: python3 scripts/validate-repo.py rfcs
 
-      - name: Repository boundary guard (no committed bindings/SDKs)
-        # Fails if generated language bindings, their directories, or the
-        # removed root buf.gen.yaml return. Temp .tmp/ smoke-test output
-        # is ignored by design and never flagged.
+      - name: Repository boundary guard (committed-gen layout)
+        # Fails if legacy gen trees return (gen/, generated/, bindings/ outside
+        # bindings/go/), if .tmp/ build output is tracked, or if committed
+        # generated types under crates/ / bindings/go/ drift from a pinned
+        # regeneration. Committed *.pb.go and generated .rs under the allowed
+        # roots are expected — see docs/schema-registry.md §11 and
+        # scripts/validate-repo.py check_boundary.
         run: python3 scripts/validate-repo.py boundary
 
   buf:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+          github_token: ${{ github.token }}
 
       - name: A3 buf format check
         run: buf format --diff --exit-code
@@ -63,14 +76,162 @@ jobs:
       - name: A5 buf build
         run: buf build
 
-      - name: A6 buf breaking change validation against stable baseline
-        # Bootstrap baseline: the committed initial snapshot. Replace with the
-        # stable BSR commit once the first release is published (reviewed PR;
-        # see docs/schema-registry.md §9). Never an arbitrary branch.
+      - name: A6 buf breaking change validation against Git baseline
+        # Bootstrap baseline: the committed initial snapshot. Replaced only by
+        # a reviewed PR that points at a newer committed Git baseline
+        # (compatibility/ image or tagged-revision descriptor) per
+        # docs/schema-registry.md §9. Never an arbitrary branch, never a
+        # registry label — this repository has no BSR module identity.
         run: buf breaking --against 'compatibility/v1-initial/image.json'
 
+  generated-freshness:
+    # Committed Rust/Go generated types must match a pinned regeneration.
+    # Both language trees are required; missing/untracked output fails closed.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"
+          github_token: ${{ github.token }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install validator dependencies
+        run: pip install pyyaml
+
+      - name: Committed generated-types freshness (buf generate drift check)
+        run: python3 scripts/validate-schema.py --drift-only
+
+  rust-tests:
+    # Default workspace tests (syntra-ffi default-empty, no ABI) plus the
+    # explicit native fixture tests. The fixture feature is test-only and
+    # never enabled in shipped binaries (including via --all-features).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Rust workspace
+        id: detect
+        run: |
+          if [ -f Cargo.toml ] || [ -f Cargo.lock ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.detect.outputs.present == 'true'
+        with:
+          toolchain: "1.88"
+          targets: wasm32-unknown-unknown
+
+      - name: cargo test (locked workspace, default features)
+        if: steps.detect.outputs.present == 'true'
+        run: cargo test --locked --workspace
+
+      - name: cargo test (syntra-ffi native fixture only)
+        if: steps.detect.outputs.present == 'true'
+        run: cargo test --locked -p syntra-ffi --features test-fixture
+
+      - name: FFI build contract (default empty + fixture + WASM rejection)
+        if: steps.detect.outputs.present == 'true'
+        run: python3 crates/syntra-ffi/tests/build_contract.py
+
+      - name: No Rust workspace yet (bootstrap skip)
+        if: steps.detect.outputs.present != 'true'
+        run: echo "No Cargo.toml/Cargo.lock yet; rust-tests skipped (bootstrap)."
+
+  go-tests:
+    # Supported pure-Go build only (no -tags). The syntranative adapter is
+    # unsupported: native_test.go requires missing symbols and is skipped by
+    # default; CI MUST NOT pass -tags syntranative.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Go module
+        id: detect
+        run: |
+          if [ -f bindings/go/go.mod ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-go@v5
+        if: steps.detect.outputs.present == 'true'
+        with:
+          go-version: "1.26.4"
+          cache-dependency-path: bindings/go/go.sum
+
+      - name: go build (committed bindings, default tags only)
+        if: steps.detect.outputs.present == 'true'
+        run: go build ./...
+        working-directory: bindings/go
+
+      - name: go test (committed bindings, default tags only)
+        if: steps.detect.outputs.present == 'true'
+        run: go test -count=1 -v ./...
+        working-directory: bindings/go
+
+      - name: No Go module yet (bootstrap skip)
+        if: steps.detect.outputs.present != 'true'
+        run: echo "No bindings/go/go.mod yet; go-tests skipped (bootstrap)."
+
+  wasm-check:
+    # syntra-ffi rejects all WASM targets by design (compile_error). This job
+    # asserts that expected failure plus the non-FFI WASM compile check.
+    # No browser WASM archive is produced; WASM checks are gates, not SDK claims.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect FFI crate
+        id: detect
+        run: |
+          if [ -f crates/syntra-ffi/Cargo.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.detect.outputs.present == 'true'
+        with:
+          toolchain: "1.88"
+          targets: wasm32-unknown-unknown
+
+      - name: WASM compile check (non-FFI crates must succeed)
+        if: steps.detect.outputs.present == 'true'
+        run: cargo check --locked -p syntra-core -p syntra-runtime -p syntra-ws -p syntra-web --target wasm32-unknown-unknown
+
+      - name: WASM rejection check (syntra-ffi must fail with diagnostic)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          set +e
+          cargo check --locked -p syntra-ffi --target wasm32-unknown-unknown 2>&1 | tee /tmp/ffi-wasm.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "error: expected syntra-ffi WASM check to fail (blocking fixture is native-only)" >&2
+            exit 1
+          fi
+          grep -q "syntra-ffi does not support WASM" /tmp/ffi-wasm.log || {
+            echo "error: syntra-ffi WASM failure lacks expected diagnostic" >&2
+            exit 1
+          }
+
+      - name: No FFI crate yet (bootstrap skip)
+        if: steps.detect.outputs.present != 'true'
+        run: echo "No crates/syntra-ffi yet; wasm-check skipped (bootstrap)."
+
   conformance:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -84,6 +245,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+          github_token: ${{ github.token }}
 
       - name: A7 requirement ID validation (uniqueness, naming, registry refs)
         run: python3 scripts/validate-repo.py requirements
