@@ -12,7 +12,8 @@ decision and remaining behavioral blockers.
 | Buf CLI | **1.59.0** | v2 module/compiler, STANDARD lint and FILE gate |
 | Rust generator | `buf.build/community/neoeinstein-prost:v0.4.0`, **revision 1** | Message/enum types, no networking or gRPC |
 | Go generator | `buf.build/protocolbuffers/go:v1.36.6`, **revision 1** | Message/enum types, `paths=source_relative` |
-| Rust toolchain | **1.88**, minimal profile | Workspace tests; see `repo-validation.yml` and `release.yml` pins |
+| Rust toolchain (workspace) | **1.88**, minimal profile | Workspace crates tests; see `repo-validation.yml` and `release.yml` pins |
+| Rust toolchain (schema isolated tests) | **1.85.1**, minimal profile | `tests/schema/rust` override; see standalone commands below |
 | Rust runtime | `prost = "=0.13.5"` | Runtime/derive alignment; transitive dependencies locked in workspace `Cargo.lock` |
 | Rust test JSON parser | `serde_json = "=1.0.140"` | Shared fixture reader only |
 | Go runtime | `google.golang.org/protobuf v1.36.6` | Bindings module lockfile; checksums in `bindings/go/go.sum` |
@@ -48,9 +49,12 @@ lockfile is required. Schema imports are all `syntra/v1/*.proto`.
 
 Install the exact Buf CLI release using the official
 [installation guide](https://buf.build/docs/cli/installation/), and check
-`buf --version` prints `1.59.0`. Install Rust 1.88 through rustup and use
+`buf --version` prints `1.59.0`. Install Rust 1.88 for the workspace
+through rustup and keep Rust 1.85.1 available for the isolated
+`tests/schema/rust` suite via its `rust-toolchain.toml` override, and use
 Go 1.26.4 (or `GOTOOLCHAIN=go1.26.4`). Do not set a global Rust default just
-for this repository: CI pins the toolchain per job.
+for this repository: CI pins the toolchain per job and the schema suite
+pins its own override.
 
 ## Generate for validation (committed output plus temporary check)
 
@@ -107,7 +111,8 @@ regression check); post-deletion results remain pending in
 not a result for the updated suite.
 
 Standalone language commands, after generation into `.tmp/` by
-`scripts/validate-schema.py`:
+`scripts/validate-schema.py` (isolated schema suite on Rust 1.85.1;
+workspace crates test separately on Rust 1.88):
 
 ```sh
 go -C .tmp/bufgen/go build ./...

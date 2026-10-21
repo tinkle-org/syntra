@@ -16,7 +16,8 @@ Fetch the versioned schema from the Git tree, not a copy pasted from
 somewhere else:
 
 - Source: `proto/syntra/v1/*.proto` at a tagged revision
-  (`syntra-core-vX.Y.Z`), package `syntra.v1`. There is no registry
+  (`syntra-core-vX.Y.Z`) or, before the first release, a commit SHA
+  on `main`, package `syntra.v1`. There is no registry
   module — see `docs/schema-registry.md` §1.
 - Pin the exact tag or commit your release builds against and record it
   with your declaration (see `docs/schema-registry.md` §§11–12 on
