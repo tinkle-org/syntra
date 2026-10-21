@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 description = "Browser client for Syntra v1 (connect/call/notify/close JS-facing API over syntra-ws)."
-publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]

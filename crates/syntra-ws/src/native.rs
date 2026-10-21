@@ -162,7 +162,7 @@ pub async fn connect(
     // Enforce the 1 MiB bound DURING assembly: tungstenite aborts
     // oversized messages before we allocate them.
     ws_config.max_message_size = Some(syntra_core::MAX_FRAME_BYTES);
-    ws_config.max_frame_size = Some(64 * 1024);
+    ws_config.max_frame_size = Some(syntra_core::MAX_FRAME_BYTES);
     let connector = if endpoint.is_secure {
         Some(tls13_connector()?)
     } else {
@@ -264,8 +264,8 @@ pub async fn connect(
         write_conn.on_transport_lost().await;
     });
 
-    // Liveness: Ping at ping_interval; silence past pong_timeout closes
-    // (1001) with UNAVAILABLE to in-flight RPCs (WS section 1I).
+    // Liveness: Ping at ping_interval; allow a full interval plus the
+    // Pong latency bound since the previous Pong before closing (1001).
     // Unsolicited Pong is accepted and ignored beyond liveness.
     let live_conn = conn.clone();
     let live_closed = closed.clone();
@@ -283,7 +283,7 @@ pub async fn connect(
                 break;
             }
             let silent = now_millis().saturating_sub(live_pong.load(Ordering::Relaxed));
-            if silent > pong_timeout.as_millis() as u64 {
+            if u128::from(silent) > ping_interval.saturating_add(pong_timeout).as_millis() {
                 tracing::warn!("liveness timeout; closing");
                 live_conn.on_transport_lost().await;
                 let _ = live_close.send(CloseCode::Away).await;

@@ -100,16 +100,74 @@ impl CancelToken {
     }
 
     pub async fn cancelled(&self) {
+        // notify_waiters remembers every Notified created before it, even
+        // before polling. Register before checking the flag so a cancel
+        // between that check and the await cannot lose its notification.
+        let notified = self.inner.notify.notified();
         if self.is_cancelled() {
             return;
         }
-        self.inner.notify.notified().await;
+        notified.await;
     }
 }
 
 impl Default for CancelToken {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod cancel_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cancellation_wakes_all_waiters_and_future_waiters() {
+        let token = CancelToken::new();
+        let mut waiters: Vec<_> = (0..16).map(|_| Box::pin(token.cancelled())).collect();
+        for waiter in &mut waiters {
+            assert!(futures_util::poll!(waiter.as_mut()).is_pending());
+        }
+        token.cancel();
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            futures_util::future::join_all(waiters),
+        )
+        .await
+        .expect("all registered waiters should wake");
+        // Cancellation is sticky and idempotent, including on clones.
+        token.cancel();
+        tokio::time::timeout(Duration::from_secs(2), token.clone().cancelled())
+            .await
+            .expect("a waiter created after cancellation should complete");
+    }
+
+    #[tokio::test]
+    async fn cancellation_racing_waiter_registration_never_loses_wakeup() {
+        const ROUNDS: usize = 4096;
+        let tokens: Arc<Vec<_>> = Arc::new((0..ROUNDS).map(|_| CancelToken::new()).collect());
+        let start = Arc::new(std::sync::Barrier::new(2));
+        let cancel_tokens = tokens.clone();
+        let cancel_start = start.clone();
+        let canceller = std::thread::spawn(move || {
+            for token in cancel_tokens.iter() {
+                cancel_start.wait();
+                token.cancel();
+            }
+        });
+        let mut missed = None;
+        for (round, token) in tokens.iter().enumerate() {
+            start.wait();
+            if tokio::time::timeout(Duration::from_secs(2), token.cancelled())
+                .await
+                .is_err()
+            {
+                // Complete the barriers even on failure so the worker exits.
+                missed.get_or_insert(round);
+            }
+        }
+        canceller.join().unwrap();
+        assert_eq!(missed, None, "cancellation notification was lost");
     }
 }
 

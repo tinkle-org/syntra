@@ -10,12 +10,13 @@
 There is **no BSR module**. Distribution identity is Git + GitHub Releases:
 
 ```text
-Git tag vX.Y.Z (+ nested Go module tag bindings/go/vX.Y.Z, same revision)
+Git tag vX.Y.Z      ↔ bindings/go/vX.Y.Z      (same revision)
+Git tag vX.Y.Z-rc.N ↔ bindings/go/vX.Y.Z-rc.N (same suffix and revision)
 ```
 
 - Release tags are cut by maintainers only (`RELEASE.md` §4; `GOVERNANCE.md` §5). Branches never define releases. CI never creates tags.
 - `buf.yaml` carries **no registry `name:`** by design. A registry identity is only needed for `buf push` / `--against-registry` breaking checks, and this repository never pushes to a registry. Breaking baselines are committed Git artifacts (`compatibility/v1-initial/image.json`, §9). Do not re-add a registry name without a maintainer decision recorded on a governance RFC.
-- The nested Go module tag (`bindings/go/vX.Y.Z`) is required for Go MVS to resolve the `bindings/go` module. `.github/workflows/release.yml` verifies it resolves to the same revision as `vX.Y.Z` and fails closed otherwise.
+- The nested Go module tag (`bindings/go/vX.Y.Z`, or `bindings/go/vX.Y.Z-rc.N` for a prerelease) is required for Go MVS to resolve the `bindings/go` module. Preserve the main tag's exact version suffix. `.github/workflows/release.yml` verifies both tags resolve to the same revision and fails closed otherwise.
 
 | Item | Policy |
 |---|---|
@@ -23,7 +24,7 @@ Git tag vX.Y.Z (+ nested Go module tag bindings/go/vX.Y.Z, same revision)
 | Visibility | **Public** Git repository; GitHub Releases carry the downloadable assets. |
 | Public status | Released only via tagged GitHub Releases. Until the first tag, the `main` head is the only distribution point. |
 | Source repository relationship | Git is the authoring authority AND the distribution point for tagged revisions (§2). |
-| Release/tag relationship | A Git tag of the form `vX.Y.Z` (or `vX.Y.Z-rc.N` prerelease) defines the release; `bindings/go/vX.Y.Z` at the same revision defines the Go module view. GitHub Releases attach the §5 asset set. |
+| Release/tag relationship | A Git tag `vX.Y.Z` pairs with `bindings/go/vX.Y.Z`; a prerelease `vX.Y.Z-rc.N` pairs with `bindings/go/vX.Y.Z-rc.N`. Each pair identifies the same revision and defines the release and Go module views. GitHub Releases attach the release asset set (`RELEASE.md` §5). |
 
 ## 2. Source of truth (B)
 
@@ -32,7 +33,7 @@ Git repository (proto/syntra/v1/*.proto)   ← sole authoring authority
         │  pinned buf generate (reviewed change only)
         ▼
 Committed generated types (crates/**, bindings/go/**)  ← reviewed, drift-checked
-        │  maintainer tag vX.Y.Z (+ bindings/go/vX.Y.Z)
+        │  maintainer tag vX.Y.Z[-rc.N] (+ bindings/go/vX.Y.Z[-rc.N])
         ▼
 GitHub Release (assets + SHA256SUMS)       ← published distribution
         │  git / tarball consumption
@@ -108,8 +109,8 @@ Five independent dimensions (SNTR-VER-001). The table below is the precise mappi
 | Dimension | Identifier | Examples | Governed by |
 |---|---|---|---|
 | Git commit | SHA | `92e5f28…` | Git history; every change lands here first |
-| Git tag (release) | `vX.Y.Z` | `v1.0.0` | Maintainer tag after `GOVERNANCE.md` §5 criteria hold |
-| Nested Go module tag | `bindings/go/vX.Y.Z` | `bindings/go/v1.0.0` | Same revision as `vX.Y.Z` (verified by release.yml) |
+| Git tag (release) | `vX.Y.Z` or `vX.Y.Z-rc.N` | `v1.0.0`, `v1.0.0-rc.1` | Maintainer tag after `GOVERNANCE.md` §5 criteria hold |
+| Nested Go module tag | `bindings/go/vX.Y.Z` or `bindings/go/vX.Y.Z-rc.N` | `bindings/go/v1.0.0`, `bindings/go/v1.0.0-rc.1` | Same suffix and revision as the main tag (verified by release.yml) |
 | GitHub Release | tag assets + SHA256SUMS | `syntra-v1.0.0` assets | Attached by `.github/workflows/release.yml` |
 | Syntra Core version | protocol behavior | Syntra Core v1 | `specifications/core/versioning.md` |
 | Protobuf package version | representation namespace | `syntra.v1` | `proto/` + Buf FILE checks |
@@ -128,8 +129,8 @@ There are no registry labels. Channel semantics live in Git tag + GitHub Release
 | Channel | GitHub mechanism | Git counterpart |
 |---|---|---|
 | `development` | `main` head (no release) | Commit on `main`, pre-tag |
-| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | Tag `vX.Y.Z-rc.N` (+ nested Go tag) |
-| `stable` | GitHub Release marked **latest** from a final tag | Tag `vX.Y.Z` (+ nested Go tag), after `GOVERNANCE.md` §5 criteria hold |
+| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | `vX.Y.Z-rc.N` + `bindings/go/vX.Y.Z-rc.N` at the same revision |
+| `stable` | GitHub Release marked **latest** from a final tag | `vX.Y.Z` + `bindings/go/vX.Y.Z` at the same revision, after `GOVERNANCE.md` §5 criteria hold |
 
 Releases move forward only: re-pointing a release at an older commit is forbidden and is treated as an incident (audit, announce, re-release). No other channel vocabulary is introduced; anything fancier stays in Git metadata (notes, release notes), not in a registry.
 
@@ -148,7 +149,7 @@ pull request
   ↓  merge allowed (only on green + required reviews)
 ```
 
-- Post-release baseline: the descriptor attached to the stable GitHub Release (or the tagged revision itself, e.g. `git show vX.Y.Z:descriptor/image.json`), adopted by a reviewed PR.
+- Post-release baseline: download `image.json` from the stable GitHub Release assets, verify it against that release's `SHA256SUMS`, and commit it at a baseline path through a reviewed PR. `descriptor/image.json` is generated by the release workflow, not committed at the tag; do not retrieve it with `git show`.
 - **Bootstrap baseline (current):** no stable release exists yet, so CI compares against the committed snapshot `compatibility/v1-initial/image.json` — the first seven-file layout image, built with Buf 1.59.0. Verified: current sources pass against it (`exit 0`). This is a floor, not a release: passing proves "no worse than the initial snapshot," and the snapshot is replaced by the first real stable baseline at release (a reviewed change, never automatic).
 - Baseline replacement is a reviewed PR that states the old baseline, the new baseline, and why the switch is legitimate. CI never rewrites baselines itself.
 
@@ -158,7 +159,7 @@ pull request
 |---|---|
 | Pull request | Validate only (format, lint, build, breaking vs Git baseline, generation drift, tests). No credentials present; nothing attached. |
 | Merge to `main` | Re-validate. **No automatic release.** Release PRs are opened by release-plz (version bumps + CHANGELOG); maintainers merge them, then cut tags manually. |
-| Version tag `vX.Y.Z` | Re-validate, then build native libs (amd64/arm64) + WASM + archives and attach to the GitHub Release. Tags are the only path to a release. Nested Go tag `bindings/go/vX.Y.Z` must exist at the same revision (verified, fails closed). |
+| Version tag `vX.Y.Z` or `vX.Y.Z-rc.N` | Re-validate, then build native libs (amd64/arm64) + WASM + archives and attach to the GitHub Release. Tags are the only path to a release. The matching nested Go tag `bindings/go/vX.Y.Z` or `bindings/go/vX.Y.Z-rc.N`, respectively, must exist at the same revision (verified, fails closed). |
 | Local developer machine | MUST NOT be treated as an official release under any circumstances. Maintainer-run pushes outside the tag workflow do not exist. |
 
 Unreviewed pushes can never become a `stable` release: the release workflow requires a tag event, validates versions/revision plus the nested Go tag identity, and only attaches assets — three independent gates (§14). CI never creates tags.
@@ -169,8 +170,8 @@ Consumers obtain types from the committed tree or the release assets — never f
 
 Per-ecosystem guide (versions below are the versions pinned for this repository's validation in `specifications/schema/generation.md`, not floating `latest`):
 
-- **Rust (primary):** depend on the crates directly via git (e.g. `libtinkle` consumes `syntra-schema` / `syntra-ffi` at the tagged revision). Message/enum types only — no networking, no gRPC, no transport. Runtime: `prost` at the pinned version. Branch on `ErrorCode`, never on message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005 — generated getters alone do not implement that policy. `release-plz.toml` versions the crates (Apache-2.0, `publish = false`); the GitHub Release carries source + `.crate` archives.
-- **Go:** use the committed `bindings/go` module (`github.com/tinklehq/syntra/bindings/go`) at the tagged revision via the nested tag `bindings/go/vX.Y.Z`, plus the prebuilt Linux native libs (`libsyntra_ffi.so`/`.a` + `syntra_ffi.h`) attached to the GitHub Release for the CGO wrapper. `buf generate` with the remote plugin `buf.build/protocolbuffers/go:v1.36.6` (revision 1 in this repo's validation), `paths=source_relative`, against the pinned schema commit. Runtime: `google.golang.org/protobuf` at the pinned version.
+- **Rust (primary):** depend on crates.io (`cargo add syntra-core`) at the released version; use a git pin at the tagged revision only for pre-release verification. For `libtinkle`, distinguish the generated schema types (compiled into `syntra-core`) from the runtime/FFI crate `syntra-ffi`. Generated schema types provide message/enum types only — no networking, gRPC, or transport — using `prost` at the pinned version. Separately, `syntra-ffi` exposes connection open/close, handshake, RPC calls, cancellation, and notification APIs backed by `syntra-runtime`. Branch on `ErrorCode`, never on message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005 — generated getters alone do not implement that policy. `release-plz.toml` versions the crates (Apache-2.0, published); the GitHub Release carries source + `.crate` archives alongside the registry versions.
+- **Go:** use the `bindings/go` module (`github.com/tinklehq/syntra/bindings/go`) via the nested tag `bindings/go/vX.Y.Z` (`go get ...@vX.Y.Z`; proxy.golang.org + pkg.go.dev index automatically, warmed by `go-proxy-warmup`), plus the prebuilt Linux native libs (`libsyntra_ffi.so`/`.a` + `syntra_ffi.h`) attached to the GitHub Release for the CGO wrapper. `buf generate` with the remote plugin `buf.build/protocolbuffers/go:v1.36.6` (revision 1 in this repo's validation), `paths=source_relative`, against the pinned schema commit. Runtime: `google.golang.org/protobuf` at the pinned version.
 - **Other languages:** generate from `buf export` output of the tagged revision with a pinned local compiler and record the toolchain version in the consumer's lockfile.
 
 In every case: pin the Git tag (exact `vX.Y.Z`), pin the generator plugin version + revision, and vendor or lock the Protobuf runtime. Rebuild bindings deliberately; never float.
@@ -213,7 +214,7 @@ Authoritative relationships at a glance (see §7 for rules):
 | A release line | Git tag `vX.Y.Z` | `v1.0.0` |
 | Nested Go module | Go module tag `bindings/go/vX.Y.Z` (same revision) | `bindings/go/v1.0.0` |
 | Current development | `main` head | moves with each accepted merge |
-| Release candidate | GitHub prerelease / `-rc` tag | `v1.1.0-rc.1` |
+| Release candidate | GitHub prerelease / paired `-rc` tags at the same revision | `v1.1.0-rc.1` + `bindings/go/v1.1.0-rc.1` |
 | Production dependency | GitHub Release marked latest / final tag | `v1.1.0` |
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |

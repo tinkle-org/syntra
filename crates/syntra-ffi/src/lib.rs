@@ -99,7 +99,7 @@ struct FfiConn {
     initiator: Initiator,
     /// Kept alive: owns the host side + its pump tasks.
     _host: Arc<Host>,
-    current_cancel: Mutex<Option<(u64, CancelToken)>>,
+    current_cancel: Mutex<Option<(u64, Arc<CancelToken>)>>,
     last_error: Mutex<Option<String>>,
 }
 
@@ -128,7 +128,7 @@ fn map_error(e: &syntra_core::SyntraError) -> i32 {
 
 struct Registry {
     next: u64,
-    conns: HashMap<u64, FfiConn>,
+    conns: HashMap<u64, Arc<FfiConn>>,
 }
 
 fn registry() -> &'static Mutex<Registry> {
@@ -142,9 +142,11 @@ fn registry() -> &'static Mutex<Registry> {
 }
 
 fn with_conn<T>(handle: u64, f: impl FnOnce(&FfiConn) -> T, dflt: T) -> T {
-    let reg = registry().lock().unwrap();
-    match reg.conns.get(&handle) {
-        Some(c) => f(c),
+    // Keep the connection alive without holding the global lock while a
+    // blocking operation runs (including cancellation or close elsewhere).
+    let conn = registry().lock().unwrap().conns.get(&handle).cloned();
+    match conn {
+        Some(c) => f(&c),
         None => dflt,
     }
 }
@@ -235,12 +237,12 @@ pub extern "C" fn syntra_open(auth_mode: u32, token_ptr: *const u8, token_len: u
             reg.next += 1;
             reg.conns.insert(
                 id,
-                FfiConn {
+                Arc::new(FfiConn {
                     initiator,
                     _host: host,
                     current_cancel: Mutex::new(None),
                     last_error: Mutex::new(None),
-                },
+                }),
             );
             Ok(id)
         })
@@ -308,22 +310,29 @@ pub extern "C" fn syntra_call(
         with_conn(
             handle,
             |c| {
-                let cancel = CancelToken::new();
+                let cancel = Arc::new(CancelToken::new());
+                // The tracked API exposes its id only after completion.
+                // Until an id-allocation callback is available, 0 means
+                // unknown; cancel_current signals this token directly.
+                *c.current_cancel.lock().unwrap() = Some((0, cancel.clone()));
                 global_runtime().block_on(async {
-                    let (id, res) = c
+                    let (_id, res) = c
                         .initiator
                         .call_cancellable_tracked(&method, payload, timeout_ms, &cancel)
                         .await;
-                    *c.current_cancel.lock().unwrap() = Some((id, cancel));
+                    {
+                        let mut current = c.current_cancel.lock().unwrap();
+                        // An older call must not clear a newer call's token.
+                        if current
+                            .as_ref()
+                            .is_some_and(|(_, t)| Arc::ptr_eq(t, &cancel))
+                        {
+                            *current = None;
+                        }
+                    }
                     match res {
-                        Ok(data) => {
-                            *c.current_cancel.lock().unwrap() = None;
-                            emit_bytes(out_ptr, out_len, data)
-                        }
-                        Err(e) => {
-                            *c.current_cancel.lock().unwrap() = None;
-                            c.result_error(&e)
-                        }
+                        Ok(data) => emit_bytes(out_ptr, out_len, data),
+                        Err(e) => c.result_error(&e),
                     }
                 })
             },
@@ -335,6 +344,10 @@ pub extern "C" fn syntra_call(
 
 /// Best-effort cancel of one `request_id` on a handle. Unknown or
 /// completed ids are ignored (`SYNTRA_OK`).
+/// The tracked call API returns its id only on completion, so this
+/// currently sends a protocol cancel without signalling the local call's
+/// token. Use [`syntra_cancel_current`] for local cancellation until the
+/// runtime exposes an id-allocation callback.
 #[no_mangle]
 pub extern "C" fn syntra_cancel(handle: u64, request_id: u64) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| -> i32 {
@@ -346,7 +359,7 @@ pub extern "C" fn syntra_cancel(handle: u64, request_id: u64) -> i32 {
                     // up; always forward the protocol-level cancel too
                     // (unknown ids are ignored by the runtime).
                     if let Some((id, token)) = c.current_cancel.lock().unwrap().clone() {
-                        if id == request_id {
+                        if id != 0 && id == request_id {
                             token.cancel();
                         }
                     }
@@ -362,7 +375,8 @@ pub extern "C" fn syntra_cancel(handle: u64, request_id: u64) -> i32 {
     r.unwrap_or(SYNTRA_E_PANIC)
 }
 
-/// Cancel whatever call is currently in flight on a handle (if any).
+/// Cancel the most recently started call still tracked on a handle (if
+/// any). The call sends its own protocol cancel for the allocated id.
 #[no_mangle]
 pub extern "C" fn syntra_cancel_current(handle: u64) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| -> i32 {
@@ -370,16 +384,10 @@ pub extern "C" fn syntra_cancel_current(handle: u64) -> i32 {
             handle,
             |c| {
                 let entry = c.current_cancel.lock().unwrap().clone();
-                match entry {
-                    Some((id, token)) => {
-                        token.cancel();
-                        global_runtime().block_on(async {
-                            let _ = c.initiator.cancel(id).await;
-                        });
-                        SYNTRA_OK
-                    }
-                    None => SYNTRA_OK,
+                if let Some((_id, token)) = entry {
+                    token.cancel();
                 }
+                SYNTRA_OK
             },
             SYNTRA_E_ARG,
         )
@@ -534,6 +542,11 @@ mod tests {
         let got = unsafe { slice::from_raw_parts(out, len) }.to_vec();
         unsafe { syntra_free(out, len) };
         assert_eq!(got, b"ping");
+        assert!(with_conn(
+            h,
+            |c| c.current_cancel.lock().unwrap().is_none(),
+            false,
+        ));
         assert_eq!(syntra_close(h), SYNTRA_OK);
     }
 
@@ -546,6 +559,11 @@ mod tests {
         let mut len = 0usize;
         let rc = syntra_call(h, method.as_ptr(), ptr::null(), 0, 2000, &mut out, &mut len);
         assert_eq!(rc, SYNTRA_E_RPC);
+        assert!(with_conn(
+            h,
+            |c| c.current_cancel.lock().unwrap().is_none(),
+            false,
+        ));
         // Connection still usable.
         let method2 = CString::new("/example.Echo/Echo").unwrap();
         let rc2 = syntra_call(
@@ -578,5 +596,163 @@ mod tests {
             msg.contains("INVALID_ARGUMENT") || msg.contains("InvalidArgument") || !msg.is_empty()
         );
         assert_eq!(syntra_close(h), SYNTRA_OK);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    mod concurrency {
+        use super::*;
+        use std::sync::mpsc;
+        use std::thread;
+        use std::time::Duration;
+
+        const WAIT: Duration = Duration::from_secs(2);
+
+        fn open_with_handler(handler: Arc<dyn syntra_runtime::Handler>) -> u64 {
+            let h = global_runtime().block_on(async {
+                let (initiator, host) = syntra_runtime::loopback_pair(
+                    Arc::new(AllowAnonymous),
+                    handler,
+                    ConnectionConfig::default(),
+                );
+                let mut reg = registry().lock().unwrap();
+                let h = reg.next;
+                reg.next += 1;
+                reg.conns.insert(
+                    h,
+                    Arc::new(FfiConn {
+                        initiator,
+                        _host: host,
+                        current_cancel: Mutex::new(None),
+                        last_error: Mutex::new(None),
+                    }),
+                );
+                h
+            });
+            assert_eq!(syntra_handshake(h, ptr::null(), 0), SYNTRA_OK);
+            h
+        }
+
+        fn pending_connection() -> (u64, mpsc::Receiver<()>) {
+            let (started, rx) = mpsc::channel();
+            let h = open_with_handler(Arc::new(FnHandler(move |_, _, _| {
+                started.send(()).unwrap();
+                std::future::pending::<HandlerOutcome>()
+            })));
+            (h, rx)
+        }
+
+        fn call(h: u64, method: &str) -> i32 {
+            let method = CString::new(method).unwrap();
+            let mut out = ptr::null_mut();
+            let mut len = 0;
+            let rc = syntra_call(h, method.as_ptr(), ptr::null(), 0, 5000, &mut out, &mut len);
+            if rc == SYNTRA_OK {
+                unsafe { syntra_free(out, len) };
+            } else {
+                assert!(out.is_null());
+                assert_eq!(len, 0);
+            }
+            rc
+        }
+
+        #[test]
+        fn blocked_callback_allows_other_handles_and_close() {
+            let h = open_anon();
+            let other = open_anon();
+            assert_eq!(syntra_handshake(other, ptr::null(), 0), SYNTRA_OK);
+            let (entered, entered_rx) = mpsc::channel();
+            let (release, release_rx) = mpsc::channel();
+            let blocked = thread::spawn(move || {
+                with_conn(
+                    h,
+                    |c| {
+                        entered.send(()).unwrap();
+                        release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                        // The Arc must keep this connection alive after close
+                        // removes its handle from the registry.
+                        c.set_error("callback finished after close");
+                        SYNTRA_OK
+                    },
+                    SYNTRA_E_ARG,
+                )
+            });
+            entered_rx.recv_timeout(WAIT).unwrap();
+            let (done, done_rx) = mpsc::channel();
+            let concurrent = thread::spawn(move || {
+                let result = call(other, "/example.Echo/Echo");
+                let closed = syntra_close(h);
+                done.send((result, closed)).unwrap();
+                syntra_close(other)
+            });
+            let result = done_rx.recv_timeout(WAIT);
+            // Unblock even on failure so a regression cannot hang the suite.
+            release.send(()).unwrap();
+            assert_eq!(blocked.join().unwrap(), SYNTRA_OK);
+            assert_eq!(concurrent.join().unwrap(), SYNTRA_OK);
+            assert_eq!(result.unwrap(), (SYNTRA_OK, SYNTRA_OK));
+            assert_eq!(syntra_cancel_current(h), SYNTRA_E_ARG);
+            assert_eq!(syntra_close(h), SYNTRA_OK);
+        }
+
+        #[test]
+        fn cancel_current_interrupts_a_blocking_call() {
+            let (h, started) = pending_connection();
+            let caller = thread::spawn(move || call(h, "/example.Test/Wait"));
+            started.recv_timeout(WAIT).unwrap();
+            assert_eq!(syntra_cancel_current(h), SYNTRA_OK);
+            assert_eq!(caller.join().unwrap(), SYNTRA_E_CANCELLED);
+            assert!(with_conn(
+                h,
+                |c| c.current_cancel.lock().unwrap().is_none(),
+                false,
+            ));
+            assert_eq!(syntra_cancel_current(h), SYNTRA_OK);
+            assert_eq!(syntra_close(h), SYNTRA_OK);
+        }
+
+        #[test]
+        fn close_interrupts_a_blocking_call() {
+            let (h, started) = pending_connection();
+            let caller = thread::spawn(move || call(h, "/example.Test/Wait"));
+            started.recv_timeout(WAIT).unwrap();
+            assert_eq!(syntra_close(h), SYNTRA_OK);
+            assert_eq!(caller.join().unwrap(), SYNTRA_E_UNAVAILABLE);
+            assert_eq!(syntra_close(h), SYNTRA_OK);
+        }
+
+        #[test]
+        fn older_completion_preserves_newer_calls_cancellation() {
+            let (started, started_rx) = mpsc::channel();
+            let release = Arc::new(tokio::sync::Notify::new());
+            let release_handler = release.clone();
+            let h = open_with_handler(Arc::new(FnHandler(move |method: String, _, _| {
+                let release = release_handler.clone();
+                let started = started.clone();
+                async move {
+                    started.send(method.clone()).unwrap();
+                    if method == "/example.Test/First" {
+                        release.notified().await;
+                        HandlerOutcome::Payload(Vec::new())
+                    } else {
+                        std::future::pending().await
+                    }
+                }
+            })));
+            let first = thread::spawn(move || call(h, "/example.Test/First"));
+            assert_eq!(
+                started_rx.recv_timeout(WAIT).unwrap(),
+                "/example.Test/First"
+            );
+            let second = thread::spawn(move || call(h, "/example.Test/Second"));
+            assert_eq!(
+                started_rx.recv_timeout(WAIT).unwrap(),
+                "/example.Test/Second"
+            );
+            release.notify_one();
+            assert_eq!(first.join().unwrap(), SYNTRA_OK);
+            assert_eq!(syntra_cancel_current(h), SYNTRA_OK);
+            assert_eq!(second.join().unwrap(), SYNTRA_E_CANCELLED);
+            assert_eq!(syntra_close(h), SYNTRA_OK);
+        }
     }
 }

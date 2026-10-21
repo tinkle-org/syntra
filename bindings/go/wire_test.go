@@ -395,6 +395,43 @@ func TestFrameValidationMatrix(t *testing.T) {
 	}
 }
 
+func TestDecodeDefersOnlyRequestMethodValidation(t *testing.T) {
+	for _, method := range []string{"", "not-a-method", "/example.Echo/With Space", "/" + strings.Repeat("a", MaxMethodLength)} {
+		t.Run(method, func(t *testing.T) {
+			f := NewRequestFrame(1, 7, &RpcRequest{Method: method})
+			if code := callCode(t, ValidateFrame(f)); code != ErrorCodeInvalidArgument {
+				t.Fatalf("ValidateFrame code = %v", code)
+			}
+			if _, err := MarshalFrame(f); callCode(t, err) != ErrorCodeInvalidArgument {
+				t.Fatalf("MarshalFrame error = %v", err)
+			}
+			raw, err := proto.Marshal(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, err := UnmarshalFrame(raw)
+			if err != nil || !proto.Equal(decoded, f) {
+				t.Fatalf("decode = %v, %v", decoded, err)
+			}
+		})
+	}
+	for _, f := range []*Frame{
+		NewRequestFrame(1, 0, &RpcRequest{}),
+		NewRequestFrame(0, 7, &RpcRequest{}),
+		NewRequestFrame(2, 7, &RpcRequest{}),
+		NewReadyFrame(1, &ServerReady{}),
+		NewResultFrame(1, 7, &RpcResult{}),
+	} {
+		raw, err := proto.Marshal(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := UnmarshalFrame(raw); err == nil {
+			t.Fatalf("accepted structurally invalid frame: %v", f)
+		}
+	}
+}
+
 // TestTrackerLifecycle covers duplicate outstanding IDs, reuse after
 // completion, unknown finishes, cancel advisory semantics, and expiry.
 func TestTrackerLifecycle(t *testing.T) {

@@ -1,28 +1,26 @@
 # release-plz: Rust-native release automation (NOT release-please).
 # https://release-plz.dev/docs/configuration
 # Flow: conventional commits on main -> release-plz opens a Release PR
-# (version bumps + CHANGELOG via git-cliff + semver-checks) -> merge the
-# PR -> maintainer cuts Git tags manually -> .github/workflows/release.yml
-# attaches prebuilt artifacts to a GitHub Release. CI NEVER creates tags.
+# (version bumps + CHANGELOG via git-cliff + semver-checks) -> review and
+# merge the PR -> release-plz release publishes to crates.io, cuts tags,
+# and creates GitHub Releases. Native artifacts + Go proxy warmup attach
+# in .github/workflows/release.yml on release published.
 #
 # Distribution contract (see docs/schema-registry.md, RELEASE.md):
-# - Git tags + GitHub Releases ONLY. No crates.io publish, no GitHub
-#   Packages registry (it has no Cargo/Go registry), no GHCR, no BSR push.
-# - Every [package] in the future Rust workspace MUST set:
-#     license = "Apache-2.0"
-#     publish = false
-#   so `cargo publish` is impossible even if invoked by mistake. This file
-#   additionally disables release-plz publishing for the whole workspace.
+# - Rust: crates.io (native registry) + GitHub Releases for notes/assets.
+# - Go: go.dev / pkg.go.dev via the Go module proxy. No `go publish` step
+#   exists; pushing the nested bindings/go/vX.Y.Z tag triggers indexing.
+#   release.yml warms proxy.golang.org and pkg.go.dev after release.
+# - Every package MUST keep Apache-2.0 license + repository metadata so
+#   `cargo publish` succeeds. Do not set `publish = false` on shippable crates.
 # - Consumers:
-#     libtinkle consumes the Rust crates directly via git DPS (path/git
-#       dependency on the tagged revision), never via crates.io.
-#     Go servers use bindings/go (CGO wrapper) plus the prebuilt Linux
+#     Rust apps use `cargo add syntra-core` (crates.io); git pinned only for pre-release.
+#     Go servers use bindings/go via MVS plus optional prebuilt Linux
 #       native libs attached to the GitHub Release (see release.yml).
 # - Tag model:
-#     main tags:            vX.Y.Z (and vX.Y.Z-rc.N prereleases)
-#     nested Go module tags: bindings/go/vX.Y.Z (same revision as vX.Y.Z;
-#       required for Go MVS to resolve the nested module; release.yml
-#       verifies both tags resolve to the same commit and fails closed).
+#     Rust crates: <package>-vX.Y.Z (release-plz default per-package tags).
+#     Nested Go module: bindings/go/vX.Y.Z (same revision as the release
+#       commit; created by release.yml Go-tag sync and verified there).
 #   Tag protection rules SHOULD restrict tag creation to maintainers.
 #   Deleting or moving a release tag is forbidden; fix forward.
 
@@ -31,16 +29,14 @@
 semver_check = true
 # Update CHANGELOG.md per crate with git-cliff (keep-a-changelog style).
 changelog_update = true
-# Tag format for the main release line (e.g. v0.2.0). The nested Go module
-# tag (bindings/go/vX.Y.Z) is cut by the maintainer alongside it and
-# verified (not created) by CI — see .github/workflows/release.yml.
-git_tag_name = "v{{ version }}"
-# Create a GitHub Release per tag (artifacts attached by release.yml).
+# Per-package tags (<name>-vX.Y.Z). The nested Go module tag
+# (bindings/go/vX.Y.Z) is synced by release.yml after publish.
+# Create a GitHub Release per tag (native assets attached by release.yml).
 git_release_enable = true
-# This is a Git-tags + GitHub-Releases project: never `cargo publish`.
-publish = false
+git_release_draft = false
+# Native registry publishing: crates.io via trusted publishing or token.
+publish = true
 release = true
-# Never publish prereleases from feature branches; main only via manual tags.
 publish_allow_dirty = false
 
 [changelog]

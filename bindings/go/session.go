@@ -54,7 +54,7 @@ type Transport interface {
 // loopback is an in-memory Transport. Frames cross by value (Send copies)
 // so callers can reuse buffers.
 type loopback struct {
-	mu     sync.Mutex
+	mu     *sync.Mutex // shared by both endpoints, including Send and Close
 	inbox  chan []byte
 	closed bool
 	peer   *loopback
@@ -66,8 +66,9 @@ const loopbackBuffer = 64
 // on a arrive on b and vice versa. It is the standard harness for
 // lifecycle tests and for embedding a session without a socket.
 func LoopbackPair() (a, b Transport) {
-	x := &loopback{inbox: make(chan []byte, loopbackBuffer)}
-	y := &loopback{inbox: make(chan []byte, loopbackBuffer)}
+	mu := &sync.Mutex{}
+	x := &loopback{mu: mu, inbox: make(chan []byte, loopbackBuffer)}
+	y := &loopback{mu: mu, inbox: make(chan []byte, loopbackBuffer)}
 	x.peer = y
 	y.peer = x
 	return x, y
@@ -76,24 +77,18 @@ func LoopbackPair() (a, b Transport) {
 // Send transmits one frame toward the peer. A closed transport reports
 // Unavailable; an oversize frame is rejected before allocation.
 func (l *loopback) Send(ctx context.Context, frame []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := ValidateFrameSize(len(frame)); err != nil {
 		return err
 	}
 	cp := make([]byte, len(frame))
 	copy(cp, frame)
 	l.mu.Lock()
+	defer l.mu.Unlock()
 	peer := l.peer
-	l.mu.Unlock()
-	_ = l
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-	peer.mu.Lock()
-	closed := peer.closed
-	peer.mu.Unlock()
-	if closed {
+	if l.closed || peer.closed {
 		return NewRpcError(ErrorCodeUnavailable, "syntra: loopback peer closed")
 	}
 	select {
@@ -146,12 +141,10 @@ func (l *loopback) Close() error {
 	l.closed = true
 	close(l.inbox)
 	if l.peer != nil {
-		l.peer.mu.Lock()
 		if !l.peer.closed {
 			l.peer.closed = true
 			close(l.peer.inbox)
 		}
-		l.peer.mu.Unlock()
 	}
 	return nil
 }
@@ -353,10 +346,11 @@ type ClientConfig struct {
 	// subject to host policy, not a parse error; oversize fails fast.
 	Credential []byte
 	// DefaultTimeout applies when a call passes timeoutMs zero. Zero
-	// selects DefaultRPCTimeout. Negative fails fast.
+	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls. Zero selects
-	// MaxConcurrentRPCs. Excess calls fail fast with ResourceExhausted.
+	// MaxConcurrentRPCs; larger values are rejected. Excess calls fail fast
+	// with ResourceExhausted.
 	MaxConcurrent int
 	// NotifyBuffer sizes the notification queue. Zero selects 16.
 	// Overflow drops the newest notification and counts it (see
@@ -391,11 +385,17 @@ func resolveClientConfig(cfg ClientConfig) (resolvedClientConfig, error) {
 	if out.timeout <= 0 {
 		return resolvedClientConfig{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: client default timeout must be positive")
 	}
+	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
+		return resolvedClientConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: client default timeout exceeds max")
+	}
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
 	}
 	if out.maxPending < 1 {
 		return resolvedClientConfig{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: client max concurrent must be positive")
+	}
+	if out.maxPending > MaxConcurrentRPCs {
+		return resolvedClientConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: client max concurrent exceeds max")
 	}
 	if out.notifyBuffer == 0 {
 		out.notifyBuffer = 16
@@ -414,15 +414,15 @@ type Client struct {
 	cfg    resolvedClientConfig
 	nextID atomic.Uint64
 
-	mu        sync.Mutex
-	cond      *sync.Cond // guards handshake completion for early Call
-	active    bool
-	closed    bool
-	done      chan struct{}
-	waiters   map[uint64]chan *RpcResult
-	notifyCh  chan *Notification
-	dropped   atomic.Uint64
-	transport Transport
+	mu          sync.Mutex
+	activated   chan struct{} // closed after successful handshake
+	closed      bool
+	pumpStarted bool // once true, Run alone closes notifyCh after the pump exits
+	done        chan struct{}
+	waiters     map[uint64]chan *RpcResult
+	notifyCh    chan *Notification
+	dropped     atomic.Uint64
+	transport   Transport
 }
 
 // OpenClient creates an initiator session. It validates the config and
@@ -438,13 +438,13 @@ func OpenClient(cfg ClientConfig) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{
-		core:     core,
-		cfg:      rcfg,
-		done:     make(chan struct{}),
-		waiters:  make(map[uint64]chan *RpcResult),
-		notifyCh: make(chan *Notification, rcfg.notifyBuffer),
+		core:      core,
+		cfg:       rcfg,
+		activated: make(chan struct{}),
+		done:      make(chan struct{}),
+		waiters:   make(map[uint64]chan *RpcResult),
+		notifyCh:  make(chan *Notification, rcfg.notifyBuffer),
 	}
-	c.cond = sync.NewCond(&c.mu)
 	return c, nil
 }
 
@@ -497,10 +497,11 @@ func (c *Client) handshake(ctx context.Context, t Transport) (*ServerReady, erro
 		return nil, err
 	}
 	c.mu.Lock()
-	c.active = true
-	c.transport = t
-	c.cond.Broadcast()
-	c.mu.Unlock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
+	}
+	close(c.activated)
 	return ready, nil
 }
 
@@ -523,30 +524,49 @@ func (c *Client) Run(ctx context.Context, t Transport) error {
 		c.mu.Unlock()
 		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: client already running")
 	}
+	c.transport = t
 	c.mu.Unlock()
 
-	if _, err := c.handshake(ctx, t); err != nil {
-		_ = c.core.close()
+	// Close also interrupts a handshake blocked in transport I/O.
+	runCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	go func() {
+		select {
+		case <-c.done:
+			stop()
+		case <-runCtx.Done():
+		}
+	}()
+	defer func() {
 		c.mu.Lock()
-		c.closed = true
-		c.cond.Broadcast()
-		close(c.done)
+		closeCore := !c.closed
+		if closeCore {
+			c.closed = true
+			c.failWaitersLocked(ErrorCodeUnavailable, "syntra: client closed")
+			close(c.done)
+			if !c.pumpStarted {
+				close(c.notifyCh)
+			}
+		}
+		if c.pumpStarted {
+			close(c.notifyCh)
+		}
 		c.mu.Unlock()
+		if closeCore {
+			_ = c.core.close()
+		}
+	}()
+	if _, err := c.handshake(runCtx, t); err != nil {
 		return err
 	}
-	err := c.pump(ctx, t)
-	_ = c.core.close()
 	c.mu.Lock()
-	// Close may have run concurrently (it owns the same teardown); only
-	// the first party closes the channels.
-	if !c.closed {
-		c.closed = true
-		c.cond.Broadcast()
-		c.failWaitersLocked(ErrorCodeUnavailable, "syntra: client closed")
-		close(c.done)
-		close(c.notifyCh)
+	if c.closed {
+		c.mu.Unlock()
+		return nil
 	}
+	c.pumpStarted = true
 	c.mu.Unlock()
+	err := c.pump(runCtx, t)
 	if err == nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -703,12 +723,18 @@ func (c *Client) Call(ctx context.Context, method string, payload []byte, timeou
 		c.mu.Unlock()
 		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
 	}
-	for !c.active {
-		c.cond.Wait()
-		if c.closed {
-			c.mu.Unlock()
-			return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
-		}
+	c.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		return nil, mapContextErr(ctx.Err())
+	case <-c.done:
+		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
+	case <-c.activated:
+	}
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
 	}
 	t := c.transport
 	c.mu.Unlock()
@@ -841,10 +867,11 @@ func (c *Client) Close() error {
 		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: client already closed")
 	}
 	c.closed = true
-	c.cond.Broadcast()
 	c.failWaitersLocked(ErrorCodeUnavailable, "syntra: client closed")
 	close(c.done)
-	close(c.notifyCh)
+	if !c.pumpStarted {
+		close(c.notifyCh)
+	}
 	core := c.core
 	c.mu.Unlock()
 	if err := core.close(); err != nil {
@@ -878,7 +905,7 @@ type HostConfig struct {
 	// UNIMPLEMENTED (no method is known).
 	Handler HandlerFunc
 	// DefaultTimeout applies when a request passes timeoutMs zero. Zero
-	// selects DefaultRPCTimeout. Negative fails fast.
+	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls per connection. Zero selects
 	// MaxConcurrentRPCs. Excess calls fail with ResourceExhausted while
@@ -909,6 +936,9 @@ func resolveHostConfig(cfg HostConfig) (resolvedHostConfig, error) {
 	}
 	if out.timeout <= 0 {
 		return resolvedHostConfig{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: host default timeout must be positive")
+	}
+	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
+		return resolvedHostConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: host default timeout exceeds max")
 	}
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
@@ -1153,7 +1183,8 @@ func validSuccess(res *RpcResult) bool {
 	if res == nil || ValidateResult(res) != nil {
 		return false
 	}
-	return res.GetPayload() != nil
+	_, ok := res.GetOutcome().(*syntrav1.RpcResult_Payload)
+	return ok
 }
 
 // dispatch runs one validated request on the handler with the effective

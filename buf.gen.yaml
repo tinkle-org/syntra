@@ -13,10 +13,9 @@
 # compiled into syntra-core (see that crate). Regeneration MUST be
 # byte-identical (drift-checked); never hand-edit files under that dir.
 #
-# Go output belongs to bindings/go/ (committed Go module, owned by the
-# schema-publish track). Do NOT run the Go half of this template on a
-# branch that does not own bindings/go/: `clean: true` would wipe that
-# tree. Rust-only regeneration:
+# Go output is committed under bindings/go/gen/syntra/v1/ within the Go
+# module. `clean: true` clears only bindings/go/gen/, preserving hand-written
+# module files. Rust-only regeneration:
 #   buf generate --template <(printf 'version: v2\nclean: true\nplugins:\n  - remote: buf.build/community/neoeinstein-prost:v0.4.0\n    revision: 1\n    out: crates/syntra-core/src/generated\n')
 version: v2
 clean: true
@@ -26,6 +25,6 @@ plugins:
     out: crates/syntra-core/src/generated
   - remote: buf.build/protocolbuffers/go:v1.36.6
     revision: 1
-    out: bindings/go
+    out: bindings/go/gen
     opt:
       - paths=source_relative

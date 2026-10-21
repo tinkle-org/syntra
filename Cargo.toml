@@ -15,6 +15,8 @@ rust-version = "1.88"
 license = "Apache-2.0"
 authors = ["Tinkle Messenger"]
 repository = "https://github.com/tinklehq/syntra"
+homepage = "https://github.com/tinklehq/syntra"
+documentation = "https://docs.rs/syntra-core"
 
 [workspace.dependencies]
 prost = "=0.13.5"

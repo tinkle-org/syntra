@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 description = "Syntra WSS/WS transport adapters (native tokio + browser wasm). Binary-only, one message per Frame."
-publish = false
 
 [dependencies]
 syntra-core = { path = "../syntra-core", version = "0.1.0" }

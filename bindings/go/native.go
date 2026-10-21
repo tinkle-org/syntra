@@ -212,7 +212,10 @@ func newClientCore(cfg resolvedClientConfig) (clientCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
-	c := &ffiClientCore{timeoutMs: uint32(cfg.timeout / time.Millisecond), maxPending: uint32(cfg.maxPending)}
+	c := &ffiClientCore{
+		minVersion: cfg.minVersion, maxVersion: cfg.maxVersion,
+		timeoutMs: uint32(cfg.timeout / time.Millisecond), maxPending: uint32(cfg.maxPending),
+	}
 	if c.timeoutMs == 0 {
 		c.timeoutMs = 1
 	}
@@ -234,10 +237,10 @@ func newClientCore(cfg resolvedClientConfig) (clientCore, error) {
 }
 
 // ffiClientCore is the CGO initiator core. All handle uses go through
-// locked(handle), which fails closed after close; destroy runs exactly
-// once via sync.Once (explicit Close or GC finalizer, whichever first).
+// locked, holding a read lock until unlockHandle after the full call;
+// destroy runs exactly once via sync.Once (Close or GC finalizer).
 type ffiClientCore struct {
-	mu         sync.Mutex
+	mu         sync.RWMutex
 	handle     *C.syntra_ffi_client_t
 	once       sync.Once
 	closed     atomic.Bool
@@ -247,6 +250,7 @@ type ffiClientCore struct {
 	// FFI (identical to the pure-Go core's rules).
 	minVersion uint32
 	maxVersion uint32
+	stateMu    sync.Mutex
 	negotiated uint32
 	active     atomic.Bool
 }
@@ -255,12 +259,17 @@ func (c *ffiClientCore) locked() (*C.syntra_ffi_client_t, error) {
 	if c.closed.Load() {
 		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
 	if c.closed.Load() || c.handle == nil {
+		c.mu.RUnlock()
 		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: client closed")
 	}
 	return c.handle, nil
+}
+
+func (c *ffiClientCore) unlockHandle() {
+	c.mu.RUnlock()
+	runtime.KeepAlive(c)
 }
 
 func (c *ffiClientCore) helloFrame() ([]byte, error) {
@@ -268,6 +277,7 @@ func (c *ffiClientCore) helloFrame() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer c.unlockHandle()
 	var out *C.uint8_t
 	var ln C.uintptr_t
 	if serr := ffiStatus(C.syntra_ffi_client_hello_frame(h, &out, &ln), "hello_frame"); serr != nil {
@@ -289,6 +299,7 @@ func (c *ffiClientCore) activate(frame []byte) (*ServerReady, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer c.unlockHandle()
 	// Go-side shape check first so a malformed peer frame is rejected
 	// with the binding's validators even if the native side is lenient.
 	ready, verr := activateFrame(frame, c.minVersion, c.maxVersion)
@@ -303,15 +314,15 @@ func (c *ffiClientCore) activate(frame []byte) (*ServerReady, error) {
 		return nil, serr
 	}
 	c.active.Store(true)
-	c.mu.Lock()
+	c.stateMu.Lock()
 	c.negotiated = ready.frameVersion
-	c.mu.Unlock()
+	c.stateMu.Unlock()
 	return ready.ready, nil
 }
 
 func (c *ffiClientCore) version() uint32 {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
 	return c.negotiated
 }
 
@@ -320,6 +331,7 @@ func (c *ffiClientCore) onFrame(frame []byte) (terminal []uint64, notifications 
 	if err != nil {
 		return nil, 0, err.(*RpcError)
 	}
+	defer c.unlockHandle()
 	const maxEvents = 128
 	ids := make([]C.uint64_t, maxEvents)
 	var n C.uintptr_t
@@ -347,6 +359,7 @@ func (c *ffiClientCore) beginCall(requestID uint64, method string, payload []byt
 	if err != nil {
 		return nil, err
 	}
+	defer c.unlockHandle()
 	// Go-side validation first: method shape, payload bound, timeout
 	// ceiling — the binding never forwards a frame it would reject.
 	if verr := ValidateMethod(method); verr != nil {
@@ -386,6 +399,7 @@ func (c *ffiClientCore) cancelCall(requestID uint64) []byte {
 	if err != nil {
 		return nil
 	}
+	defer c.unlockHandle()
 	var out *C.uint8_t
 	var ln C.uintptr_t
 	if serr := ffiStatus(C.syntra_ffi_client_cancel(h, C.uint64_t(requestID), &out, &ln), "cancel"); serr != nil {
@@ -399,6 +413,7 @@ func (c *ffiClientCore) takeOutcome(requestID uint64) (*RpcResult, bool) {
 	if err != nil {
 		return nil, false
 	}
+	defer c.unlockHandle()
 	var out *C.uint8_t
 	var ln C.uintptr_t
 	var present C.int32_t
@@ -421,6 +436,7 @@ func (c *ffiClientCore) pollNotification() (*Notification, bool) {
 	if err != nil {
 		return nil, false
 	}
+	defer c.unlockHandle()
 	var out *C.uint8_t
 	var ln C.uintptr_t
 	var present C.int32_t
@@ -444,6 +460,7 @@ func (c *ffiClientCore) reapExpired(now time.Time) []uint64 {
 	if err != nil {
 		return nil
 	}
+	defer c.unlockHandle()
 	const maxIDs = 256
 	ids := make([]C.uint64_t, maxIDs)
 	var n C.uintptr_t
@@ -504,7 +521,7 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 // ffiHostCore is the CGO responder core with the same exactly-once
 // destruction discipline as the client core.
 type ffiHostCore struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	handle *C.syntra_ffi_host_t
 	once   sync.Once
 	closed atomic.Bool
@@ -514,12 +531,17 @@ func (c *ffiHostCore) locked() (*C.syntra_ffi_host_t, error) {
 	if c.closed.Load() {
 		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
 	if c.closed.Load() || c.handle == nil {
+		c.mu.RUnlock()
 		return nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
 	}
 	return c.handle, nil
+}
+
+func (c *ffiHostCore) unlockHandle() {
+	c.mu.RUnlock()
+	runtime.KeepAlive(c)
 }
 
 func (c *ffiHostCore) acceptHello(frame []byte) (uint32, error) {
@@ -527,6 +549,7 @@ func (c *ffiHostCore) acceptHello(frame []byte) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+	defer c.unlockHandle()
 	var version C.uint32_t
 	var st C.int32_t
 	withBorrowed(frame, func(ptr *C.uint8_t, ln C.uintptr_t) {
@@ -543,6 +566,7 @@ func (c *ffiHostCore) authComplete(principal string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer c.unlockHandle()
 	if principal == "" {
 		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: principal must be non-empty at activation")
 	}
@@ -573,6 +597,7 @@ func (c *ffiHostCore) onFrame(frame []byte) ([][]byte, []uint64, *RpcError) {
 		}
 		return nil, nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
 	}
+	defer c.unlockHandle()
 	const maxCancels = 64
 	cancels := make([]C.uint64_t, maxCancels)
 	var out *C.uint8_t
@@ -609,6 +634,7 @@ func (c *ffiHostCore) takePending() (uint64, *RpcRequest, bool) {
 	if err != nil {
 		return 0, nil, false
 	}
+	defer c.unlockHandle()
 	var id C.uint64_t
 	var out *C.uint8_t
 	var ln C.uintptr_t
@@ -632,6 +658,7 @@ func (c *ffiHostCore) isCancelled(requestID uint64) bool {
 	if err != nil {
 		return false
 	}
+	defer c.unlockHandle()
 	var cancelled C.int32_t
 	if serr := ffiStatus(C.syntra_ffi_host_is_cancelled(h, C.uint64_t(requestID), &cancelled), "is_cancelled"); serr != nil {
 		return false
@@ -644,6 +671,7 @@ func (c *ffiHostCore) answer(requestID uint64, result *RpcResult) ([]byte, bool,
 	if err != nil {
 		return nil, false, err
 	}
+	defer c.unlockHandle()
 	if verr := ValidateResult(result); verr != nil {
 		return nil, false, verr
 	}
@@ -676,6 +704,7 @@ func (c *ffiHostCore) notify(payload []byte) error {
 	if err != nil {
 		return err
 	}
+	defer c.unlockHandle()
 	if verr := ValidatePayloadSize(len(payload)); verr != nil {
 		return verr
 	}
@@ -691,6 +720,7 @@ func (c *ffiHostCore) nextOutbound() ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
+	defer c.unlockHandle()
 	var out *C.uint8_t
 	var ln C.uintptr_t
 	var present C.int32_t
@@ -709,6 +739,7 @@ func (c *ffiHostCore) reapExpired(now time.Time) []uint64 {
 	if err != nil {
 		return nil
 	}
+	defer c.unlockHandle()
 	const maxIDs = 256
 	ids := make([]C.uint64_t, maxIDs)
 	var n C.uintptr_t

@@ -238,6 +238,212 @@ async fn live_echo_over_ws() {
 }
 
 #[tokio::test]
+async fn unfragmented_messages_above_64k_and_near_envelope_limit_are_accepted() {
+    let cfg = syntra_ws::WsConfig::insecure_dev(loopback_server(false).await);
+    let handle = syntra_ws::connect(cfg, vec![], ConnectionConfig::default())
+        .await
+        .expect("connect+handshake");
+    // Tungstenite sends each Binary as one unfragmented WS frame. Leave
+    // room for the Syntra request envelope, not just its opaque payload.
+    for len in [64 * 1024 + 1, syntra_core::MAX_FRAME_BYTES - 128] {
+        let payload = vec![0x5a; len];
+        let out = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            handle
+                .connection()
+                .call("/example.Echo/Echo", payload.clone(), 3000),
+        )
+        .await
+        .expect("bounded echo")
+        .expect("legal unfragmented result");
+        assert_eq!(out, payload);
+    }
+    handle.close().await;
+}
+
+#[tokio::test]
+async fn healthy_pongs_survive_multiple_ping_intervals() {
+    let mut cfg = syntra_ws::WsConfig::insecure_dev(loopback_server(false).await);
+    cfg.ping_interval = std::time::Duration::from_millis(100);
+    cfg.pong_timeout = std::time::Duration::from_millis(40);
+    let handle = syntra_ws::connect(cfg, vec![], ConnectionConfig::default())
+        .await
+        .expect("connect+handshake");
+    tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+    assert!(
+        !handle.is_closed(),
+        "healthy peer must not time out between Pings"
+    );
+    let out = handle
+        .connection()
+        .call("/example.Echo/Echo", b"alive".to_vec(), 1000)
+        .await
+        .expect("usable after multiple Pongs");
+    assert_eq!(out, b"alive");
+    handle.close().await;
+}
+
+/// One owned peer: flush ready, wait for the client-side test to start,
+/// send scripted WS frames, then stay silent without polling (and thus
+/// without tungstenite's automatic Pong replies). No per-message tasks.
+#[allow(clippy::result_large_err)] // Tungstenite fixes the Upgrade callback's error type.
+async fn scripted_peer(
+    messages: Vec<tokio_tungstenite::tungstenite::Message>,
+) -> (
+    String,
+    tokio::sync::oneshot::Sender<()>,
+    tokio::task::JoinHandle<()>,
+) {
+    use tokio_tungstenite::tungstenite::handshake::server::{Request, Response};
+    use tokio_tungstenite::tungstenite::Message;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (start_tx, start_rx) = tokio::sync::oneshot::channel();
+    let task = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_hdr_async(
+            socket,
+            |_req: &Request, mut response: Response| {
+                response
+                    .headers_mut()
+                    .insert("sec-websocket-protocol", "syntra.v1".parse().unwrap());
+                Ok(response)
+            },
+        )
+        .await
+        .unwrap();
+        let (host, mut wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            test_handler(),
+        );
+        loop {
+            match ws.next().await {
+                Some(Ok(Message::Binary(hello))) => {
+                    host.ingest(&hello).await;
+                    break;
+                }
+                Some(Ok(Message::Ping(payload))) => ws.send(Message::Pong(payload)).await.unwrap(),
+                other => panic!("expected hello, got {other:?}"),
+            }
+        }
+        ws.send(Message::Binary(wrx.recv().await.unwrap().into()))
+            .await
+            .unwrap();
+        if start_rx.await.is_ok() {
+            for message in messages {
+                if ws.send(message).await.is_err() {
+                    break;
+                }
+            }
+            std::future::pending::<()>().await;
+        }
+        host.on_transport_lost().await;
+    });
+    (
+        format!("ws://127.0.0.1:{port}/syntra/v1/ws"),
+        start_tx,
+        task,
+    )
+}
+
+#[tokio::test]
+async fn receive_limit_covers_single_frames_and_fragmented_messages() {
+    use prost::Message as _;
+    use tokio_tungstenite::tungstenite::{
+        protocol::frame::{
+            coding::{Data, OpCode},
+            Frame,
+        },
+        Message,
+    };
+    // At this size, each of the two protobuf length prefixes takes three
+    // bytes, so the notification envelope adds exactly ten bytes.
+    let payload = vec![0x5a; syntra_core::MAX_FRAME_BYTES - 10];
+    let at_limit = syntra_core::Frame {
+        version: 1,
+        request_id: 0,
+        body: Some(syntra_core::proto::frame::Body::Notification(
+            syntra_core::Notification {
+                payload: payload.clone(),
+            },
+        )),
+    }
+    .encode_to_vec();
+    assert_eq!(at_limit.len(), syntra_core::MAX_FRAME_BYTES);
+    // Each fragment is within the per-frame cap, but their sum is MAX+1.
+    for fragmented in [false, true] {
+        let oversize = vec![0x5a; syntra_core::MAX_FRAME_BYTES + 1];
+        let mut messages = vec![Message::Binary(at_limit.clone().into())];
+        if fragmented {
+            messages.push(Message::Frame(Frame::message(
+                oversize[..64 * 1024].to_vec(),
+                OpCode::Data(Data::Binary),
+                false,
+            )));
+            messages.push(Message::Frame(Frame::message(
+                oversize[64 * 1024..].to_vec(),
+                OpCode::Data(Data::Continue),
+                true,
+            )));
+        } else {
+            messages.push(Message::Binary(oversize.into()));
+        }
+        let (url, start, peer) = scripted_peer(messages).await;
+        let handle = syntra_ws::connect(
+            syntra_ws::WsConfig::insecure_dev(url),
+            vec![],
+            ConnectionConfig::default(),
+        )
+        .await
+        .expect("connect+handshake");
+        let mut closed = handle.connection().subscribe_close();
+        start.send(()).unwrap();
+        let received = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            handle.connection().next_notification(),
+        )
+        .await
+        .expect("bounded notification")
+        .expect("exact-limit notification accepted");
+        assert_eq!(received, payload);
+        tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            closed.wait_for(|closed| *closed),
+        )
+        .await
+        .expect("oversize closes connection")
+        .unwrap();
+        peer.abort();
+        assert!(peer.await.unwrap_err().is_cancelled());
+        handle.close().await;
+    }
+}
+
+#[tokio::test]
+async fn missing_pongs_still_close_a_silent_peer() {
+    let (url, start, peer) = scripted_peer(vec![]).await;
+    let mut cfg = syntra_ws::WsConfig::insecure_dev(url);
+    cfg.ping_interval = std::time::Duration::from_millis(100);
+    cfg.pong_timeout = std::time::Duration::from_millis(40);
+    let handle = syntra_ws::connect(cfg, vec![], ConnectionConfig::default())
+        .await
+        .expect("connect+handshake");
+    let mut closed = handle.connection().subscribe_close();
+    start.send(()).unwrap();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        closed.wait_for(|closed| *closed),
+    )
+    .await
+    .expect("silent peer times out")
+    .unwrap();
+    peer.abort();
+    assert!(peer.await.unwrap_err().is_cancelled());
+    handle.close().await;
+}
+
+#[tokio::test]
 async fn subprotocol_mismatch_aborts() {
     let url = loopback_server(true).await;
     let cfg = syntra_ws::WsConfig::insecure_dev(url);

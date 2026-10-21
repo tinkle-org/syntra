@@ -36,7 +36,8 @@ pub struct WsHandle {
 
 impl WsHandle {
     /// Graceful close: stop new RPCs, then release the socket.
-    /// (Dropping the `WsStream` halves closes the browser socket.)
+    /// The connection's close broadcast wakes both pumps, including while
+    /// idle; the writer closes the browser sink before releasing it.
     pub async fn close(self) {
         self.conn.close().await;
         self.shutdown.store(true, Ordering::Relaxed);
@@ -48,6 +49,8 @@ impl WsHandle {
 
     /// Split into the protocol engine and its shutdown flag for embeds
     /// (e.g. client registries) that manage lifetime by id.
+    /// Call `Initiator::close()` to wake idle pumps; setting the flag alone
+    /// does not send a wakeup. Both pumps share the initiator's close signal.
     pub fn into_parts(self) -> (Initiator, Arc<AtomicBool>) {
         (self.conn, self.shutdown)
     }
@@ -95,12 +98,19 @@ pub async fn connect(
     // Write pump: one Vec<u8> = one binary message.
     let write_conn = conn.clone();
     let write_shutdown = shutdown.clone();
+    let mut write_close = conn.subscribe_close();
+    let close_grace = cfg.close_grace;
     wasm_bindgen_futures::spawn_local(async move {
         loop {
-            if write_shutdown.load(Ordering::Relaxed) {
+            if write_conn.is_closed() || write_shutdown.load(Ordering::Relaxed) {
                 break;
             }
-            match wrx.recv().await {
+            let next = tokio::select! {
+                biased;
+                _ = write_close.changed() => break,
+                next = wrx.recv() => next,
+            };
+            match next {
                 Some(bytes) => {
                     if bytes.len() > syntra_core::MAX_FRAME_BYTES {
                         tracing::warn!("outgoing frame exceeds bound; dropping");
@@ -117,6 +127,15 @@ pub async fn connect(
                 None => break,
             }
         }
+        write_shutdown.store(true, Ordering::Relaxed);
+        // Closing the sink initiates WebSocket.close; do not retain the
+        // split socket forever if the browser never delivers its close event.
+        tokio::select! {
+            biased;
+            _ = sink.close() => {},
+            _ = syntra_runtime::sleep_for(close_grace) => {},
+        }
+        drop(sink);
         write_conn.on_transport_lost().await;
     });
 
@@ -124,13 +143,22 @@ pub async fn connect(
     // (Pong/ping/close stay inside the browser stack.)
     let read_conn = conn.clone();
     let read_shutdown = shutdown.clone();
+    let mut read_close = conn.subscribe_close();
     wasm_bindgen_futures::spawn_local(async move {
         // `WsStream` yields `WsMessage` directly (errors surface as
         // `Close` events on the socket, which end the stream).
-        while let Some(msg) = stream.next().await {
-            if read_shutdown.load(Ordering::Relaxed) {
+        loop {
+            if read_conn.is_closed() || read_shutdown.load(Ordering::Relaxed) {
                 break;
             }
+            let msg = tokio::select! {
+                biased;
+                _ = read_close.changed() => break,
+                msg = stream.next() => match msg {
+                    Some(msg) => msg,
+                    None => break,
+                },
+            };
             match msg {
                 ws_stream_wasm::WsMessage::Binary(data) => {
                     if data.is_empty() {
@@ -152,6 +180,7 @@ pub async fn connect(
                 }
             }
         }
+        read_shutdown.store(true, Ordering::Relaxed);
         read_conn.on_transport_lost().await;
     });
 

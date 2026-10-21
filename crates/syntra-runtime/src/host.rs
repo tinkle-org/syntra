@@ -577,10 +577,12 @@ impl Host {
             // until now, a duplicate id is a duplicate (original wins).
             inflight.lock().unwrap().remove(&id);
         });
-        self.inflight
-            .lock()
-            .unwrap()
-            .insert(id, InflightEntry { cancel, task });
+        // A fast handler may already have removed the entry. Only attach
+        // the task to a live request; never resurrect a completed id or
+        // replace the cancellation token that already owns this request.
+        if let Some(entry) = self.inflight.lock().unwrap().get_mut(&id) {
+            entry.task = task;
+        }
     }
 
     async fn on_cancel(&self, id: u64) {
@@ -858,5 +860,101 @@ mod tests {
             other => panic!("expected result, got {other:?}"),
         }
         assert_eq!(host.state().await, ConnectionState::Active);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn immediate_handlers_do_not_resurrect_completed_requests() {
+        const REQUESTS: u64 = 4096;
+        let config = ConnectionConfig {
+            max_outstanding: REQUESTS as usize,
+            writer_capacity: REQUESTS as usize,
+            ..ConnectionConfig::default()
+        };
+        let (host, mut wrx) = Host::new(config, Arc::new(AllowAnonymous), echo_handler());
+        host.inject(&hello_frame(1, 1, vec![])).await;
+        wrx.recv().await.unwrap();
+        let dispatcher = host.clone();
+        let runtime = tokio::runtime::Handle::current();
+        // Dispatch on a separate OS thread while this executor runs the
+        // handlers, exercising completion before task-handle attachment.
+        let dispatch = tokio::task::spawn_blocking(move || {
+            runtime.block_on(async {
+                for id in 1..=REQUESTS {
+                    dispatcher
+                        .on_request(
+                            id,
+                            1,
+                            RpcRequest {
+                                method: "/example.Echo/Echo".into(),
+                                payload: vec![].into(),
+                                timeout_ms: 5000,
+                            },
+                        )
+                        .await;
+                }
+            });
+        });
+        tokio::time::timeout(Duration::from_secs(10), async {
+            for _ in 0..REQUESTS {
+                let bytes = wrx.recv().await.expect("terminal result");
+                let frame = decode_frame(&bytes, ValidationContext::active(1)).unwrap();
+                assert!(matches!(
+                    frame.body,
+                    Some(Body::Result(RpcResult {
+                        outcome: Some(syntra_core::proto::rpc_result::Outcome::Payload(_))
+                    }))
+                ));
+            }
+            dispatch.await.unwrap();
+        })
+        .await
+        .expect("all immediate handlers should complete");
+        assert_eq!(host.inflight_len(), 0, "completed ids must stay removed");
+        assert!(wrx.try_recv().is_err(), "no duplicate terminal results");
+        host.close().await;
+    }
+
+    #[tokio::test]
+    async fn attached_task_preserves_request_cancellation_token() {
+        let (started, mut started_rx) = mpsc::unbounded_channel();
+        let handler = Arc::new(FnHandler(move |_, _, cancel| {
+            started.send(cancel).unwrap();
+            std::future::pending::<HandlerOutcome>()
+        }));
+        let (host, mut wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            handler,
+        );
+        host.inject(&hello_frame(1, 1, vec![])).await;
+        wrx.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Test/Wait".into(),
+                payload: vec![].into(),
+                timeout_ms: 5000,
+            },
+        )
+        .await;
+        let token = started_rx.recv().await.unwrap();
+        host.on_cancel(1).await;
+        assert!(token.is_cancelled());
+        let bytes = tokio::time::timeout(Duration::from_secs(2), wrx.recv())
+            .await
+            .expect("cancel should promptly end the request")
+            .unwrap();
+        let frame = decode_frame(&bytes, ValidationContext::active(1)).unwrap();
+        match frame.body {
+            Some(Body::Result(RpcResult {
+                outcome: Some(syntra_core::proto::rpc_result::Outcome::Error(e)),
+            })) => assert_eq!(e.code, ErrorCode::Cancelled.as_i32()),
+            other => panic!("expected CANCELLED result, got {other:?}"),
+        }
+        assert_eq!(host.inflight_len(), 0);
+        assert!(wrx.try_recv().is_err());
+        host.close().await;
     }
 }

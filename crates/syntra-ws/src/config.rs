@@ -10,7 +10,7 @@ pub struct WsConfig {
     /// variant unless the deployment documents aliasing).
     pub url: String,
     /// When false (default), only `wss://` is accepted. Set true only for
-    /// loopback/isolated test networks (`ws://127.0.0.1/...`); production
+    /// loopback endpoints (`ws://127.0.0.1/...`); production
     /// builds MUST NOT enable it.
     pub allow_insecure: bool,
     /// Expected host for TLS hostname verification is derived from the URL;
@@ -23,8 +23,9 @@ pub struct WsConfig {
     pub close_grace: Duration,
     /// Ping interval for transport liveness (WS section 1I).
     pub ping_interval: Duration,
-    /// Pong latency bound: silence longer than this closes the connection
-    /// (typically code 1001) with `UNAVAILABLE` to in-flight RPCs.
+    /// Pong latency allowance after each Ping interval: silence longer than
+    /// `ping_interval + pong_timeout` closes the connection (typically code
+    /// 1001) with `UNAVAILABLE` to in-flight RPCs.
     pub pong_timeout: Duration,
     /// Bound for one outbound write: exceeding it closes a slow receiver
     /// (typically 1001) instead of queueing unboundedly (WS section 1L).
@@ -46,8 +47,8 @@ impl WsConfig {
     }
 
     /// Development-only plaintext endpoint. Emits an insecure-mode warning
-    /// at connect time and refuses non-loopback hosts unless the caller
-    /// explicitly opts in (defense against accidental public plaintext).
+    /// at connect time and refuses non-loopback hosts, even with
+    /// `allow_insecure` set (defense against accidental public plaintext).
     pub fn insecure_dev(url: impl Into<String>) -> Self {
         Self {
             url: url.into(),
@@ -107,11 +108,6 @@ impl Endpoint {
                 )))
             }
         };
-        if !is_secure && !allow_insecure {
-            return Err(crate::error::TransportError::InsecureDenied(
-                "plaintext WS is restricted-development only".to_string(),
-            ));
-        }
         let path = url.path().to_string();
         if path != crate::ENDPOINT_PATH {
             return Err(crate::error::TransportError::InvalidUrl(format!(
@@ -125,14 +121,12 @@ impl Endpoint {
                 "missing host".to_string(),
             ));
         }
-        // Plaintext guard: refuse non-loopback unless explicitly allowed.
-        // Loopback check is hostname-based (127.*, ::1, localhost); docs
-        // require isolated test networks for any other plaintext host.
-        if !is_secure && !is_loopback(&host) {
-            tracing::warn!(
-                host = %host,
-                "plaintext WS to non-loopback host; allowed only on isolated test networks"
-            );
+        // A development opt-in never authorizes credentials over public
+        // plaintext. Inspect the parsed host, not a spoofable string prefix.
+        if !is_secure && !url.host().is_some_and(is_loopback) {
+            return Err(crate::error::TransportError::InsecureDenied(
+                "plaintext WS is restricted to loopback hosts".to_string(),
+            ));
         }
         Ok(Self {
             scheme,
@@ -149,12 +143,12 @@ fn looks_like_secret(q: &str) -> bool {
     l.contains("token") || l.contains("credential") || l.contains("auth") || l.contains("secret")
 }
 
-fn is_loopback(host: &str) -> bool {
-    host == "localhost"
-        || host == "127.0.0.1"
-        || host.starts_with("127.")
-        || host == "::1"
-        || host == "[::1]"
+fn is_loopback(host: url::Host<&str>) -> bool {
+    match host {
+        url::Host::Domain(name) => name == "localhost",
+        url::Host::Ipv4(ip) => std::net::IpAddr::V4(ip).is_loopback(),
+        url::Host::Ipv6(ip) => std::net::IpAddr::V6(ip).is_loopback(),
+    }
 }
 
 #[cfg(test)]
@@ -174,5 +168,51 @@ mod tests {
         assert!(Endpoint::parse("ws://h/syntra/v1/ws", false).is_err());
         assert!(Endpoint::parse("ws://127.0.0.1/syntra/v1/ws", true).is_ok());
         assert!(Endpoint::parse("https://h/syntra/v1/ws", false).is_err());
+    }
+
+    #[test]
+    fn plaintext_requires_loopback_even_with_dev_opt_in() {
+        for host in [
+            "example.com",
+            "127.evil.example",
+            "127.0.0.1.example.com",
+            "localhost.example.com",
+            "192.168.1.2",
+            "0.0.0.0",
+            "[::]",
+            "[2001:db8::1]",
+            "[::ffff:127.0.0.1]",
+        ] {
+            let cfg = WsConfig::insecure_dev(format!("ws://{host}/syntra/v1/ws"));
+            assert!(
+                matches!(
+                    Endpoint::parse(&cfg.url, cfg.allow_insecure),
+                    Err(crate::error::TransportError::InsecureDenied(_))
+                ),
+                "plaintext must be denied for {host}"
+            );
+            assert!(Endpoint::parse(&format!("wss://{host}/syntra/v1/ws"), false).is_ok());
+        }
+    }
+
+    #[test]
+    fn plaintext_accepts_only_parsed_loopback_addresses_and_localhost() {
+        for host in [
+            "localhost",
+            "LOCALHOST",
+            "127.0.0.1",
+            "127.23.45.67",
+            "[::1]",
+            "[0:0:0:0:0:0:0:1]",
+        ] {
+            let url = format!("ws://{host}/syntra/v1/ws");
+            assert!(Endpoint::parse(&url, true).is_ok(), "loopback: {host}");
+            assert!(matches!(
+                Endpoint::parse(&url, false),
+                Err(crate::error::TransportError::InsecureDenied(_))
+            ));
+            assert!(Endpoint::parse(&format!("ws://u:p@{host}/syntra/v1/ws"), true).is_err());
+            assert!(Endpoint::parse(&format!("{url}?token=abc"), true).is_err());
+        }
     }
 }

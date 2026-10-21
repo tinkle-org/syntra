@@ -685,6 +685,12 @@ func ValidateResult(r *RpcResult) error {
 // there is nothing to re-check here beyond cardinality. ACTIVE gating is
 // stateful and lives in ValidateFrameForState.
 func ValidateFrame(f *Frame) error {
+	return validateFrame(f, true)
+}
+
+// validateFrame defers request method validation only on decode, allowing
+// the host to answer INVALID_ARGUMENT for a structurally routable request.
+func validateFrame(f *Frame, validateRequestMethod bool) error {
 	if f == nil {
 		return NewRpcError(ErrorCodeInvalidArgument, "syntra: nil frame")
 	}
@@ -718,7 +724,10 @@ func ValidateFrame(f *Frame) error {
 		if req == nil {
 			return NewRpcError(ErrorCodeInvalidArgument, "syntra: nil request")
 		}
-		return ValidateMethod(req.GetMethod())
+		if validateRequestMethod {
+			return ValidateMethod(req.GetMethod())
+		}
+		return nil
 	case BodyKindResult:
 		return ValidateResult(f.GetResult())
 	case BodyKindCancel:
@@ -1350,7 +1359,8 @@ func MarshalFrame(f *Frame) ([]byte, error) {
 
 // UnmarshalFrame decodes exactly one Frame from data. It rejects empty
 // inputs, trailing bytes, reserved numbers, and duplicate bodies before
-// running stateless validation. proto.Unmarshal owns field decoding; the
+// running structural validation. Request methods are validated by the host
+// so malformed methods receive per-RPC errors. proto.Unmarshal owns decoding; the
 // pre-scan owns protocol strictness the generated codec does not enforce
 // (reserved 16/17, duplicate body alternatives, unexpected top-level
 // fields).
@@ -1370,7 +1380,7 @@ func UnmarshalFrame(data []byte) (*Frame, error) {
 	}
 	// proto.Unmarshal consumed every tag the pre-scan walked, so a
 	// successful unmarshal here consumed exactly one Frame.
-	if err := ValidateFrame(&f); err != nil {
+	if err := validateFrame(&f, false); err != nil {
 		return nil, err
 	}
 	// Credential size gate before auth: the validator treats credential

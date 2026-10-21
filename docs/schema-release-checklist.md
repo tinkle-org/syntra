@@ -19,7 +19,7 @@ Use this checklist for every schema change (additive revision) and every release
 - [ ] Version mapping recorded: Git tag (`vX.Y.Z`), nested Go module tag (`bindings/go/vX.Y.Z`, same revision), Syntra Core version, package version (`syntra.v1`), and transport profiles covered.
 - [ ] No registry identity configured (`buf.yaml` has no `name:`; no `BUF_TOKEN`, no `bsr-publish` environment, no `BSR_MODULE` variable). **If any registry push path exists, stop: publication is blocked.**
 - [ ] Tags `vX.Y.Z` and `bindings/go/vX.Y.Z` created by a maintainer at the same revision; tag protection rules enforced (`v*`, `bindings/go/v*` restricted). CI never creates tags.
-- [ ] `release-plz.toml` versions align with the tag (Apache-2.0, `publish = false`); Release PR merged before tagging.
+- [ ] `release-plz.toml` versions align with the tag (Apache-2.0, publish enabled); Release PR merged before tagging.
 - [ ] Release notes drafted from `CHANGELOG.md`: wire contracts, supported transports, native-lib/WASM asset list, migration notes, deprecation notices with removal versions.
 
 ## C. Release (tag workflow)
