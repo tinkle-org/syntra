@@ -1,0 +1,42 @@
+crates/syntra-core/src/frame.rs
+  s_81f81d583e0214::t_48d8c8f581ed50 590-608,610-613,615-617
+  s_81f81d583e0214::t_34add9577ded1e 108,304-310,312-316,318-325
+  s_81f81d583e0214::t_87349de164de60 85-88,101-104
+  s_81f81d583e0214::t_2f9406836bcab6 609,614
+bindings/go/session.go
+  s_81f81d583e0214::t_6018885f2083a5 390-391,974-975
+  s_81f81d583e0214::t_f14a750b8294a7 433-435,1011-1013
+audits/v1-wss-h1-v1-review.md
+  s_81f81d583e0214::t_2ecc0066d91d5f 123
+  s_81f81d583e0214::t_a738e04e616c97 5
+  s_81f81d583e0214::t_57750f20c5e818 67,318
+crates/syntra-runtime/src/policy.rs
+  s_81f81d583e0214::t_4e390f67eb674d 164-266
+docs/production-runtime.md
+  s_81f81d583e0214::t_4309b9321c69f0 73,75-79
+audits/bsr-publication-readiness.md
+  s_81f81d583e0214::t_2dde9741c72389 13
+bindings/go/session_test.go
+  s_81f81d583e0214::t_a9cfff1a62b2ea 54-84
+bindings/go/syntra.go
+  s_81f81d583e0214::t_a0f91f50270028 9-10,12-13
+  s_81f81d583e0214::t_b25141a220aa26 150-162
+bindings/go/native.go
+  s_81f81d583e0214::t_03585fd496314f 205-206,209,523-525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2e53395683a192de0f28ccb1ca85c8e946a8c367",
+  "prompts": {},
+  "sessions": {
+    "s_81f81d583e0214": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9f8ca991ffe1UbP7iczXhs8R9",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
