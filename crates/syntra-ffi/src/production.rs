@@ -27,8 +27,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use prost::Message;
 
 use syntra_core::{
-    negotiate_version, validate_hello_range, validate_method, Frame, MAX_CREDENTIAL_BYTES,
-    MAX_FRAME_BYTES,
+    validate_hello_range, validate_method, validate_wire_structure, ConnectionState, Frame,
+    ValidationContext, MAX_CREDENTIAL_BYTES, MAX_FRAME_BYTES,
 };
 
 // -- ABI version and status -----------------------------------------------
@@ -42,11 +42,13 @@ pub const SYNTRA_FFI_OK: i32 = 0;
 pub const SYNTRA_FFI_INVALID: i32 = -1;
 /// Operation on a closed handle.
 pub const SYNTRA_FFI_CLOSED: i32 = -2;
-/// ABI version mismatch.
+/// ABI version mismatch. Reserved for future use; not returned. Compare
+/// `syntra_ffi_abi_version()` against `SYNTRA_FFI_ABI_VERSION` out of band.
 pub const SYNTRA_FFI_ABI_MISMATCH: i32 = -3;
 /// Allocation failure.
 pub const SYNTRA_FFI_NOMEM: i32 = -4;
-/// Deadline expired.
+/// Deadline expired. Reserved as a return code; expiration is reported via
+/// out-params (`expired=1`) and reap lists, with `SYNTRA_FFI_OK` returned.
 pub const SYNTRA_FFI_EXPIRED: i32 = -5;
 /// Internal failure (including contained panic).
 pub const SYNTRA_FFI_INTERNAL: i32 = -6;
@@ -193,11 +195,8 @@ fn generate_connection_id() -> String {
     format!("c-{seq:x}-{nanos:x}")
 }
 
-fn decode_frame(bytes: &[u8]) -> Result<Frame, i32> {
-    if bytes.is_empty() || bytes.len() > MAX_FRAME_BYTES {
-        return Err(SYNTRA_FFI_INVALID);
-    }
-    Frame::decode(bytes).map_err(|_| SYNTRA_FFI_INVALID)
+fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, i32> {
+    syntra_core::codec::decode_frame(bytes, ctx).map_err(|_| SYNTRA_FFI_INVALID)
 }
 
 fn client_lock<'a>(
@@ -259,6 +258,11 @@ pub extern "C" fn syntra_ffi_client_open(
         }
         unsafe { *out = ptr::null_mut() };
         if min_version == 0 || max_version == 0 || min_version > max_version {
+            return SYNTRA_FFI_INVALID;
+        }
+        // Bound the caller length before copying: a huge valid buffer would
+        // otherwise make `borrow_bytes` attempt an aborting allocation.
+        if credential_len > MAX_CREDENTIAL_BYTES {
             return SYNTRA_FFI_INVALID;
         }
         let cred = match borrow_bytes(credential, credential_len) {
@@ -346,11 +350,17 @@ pub extern "C" fn syntra_ffi_client_activate(
     len: usize,
 ) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| {
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(ready_frame, len) {
             Ok(v) => v,
             Err(code) => return code,
         };
-        let frame = match decode_frame(&bytes) {
+        let frame = match decode_frame(
+            &bytes,
+            ValidationContext::pre_handshake(ConnectionState::Authenticating),
+        ) {
             Ok(f) => f,
             Err(code) => return code,
         };
@@ -360,6 +370,9 @@ pub extern "C" fn syntra_ffi_client_activate(
         };
         if inner.closed {
             return SYNTRA_FFI_CLOSED;
+        }
+        if inner.active {
+            return SYNTRA_FFI_INVALID;
         }
         if frame.request_id != 0 {
             return SYNTRA_FFI_INVALID;
@@ -400,6 +413,9 @@ pub extern "C" fn syntra_ffi_client_on_frame(
             *terminal_n = 0;
             *notifications = 0;
         }
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(frame, len) {
             Ok(v) => v,
             Err(code) => return code,
@@ -407,10 +423,6 @@ pub extern "C" fn syntra_ffi_client_on_frame(
         if bytes.is_empty() {
             return SYNTRA_FFI_INVALID;
         }
-        let decoded = match decode_frame(&bytes) {
-            Ok(f) => f,
-            Err(code) => return code,
-        };
         let mut inner = match client_lock(c) {
             Ok(g) => g,
             Err(code) => return code,
@@ -418,9 +430,13 @@ pub extern "C" fn syntra_ffi_client_on_frame(
         if inner.closed {
             return SYNTRA_FFI_CLOSED;
         }
-        if !inner.active {
+        if !inner.active || inner.negotiated == 0 {
             return SYNTRA_FFI_INVALID;
         }
+        let decoded = match decode_frame(&bytes, ValidationContext::active(inner.negotiated)) {
+            Ok(f) => f,
+            Err(code) => return code,
+        };
         if decoded.version != inner.negotiated {
             return SYNTRA_FFI_INVALID;
         }
@@ -472,6 +488,13 @@ pub extern "C" fn syntra_ffi_client_begin_call(
 ) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| {
         if request_id == 0 {
+            return SYNTRA_FFI_INVALID;
+        }
+        // Bound caller lengths before copying (see borrow_bytes).
+        if method_len > 512 {
+            return SYNTRA_FFI_INVALID;
+        }
+        if payload_len > MAX_FRAME_BYTES {
             return SYNTRA_FFI_INVALID;
         }
         let method_bytes = match borrow_bytes(method, method_len) {
@@ -774,11 +797,17 @@ pub extern "C" fn syntra_ffi_host_accept_hello(
             return SYNTRA_FFI_INVALID;
         }
         unsafe { *version_out = 0 };
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(frame, len) {
             Ok(v) => v,
             Err(code) => return code,
         };
-        let decoded = match decode_frame(&bytes) {
+        let decoded = match decode_frame(
+            &bytes,
+            ValidationContext::pre_handshake(ConnectionState::Connected),
+        ) {
             Ok(f) => f,
             Err(code) => return code,
         };
@@ -789,7 +818,7 @@ pub extern "C" fn syntra_ffi_host_accept_hello(
         if inner.closed {
             return SYNTRA_FFI_CLOSED;
         }
-        if inner.active {
+        if inner.active || inner.negotiated != 0 {
             return SYNTRA_FFI_INVALID;
         }
         if decoded.request_id != 0 {
@@ -808,11 +837,16 @@ pub extern "C" fn syntra_ffi_host_accept_hello(
         if hello.credential.len() > MAX_CREDENTIAL_BYTES {
             return SYNTRA_FFI_INVALID;
         }
-        let supported: Vec<u32> = (inner.min_version..=inner.max_version).collect();
-        let selected = match negotiate_version(hello.min_version, hello.max_version, &supported) {
-            Ok(v) => v,
-            Err(_) => return SYNTRA_FFI_INVALID,
-        };
+        // Intersect contiguous ranges arithmetically; never materialize
+        // `(min..=max)` which a peer or embedder could make arbitrarily
+        // large. Highest overlap wins, matching `negotiate_version`
+        // semantics for contiguous host support.
+        let lo = hello.min_version.max(inner.min_version);
+        let hi = hello.max_version.min(inner.max_version);
+        if lo > hi {
+            return SYNTRA_FFI_INVALID;
+        }
+        let selected = hi;
         inner.negotiated = selected;
         unsafe { *version_out = selected };
         SYNTRA_FFI_OK
@@ -830,6 +864,9 @@ pub extern "C" fn syntra_ffi_host_auth_complete(
     out_len: *mut usize,
 ) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| {
+        if principal_len > 512 {
+            return SYNTRA_FFI_INVALID;
+        }
         let princ_bytes = match borrow_bytes(principal as *const u8, principal_len) {
             Ok(v) => v,
             Err(code) => return code,
@@ -899,12 +936,11 @@ pub extern "C" fn syntra_ffi_host_on_frame(
                 *out_len = 0;
             }
         }
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(frame, len) {
             Ok(v) => v,
-            Err(code) => return code,
-        };
-        let decoded = match decode_frame(&bytes) {
-            Ok(f) => f,
             Err(code) => return code,
         };
         let mut inner = match host_lock(h) {
@@ -917,6 +953,59 @@ pub extern "C" fn syntra_ffi_host_on_frame(
         if !inner.active || inner.negotiated == 0 {
             return SYNTRA_FFI_INVALID;
         }
+        let decoded = match decode_frame(&bytes, ValidationContext::active(inner.negotiated)) {
+            Ok(f) => f,
+            Err(_) => {
+                // Core validation is the primary gate, but a well-formed
+                // Request envelope with a malformed method stays a per-RPC
+                // error, never a fatal connection failure. Raw-wire
+                // structural violations (reserved tags, duplicate bodies,
+                // truncation, alloc/depth bounds) are rejected first: only
+                // a structurally sound envelope qualifies for per-RPC
+                // method-error mapping. The prost fallback below is error
+                // mapping only and is never dispatched without validation.
+                if validate_wire_structure(&bytes).is_err() {
+                    return SYNTRA_FFI_INVALID;
+                }
+                match Frame::decode(bytes.as_slice()) {
+                    Ok(fallback)
+                        if fallback.version == inner.negotiated
+                            && fallback.request_id != 0 =>
+                    {
+                        match fallback.body {
+                            Some(syntra_core::proto::frame::Body::Request(req))
+                                if validate_method(&req.method).is_err() =>
+                            {
+                                let id = fallback.request_id;
+                                let err_frame = Frame {
+                                    version: inner.negotiated,
+                                    request_id: id,
+                                    body: Some(
+                                        syntra_core::proto::frame::Body::Result(
+                                            syntra_core::proto::RpcResult {
+                                                outcome: Some(
+                                                    syntra_core::proto::rpc_result::Outcome::Error(
+                                                        syntra_core::proto::RpcError {
+                                                            code: syntra_core::ErrorCode::InvalidArgument.as_i32(),
+                                                            message: "invalid method".to_string(),
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                };
+                                let out = err_frame.encode_to_vec();
+                                unsafe { *has_response = 1 };
+                                return alloc_owned(&out, out_response, out_len);
+                            },
+                            _ => return SYNTRA_FFI_INVALID,
+                        }
+                    },
+                    _ => return SYNTRA_FFI_INVALID,
+                }
+            },
+        };
         if decoded.version != inner.negotiated {
             return SYNTRA_FFI_INVALID;
         }
@@ -1118,12 +1207,11 @@ pub extern "C" fn syntra_ffi_host_answer(
             return SYNTRA_FFI_INVALID;
         }
         unsafe { *expired = 0 };
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(result_frame, len) {
             Ok(v) => v,
-            Err(code) => return code,
-        };
-        let decoded = match decode_frame(&bytes) {
-            Ok(f) => f,
             Err(code) => return code,
         };
         let mut inner = match host_lock(h) {
@@ -1133,6 +1221,13 @@ pub extern "C" fn syntra_ffi_host_answer(
         if inner.closed {
             return SYNTRA_FFI_CLOSED;
         }
+        if inner.negotiated == 0 {
+            return SYNTRA_FFI_INVALID;
+        }
+        let decoded = match decode_frame(&bytes, ValidationContext::active(inner.negotiated)) {
+            Ok(f) => f,
+            Err(code) => return code,
+        };
         let id = decoded.request_id;
         if id == 0 {
             return SYNTRA_FFI_INVALID;
@@ -1169,6 +1264,9 @@ pub extern "C" fn syntra_ffi_host_notify(
     len: usize,
 ) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| {
+        if len > MAX_FRAME_BYTES {
+            return SYNTRA_FFI_INVALID;
+        }
         let bytes = match borrow_bytes(payload, len) {
             Ok(v) => v,
             Err(code) => return code,
@@ -1267,7 +1365,14 @@ pub extern "C" fn syntra_ffi_host_reap_expired(
         expired.sort_unstable();
         let limit = cap.min(MAX_DRAIN_IDS);
         let mut written = 0usize;
-        for id in expired.into_iter().take(limit) {
+        let to_reap: Vec<u64> = expired.into_iter().take(limit).collect();
+        // Remove queue entries for the same IDs so a reaped RPC is never
+        // returned later by `host_take_pending`.
+        if !to_reap.is_empty() {
+            let reaped: HashSet<u64> = to_reap.iter().copied().collect();
+            inner.pending_queue.retain(|(id, _)| !reaped.contains(id));
+        }
+        for id in to_reap {
             inner.pending_map.remove(&id);
             inner.cancelled.remove(&id);
             unsafe { *ids.add(written) = id };
@@ -1356,6 +1461,88 @@ mod tests {
         assert_eq!(syntra_ffi_client_activate(c, ready.as_ptr(), ready.len()), SYNTRA_FFI_OK);
 
         assert_eq!(syntra_ffi_client_close(c), SYNTRA_FFI_OK);
+        assert_eq!(syntra_ffi_host_close(h), SYNTRA_FFI_OK);
+    }
+
+    fn open_active_host() -> *mut syntra_ffi_host_t {
+        let c = open_client();
+        let mut ptr: *mut u8 = ptr::null_mut();
+        let mut len = 0usize;
+        assert_eq!(syntra_ffi_client_hello_frame(c, &mut ptr, &mut len), SYNTRA_FFI_OK);
+        let hello = unsafe { slice::from_raw_parts(ptr, len).to_vec() };
+        syntra_ffi_free(ptr, len);
+        let mut h: *mut syntra_ffi_host_t = ptr::null_mut();
+        assert_eq!(syntra_ffi_host_open(1, 1, 16, &mut h), SYNTRA_FFI_OK);
+        let mut ver = 0u32;
+        assert_eq!(
+            syntra_ffi_host_accept_hello(h, hello.as_ptr(), hello.len(), &mut ver),
+            SYNTRA_FFI_OK
+        );
+        let princ = b"svc-test";
+        let mut rptr: *mut u8 = ptr::null_mut();
+        let mut rlen = 0usize;
+        assert_eq!(
+            syntra_ffi_host_auth_complete(h, princ.as_ptr() as *const _, princ.len(), &mut rptr, &mut rlen),
+            SYNTRA_FFI_OK
+        );
+        syntra_ffi_free(rptr, rlen);
+        assert_eq!(syntra_ffi_client_close(c), SYNTRA_FFI_OK);
+        h
+    }
+
+    fn on_frame_status(
+        h: *mut syntra_ffi_host_t,
+        bytes: &[u8],
+    ) -> (i32, i32) {
+        let mut out: *mut u8 = ptr::null_mut();
+        let mut out_len = 0usize;
+        let mut has_response = 0i32;
+        let mut cancel_n = 0usize;
+        let rc = syntra_ffi_host_on_frame(
+            h,
+            bytes.as_ptr(),
+            bytes.len(),
+            &mut out,
+            &mut out_len,
+            &mut has_response,
+            ptr::null_mut(),
+            0,
+            &mut cancel_n,
+        );
+        if has_response != 0 {
+            syntra_ffi_free(out, out_len);
+        }
+        (rc, has_response)
+    }
+
+    #[test]
+    fn invalid_method_with_structural_violation_is_fatal() {
+        let h = open_active_host();
+        // Control: prost-encoded bad-method request is a per-RPC error.
+        let bad = Frame {
+            version: 1,
+            request_id: 7,
+            body: Some(syntra_core::proto::frame::Body::Request(
+                syntra_core::proto::RpcRequest {
+                    method: "not-a-method".to_string(),
+                    payload: Vec::new().into(),
+                    timeout_ms: 1000,
+                },
+            )),
+        };
+        let bad_bytes = bad.encode_to_vec();
+        let (rc, has_response) = on_frame_status(h, &bad_bytes);
+        assert_eq!(rc, SYNTRA_FFI_OK);
+        assert_eq!(has_response, 1);
+        // Same malformed method plus a duplicate body field on the raw
+        // wire: structural violation, so the connection fails instead of
+        // reporting a per-RPC error. The version/request_id prefix for
+        // small ids is four bytes; the remainder is the body field.
+        let mut raw = bad_bytes.clone();
+        raw.extend_from_slice(&bad_bytes[4..]);
+        let (rc, has_response) = on_frame_status(h, &raw);
+        assert_eq!(rc, SYNTRA_FFI_INVALID);
+        assert_eq!(has_response, 0);
         assert_eq!(syntra_ffi_host_close(h), SYNTRA_FFI_OK);
     }
 }

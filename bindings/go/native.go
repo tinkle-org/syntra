@@ -243,6 +243,11 @@ type ffiClientCore struct {
 	stateMu    sync.Mutex
 	negotiated uint32
 	active     atomic.Bool
+	// Synthesized terminal outcomes for calls the native core reaped.
+	// Rust drops expired correlation entries without an outcome frame;
+	// the binding stashes DEADLINE_EXCEEDED here so reap() can deliver
+	// them exactly like the pure-Go core does.
+	expired map[uint64]*RpcResult
 }
 
 func (c *ffiClientCore) locked() (*C.syntra_ffi_client_t, error) {
@@ -399,6 +404,13 @@ func (c *ffiClientCore) cancelCall(requestID uint64) []byte {
 }
 
 func (c *ffiClientCore) takeOutcome(requestID uint64) (*RpcResult, bool) {
+	c.stateMu.Lock()
+	if res, ok := c.expired[requestID]; ok {
+		delete(c.expired, requestID)
+		c.stateMu.Unlock()
+		return res, true
+	}
+	c.stateMu.Unlock()
 	h, err := c.locked()
 	if err != nil {
 		return nil, false
@@ -461,6 +473,16 @@ func (c *ffiClientCore) reapExpired(now time.Time) []uint64 {
 	for i := 0; i < int(n); i++ {
 		out = append(out, uint64(ids[i]))
 	}
+	if len(out) > 0 {
+		c.stateMu.Lock()
+		if c.expired == nil {
+			c.expired = make(map[uint64]*RpcResult, len(out))
+		}
+		for _, id := range out {
+			c.expired[id] = NewWireErrorResult(ErrorCodeDeadlineExceeded, "syntra: deadline exceeded")
+		}
+		c.stateMu.Unlock()
+	}
 	return out
 }
 
@@ -486,6 +508,12 @@ func (c *ffiClientCore) destroy() {
 }
 
 // newHostCore opens a Rust-backed responder core for one connection.
+// host_open takes no default-timeout param in ABI v1, so the Go wrapper
+// threads cfg.timeout at request time: onFrame rewrites a zero wire
+// timeout_ms to the configured default before crossing FFI, matching the
+// pure-Go core. An ABI change adding default_timeout_ms to host_open
+// would require header + Rust + Go + smoke test updates and an ABI bump;
+// request-time threading is the minimal compatible fix.
 func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	if cfg.minVersion == 0 || cfg.maxVersion == 0 || cfg.minVersion > cfg.maxVersion {
 		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: host version range invalid")
@@ -493,10 +521,16 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
-	c := &ffiHostCore{}
+	timeoutMs := uint32(cfg.timeout / time.Millisecond)
+	if timeoutMs == 0 {
+		timeoutMs = 1
+	}
+	c := &ffiHostCore{timeoutMs: timeoutMs}
 	var handle *C.syntra_ffi_host_t
 	// host_open takes the version range and concurrency bound. Per-RPC
-	// budgets travel with each request; zero selects the core default.
+	// budgets travel with each request; a zero wire timeout is rewritten
+	// to the configured default in onFrame before crossing FFI (host_open
+	// has no timeout param in ABI v1).
 	st := C.syntra_ffi_host_open(C.uint32_t(cfg.minVersion), C.uint32_t(cfg.maxVersion),
 		C.uint32_t(cfg.maxPending), &handle)
 	if err := ffiStatus(st, "host_open"); err != nil {
@@ -511,12 +545,15 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 }
 
 // ffiHostCore is the CGO responder core with the same exactly-once
-// destruction discipline as the client core.
+// destruction discipline as the client core. timeoutMs is the resolved
+// HostConfig.DefaultTimeout in milliseconds, threaded at request time
+// because host_open takes no timeout param in ABI v1.
 type ffiHostCore struct {
-	mu     sync.RWMutex
-	handle *C.syntra_ffi_host_t
-	once   sync.Once
-	closed atomic.Bool
+	mu        sync.RWMutex
+	handle    *C.syntra_ffi_host_t
+	once      sync.Once
+	closed    atomic.Bool
+	timeoutMs uint32
 }
 
 func (c *ffiHostCore) locked() (*C.syntra_ffi_host_t, error) {
@@ -590,6 +627,22 @@ func (c *ffiHostCore) onFrame(frame []byte) ([][]byte, []uint64, *RpcError) {
 		return nil, nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
 	}
 	defer c.unlockHandle()
+	// Thread the configured default: host_open has no timeout param, so a
+	// zero wire timeout would otherwise fall back to the Rust hard-coded
+	// 3s instead of cfg.timeout. Rewrite zero to the configured default
+	// (validated <= MaxRPCTimeoutMs) to match the pure-Go core.
+	wire := frame
+	if f, uerr := UnmarshalFrame(frame); uerr == nil && BodyKindOf(f) == BodyKindRequest && f.GetRequest().GetTimeoutMs() == 0 {
+		f.GetRequest().TimeoutMs = c.timeoutMs
+		raw, merr := MarshalFrame(NewRequestFrame(f.GetVersion(), f.GetRequestId(), f.GetRequest()))
+		if merr != nil {
+			// Leave the original bytes for the native core: it reports
+			// malformed requests as per-RPC errors, never fatal.
+			wire = frame
+		} else {
+			wire = raw
+		}
+	}
 	const maxCancels = 64
 	cancels := make([]C.uint64_t, maxCancels)
 	var out *C.uint8_t
@@ -597,7 +650,7 @@ func (c *ffiHostCore) onFrame(frame []byte) ([][]byte, []uint64, *RpcError) {
 	var hasResp C.int32_t
 	var nCancel C.uintptr_t
 	var st C.int32_t
-	withBorrowed(frame, func(ptr *C.uint8_t, fln C.uintptr_t) {
+	withBorrowed(wire, func(ptr *C.uint8_t, fln C.uintptr_t) {
 		st = C.syntra_ffi_host_on_frame(h, ptr, fln, &out, &ln, &hasResp,
 			&cancels[0], C.uintptr_t(len(cancels)), &nCancel)
 	})

@@ -324,6 +324,22 @@ class ReleaseWorkflowTests(unittest.TestCase):
         # against the production Rust library.
         self.assertTrue(any("go test -count=1 -v ./..." in c for c in commands))
         self.assertTrue(any("go test -tags syntranative" in c for c in commands))
+        # The syntranative tag must appear only in the dedicated native
+        # step, which must build the production library first.
+        native = step("go-tests", "go test (production native adapter)", CI)
+        native_run = native.get("run", "")
+        self.assertIn("cargo build --locked -p syntra-ffi --features production", native_run)
+        self.assertIn("go test -tags syntranative", native_run)
+        self.assertLess(
+            native_run.index("cargo build --locked -p syntra-ffi --features production"),
+            native_run.index("go test -tags syntranative"),
+        )
+        for s in CI["jobs"]["go-tests"]["steps"]:
+            if s.get("name") == "go test (production native adapter)":
+                continue
+            self.assertNotIn("syntranative", s.get("run", ""))
+        default_go_test = step("go-tests", "go test (committed bindings, default tags only)", CI)
+        self.assertNotIn("syntranative", default_go_test.get("run", ""))
 
     def test_clean_go_generation_is_scoped_to_generated_files(self):
         template = yaml.safe_load((ROOT / "buf.gen.yaml").read_text())

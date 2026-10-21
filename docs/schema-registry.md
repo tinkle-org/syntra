@@ -240,7 +240,8 @@ Authoritative relationships at a glance (see §7 for rules):
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |
 | Transport conformance | Transport profile ID | `SNTR-WSS-H1-V1` (see `conformance/profiles.yaml`) |
-| Native Go / browser WASM binaries | Unsupported distribution; no release assets | Requires ABI alignment and linked runtime tests |
+| Native Go library | Supported via source build: `cargo build -p syntra-ffi --features production` plus `-tags syntranative` with `CGO_LDFLAGS`/`LD_LIBRARY_PATH` and linked runtime tests; no prebuilt release assets | Requires ABI version check (`CheckABI`) and linked runtime tests |
+| Browser WASM binaries | Unsupported distribution; no release assets | No browser ABI defined; `syntra-ffi` rejects WASM targets |
 
 Per-crate tags such as `syntra-core-v1.0.0` are explicit. Neither global
 `v1.0.0` nor `proto-v1.0.0` tags drive this workflow. Implementation versions

@@ -3,11 +3,12 @@
 // Distribution note: `go get github.com/tinklehq/syntra/bindings/go`
 // installs the Go sources in this module only (generated Protobuf types
 // plus the pure-Go validation, codec, handshake, and session logic).
-// Sessions use the supported pure-Go core; no native library is required
-// and this module never downloads binaries. The syntranative adapter is
-// unsupported: its proposed syntra_ffi_* ABI is incompatible with the
-// current crates/syntra-ffi exports. Release-built Rust libraries cannot
-// enable it. See README.md for the ABI reconciliation blockers.
+// Sessions use the supported pure-Go core by default; no native library
+// is required and this module never downloads binaries. The syntranative
+// adapter is supported via the production Rust core: build
+// crates/syntra-ffi with --features production and link with
+// -tags syntranative (native.go matches
+// crates/syntra-ffi/include/syntra_production.h). See README.md.
 //
 // The binding implements the transport-independent core only
 // (specifications/core/{framing,rpc,serialization,errors,handshake}.md and

@@ -11,18 +11,17 @@ import (
 //
 // When the syntranative build tag is absent, sessions run on this
 // in-process core built from the syntra.go primitives (Connection,
-// Tracker, codec). This is the supported Go session backend. NativeAvailable
+// Tracker, codec). This is the default Go session backend. NativeAvailable
 // reports false in this configuration, and no CGO or native library is
-// required to build, vet, or test the module. The proposed native adapter
-// does not match the current Rust FFI and is unsupported.
+// required to build, vet, or test the module. The syntranative adapter
+// (native.go) provides the production Rust-backed alternative.
 
 // NativeAvailable reports whether the process links the native
-// libsyntra_ffi core. It is false in the supported pure-Go build.
+// libsyntra_ffi core. It is false in the default pure-Go build.
 func NativeAvailable() bool { return false }
 
 // CheckABI verifies the linked native core's C ABI version. With no
 // native library linked there is nothing to check, so this returns nil.
-// It does not establish compatibility with the unsupported native adapter.
 func CheckABI() error { return nil }
 
 // newClientCore opens a pure-Go initiator core.

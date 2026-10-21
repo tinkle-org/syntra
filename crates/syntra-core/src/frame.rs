@@ -287,6 +287,38 @@ pub fn validate_frame(frame: &Frame, ctx: ValidationContext) -> Result<FrameKind
 /// Outcome of the raw wire pre-scan.
 struct ScanStats {
     unknown_present: bool,
+    body_present: bool,
+}
+
+/// Raw-wire structural validation without semantic checks.
+///
+/// Runs the same bounded pre-scan as [`decode_frame`] (reserved
+/// top-level fields, duplicate body alternatives, truncation,
+/// allocation and depth bounds) but classifies no method, version, or
+/// state semantics. Used by embedding boundaries that map some decode
+/// failures to per-RPC errors: structural violations stay fatal even
+/// when the envelope also carries a malformed method.
+pub fn validate_wire_structure(bytes: &[u8]) -> Result<(), SyntraError> {
+    if bytes.is_empty() {
+        return Err(SyntraError::Protocol {
+            code: ErrorCode::InvalidArgument,
+            message: "empty frame bytes".to_string(),
+        });
+    }
+    if bytes.len() > MAX_FRAME_BYTES {
+        return Err(SyntraError::Protocol {
+            code: ErrorCode::ResourceExhausted,
+            message: "frame exceeds maximum envelope size".to_string(),
+        });
+    }
+    let scan = scan_top_level(bytes)?;
+    if !scan.body_present {
+        return Err(SyntraError::Protocol {
+            code: ErrorCode::InvalidArgument,
+            message: "frame body must be set".to_string(),
+        });
+    }
+    Ok(())
 }
 
 /// Scan top-level protobuf wire bytes before prost decodes.
@@ -342,7 +374,7 @@ fn scan_top_level(bytes: &[u8]) -> Result<ScanStats, SyntraError> {
         }
         i = skip_top_value(bytes, i, wire, field)?;
     }
-    Ok(ScanStats { unknown_present })
+    Ok(ScanStats { unknown_present, body_present: body_count == 1 })
 }
 
 fn reject_reserved(field: u32) -> Result<(), SyntraError> {
@@ -535,6 +567,14 @@ mod tests {
             body: None,
         };
         assert!(validate_frame(&f, ctx_active()).is_err());
+    }
+
+    #[test]
+    fn wire_structure_rejects_bodyless_input_like_decode() {
+        // version=1 with no body: structurally incomplete.
+        let raw = [0x08u8, 0x01];
+        assert!(validate_wire_structure(&raw).is_err());
+        assert!(decode_frame(&raw, ctx_active()).is_err());
     }
 
     #[test]

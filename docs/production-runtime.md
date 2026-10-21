@@ -9,10 +9,15 @@ The production protocol engine is Rust:
 
 - `syntra-core` owns envelope codec, validation, version negotiation,
   correlation, and typed errors.
-- `syntra-runtime` owns initiator/host state machines, connection-bound
-  sessions, deadlines, cancellation, and bounded queues.
-- `syntra-ffi` with the `production` feature exposes those cores through
-  `include/syntra_production.h`.
+- `syntra-runtime` provides async initiator/host engines with
+  connection-bound sessions, deadlines, cancellation, and bounded queues.
+- `syntra-ffi` with the `production` feature implements a separate C
+  frame-pump with the same protocol mechanics (version negotiation, frame
+  validation, correlation, deadlines, cancellation observation, outbound
+  queueing) on top of `syntra-core`, exposed through
+  `include/syntra_production.h`. It does not wrap
+  `syntra-runtime::Initiator`/`Host`; the embedding application owns the
+  transport pump (see `crates/syntra-ffi/src/production.rs` module docs).
 - The Go module uses that ABI under `-tags syntranative`. The default
   pure-Go build remains available for development and comparison.
 
@@ -51,17 +56,26 @@ Build:
 cargo build -p syntra-ffi --features production
 ```
 
-Go:
+Go (from `bindings/go`, per `.github/workflows/repo-validation.yml`):
 
 ```sh
-go test -tags syntranative ./...
+CGO_LDFLAGS="-L../../target/debug -lsyntra_ffi" LD_LIBRARY_PATH="../../target/debug" go test -tags syntranative -count=1 ./...
 ```
+
+CI builds the library with `cargo build --locked -p syntra-ffi
+--features production` and uses `LIBDIR="$GITHUB_WORKSPACE/target/debug"`
+(`CGO_LDFLAGS="-L$LIBDIR -lsyntra_ffi"`,
+`LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH"`). `-tags syntranative`
+alone does not link the library.
 
 ## Recovery
 
 The core reports transport acceptance, completed outcomes, expiry,
-cancellation, capacity exhaustion, and continuity loss. It does not decide
-application recovery.
+cancellation, capacity exhaustion, and transport loss (as `UNAVAILABLE` to
+in-flight waiters). Applications report stream continuity loss to the
+recovery coordinator (`RecoveryInput::ContinuityLost` / `GapDetected` in
+`syntra-runtime::recovery`); the core never synthesizes stream positions.
+It does not decide application recovery.
 
 Applications define streams and checkpoints:
 

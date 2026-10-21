@@ -230,8 +230,11 @@ validated tagged commit (crates.io publishing is a separate preceding step):
   `production` features export their respective ABIs. The registry
   publishing step performs build verification. Source archives do not
   vendor dependencies and do not promise offline builds.
-- `syntra-go-bindings-<tag>.tar.gz` — the committed Go module source,
-  including the header reference for native builds.
+- `syntra-go-bindings-<tag>.tar.gz` — the committed Go module source
+  (`bindings/go` only; it documents the header location but does not carry
+  the header). Native builds use the authoritative header from the source
+  snapshot (`syntra-source-<tag>.tar.gz`:
+  `crates/syntra-ffi/include/syntra_production.h`).
 - `CHANGELOG.md`, `RELEASE.md`, `GOVERNANCE.md`, `LICENSE` (as tagged).
 - `SHA256SUMS` — checksums for exactly the uploaded assets other than itself.
 

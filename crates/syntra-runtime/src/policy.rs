@@ -34,8 +34,50 @@ pub enum AuthzDecision {
 /// identifies correlation on the transport. Separating them keeps
 /// late completions, retries with reused ids, and post-close arrivals
 /// unambiguous.
+///
+/// Token-issuing authority: the embedding application (host-owned dispatch
+/// layer) issues the token when it admits a request for dispatch. Tokens
+/// MUST be unique per admitted slot and MUST NOT be reused for a distinct
+/// admission while the original slot is outstanding.
+///
+/// Completion-resolution rules (embedding MUST enforce):
+/// - Resolve completions by token equality only; do NOT route completions
+///   by wire `request_id` after admission.
+/// - A result for an unknown or already-completed token is dropped
+///   ([`CompletionDisposition::Unknown`]).
+/// - A result arriving after the slot deadline is dropped without
+///   transmission ([`CompletionDisposition::Expired`]).
+/// - A result arriving after handle close is dropped
+///   ([`CompletionDisposition::Closed`]).
+/// - Wire `request_id` reuse with a different token MUST NOT complete the
+///   newer call; only the matching token completes its own slot.
+///
+/// Integration note: the production C ABI (`syntra-ffi::production`)
+/// correlates dispatch/completion by wire `request_id` only
+/// (`host_take_pending` / `host_answer`). `CompletionToken` is the
+/// embedding-layer contract for disambiguating late/duplicate completions
+/// when `request_id` values are reused; it is intentionally not plumbed
+/// through the stable C ABI in v1. Threading tokens through the ABI would
+/// change `host_take_pending` / `host_answer` signatures (an ABI break)
+/// and is out of scope for this change, which is limited to this module.
+/// Until such wiring lands, embeddings must keep a `(request_id -> token)`
+/// side table and resolve completions by token per the rules above.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CompletionToken(pub u64);
+pub struct CompletionToken(u64);
+
+impl CompletionToken {
+    /// Issues a token value. Call only from the token-issuing authority
+    /// (embedding dispatch layer) when admitting a request.
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    /// Returns the opaque token value for transport to the completion path.
+    /// The value carries no wire meaning; it only identifies the slot.
+    pub fn value(self) -> u64 {
+        self.0
+    }
+}
 
 /// A request admitted for application dispatch.
 #[derive(Debug, Clone)]
@@ -48,11 +90,16 @@ pub struct AdmittedRequest {
 }
 
 /// Result supplied by the application for an admitted request.
+///
+/// Invariant: exactly one of `payload` / `error` is present. Construct only
+/// via [`HostResult::ok`] / [`HostResult::err`]; field access goes through
+/// [`HostResult::token`], [`HostResult::payload`], and [`HostResult::error`]
+/// so the invariant cannot be broken by direct construction.
 #[derive(Debug, Clone)]
 pub struct HostResult {
-    pub token: CompletionToken,
-    pub payload: Option<Vec<u8>>,
-    pub error: Option<(ErrorCode, String)>,
+    token: CompletionToken,
+    payload: Option<Vec<u8>>,
+    error: Option<(ErrorCode, String)>,
 }
 
 impl HostResult {
@@ -62,6 +109,21 @@ impl HostResult {
 
     pub fn err(token: CompletionToken, code: ErrorCode, message: impl Into<String>) -> Self {
         Self { token, payload: None, error: Some((code, message.into())) }
+    }
+
+    /// Token of the admitted slot this result completes.
+    pub fn token(&self) -> CompletionToken {
+        self.token
+    }
+
+    /// Success payload, when [`HostResult::ok`] constructed this result.
+    pub fn payload(&self) -> Option<&[u8]> {
+        self.payload.as_deref()
+    }
+
+    /// Typed error, when [`HostResult::err`] constructed this result.
+    pub fn error(&self) -> Option<&(ErrorCode, String)> {
+        self.error.as_ref()
     }
 }
 
@@ -102,11 +164,57 @@ mod tests {
 
     #[test]
     fn completion_tokens_distinguish_wire_ids() {
-        let a = CompletionToken(7);
-        let b = CompletionToken(7);
-        assert_eq!(a, b);
-        let r = HostResult::ok(a, b"ok".to_vec());
-        assert!(r.payload.is_some());
+        // Same wire `request_id` reused for two admissions must still resolve
+        // by token: distinct tokens identify distinct slots.
+        let first = AdmittedRequest {
+            token: CompletionToken::new(7),
+            request_id: 42,
+            method: "/example.Echo/Echo".to_string(),
+            payload: b"first".to_vec(),
+            deadline: Duration::from_secs(5),
+        };
+        let second = AdmittedRequest {
+            token: CompletionToken::new(8),
+            request_id: 42,
+            method: "/example.Echo/Echo".to_string(),
+            payload: b"second".to_vec(),
+            deadline: Duration::from_secs(5),
+        };
+        assert_ne!(first.token, second.token);
+        assert_eq!(first.request_id, second.request_id);
+
+        // Late result for the first slot must not complete the second slot:
+        // resolution is by token equality.
+        let late = HostResult::ok(first.token, b"ok".to_vec());
+        assert_eq!(late.token(), first.token);
+        assert_ne!(late.token(), second.token);
+        assert_eq!(late.payload(), Some(b"ok".as_slice()));
+        assert!(late.error().is_none());
+
+        let err = HostResult::err(
+            second.token,
+            ErrorCode::PermissionDenied,
+            "denied",
+        );
+        assert_eq!(err.token(), second.token);
+        assert!(err.payload().is_none());
+        let (code, msg) = err.error().expect("typed error");
+        assert_eq!(*code, ErrorCode::PermissionDenied);
+        assert_eq!(msg, "denied");
+    }
+
+    #[test]
+    fn admitted_request_preserves_distinct_token_and_wire_id() {
+        let req = AdmittedRequest {
+            token: CompletionToken::new(7),
+            request_id: 42,
+            method: "/example.Echo/Echo".to_string(),
+            payload: b"hello".to_vec(),
+            deadline: Duration::from_secs(5),
+        };
+        assert_eq!(req.token.value(), 7);
+        assert_eq!(req.request_id, 42);
+        assert_ne!(req.token.value(), req.request_id);
     }
 
     #[test]

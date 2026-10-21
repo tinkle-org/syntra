@@ -99,7 +99,7 @@ responsibilities (`SYN-ARCH-010`–`013`).
   **drafts, acceptance pending**)
 - [x] Conformance + interop suite (`conformance/`, executable manifests
   and test vectors)
-- [x] Rust runtime with production native ABI (`syntra-core`, `syntra-runtime`, `syntra-ws`, `syntra-ffi` production feature, Go `syntranative` adapter; see `docs/production-runtime.md`)
+- Available: Rust runtime with production native ABI (`syntra-core`, `syntra-runtime`, `syntra-ws`, `syntra-ffi` production feature, Go `syntranative` adapter; see `docs/production-runtime.md`) — available for embedding, not an RFC-accepted completion claim
 
 Each item is accepted via the RFC process in `rfcs/README.md`.
 Release-blocking open questions are tracked in `SESSION-OPEN-QUESTIONS.md`
@@ -146,7 +146,7 @@ proto/syntra/v1/               — sole authoritative Protobuf source (seven fil
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
 crates/                        — Rust workspace (protocol cores plus `syntra-ffi` with test-fixture and production ABIs; WASM unsupported; committed prost output, drift-checked)
-bindings/go/                   — committed Go protobuf types + production native adapter + supported pure-Go core (drift-checked; default and `syntranative` tags)
+bindings/go/                   — committed Go protobuf types + supported pure-Go core + production native adapter under `-tags syntranative` (drift-checked; default and `syntranative` tags; see `bindings/go/README.md`)
 tests/schema/                  — descriptor and codec validation (committed generation drift-checked; .tmp/ holds disposable repro only)
 conformance/                   — executable conformance suite (manifests,
   profiles, test vectors, claims, declarations)
@@ -249,8 +249,10 @@ transport, or WebSocket transport — that is your implementation's job
 [FAQ](docs/faq.md)). See [Repository boundary](#repository-boundary)
 for what lives where. Pin Rust crate versions or exact Git revisions; Go consumers use the
 default pure-Go module or link the production library with
-`-tags syntranative` (see `docs/production-runtime.md` and
-`bindings/go/README.md`). No browser WASM release asset is currently
+`-tags syntranative` from `bindings/go` with
+`CGO_LDFLAGS="-L../../target/debug -lsyntra_ffi"` and
+`LD_LIBRARY_PATH="../../target/debug"` (per CI; see `docs/production-runtime.md` and
+`bindings/go/README.md`; `-tags` alone does not link the library). No browser WASM release asset is currently
 promised. Native distribution requires the matching header and
 cross-language link/runtime tests; a Rust compile check alone is
 insufficient.
@@ -344,7 +346,7 @@ rfcs/                          — public RFC process, template, RFCs 0001–000
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 crates/                        — Rust workspace (protocol cores; `syntra-ffi` with test-fixture and production ABIs; committed generation)
-bindings/go/                   — committed Go protobuf types + supported pure-Go core + production native adapter
+bindings/go/                   — committed Go protobuf types + supported pure-Go core + production native adapter under `-tags syntranative`
 specifications/                — charter, core, transports, security, schema, ADRs
 specifications/schema/         — IDL reference, generation and compatibility docs
 compatibility/v1-initial/      — initial baseline + archived historical descriptors

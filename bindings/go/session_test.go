@@ -2,9 +2,9 @@
 // context cancellation, notifications, concurrency, and deterministic
 // close over a loopback transport. All method fixtures are neutral
 // (/example.Echo/Echo, /example.KV/Get, /example.Slow/Wait); no
-// messenger semantics appear here. Tests run on the supported pure-Go
-// core in default builds (no -tags). The syntranative adapter is
-// unsupported and is not exercised here; TestCoreBackend logs the
+// messenger semantics appear here. Tests run on the pure-Go core in
+// default builds (no -tags). The syntranative adapter is exercised by
+// native_test.go under -tags syntranative; TestCoreBackend logs the
 // linked selection.
 package syntra
 

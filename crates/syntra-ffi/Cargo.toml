@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
-description = "Quarantined native C ABI test fixture. No production FFI; no default ABI exports; WASM unsupported."
+description = "Native C ABI surface: test fixture plus production frame-pump; no default ABI exports; WASM unsupported."
 
 [lib]
 name = "syntra_ffi"
@@ -19,11 +19,10 @@ default = []
 # binaries (including via --all-features). Default builds expose no C ABI.
 test-fixture = ["dep:syntra-core", "dep:syntra-runtime", "dep:tokio"]
 # Production transport-agnostic frame-pump ABI. Native-only, no WASM.
-production = ["dep:syntra-core", "dep:prost", "dep:bytes"]
+production = ["dep:syntra-core", "dep:prost"]
 
 [dependencies]
 prost = { workspace = true, optional = true }
-bytes = { workspace = true, optional = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 syntra-core = { path = "../syntra-core", version = "0.1.0", optional = true }

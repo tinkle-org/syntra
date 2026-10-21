@@ -21,13 +21,15 @@
 //! storage, presence, and durable data remain host-owned. Externally
 //! reachable production traffic requires TLS.
 //!
-//! # Caller obligations
-//! All non-null pointers must be valid, aligned, and live for the call;
-//! byte buffers must cover their stated lengths. Outputs must be writable
-//! and must not overlap one another or any input. Owned return buffers must
-//! be freed exactly once with the matching free function and their original
-//! length. Unwinding-panic containment does not make invalid pointers,
-//! allocation failure, or panic=abort safe.
+//! # Caller obligations (fixture only)
+//! All non-null pointers must be valid, aligned, and live for the call; input
+//! strings must be NUL-terminated; byte buffers must cover their stated
+//! lengths. Outputs must be writable and must not overlap one another or any
+//! input. Owned return buffers must be freed exactly once with the matching
+//! free function and their original length. Unwinding-panic containment does
+//! not make invalid pointers, allocation failure, or panic=abort safe.
+//! Blocking functions must not be called from a Tokio asynchronous execution
+//! context.
 
 #[cfg(target_family = "wasm")]
 compile_error!("syntra-ffi does not support WASM: native ABIs only; no browser ABI is available");

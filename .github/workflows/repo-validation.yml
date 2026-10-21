@@ -165,6 +165,15 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Detect Rust workspace
+        id: detect-rust
+        run: |
+          if [ -f Cargo.toml ] || [ -f Cargo.lock ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-go@v5
         if: steps.detect.outputs.present == 'true'
         with:
@@ -182,17 +191,21 @@ jobs:
         working-directory: bindings/go
 
       - uses: dtolnay/rust-toolchain@stable
-        if: steps.detect.outputs.present == 'true'
+        if: steps.detect.outputs.present == 'true' && steps.detect-rust.outputs.present == 'true'
         with:
           toolchain: "1.88"
 
       - name: go test (production native adapter)
-        if: steps.detect.outputs.present == 'true'
+        if: steps.detect.outputs.present == 'true' && steps.detect-rust.outputs.present == 'true'
         run: |
           cargo build --locked -p syntra-ffi --features production
           LIBDIR="$GITHUB_WORKSPACE/target/debug"
           CGO_LDFLAGS="-L$LIBDIR -lsyntra_ffi" LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH" go test -tags syntranative -count=1 ./...
         working-directory: bindings/go
+
+      - name: No Rust workspace yet (native adapter skip)
+        if: steps.detect.outputs.present == 'true' && steps.detect-rust.outputs.present != 'true'
+        run: echo "No Cargo.toml/Cargo.lock yet; native adapter test skipped (bootstrap)."
 
       - name: No Go module yet (bootstrap skip)
         if: steps.detect.outputs.present != 'true'

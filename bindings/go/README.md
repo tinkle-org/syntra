@@ -17,9 +17,26 @@ This module never downloads binaries. In this build, `NativeAvailable()`
 returns false and `CheckABI()` returns nil because no native library is linked.
 
 **Native Go integration (`-tags syntranative`) uses the production Rust core.**
-Build the native library with `cargo build -p syntra-ffi --features production`,
-then build Go with `-tags syntranative` against that library. The adapter in
-`native.go` matches `crates/syntra-ffi/include/syntra_production.h`.
+Build the native library from the repository root, then run Go from this
+directory with the linker and runtime paths set (per
+`.github/workflows/repo-validation.yml`):
+
+```sh
+cargo build -p syntra-ffi --features production
+```
+
+```sh
+CGO_LDFLAGS="-L../../target/debug -lsyntra_ffi" LD_LIBRARY_PATH="../../target/debug" go test -tags syntranative ./...
+```
+
+CI runs the same step with `cargo build --locked -p syntra-ffi
+--features production` and `LIBDIR="$GITHUB_WORKSPACE/target/debug"`
+(`CGO_LDFLAGS="-L$LIBDIR -lsyntra_ffi"`,
+`LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH"`,
+`go test -tags syntranative -count=1 ./...`) with `working-directory:
+bindings/go`. `-tags syntranative` alone does not link the library.
+The adapter in `native.go` matches
+`crates/syntra-ffi/include/syntra_production.h`.
 See [Native ABI](#native-abi).
 
 ## Layout
