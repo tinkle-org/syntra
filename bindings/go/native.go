@@ -202,12 +202,11 @@ func newClientCore(cfg resolvedClientConfig) (clientCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
+	// cfg.timeout is already whole milliseconds (rounded up at config
+	// resolution); the helper keeps the conversion exact and floors at 1.
 	c := &ffiClientCore{
 		minVersion: cfg.minVersion, maxVersion: cfg.maxVersion,
-		timeoutMs: uint32(cfg.timeout / time.Millisecond), maxPending: uint32(cfg.maxPending),
-	}
-	if c.timeoutMs == 0 {
-		c.timeoutMs = 1
+		timeoutMs: roundUpToMs(cfg.timeout), maxPending: uint32(cfg.maxPending),
 	}
 	var handle *C.syntra_ffi_client_t
 	var st C.int32_t
@@ -521,10 +520,9 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
-	timeoutMs := uint32(cfg.timeout / time.Millisecond)
-	if timeoutMs == 0 {
-		timeoutMs = 1
-	}
+	// cfg.timeout is already whole milliseconds (rounded up at config
+	// resolution); the helper keeps the conversion exact and floors at 1.
+	timeoutMs := roundUpToMs(cfg.timeout)
 	c := &ffiHostCore{timeoutMs: timeoutMs}
 	var handle *C.syntra_ffi_host_t
 	// host_open takes the version range and concurrency bound. Per-RPC

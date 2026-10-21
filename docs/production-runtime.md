@@ -70,9 +70,13 @@ alone does not link the library.
 
 ## Recovery
 
-The core reports transport acceptance, completed outcomes, expiry,
+`syntra-runtime` reports transport acceptance, completed outcomes, expiry,
 cancellation, capacity exhaustion, and transport loss (as `UNAVAILABLE` to
-in-flight waiters). Applications report stream continuity loss to the
+in-flight waiters). The native ABI does not: `syntra_ffi_client_close`
+silently clears pending RPCs and no production FFI call reports transport
+loss, so native embedders must surface transport loss to in-flight calls
+themselves (fail each waiter as `UNAVAILABLE` with unknown outcome, never
+as success or proof of non-execution). Applications report stream continuity loss to the
 recovery coordinator (`RecoveryInput::ContinuityLost` / `GapDetected` in
 `syntra-runtime::recovery`); the core never synthesizes stream positions.
 It does not decide application recovery.

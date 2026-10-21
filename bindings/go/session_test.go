@@ -51,6 +51,37 @@ func testClientConfig() ClientConfig {
 	}
 }
 
+// TestDefaultTimeoutRoundsUpToWholeMs pins the shared rounding policy:
+// sub-millisecond defaults round up at resolution so the pure-Go and
+// native backends enforce the identical deadline, never a shorter one.
+func TestDefaultTimeoutRoundsUpToWholeMs(t *testing.T) {
+	if got := roundUpToMs(1500 * time.Microsecond); got != 2 {
+		t.Fatalf("roundUpToMs(1.5ms) = %d, want 2", got)
+	}
+	if got := roundUpToMs(time.Millisecond); got != 1 {
+		t.Fatalf("roundUpToMs(1ms) = %d, want 1", got)
+	}
+	cfg, err := resolveClientConfig(ClientConfig{
+		MinVersion: 1, MaxVersion: 1, DefaultTimeout: 1500 * time.Microsecond,
+	})
+	if err != nil {
+		t.Fatalf("resolveClientConfig: %v", err)
+	}
+	if cfg.timeout != 2*time.Millisecond {
+		t.Fatalf("client timeout = %v, want 2ms", cfg.timeout)
+	}
+	host, err := resolveHostConfig(HostConfig{
+		MinVersion: 1, MaxVersion: 1, DefaultTimeout: 1500 * time.Microsecond,
+		Policy: StaticPolicy("test-principal", true), Handler: echoHandler,
+	})
+	if err != nil {
+		t.Fatalf("resolveHostConfig: %v", err)
+	}
+	if host.timeout != 2*time.Millisecond {
+		t.Fatalf("host timeout = %v, want 2ms", host.timeout)
+	}
+}
+
 func testHostConfig() HostConfig {
 	return HostConfig{
 		MinVersion: 1,

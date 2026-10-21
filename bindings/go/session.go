@@ -387,6 +387,8 @@ type ClientConfig struct {
 	Credential []byte
 	// DefaultTimeout applies when a call passes timeoutMs zero. Zero
 	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
+	// The value is rounded up to whole milliseconds at resolution so the
+	// pure-Go and native backends enforce the identical deadline.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls. Zero selects
 	// MaxConcurrentRPCs; larger values are rejected. Excess calls fail fast
@@ -428,6 +430,9 @@ func resolveClientConfig(cfg ClientConfig) (resolvedClientConfig, error) {
 	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
 		return resolvedClientConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: client default timeout exceeds max")
 	}
+	// Normalize once so both backends share the identical deadline: whole
+	// milliseconds, rounded up, never shorter than configured.
+	out.timeout = time.Duration(roundUpToMs(out.timeout)) * time.Millisecond
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
 	}
@@ -966,6 +971,8 @@ type HostConfig struct {
 	Authorize AuthorizeFunc
 	// DefaultTimeout applies when a request passes timeoutMs zero. Zero
 	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
+	// The value is rounded up to whole milliseconds at resolution so the
+	// pure-Go and native backends enforce the identical deadline.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls per connection. Zero selects
 	// MaxConcurrentRPCs. Excess calls fail with ResourceExhausted while
@@ -1001,6 +1008,9 @@ func resolveHostConfig(cfg HostConfig) (resolvedHostConfig, error) {
 	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
 		return resolvedHostConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: host default timeout exceeds max")
 	}
+	// Normalize once so both backends share the identical deadline: whole
+	// milliseconds, rounded up, never shorter than configured.
+	out.timeout = time.Duration(roundUpToMs(out.timeout)) * time.Millisecond
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
 	}

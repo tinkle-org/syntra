@@ -161,6 +161,109 @@ impl Default for PolicyDeadlines {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    /// Reference slot table implementing the documented completion-resolution
+    /// rules: resolve by token equality only; unknown or already-completed
+    /// tokens are dropped (`Unknown`); results past the slot deadline are
+    /// dropped (`Expired`); results after handle close are dropped (`Closed`).
+    /// Embeddings implement these rules against their own state; this table
+    /// exists so the rules themselves are exercised, not just the token
+    /// accessors.
+    struct ReferenceSlots {
+        outstanding: HashMap<CompletionToken, Duration>,
+        closed: bool,
+    }
+
+    impl ReferenceSlots {
+        fn new() -> Self {
+            Self { outstanding: HashMap::new(), closed: false }
+        }
+
+        fn admit(&mut self, req: &AdmittedRequest) {
+            self.outstanding.insert(req.token, req.deadline);
+        }
+
+        fn resolve(&mut self, result: &HostResult, now: Duration) -> CompletionDisposition {
+            if self.closed {
+                return CompletionDisposition::Closed;
+            }
+            match self.outstanding.remove(&result.token()) {
+                None => CompletionDisposition::Unknown,
+                Some(deadline) if now > deadline => CompletionDisposition::Expired,
+                Some(_) => CompletionDisposition::Accepted,
+            }
+        }
+
+        fn close(&mut self) {
+            self.closed = true;
+        }
+    }
+
+    fn admitted(token: u64, request_id: u64, deadline_secs: u64) -> AdmittedRequest {
+        AdmittedRequest {
+            token: CompletionToken::new(token),
+            request_id,
+            method: "/example.Echo/Echo".to_string(),
+            payload: b"payload".to_vec(),
+            deadline: Duration::from_secs(deadline_secs),
+        }
+    }
+
+    #[test]
+    fn completion_resolution_follows_token_rules() {
+        let mut slots = ReferenceSlots::new();
+        let first = admitted(7, 42, 5);
+        slots.admit(&first);
+
+        // Matching token before the deadline completes its own slot.
+        let ok = HostResult::ok(first.token, b"ok".to_vec());
+        assert_eq!(slots.resolve(&ok, Duration::from_secs(1)), CompletionDisposition::Accepted);
+        // The slot is consumed: a duplicate completion is unknown.
+        assert_eq!(slots.resolve(&ok, Duration::from_secs(1)), CompletionDisposition::Unknown);
+        // A token that was never admitted is unknown.
+        let stranger = HostResult::ok(CompletionToken::new(99), b"ok".to_vec());
+        assert_eq!(slots.resolve(&stranger, Duration::from_secs(1)), CompletionDisposition::Unknown);
+
+        // Past the slot deadline the result expires without transmission.
+        let second = admitted(8, 43, 5);
+        slots.admit(&second);
+        let late = HostResult::ok(second.token, b"ok".to_vec());
+        assert_eq!(slots.resolve(&late, Duration::from_secs(6)), CompletionDisposition::Expired);
+
+        // After handle close every result is dropped, even a fresh one.
+        let third = admitted(9, 44, 60);
+        slots.admit(&third);
+        slots.close();
+        let after_close = HostResult::ok(third.token, b"ok".to_vec());
+        assert_eq!(slots.resolve(&after_close, Duration::from_secs(1)), CompletionDisposition::Closed);
+    }
+
+    #[test]
+    fn late_result_for_old_token_cannot_complete_reused_wire_id() {
+        let mut slots = ReferenceSlots::new();
+        // Same wire `request_id` reused for a second admission.
+        let first = admitted(7, 42, 5);
+        let second = admitted(8, 42, 5);
+        slots.admit(&first);
+        let first_result = HostResult::ok(first.token, b"first".to_vec());
+        assert_eq!(
+            slots.resolve(&first_result, Duration::from_secs(1)),
+            CompletionDisposition::Accepted
+        );
+        slots.admit(&second);
+        // The late duplicate for the old token resolves Unknown: it must
+        // not complete the second slot, which only token 8 can complete.
+        assert_eq!(
+            slots.resolve(&first_result, Duration::from_secs(2)),
+            CompletionDisposition::Unknown
+        );
+        let second_result = HostResult::ok(second.token, b"second".to_vec());
+        assert_eq!(
+            slots.resolve(&second_result, Duration::from_secs(2)),
+            CompletionDisposition::Accepted
+        );
+    }
 
     #[test]
     fn completion_tokens_distinguish_wire_ids() {
