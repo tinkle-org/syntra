@@ -1,0 +1,111 @@
+specifications/decisions/ADR-010-rust-reference-status.md
+  s_81f81d583e0214::t_770c6424b60349 60-62
+crates/syntra-ffi/Cargo.toml
+  s_81f81d583e0214::t_7517ea5664ffe4 21-26
+CHANGELOG.md
+  s_81f81d583e0214::t_1cc4625cab1b4a 10-28
+conformance/README.md
+  s_81f81d583e0214::t_5f5b931a1341f7 13
+crates/syntra-runtime/src/recovery.rs
+  s_81f81d583e0214::t_539b4b486969b1 136-137,141-142,151,170-177
+  s_81f81d583e0214::t_e1312f6ecaee35 138-140,143-147,152,159-169
+  s_81f81d583e0214::t_a2a31569f0707e 246-261,283-291
+  s_81f81d583e0214::t_62dd6d2d05cae8 127-129
+  s_81f81d583e0214::t_65c547b486b725 148-150,153-158
+  s_81f81d583e0214::t_c028bd6a4d3c34 114,116-118
+  s_81f81d583e0214::t_5905b8fe03269a 189,191-196,198-204,206-215
+  s_81f81d583e0214::t_0410bac6acce0a 1-76,81-113,115,119-126,130-135,178-188,190,197,205,216-235,292
+  s_81f81d583e0214::t_3e91fbe044a401 77-80
+  s_81f81d583e0214::t_c4ec6f26ebb341 262-282
+  s_81f81d583e0214::t_e37ad6e6b00ee1 236-245
+.github/workflows/repo-validation.yml
+  s_81f81d583e0214::t_9bf98cc4284f56 153-154
+  s_81f81d583e0214::t_920e37fb217573 140-144
+  s_81f81d583e0214::t_3cae2442d8446c 184-188,192
+  s_81f81d583e0214::t_c671a2945b231f 111
+  s_81f81d583e0214::t_24e8cfa6a875d8 189-191,193-196
+README.md
+  s_81f81d583e0214::t_db4418fac1a976 102
+  s_81f81d583e0214::t_26ec6ab4a5e988 20
+  s_81f81d583e0214::t_1410a7a39ad1bc 373
+  s_81f81d583e0214::t_94ad5e28b4f0f8 185
+  s_81f81d583e0214::t_af7f67e5cddc83 250-256
+  s_81f81d583e0214::t_6f1693c5961fd8 346-347
+  s_81f81d583e0214::t_9acff77a10e2bc 148-149
+crates/syntra-ffi/tests/build_contract.py
+  s_81f81d583e0214::t_2a553cbd887e3d 44-45,49-50,53
+  s_81f81d583e0214::t_8f2ddafb6e5229 62-96,99
+bindings/go/README.md
+  s_81f81d583e0214::t_e8303666b9cd05 19-23
+  s_81f81d583e0214::t_7f91c0412a52d8 32
+  s_81f81d583e0214::t_02ff8e200e4ca3 103-122
+crates/syntra-ffi/tests/production_smoke.c
+  s_81f81d583e0214::t_3470caabc87fdc 1-42
+bindings/go/native.go
+  s_81f81d583e0214::t_4d5d982cb4c823 117-118,121
+  s_81f81d583e0214::t_c04550c046be34 155
+  s_81f81d583e0214::t_4d6eaefee4fe12 11,13-17,20,28-29,33-35
+  s_81f81d583e0214::t_03a1478f958596 18
+  s_81f81d583e0214::t_6633e8657f2243 498-499
+docs/schema-registry.md
+  s_81f81d583e0214::t_a7494d07e53b04 149-150
+  s_81f81d583e0214::t_1a8ce81268ae01 187,190-195
+SUPPORT.md
+  s_81f81d583e0214::t_62865ef1008262 11-13
+  s_81f81d583e0214::t_1b20a25264e7e6 32-34
+tests/test_release_workflow.py
+  s_81f81d583e0214::t_cc5b2c03c2e5cd 314,323-326
+crates/syntra-runtime/src/policy.rs
+  s_81f81d583e0214::t_88a98c69b7ecd0 1-117
+docs/building-on-syntra.md
+  s_81f81d583e0214::t_3f8f01d31105ff 69-70
+crates/syntra-runtime/src/lib.rs
+  s_81f81d583e0214::t_e03f54e65aaebf 24-25,31-35
+docs/schema-release-checklist.md
+  s_81f81d583e0214::t_7d572b9ef8be8d 37
+  s_81f81d583e0214::t_7ae240806f242b 27
+  s_81f81d583e0214::t_ad913251919f51 17
+crates/syntra-ffi/src/lib.rs
+  s_81f81d583e0214::t_54bd8e2f042ec5 1,3-8,10-11,13,15-18,20-22,24-30,33,40-45
+crates/syntra-ffi/include/syntra_production.h
+  s_81f81d583e0214::t_f64a9846c3a0e4 1-96
+docs/production-runtime.md
+  s_81f81d583e0214::t_6730c2bc0bd549 1-93
+CONTRIBUTING.md
+  s_81f81d583e0214::t_2aa53d7e28ded1 108-114
+crates/syntra-ffi/src/production.rs
+  s_81f81d583e0214::t_b54bb19d56f709 1325
+  s_81f81d583e0214::t_118db4ee97891d 694,697-703,707-712
+  s_81f81d583e0214::t_73c6750f376123 518
+  s_81f81d583e0214::t_0660fcef23bc4b 746
+  s_81f81d583e0214::t_34bd6657366260 1293-1300,1304-1306
+  s_81f81d583e0214::t_faa02ec377fe08 1268,1270,1273-1274
+  s_81f81d583e0214::t_c11be7c904048d 1290
+  s_81f81d583e0214::t_b200ffae09a623 1-105,107-517,519-672,674,676,679-693,695-696,704-706,713-745,747-970,972-1267,1269,1271-1272,1275-1289,1291-1292,1301-1303,1307-1324,1326-1361
+  s_81f81d583e0214::t_6b0435c6d3108b 106
+  s_81f81d583e0214::t_7e32dfd3895b9e 971
+  s_81f81d583e0214::t_de86ab29ef7ca0 673,675,677-678
+docs/implementer-guide.md
+  s_81f81d583e0214::t_30f0592d97f645 151-153
+RELEASE.md
+  s_81f81d583e0214::t_e0869bfbc3b2cc 41-42
+  s_81f81d583e0214::t_0e566a38dc320d 229-234,238-243
+Cargo.lock
+  s_81f81d583e0214::t_779d5652e4061f 895-896
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "211aa71d5ba693bd9ec6d6029ea338c36c34d099",
+  "prompts": {},
+  "sessions": {
+    "s_81f81d583e0214": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9f8ca991ffe1UbP7iczXhs8R9",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
