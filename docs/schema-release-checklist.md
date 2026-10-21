@@ -14,7 +14,7 @@ Releases (no BSR or GHCR).
 - [ ] `reserved` numbers/names are preserved; nothing is reused (SNTR-VER-005).
 - [ ] Committed generation updated: `crates/` + `bindings/go/` regenerated with the pinned template and committed in the same PR (no drift; `scripts/validate-schema.py --drift-only` green).
 - [ ] Conformance impact assessed: new/changed behavior has test coverage or a tracked placeholder linked from the requirement's `requirements.yaml` row.
-- [ ] CI is green: `buf format --diff --exit-code`, `buf lint`, `buf build`, `buf breaking` against the current Git baseline, generation drift check, default + fixture `cargo test` (`--workspace` plus `-p syntra-ffi --features test-fixture` and `build_contract.py`), default-tag `go test` (no `-tags syntranative`), non-FFI WASM success plus expected `syntra-ffi does not support WASM` failure, plus the schema test suite (`scripts/validate-schema.py`, `tests/schema`).
+- [ ] CI is green: `buf format --diff --exit-code`, `buf lint`, `buf build`, `buf breaking` against the current Git baseline, generation drift check, `cargo test` (`--workspace` plus `-p syntra-ffi --features test-fixture`, `-p syntra-ffi --features production`, and `build_contract.py`), `go test` (default tags plus `-tags syntranative` against the production library), non-FFI WASM success plus expected `syntra-ffi does not support WASM` failure, plus the schema test suite (`scripts/validate-schema.py`, `tests/schema`).
 
 ## B. Pre-release (tag creation)
 
@@ -24,7 +24,7 @@ Releases (no BSR or GHCR).
 - [ ] Maintainer-reviewed Release PR authorizes publishing (`release_always = false`); syntra-core's version matches the intended schema/Go release. Go-only changes include an explicit syntra-core version bump when a new paired release is needed.
 - [ ] Tag protection covers `syntra-*-v*` and `bindings/go/v*`, with the release automation identity allowed. release-plz owns crate tags; `release.yml` owns the Go ref and never moves an existing tag.
 - [ ] Full Apache-2.0 license and package repository metadata present; publishing credentials configured (OIDC trusted publisher, or scoped bootstrap token).
-- [ ] Release notes describe wire contracts, migration/deprecation notes, and the actual source/schema asset set. Native Go mode (`syntranative`) is marked unsupported; native/header/browser WASM binaries are not promised.
+- [ ] Release notes describe wire contracts, migration notes, and the actual source/schema asset set. Native Go mode links the production library per `docs/production-runtime.md`; browser WASM binaries are not promised.
 
 ## C. Release (direct reusable workflow call or tag recovery)
 
@@ -34,7 +34,7 @@ Releases (no BSR or GHCR).
 - [ ] Nested Go module tag created or verified at syntra-core's peeled commit; mismatches fail closed. Go v2+ is blocked until the required module-path migration.
 - [ ] `cargo package --workspace --locked --no-verify` succeeded and crate archives exist; no packaging error was swallowed. Registry publication performed build verification separately.
 - [ ] Full source/crate archives, Go bindings archive, descriptor, manifests, vectors, and exact flat-asset `SHA256SUMS` attached to the syntra-core GitHub Release.
-- [ ] No native-Go or browser-WASM support inferred from compile-only checks. Restoring binaries requires FFI/Go contract alignment and linked runtime tests.
+- [ ] No browser-WASM support inferred from compile-only checks. Native support is proven by linked runtime tests against the production library, not by compile checks alone.
 - [ ] Correct maturity flagged (`prerelease` for `-rc` tags); finals/latest alone do not assert protocol stability. Releases move forward only.
 
 ## D. Post-release

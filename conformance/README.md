@@ -10,7 +10,7 @@
 - Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
 
 This directory is the **sole executable definition of conformance**. The Rust
-reference implementation (forthcoming) conforms to it; it is never the source
+reference implementation in `crates/` conforms to it; it is never the source
 of truth (ADR-010, SYN-ARCH-041).
 
 > A completely separate repository (for example `syntra-rs`, `syntra-go`, or a

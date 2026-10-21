@@ -311,6 +311,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         commands = [s.get("run", "") for job in CI["jobs"].values() for s in job["steps"]]
         self.assertIn("cargo test --locked --workspace", commands)
         self.assertIn("cargo test --locked -p syntra-ffi --features test-fixture", commands)
+        self.assertIn("cargo test --locked -p syntra-ffi --features production", commands)
         self.assertIn("python3 crates/syntra-ffi/tests/build_contract.py", commands)
         # WASM job asserts the expected syntra-ffi failure, not success.
         wasm_runs = " ".join(commands)
@@ -319,10 +320,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
             "cargo check --locked -p syntra-core -p syntra-runtime -p syntra-ws -p syntra-web --target wasm32-unknown-unknown",
             commands,
         )
-        # Go jobs run default tags only; syntranative is never enabled in CI.
-        for job in CI["jobs"].values():
-            for s in job.get("steps", []):
-                self.assertNotIn("syntranative", s.get("run", ""))
+        # Go default tests plus the production native adapter linked
+        # against the production Rust library.
+        self.assertTrue(any("go test -count=1 -v ./..." in c for c in commands))
+        self.assertTrue(any("go test -tags syntranative" in c for c in commands))
 
     def test_clean_go_generation_is_scoped_to_generated_files(self):
         template = yaml.safe_load((ROOT / "buf.gen.yaml").read_text())

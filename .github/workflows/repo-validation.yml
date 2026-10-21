@@ -108,7 +108,7 @@ jobs:
 
   rust-tests:
     # Default workspace tests (syntra-ffi default-empty, no ABI) plus the
-    # explicit native fixture tests. The fixture feature is test-only and
+    # explicit fixture and production ABI tests. Fixture is test-only and
     # never enabled in shipped binaries (including via --all-features).
     runs-on: ubuntu-24.04
     steps:
@@ -137,7 +137,11 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         run: cargo test --locked -p syntra-ffi --features test-fixture
 
-      - name: FFI build contract (default empty + fixture + WASM rejection)
+      - name: cargo test (syntra-ffi production ABI)
+        if: steps.detect.outputs.present == 'true'
+        run: cargo test --locked -p syntra-ffi --features production
+
+      - name: FFI build contract (default empty + fixture + production + WASM rejection)
         if: steps.detect.outputs.present == 'true'
         run: python3 crates/syntra-ffi/tests/build_contract.py
 
@@ -146,9 +150,8 @@ jobs:
         run: echo "No Cargo.toml/Cargo.lock yet; rust-tests skipped (bootstrap)."
 
   go-tests:
-    # Supported pure-Go build only (no -tags). The syntranative adapter is
-    # unsupported: native_test.go requires missing symbols and is skipped by
-    # default; CI MUST NOT pass -tags syntranative.
+    # Default pure-Go build plus the production native adapter linked
+    # against the production Rust library.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -176,6 +179,19 @@ jobs:
       - name: go test (committed bindings, default tags only)
         if: steps.detect.outputs.present == 'true'
         run: go test -count=1 -v ./...
+        working-directory: bindings/go
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.detect.outputs.present == 'true'
+        with:
+          toolchain: "1.88"
+
+      - name: go test (production native adapter)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          cargo build --locked -p syntra-ffi --features production
+          LIBDIR="$GITHUB_WORKSPACE/target/debug"
+          CGO_LDFLAGS="-L$LIBDIR -lsyntra_ffi" LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH" go test -tags syntranative -count=1 ./...
         working-directory: bindings/go
 
       - name: No Go module yet (bootstrap skip)

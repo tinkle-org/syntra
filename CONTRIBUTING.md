@@ -105,12 +105,13 @@ Before requesting review:
       FILE/source break. Historical comparisons read the hash-verified
       `compatibility/v1-initial/historical.json` archive, without a Git
       checkout or duplicate schema tree. Regenerate committed types in the
-      same PR (`--drift-only` must pass); default + fixture `cargo test`
-      (`--workspace` plus `-p syntra-ffi --features test-fixture` and
-      `build_contract.py`), default-tag `go test` (no `-tags syntranative`),
-      and WASM checks (non-FFI success plus expected `syntra-ffi does not
-      support WASM` failure; no browser WASM archive) run in CI (see
-      `repo-validation.yml`).
+       same PR (`--drift-only` must pass); `cargo test` (`--workspace`
+       plus `-p syntra-ffi --features test-fixture`, `-p syntra-ffi
+       --features production`, and `build_contract.py`), `go test`
+       (default tags plus `-tags syntranative` against the production
+       library), and WASM checks (non-FFI success plus expected
+       `syntra-ffi does not support WASM` failure; no browser WASM
+       archive) run in CI (see `repo-validation.yml`).
 - [ ] Markdown uses BCP 14 keywords correctly (capitalized only for
       normative force).
 - [ ] No private dependency or domain-specific term introduced

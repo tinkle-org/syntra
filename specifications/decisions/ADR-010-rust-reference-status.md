@@ -57,6 +57,6 @@ independent implementation becomes impossible.
 
 ## Status
 
-Accepted. The reference implementation is forthcoming and will live
-outside the normative paths defined in `specifications/architecture.md`
-Sec. 8.
+Accepted. The reference implementation is present in `crates/` (including
+the production native ABI) and lives outside the normative paths defined
+in `specifications/architecture.md` Sec. 8.

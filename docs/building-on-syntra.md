@@ -66,7 +66,8 @@ ordering metadata in payloads (the core guarantees none across streams),
 duplicate tolerance (initiators MUST tolerate), queue/drop policy, replay
 and cursor format/lifetime/recovery (only under a negotiated stream spec),
 and termination signals. Every subscription is an authorization point for
-the bound principal.
+the bound principal. For checkpoint discipline and the generic recovery
+coordinator, see `docs/production-runtime.md`.
 
 ## Authentication policies
 

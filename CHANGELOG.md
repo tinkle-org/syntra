@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
 development, changes land under `Unreleased`.
 
+## [Unreleased]
+
+### Added
+
+- Production native ABI in `crates/syntra-ffi` (`production` feature) with
+  `crates/syntra-ffi/include/syntra_production.h`: transport-agnostic
+  initiator/responder cores, stable handles, version checks, buffer
+  ownership, lifecycle, frame ingest, and outbound actions.
+- Host policy bridge in `crates/syntra-runtime::policy`: asynchronous
+  authentication and authorization completion with tokens distinct from
+  wire `request_id` values.
+- Generic recovery boundary in `crates/syntra-runtime::recovery`:
+  application-supplied stream checkpoints with local recovery actions; the
+  core never invokes recovery RPCs.
+- Go production adapter under `-tags syntranative` linked against the
+  production library, with lifecycle and concurrency coverage.
+- `docs/production-runtime.md` describing engine ownership, the native ABI,
+  recovery rules, and distribution.
+
 ## [v1.0.0-rc.1] - TBD (pending; do not treat as released)
 
 First release candidate scope (protocol v1). This section is a release
