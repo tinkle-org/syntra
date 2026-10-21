@@ -9,7 +9,7 @@ Release authority: `GOVERNANCE.md` Sec. 5 (stability criteria),
 `GOVERNANCE.md` Sec. 3 (approval quorum), `GOVERNANCE.md` Sec. 4 +
 Deprecation (breaking/deprecation handling), `rfcs/README.md` (RFC
 lifecycle — only **Accepted** RFCs may modify normative behavior),
-`docs/schema-registry.md` (Git-tags + GitHub-Releases distribution contract),
+`docs/schema-registry.md` (crates.io, Go modules, and GitHub Releases contract),
 `docs/schema-release-checklist.md` (per-schema-release gates).
 
 Status terms: an RC is a **candidate**, not a stable release. Tagging an
@@ -38,9 +38,9 @@ An unchecked box blocks tagging.
 - [ ] Proto lint passes
 - [ ] Proto breaking checks pass
 - [ ] Committed generated types fresh (`validate-schema.py --drift-only`)
-- [ ] Rust tests pass (`cargo test --locked --workspace`)
-- [ ] Go tests pass (`go test ./...` in `bindings/go`)
-- [ ] WASM compile check passes (`cargo check --locked -p syntra-ffi --target wasm32-unknown-unknown`)
+- [ ] Rust tests pass (default `cargo test --locked --workspace` plus `cargo test -p syntra-ffi --features test-fixture` and `build_contract.py`)
+- [ ] Go tests pass (`go test ./...` in `bindings/go`, default tags only; no `-tags syntranative`)
+- [ ] WASM checks pass (non-FFI `cargo check --locked -p syntra-core -p syntra-runtime -p syntra-ws -p syntra-web --target wasm32-unknown-unknown` succeeds; `syntra-ffi` WASM check fails with `syntra-ffi does not support WASM`)
 - [ ] Conformance requirements complete
 - [ ] Test vectors validated
 - [ ] Consistency audit has no P0 blockers
@@ -61,8 +61,8 @@ Evidence mapping (where each box is verified):
 | Conformance requirements complete | `requirements.yaml` covers every defined ID; no `not_testable` without a stated reason (`validate-repo.py requirements manifests`) |
 | Test vectors validated | `validate-repo.py vectors` green (hex parses, protobuf decodes against `proto/`, TCP lengths match, malformed vectors intentionally malformed) |
 | Consistency audit no P0 | `audits/v1-consistency-review.md` P0 list empty or all P0s closed by Accepted RFCs; readiness report shows no BLOCKED area required for the RC scope |
-| Committed generation fresh | `scripts/validate-schema.py --drift-only` green (committed `crates/` + `bindings/go/` match pinned regeneration); `cargo test`, `go test`, WASM check green |
-| Release workflow ready | `release-plz.toml` (Apache-2.0, publish enabled) + `.github/workflows/release.yml` reviewed and validation/build prerequisites green; asset publication is verified after tagging (§6) |
+| Committed generation fresh | `scripts/validate-schema.py --drift-only` green (committed `crates/` + `bindings/go/` match pinned regeneration); default + fixture `cargo test`, default-tag `go test`, and WASM checks green (non-FFI success + expected syntra-ffi failure) |
+| Release workflow ready | `release-plz.toml` (publish enabled, `release_always = false`) + release workflows reviewed; tooling regression tests and actionlint green; asset publication is verified after tagging (§6) |
 | License present | Apache-2.0 `LICENSE` file present per `GOVERNANCE.md` Sec. 7 |
 | Security process documented | `SECURITY.md` private reporting channel live; embargo handling per `GOVERNANCE.md` Sec. 3 |
 | CHANGELOG updated | `## [v1.0.0-rc.1]` section with Added/Changed/Deprecated/Removed/Security; every wire-affecting change has migration notes |
@@ -167,79 +167,99 @@ per-transport version numbers.
 
 ## 4. Tagging procedure (release-plz PR, then publish on merge)
 
-Releases are cut via the release-plz PR flow (`.github/workflows/release-plz.yml`).
-Conventional commits on main keep a Release PR up to date (version bumps +
-CHANGELOG). Review and merge that PR — approval and merge is the release gate.
-On the next main push, release-plz publishes unpublished crates to crates.io
-(trusted publishing preferred), cuts per-package tags (`<name>-vX.Y.Z`), and
-creates GitHub Releases. Native artifacts and Go proxy warmup attach in
-`release.yml` on release published.
+`.github/workflows/release-plz.yml` maintains a Release PR with package
+versions and changelogs. Review its complete release scope and CI evidence
+before merging. `release_always = false` prevents publication on ordinary
+main commits: publication is authorized by merging a Release PR. The
+repository must allow Actions to create PRs; approve the checks on bot-created
+PRs if GitHub requires it before merging.
 
-Manual recovery tags (maintainers only) remain supported after the checklist
-(§1) is fully evidenced and `audits/v1-release-readiness.md` is updated:
+release-plz publishes Rust crates to crates.io (Trusted Publishing OIDC,
+or a scoped bootstrap `CARGO_REGISTRY_TOKEN`), creates `<crate>-vX.Y.Z`
+tags, and creates per-crate GitHub Releases. The explicit tag template is
+stable even if the number of public crates changes. Package versions need
+not all be equal; the artifact gate parses syntra-core's TOML version,
+including workspace inheritance, instead of grepping dependency versions.
+
+**The schema/Go release anchor is `syntra-core-vX.Y.Z`.** After publishing
+syntra-core, release-plz passes its output tag directly to the reusable
+`release.yml` workflow. A `GITHUB_TOKEN`-created tag or release does not
+trigger another push/release workflow, so event chaining is not used.
+Other crate releases carry their own notes and registry versions; they
+do not each mint a Go tag or duplicate the schema assets. Global `vX.Y.Z`
+tags are not part of this model.
+
+After validation and packaging, `release.yml` creates the missing
+`bindings/go/vX.Y.Z` ref at the syntra-core tag's **peeled commit**, or
+verifies an existing ref at that commit. The workflow is the sole automated
+owner of this namespace. It never moves an existing tag. This applies to
+`-rc.N` suffixes too. Go v2+ is blocked until a reviewed module-path migration
+adds the required major suffix. Changes to Go bindings alone require a
+reviewed syntra-core version bump to cut a new paired release.
+
+Recovery: rerun failed jobs, or dispatch `release.yml` with the existing
+syntra-core tag. A maintainer may recreate a missing release path using a
+new signed tag at an approved, merged commit whose package version matches:
 
 ```sh
 git tag -s syntra-core-v1.0.0-rc.1 -m "syntra-core v1.0.0-rc.1 (release candidate, not stable)"
-git tag -s bindings/go/v1.0.0-rc.1 'syntra-core-v1.0.0-rc.1^{commit}' -m "Go bindings v1.0.0-rc.1"
-git push --atomic origin syntra-core-v1.0.0-rc.1 bindings/go/v1.0.0-rc.1
+git push origin syntra-core-v1.0.0-rc.1
 ```
 
-Rules: annotated (preferably signed) tags only. Rust crates use per-package
-tags (`<name>-vX.Y.Z`, `-rc.N` for prereleases); branches never define releases
-(`GOVERNANCE.md` Sec. 5). For every release commit, sync `bindings/go/vX.Y.Z`
-(or `bindings/go/vX.Y.Z-rc.N` for prereleases) at the SAME revision (required
-for Go MVS to resolve the `bindings/go` module; `release.yml` verifies both
-tags resolve to the same commit and fails closed, and `go-proxy-warmup` warms
-proxy.golang.org plus pkg.go.dev). Tag protection rules SHOULD restrict tag
-creation to maintainers. Deleting or moving a release tag is forbidden; fix
-forward with a new tag.
+The tag push validates and attaches assets; it does **not** publish crates
+to crates.io. Confirm registry publication separately during recovery.
+Restrict `syntra-*-v*` and `bindings/go/v*` tag creation to maintainers and
+the release automation identity. Automation may create lightweight refs;
+manual recovery tags should be signed. Deleting or moving a published tag
+is forbidden; fix forward. A mismatch in an existing Go tag blocks release
+attachments and proxy warmup.
 
 ## 5. Release artifacts
 
-For each tag, `.github/workflows/release.yml` assembles and attaches to the
-GitHub Release (Rust publishing itself happens in release-plz.yml via
-crates.io; no GHCR, no BSR push):
+The **syntra-core** GitHub Release receives this flat asset set from the
+validated tagged commit (crates.io publishing is a separate preceding step):
 
-- `image.json` — `buf build` descriptor of exactly the tagged revision.
-- `syntra-schema-<tag>.tar.gz` — `descriptor/` (the descriptor plus the
-  `buf export` tree), `manifests/` (from `conformance/manifest/*.yaml`),
-  and `test-vectors/` (from `conformance/test-vectors/`) at the tag.
-- `rust/` — Rust source archive + per-crate `.crate` files (offline-friendly;
-  Apache-2.0, published to crates.io by release-plz) when the workspace exists.
-- `go/` — `bindings/go` source archive (CGO wrapper + committed `*.pb.go`).
-- `syntra-native-linux-amd64-<tag>.tar.gz`, `syntra-native-linux-arm64-<tag>.tar.gz` — `syntra-ffi` cdylib
-  (`libsyntra_ffi.so`), staticlib (`libsyntra_ffi.a`), and C header
-  (`syntra_ffi.h`) built `--locked --release` on each arch.
-- `wasm/` — browser WASM archive (`syntra_ffi.wasm` tarball, built for
-  `wasm32-unknown-unknown`).
+- `image.json` — the `buf build` descriptor.
+- `syntra-schema-<tag>.tar.gz` — `descriptor/` (descriptor and `buf export`
+  sources), `manifests/`, and `test-vectors/`.
+- `syntra-source-<tag>.tar.gz` — the full tracked source snapshot via
+  `git archive`, including build scripts and schemas.
+- `*.crate` — workspace package archives. `cargo package --workspace
+  --locked --no-verify` must succeed; missing archives fail the job. The
+  `syntra-ffi` archive is expected noise: default builds export no C ABI
+  (empty fixture crate by design), and its presence does not imply native
+  support. The registry publishing step performs build verification.
+  Source archives do not vendor dependencies and do not promise offline builds.
+- `syntra-go-bindings-<tag>.tar.gz` — the committed Go module source.
 - `CHANGELOG.md`, `RELEASE.md`, `GOVERNANCE.md`, `LICENSE` (as tagged).
-- `SHA256SUMS` — checksums for exactly the flattened uploaded assets
-  (excluding the checksum file itself), including `image.json`.
+- `SHA256SUMS` — checksums for exactly the uploaded assets other than itself.
 
-`scripts/collect-release-artifacts.sh <tag>` reproduces the
-descriptor/manifests/vectors + docs subset locally under
-`dist/release/<tag>/` (gitignored). Checksums are the integrity contract
-for downloadable artifacts; the tag + checksums together define the RC.
+**Go native mode (`syntranative`) is unsupported.** Its session-oriented C
+declarations do not match the Rust FFI exports, signatures, and ownership
+contract. An ABI-version integer alone cannot establish compatibility.
+Native libraries/headers and browser WASM binaries are withheld from this
+release payload until the FFI/Go owners align the contract and add linked
+runtime tests. The default pure-Go module is the documented Go path. Rust
+and WASM compile checks are useful gates, not native-Go integration proof
+or a browser SDK support claim.
+
+`scripts/collect-release-artifacts.sh <tag>` reproduces only the
+descriptor/manifests/vectors + docs subset under `dist/release/<tag>/`.
+It does not publish a release.
 
 ## 6. GitHub Release association (no BSR)
 
-There is no BSR module and no `buf push`. Release identity lives in
-crates.io + Go module proxy + GitHub Releases (see `docs/schema-registry.md`
-§§1, 8–10 and `docs/schema-release-checklist.md` §B–C):
+Rust package `<crate>` at version `X.Y.Z` maps to `<crate>-vX.Y.Z` and
+its crates.io version. The schema/Go association is specifically
+`syntra-core-vX.Y.Z` ↔ `bindings/go/vX.Y.Z` at the same commit ↔ the §5
+assets. There is no BSR module, `buf push`, or GHCR publication.
 
-Tag namespaces are distinct by design: Rust crates use per-package tags
-(`<name>-vX.Y.Z`, §4 above) created by release-plz on merge, and nested Go
-module tags use `bindings/go/vX.Y.Z` at the same revision; prereleases pair
-`-rc.N` suffixes identically (release.yml verifies and fails closed, then
-`go-proxy-warmup` indexes via proxy.golang.org and pkg.go.dev). A release is
-cut only after the repository RC checklist (§1) holds. Association rules: Git
-tag `<name>-vX.Y.Z` ↔ crates.io version + GitHub Release carrying the §5
-assets; nested tag `bindings/go/vX.Y.Z` ↔ the same commit (verified, fails
-closed) ↔ `go get` + pkg.go.dev docs; release maturity via prerelease flags
-(`-rc` tags marked prerelease, finals marked latest) — never by moving a tag.
-After the release completes, verify the GitHub Release contains Linux
-amd64/arm64 native archives with libraries + header, the WASM archive, Rust
-source/crate archives, descriptor, manifests/vectors, and SHA256SUMS, that
-`cargo add syntra-core@X.Y.Z` resolves, and that `GOPROXY=proxy.golang.org
-go list -m github.com/tinklehq/syntra/bindings/go@vX.Y.Z` resolves. Download
-the assets and verify their checksums read-only (no credentials echoed).
+RC tags are marked prerelease; final package tags do not by themselves
+assert the protocol stability criteria in `GOVERNANCE.md` §5. After the
+workflow completes, download and verify all assets against `SHA256SUMS`,
+check that `cargo add syntra-core@X.Y.Z` resolves, and run
+`GOPROXY=https://proxy.golang.org go list -m github.com/tinklehq/syntra/bindings/go@vX.Y.Z`.
+Proxy warmup retries a version with the leading `v` and fails after five
+unsuccessful attempts. pkg.go.dev indexing is asynchronous and best-effort.
+If the registry release succeeded but later jobs failed, use §4 recovery;
+publication and artifact attachment are not an atomic transaction.

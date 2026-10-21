@@ -104,15 +104,7 @@ impl Initiator {
     /// `ClientHello.credential`. This function never logs it and the
     /// caller should drop it after the handshake where possible.
     pub async fn handshake(&self, credential: Vec<u8>) -> Result<String, SyntraError> {
-        {
-            let s = self.conn.state().await;
-            if s != ConnectionState::Connected {
-                return Err(SyntraError::Protocol {
-                    code: ErrorCode::FailedPrecondition,
-                    message: "handshake already started".to_string(),
-                });
-            }
-        }
+        let deadline = Instant::now() + self.conn.shared.config.handshake_timeout;
         let (min_version, max_version) = {
             let shared = &self.conn.shared;
             (shared.proposed_min, shared.proposed_max)
@@ -140,21 +132,36 @@ impl Initiator {
         )?;
 
         let (tx, rx) = oneshot::channel();
-        *self.conn.shared.handshake_tx.lock().await = Some(tx);
-        self.conn.transition(StateEvent::HelloSent).await?;
+        {
+            // Claim the handshake and install its waiter atomically. The
+            // lock order is state -> handshake_tx, also used by on_ready.
+            let mut state = self.conn.shared.state.write().await;
+            if *state != ConnectionState::Connected || self.conn.is_closed() {
+                return Err(SyntraError::Protocol {
+                    code: ErrorCode::FailedPrecondition,
+                    message: "handshake already started".to_string(),
+                });
+            }
+            let mut waiter = self.conn.shared.handshake_tx.lock().await;
+            *state = state.transition(StateEvent::HelloSent)?;
+            *waiter = Some(tx);
+        }
 
         let bytes = frame.encode_to_vec();
-        if let Err(e) = self.conn.send_bytes(bytes).await {
+        let sent = tokio::select! {
+            biased;
+            _ = sleep_until(deadline) => Err(SyntraError::DeadlineExceeded("handshake timed out".to_string())),
+            sent = self.conn.send_bytes(bytes) => sent,
+        };
+        if let Err(e) = sent {
             self.conn
-                .fail_handshake(SyntraError::Closed(format!("handshake send failed: {e}")))
+                .fail_handshake_and_close(e.code(), "handshake send failed".to_string())
                 .await;
-            return Err(SyntraError::Closed("handshake send failed".to_string()));
+            return Err(e);
         }
 
         // Await ready with the handshake deadline; expiry explicitly
         // closes the core (SNTR-HS-011).
-        let timeout = self.conn.shared.config.handshake_timeout;
-        let deadline = Instant::now() + timeout;
         let res = tokio::select! {
             biased;
             res = rx => res
@@ -316,11 +323,24 @@ impl Initiator {
                 .await;
             return;
         }
+        let mut state = self.conn.shared.state.write().await;
+        if self.conn.is_closed() {
+            return;
+        }
+        // Re-check after all validation awaits: close may have won.
+        let authenticating = if *state == ConnectionState::Negotiating {
+            state.transition(StateEvent::VersionAccepted)
+        } else if *state == ConnectionState::Authenticating {
+            Ok(*state)
+        } else {
+            return;
+        };
+        let Ok(active) = authenticating.and_then(|s| s.transition(StateEvent::ReadyReceived))
+        else {
+            return;
+        };
         *self.conn.shared.version.write().await = Some(frame.version);
-        // NEGOTIATING -> AUTHENTICATING -> ACTIVE. The initiator path
-        // collapses version-accept + credential-accept into ready.
-        let _ = self.conn.transition(StateEvent::VersionAccepted).await;
-        let _ = self.conn.transition(StateEvent::ReadyReceived).await;
+        *state = active;
         self.conn
             .complete_handshake(HandshakeDone {
                 connection_id: ready.connection_id,
@@ -355,7 +375,9 @@ impl Initiator {
             Some(Body::Notification(n)) => n,
             _ => return,
         };
-        if !self.conn.state().await.is_active() {
+        let state = self.conn.shared.state.read().await;
+        if !state.is_active() {
+            drop(state);
             // Pre-ACTIVE notifications fail the handshake per
             // handshake.md section 1B (recorded conflict B2).
             self.conn
@@ -420,80 +442,14 @@ impl Initiator {
         payload: Vec<u8>,
         timeout_ms: u32,
     ) -> Result<Vec<u8>, SyntraError> {
-        // Deadline first: queue admission must not consume the budget.
-        let deadline = Instant::now() + self.budget(timeout_ms);
-        // New RPCs on a closed connection are rejected as Closed (no new
-        // work in CLOSING/CLOSED); before ACTIVE they are premature.
-        if self.conn.is_closed() {
-            return Err(SyntraError::Closed("connection closed".to_string()));
-        }
-        if self.conn.state().await != ConnectionState::Active {
-            return Err(SyntraError::Protocol {
-                code: ErrorCode::FailedPrecondition,
-                message: "RPC requires ACTIVE connection".to_string(),
-            });
-        }
-        syntra_core::validate_method(method)?;
-
-        let version = self
-            .conn
-            .negotiated_version()
+        // Share admission/deadline/cleanup logic with the cancellable path.
+        self.call_cancellable(method, payload, timeout_ms, &crate::CancelToken::new())
             .await
-            .ok_or(SyntraError::Protocol {
-                code: ErrorCode::FailedPrecondition,
-                message: "no negotiated version".to_string(),
-            })?;
-
-        let id = self.alloc_id().await?;
-        let mut rx = self.conn.shared.pending.insert(id, method.to_string())?;
-        // Guards validation failure, send failure, and dropped futures.
-        let _guard = PendingGuard::new(&self.conn.shared.pending, id);
-
-        let req = RpcRequest {
-            method: method.to_string(),
-            payload: payload.into(),
-            timeout_ms,
-        };
-        let frame = Frame {
-            version,
-            request_id: id,
-            body: Some(Body::Request(req)),
-        };
-        validate_frame(&frame, ValidationContext::active(version))?;
-        {
-            let bytes = frame.encode_to_vec();
-            if bytes.len() > syntra_core::MAX_FRAME_BYTES {
-                return Err(SyntraError::ResourceExhausted(
-                    "request exceeds maximum envelope size".to_string(),
-                ));
-            }
-            self.conn.send_bytes(bytes).await?;
-        }
-
-        // Initiator timer <= requested budget (SNTR-RPC-004/section 1F).
-        // Completion wins: a result that arrived by the deadline is
-        // returned even if the timer fired first.
-        let outcome = tokio::select! {
-            biased;
-            res = &mut rx => Some(res),
-            _ = sleep_until(deadline) => None,
-        };
-        let outcome = match outcome {
-            Some(res) => res,
-            None => match rx.try_recv() {
-                Ok(res) => Ok(res),
-                _ => {
-                    return Err(SyntraError::DeadlineExceeded(format!("{method} timed out")));
-                }
-            },
-        };
-        let outcome = outcome.map_err(|_| SyntraError::Closed("rpc waiter dropped".to_string()))?;
-        map_outcome(method, outcome)
     }
 
     /// Cancellable RPC: same as [`Initiator::call`] but aborts early when
     /// `cancel` fires. On cancellation this sends best-effort `Cancel{}`
-    /// for the allocated id, abandons the waiter, and returns
+    /// for an admitted request, abandons the waiter, and returns
     /// `CANCELLED`. The host still ends the RPC with exactly one
     /// terminal `result` (completion wins races); the late result is
     /// ignored as unknown. (`SNTR-RPC-005/021`.)
@@ -539,63 +495,83 @@ impl Initiator {
     ) -> (u64, Result<Vec<u8>, SyntraError>) {
         let fail = |e: SyntraError| (0u64, Err(e));
         let deadline = Instant::now() + self.budget(timeout_ms);
-        if self.conn.is_closed() {
-            return fail(SyntraError::Closed("connection closed".to_string()));
-        }
-        if self.conn.state().await != ConnectionState::Active {
-            return fail(SyntraError::Protocol {
-                code: ErrorCode::FailedPrecondition,
-                message: "RPC requires ACTIVE connection".to_string(),
-            });
-        }
-        if let Err(e) = syntra_core::validate_method(method) {
-            return fail(e);
-        }
-        let version = match self.conn.negotiated_version().await {
-            Some(v) => v,
-            None => {
-                return fail(SyntraError::Protocol {
+        let admission = async {
+            // Hold the read lock only through pending insertion, so close
+            // cannot drain the table just before a late insertion.
+            let state = self.conn.shared.state.read().await;
+            if self.conn.is_closed() {
+                return Err(SyntraError::Closed("connection closed".to_string()));
+            }
+            if *state != ConnectionState::Active {
+                return Err(SyntraError::Protocol {
+                    code: ErrorCode::FailedPrecondition,
+                    message: "RPC requires ACTIVE connection".to_string(),
+                });
+            }
+            syntra_core::validate_method(method)?;
+            let version = self
+                .conn
+                .negotiated_version()
+                .await
+                .ok_or(SyntraError::Protocol {
                     code: ErrorCode::FailedPrecondition,
                     message: "no negotiated version".to_string(),
-                })
+                })?;
+            let id = self.alloc_id().await?;
+            if let Some(slot) = id_out.as_deref_mut() {
+                *slot = id;
             }
-        };
-        let id = match self.alloc_id().await {
-            Ok(id) => id,
-            Err(e) => return fail(e),
-        };
-        if let Some(slot) = id_out.as_deref_mut() {
-            *slot = id;
-        }
-        let mut rx = match self.conn.shared.pending.insert(id, method.to_string()) {
-            Ok(rx) => rx,
-            Err(e) => return fail(e),
-        };
-        let _guard = PendingGuard::new(&self.conn.shared.pending, id);
-        let req = RpcRequest {
-            method: method.to_string(),
-            payload: payload.into(),
-            timeout_ms,
-        };
-        let frame = Frame {
-            version,
-            request_id: id,
-            body: Some(Body::Request(req)),
-        };
-        if let Err(e) = validate_frame(&frame, ValidationContext::active(version)) {
-            return fail(e);
-        }
-        {
+            let rx = self.conn.shared.pending.insert(id, method.to_string())?;
+            let guard = PendingGuard::new(&self.conn.shared.pending, id);
+            drop(state);
+            let frame = Frame {
+                version,
+                request_id: id,
+                body: Some(Body::Request(RpcRequest {
+                    method: method.to_string(),
+                    payload,
+                    timeout_ms,
+                })),
+            };
+            validate_frame(&frame, ValidationContext::active(version))?;
             let bytes = frame.encode_to_vec();
             if bytes.len() > syntra_core::MAX_FRAME_BYTES {
-                return fail(SyntraError::ResourceExhausted(
+                return Err(SyntraError::ResourceExhausted(
                     "request exceeds maximum envelope size".to_string(),
                 ));
             }
-            if let Err(e) = self.conn.send_bytes(bytes).await {
-                return fail(e);
+            let permit = self.conn.reserve_writer().await?;
+            let state = self.conn.shared.state.read().await;
+            if self.conn.is_closed() || *state != ConnectionState::Active {
+                return Err(SyntraError::Closed("connection closed".to_string()));
             }
-        }
+            // select! checked before polling admission. Re-check at the
+            // actual enqueue point as encoding/lock acquisition may have
+            // consumed the remaining budget during that poll.
+            if cancel.is_cancelled() {
+                return Err(SyntraError::Cancelled(format!("{method} cancelled")));
+            }
+            if Instant::now() >= deadline {
+                return Err(SyntraError::DeadlineExceeded(format!("{method} timed out")));
+            }
+            permit.send(bytes);
+            drop(state);
+            Ok((id, rx, guard))
+        };
+        // Before admission there can be no successful remote completion.
+        // Cancellation/expiry win over newly available capacity; dropping
+        // the send future cannot enqueue the request later. No Cancel is
+        // sent for work that never left the initiator.
+        let admitted = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err(SyntraError::Cancelled(format!("{method} cancelled"))),
+            _ = sleep_until(deadline) => Err(SyntraError::DeadlineExceeded(format!("{method} timed out"))),
+            admitted = admission => admitted,
+        };
+        let (id, mut rx, _guard) = match admitted {
+            Ok(admitted) => admitted,
+            Err(e) => return fail(e),
+        };
         // Completion wins every race (biased, result branch first).
         enum Outcome {
             Done(Result<PendingOutcome, RecvError>),
@@ -605,18 +581,15 @@ impl Initiator {
         let outcome = tokio::select! {
             biased;
             res = &mut rx => Outcome::Done(res),
-            _ = cancel.cancelled() => Outcome::Cancelled,
-            _ = sleep_until(deadline) => {
-                if cancel.is_cancelled() {
-                    Outcome::Cancelled
-                } else {
-                    match rx.try_recv() {
-                        // A result that arrived by the deadline wins.
-                        Ok(res) => Outcome::Done(Ok(res)),
-                        _ => Outcome::TimedOut,
-                    }
-                }
-            }
+            _ = cancel.cancelled() => match rx.try_recv() {
+                Ok(res) => Outcome::Done(Ok(res)),
+                _ => Outcome::Cancelled,
+            },
+            _ = sleep_until(deadline) => match rx.try_recv() {
+                Ok(res) => Outcome::Done(Ok(res)),
+                _ if cancel.is_cancelled() => Outcome::Cancelled,
+                _ => Outcome::TimedOut,
+            },
         };
         match outcome {
             Outcome::Done(res) => {
@@ -724,6 +697,169 @@ mod tests {
     use super::*;
     use syntra_core::proto::rpc_result::Outcome;
     use syntra_core::proto::{RpcError as ProtoError, RpcResult};
+
+    #[tokio::test]
+    async fn concurrent_handshake_does_not_replace_original_waiter() {
+        let (c, mut writer) = Initiator::new(ConnectionConfig::default());
+        let gate = c.conn.shared.handshake_tx.lock().await;
+        let mut first = Box::pin(c.handshake(vec![]));
+        let mut second = Box::pin(c.handshake(vec![]));
+        assert!(futures_util::poll!(&mut first).is_pending());
+        assert!(futures_util::poll!(&mut second).is_pending());
+        drop(gate);
+        assert!(futures_util::poll!(&mut first).is_pending());
+        assert!(second.await.is_err());
+        // The first send may have queued a state read behind the second
+        // handshake's exclusive claim; resume it before delivering ready.
+        assert!(futures_util::poll!(&mut first).is_pending());
+        c.inject_frame(ready_frame(1)).await;
+        assert_eq!(first.await.unwrap(), "conn-test-1");
+        assert!(writer.try_recv().is_ok());
+        assert!(writer.try_recv().is_err(), "only one hello");
+    }
+
+    #[tokio::test]
+    async fn handshake_send_failure_closes_connection() {
+        let (c, writer) = Initiator::new(ConnectionConfig::default());
+        drop(writer);
+        assert!(c.handshake(vec![]).await.is_err());
+        assert!(c.is_closed());
+        assert_eq!(c.state().await, ConnectionState::Closed);
+        assert!(*c.subscribe_close().borrow());
+    }
+
+    async fn saturated_conn() -> (Initiator, mpsc::Receiver<Vec<u8>>) {
+        let (c, writer) = Initiator::new(ConnectionConfig {
+            writer_capacity: 1,
+            ..ConnectionConfig::default()
+        });
+        *c.conn.shared.state.write().await = ConnectionState::Active;
+        *c.conn.shared.version.write().await = Some(1);
+        c.conn.shared.writer.try_send(vec![0]).unwrap();
+        (c, writer)
+    }
+
+    #[tokio::test]
+    async fn both_rpc_paths_deadline_bounds_queue_admission() {
+        for cancellable in [false, true] {
+            let (c, mut writer) = saturated_conn().await;
+            let token = crate::CancelToken::new();
+            let result = tokio::time::timeout(Duration::from_secs(1), async {
+                if cancellable {
+                    c.call_cancellable("/example.Echo/Echo", vec![], 10, &token)
+                        .await
+                } else {
+                    c.call("/example.Echo/Echo", vec![], 10).await
+                }
+            })
+            .await
+            .expect("queueing must respect the RPC deadline");
+            assert!(matches!(result, Err(SyntraError::DeadlineExceeded(_))));
+            assert_eq!(c.pending_len(), 0);
+            assert_eq!(writer.try_recv().unwrap(), vec![0]);
+            assert!(
+                writer.try_recv().is_err(),
+                "expired request must not be queued later"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn cancellation_during_queue_admission_never_sends_request_or_cancel() {
+        let (c, mut writer) = saturated_conn().await;
+        let token = crate::CancelToken::new();
+        let mut call = Box::pin(c.call_cancellable("/example.Echo/Echo", vec![], 5000, &token));
+        assert!(futures_util::poll!(&mut call).is_pending());
+        token.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(1), call)
+            .await
+            .expect("cancel must interrupt queue admission");
+        assert!(matches!(result, Err(SyntraError::Cancelled(_))));
+        assert_eq!(c.pending_len(), 0);
+        assert_eq!(writer.try_recv().unwrap(), vec![0]);
+        assert!(writer.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn pre_cancelled_call_does_not_allocate_or_send() {
+        let (c, mut writer) = test_conn().await;
+        let token = crate::CancelToken::new();
+        token.cancel();
+        let (id, result) = c
+            .call_cancellable_tracked("/example.Echo/Echo", vec![], 1000, &token)
+            .await;
+        assert_eq!(id, 0);
+        assert!(matches!(result, Err(SyntraError::Cancelled(_))));
+        assert!(writer.try_recv().is_err());
+        assert_eq!(c.pending_len(), 0);
+    }
+
+    #[tokio::test]
+    async fn expired_admission_loses_to_new_capacity_in_both_rpc_paths() {
+        for cancellable in [false, true] {
+            let (c, mut writer) = saturated_conn().await;
+            let token = crate::CancelToken::new();
+            let mut call = Box::pin(async {
+                if cancellable {
+                    c.call_cancellable("/example.Echo/Echo", vec![], 10, &token)
+                        .await
+                } else {
+                    c.call("/example.Echo/Echo", vec![], 10).await
+                }
+            });
+            assert!(futures_util::poll!(&mut call).is_pending());
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            writer.try_recv().unwrap();
+            assert!(matches!(call.await, Err(SyntraError::DeadlineExceeded(_))));
+            assert!(writer.try_recv().is_err());
+            assert_eq!(c.pending_len(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn close_and_dropped_futures_clean_queued_calls() {
+        for cancellable in [false, true] {
+            let (c, _writer) = saturated_conn().await;
+            let token = crate::CancelToken::new();
+            let mut call = Box::pin(async {
+                if cancellable {
+                    c.call_cancellable("/example.Echo/Echo", vec![], 5000, &token)
+                        .await
+                } else {
+                    c.call("/example.Echo/Echo", vec![], 5000).await
+                }
+            });
+            assert!(futures_util::poll!(&mut call).is_pending());
+            assert_eq!(c.pending_len(), 1);
+            drop(call);
+            assert_eq!(c.pending_len(), 0);
+            let mut call = Box::pin(c.call("/example.Echo/Echo", vec![], 5000));
+            assert!(futures_util::poll!(&mut call).is_pending());
+            c.close().await;
+            assert!(tokio::time::timeout(Duration::from_secs(1), call)
+                .await
+                .unwrap()
+                .is_err());
+            assert_eq!(c.pending_len(), 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn queued_handshake_is_bounded_by_its_deadline() {
+        let (c, mut writer) = Initiator::new(ConnectionConfig {
+            writer_capacity: 1,
+            handshake_timeout: Duration::from_millis(10),
+            ..ConnectionConfig::default()
+        });
+        c.conn.shared.writer.try_send(vec![0]).unwrap();
+        let result = tokio::time::timeout(Duration::from_secs(1), c.handshake(vec![]))
+            .await
+            .unwrap();
+        assert!(matches!(result, Err(SyntraError::DeadlineExceeded(_))));
+        assert!(c.is_closed());
+        assert_eq!(writer.try_recv().unwrap(), vec![0]);
+        assert!(writer.try_recv().is_err());
+    }
 
     async fn test_conn() -> (Initiator, mpsc::Receiver<Vec<u8>>) {
         let (c, wrx) = Initiator::new(ConnectionConfig::default());

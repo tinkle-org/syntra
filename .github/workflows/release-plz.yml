@@ -1,10 +1,8 @@
 name: release-plz
 
-# Production-grade release-plz flow: on every push to main, keep a Release PR
-# up to date (version bumps + changelog). When that PR is approved and merged,
-# the next run publishes unpublished crates to crates.io, cuts per-package
-# tags (<name>-vX.Y.Z), and creates GitHub Releases. Native artifacts and Go
-# proxy warmup attach in release.yml on release published.
+# Publish Rust crates with per-package tags, then call the artifact workflow
+# directly for syntra-core (the schema/Go release anchor). GITHUB_TOKEN-created
+# tag/release events do not trigger another workflow.
 #
 # Auth: crates.io Trusted Publishing (OIDC) preferred, CARGO_REGISTRY_TOKEN
 # fallback for bootstrap. New crates must be published manually once before
@@ -16,6 +14,9 @@ on:
 
 permissions: {}
 
+# Whole-run serialization is intentional: concurrent pushes to main must not
+# publish crates or open competing Release PRs in parallel. Scoping this to
+# the PR job only would let release jobs race; keep the top-level group.
 concurrency:
   group: release-plz-${{ github.ref }}
   cancel-in-progress: false
@@ -24,7 +25,11 @@ jobs:
   release-plz-release:
     name: Publish crates and create GitHub Release
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'tinklehq'
+    if: github.repository == 'tinklehq/syntra'
+    outputs:
+      schema_tag: ${{ steps.schema.outputs.tag }}
+    env:
+      REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     permissions:
       contents: write
       pull-requests: read
@@ -39,27 +44,42 @@ jobs:
           toolchain: "1.88"
       - name: Authenticate to crates.io (Trusted Publishing)
         id: auth
-        if: ${{ secrets.CARGO_REGISTRY_TOKEN == '' }}
+        if: env.REGISTRY_TOKEN == ''
         uses: rust-lang/crates-io-auth-action@v1
       - name: Run release-plz release
+        id: release
         uses: release-plz/action@v0.5
         with:
           command: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
+      - name: Select schema release
+        id: schema
+        env:
+          RELEASES: ${{ steps.release.outputs.releases }}
+        run: |
+          set -euo pipefail
+          TAG="$(jq -er '[.[] | select(.package_name == "syntra-core") | .tag] | if length == 0 then "" elif length == 1 then .[0] else error("duplicate syntra-core releases") end' <<< "$RELEASES")"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  release-artifacts:
+    needs: release-plz-release
+    if: needs.release-plz-release.outputs.schema_tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.release-plz-release.outputs.schema_tag }}
 
   release-plz-pr:
     name: Open or update the release PR
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'tinklehq'
+    if: github.repository == 'tinklehq/syntra'
     needs: release-plz-release
     permissions:
       contents: write
       pull-requests: write
-    concurrency:
-      group: release-plz-${{ github.ref }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:

@@ -9,10 +9,11 @@
 // LoopbackPair provides an in-memory Transport for tests and embedding.
 //
 // Both Client and Host delegate state (handshake machine, correlation,
-// timers) to a core selected at build time: the Rust-backed CGO core
-// with -tags syntranative (native.go) or the pure-Go core otherwise
-// (native_purego.go). Behavior is identical; NativeAvailable reports
-// which core is linked.
+// timers) to the supported pure-Go core (native_purego.go) in default
+// builds. The syntranative adapter (native.go) is unsupported: its
+// proposed syntra_ffi_* ABI is incompatible with the current
+// crates/syntra-ffi exports, so Release-built libraries cannot enable it.
+// NativeAvailable reports which core is linked (false in supported builds).
 //
 // Context deadlines and cancellation: every blocking call honors ctx.
 // Call derives the wire timeout_ms budget as the minimum of the
@@ -178,11 +179,47 @@ func StaticPolicy(principal string, allowEmpty bool) CredentialPolicy {
 // (nil, nil) is a handler bug and is reported as INTERNAL.
 type HandlerFunc func(ctx context.Context, req *RpcRequest) (*RpcResult, error)
 
+// AuthorizeFunc is the optional host-owned per-method policy, evaluated
+// for every RPC using the connection's bound principal, before handler
+// effects. Implementations must be nonblocking and may re-check
+// expiry/revocation here. A nil Authorize preserves the legacy
+// allow-everything behavior for backward compatibility; set it explicitly
+// for parity with the Rust Host, whose Handler::authorize default is
+// fail-closed deny. Divergence tracking: nil (Go allow) vs default-deny
+// (Rust) is intentional until callers opt into an explicit policy; pass
+// DenyAllAuthorize to match the Rust default, or a principal-aware func
+// to allow selected methods. Only generic Unauthenticated
+// ("syntra: credential not accepted") and PermissionDenied
+// ("syntra: access denied") codes/messages reach the wire, so policy
+// internals never leak (SNTR-ERR-003).
+type AuthorizeFunc func(ctx context.Context, principal string, method string) error
+
+// DenyAllAuthorize matches the Rust Handler::authorize fail-closed default:
+// every RPC is denied with generic PermissionDenied. Wrap or replace with
+// a principal-aware policy to allow selected methods.
+func DenyAllAuthorize(ctx context.Context, principal string, method string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return NewRpcError(ErrorCodePermissionDenied, "syntra: access denied")
+}
+
+// AllowAllAuthorize documents an explicit opt-in to the legacy permissive
+// posture (every bound principal may invoke every method). It exists so
+// call sites can state the allow-all choice instead of leaving
+// HostConfig.Authorize nil by accident.
+func AllowAllAuthorize(ctx context.Context, principal string, method string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // clientCore owns initiator-side session state: handshake progress,
-// correlation, timers, and notification queue. Implementations are the
-// Rust-backed CGO core (native.go) or the pure-Go core
-// (native_purego.go). All methods except close are invalid after close
-// reports, and report FailedPrecondition once closed.
+// correlation, timers, and notification queue. The supported
+// implementation is the pure-Go core (native_purego.go); the syntranative
+// adapter (native.go) is unsupported. All methods except close are invalid
+// after close reports, and report FailedPrecondition once closed.
 type clientCore interface {
 	// helloFrame returns the hello frame to transmit. It fails closed on
 	// invalid config (empty version range, oversize credential).
@@ -268,8 +305,9 @@ type activatedReady struct {
 }
 
 // activateFrame validates one inbound ServerReady frame against the
-// proposed range and returns the selected version. Shared by both cores
-// so handshake acceptance is identical with and without native.
+// proposed range and returns the selected version. Shared handshake
+// acceptance for the supported pure-Go core (the syntranative adapter is
+// unsupported).
 func activateFrame(frame []byte, minVersion, maxVersion uint32) (*activatedReady, error) {
 	f, err := UnmarshalFrame(frame)
 	if err != nil {
@@ -478,6 +516,8 @@ func (c *Client) failWaitersLocked(code ErrorCode, msg string) {
 
 // handshake performs the hello/ready exchange on t.
 func (c *Client) handshake(ctx context.Context, t Transport) (*ServerReady, error) {
+	ctx, stop := context.WithTimeout(ctx, sessionHandshakeTimeout)
+	defer stop()
 	hello, err := c.core.helloFrame()
 	if err != nil {
 		return nil, err
@@ -510,7 +550,8 @@ func (c *Client) handshake(ctx context.Context, t Transport) (*ServerReady, erro
 // returns nil only on a clean shutdown (Close or ctx end with no
 // outstanding violation); transport and protocol failures are returned.
 // Call Run once per Client in its own goroutine; concurrent Calls share
-// the pump.
+// the pump. The handshake has a five-second deadline, shortened by ctx;
+// that deadline does not limit the activated connection's lifetime.
 func (c *Client) Run(ctx context.Context, t Transport) error {
 	if c == nil {
 		return NewRpcError(ErrorCodeInternal, "syntra: nil client")
@@ -586,6 +627,16 @@ type recvResult struct {
 // pumpTick bounds deadline granularity for calls whose budget expires
 // while no frames arrive. Reaping is idempotent and cheap on both cores.
 const pumpTick = 10 * time.Millisecond
+
+// The entire hello/policy/ready exchange shares one five-second budget
+// (SNTR-HS-011), shortened by the caller's deadline or cancellation. It
+// never becomes the lifetime context of an activated connection.
+const sessionHandshakeTimeout = 5 * time.Second
+
+// Go cannot forcibly interrupt host callbacks. Teardown signals all
+// handlers and drains completions for this grace period before abandoning
+// callbacks that ignore their contexts. No waiter goroutine is left behind.
+const handlerShutdownGrace = time.Second
 
 // pump routes inbound frames to call waiters and the notification
 // stream, and reaps expired calls on a tick so budgets fire even when
@@ -886,6 +937,7 @@ type resolvedHostConfig struct {
 	maxVersion uint32
 	policy     CredentialPolicy
 	handler    HandlerFunc
+	authorize  AuthorizeFunc
 	timeout    time.Duration
 	maxPending int
 }
@@ -904,6 +956,12 @@ type HostConfig struct {
 	// Handler dispatches validated requests. Nil answers every request
 	// UNIMPLEMENTED (no method is known).
 	Handler HandlerFunc
+	// Authorize is the optional per-method policy evaluated with the
+	// bound principal before handler effects. Nil preserves the legacy
+	// allow-everything behavior for backward compatibility and diverges
+	// from the Rust Host fail-closed default; set DenyAllAuthorize to
+	// match Rust, or a principal-aware func to allow selected methods.
+	Authorize AuthorizeFunc
 	// DefaultTimeout applies when a request passes timeoutMs zero. Zero
 	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
 	DefaultTimeout time.Duration
@@ -919,6 +977,7 @@ func resolveHostConfig(cfg HostConfig) (resolvedHostConfig, error) {
 		maxVersion: cfg.MaxVersion,
 		policy:     cfg.Policy,
 		handler:    cfg.Handler,
+		authorize:  cfg.Authorize,
 		timeout:    cfg.DefaultTimeout,
 		maxPending: cfg.MaxConcurrent,
 	}
@@ -964,9 +1023,13 @@ type Host struct {
 // wake signals the serve pump that queued outbound frames (expiry
 // results, broadcasts) are ready even when no inbound frame arrived.
 type hostConn struct {
-	core    hostCore
-	cancels map[uint64]*callCancel
-	wake    chan struct{}
+	core      hostCore
+	cancels   map[uint64]*callCancel
+	wake      chan struct{}
+	stop      context.CancelFunc // registered before Close can observe this connection
+	completed chan *callCancel   // bounded by maxPending, including abandoned workers
+	workers   int                // Serve-owned; released only when the callback actually returns
+	principal string             // bound at handshake; used by Authorize before handler effects
 }
 
 // callCancel is the abandon handle for one in-flight handler. It is a
@@ -974,7 +1037,9 @@ type hostConn struct {
 // newer entry reusing the same request ID (functions are not comparable
 // in Go; pointers are).
 type callCancel struct {
-	stop context.CancelFunc
+	stop   context.CancelFunc
+	id     uint64
+	result chan *RpcResult // one completion; publish before notifying Serve
 }
 
 // OpenHost creates a responder session factory. It validates the config
@@ -993,9 +1058,21 @@ func OpenHost(cfg HostConfig) (*Host, error) {
 // close), then validated dispatch until ctx ends, the transport fails, a
 // fatal protocol violation arrives, or the Host closes. Unknown methods
 // answer UNIMPLEMENTED; handler failures answer their mapped code; the
-// connection stays usable. ctx end cancels in-flight handlers and closes
-// the connection. Serve returns nil on a clean handshake-completed close
-// and the fatal error otherwise.
+// connection stays usable. When HostConfig.Authorize is set it is checked
+// with the bound principal before handler effects on every call; denials
+// answer generic Unauthenticated/PermissionDenied and the connection stays
+// usable. A nil Authorize preserves the legacy allow-everything behavior
+// (divergent from the Rust fail-closed default; see AuthorizeFunc). ctx
+// end cancels in-flight handlers and closes the connection. Serve returns
+// nil on a clean handshake-completed close and the fatal error otherwise.
+// The entire handshake, including Policy, has a five-second deadline
+// shortened by ctx. Policy and Transport must honor their contexts.
+// Transport.Recv MUST return promptly when its context ends; teardown
+// waits at most handlerShutdownGrace for a violating Recv before
+// abandoning the pump (the leaked Recv goroutine exits when Recv finally
+// returns). On teardown Serve cancels callbacks and drains completions
+// for up to one second; callbacks that ignore cancellation cannot send a
+// late result or access the closed connection core.
 func (h *Host) Serve(ctx context.Context, t Transport) error {
 	if h == nil {
 		return NewRpcError(ErrorCodeInternal, "syntra: nil host")
@@ -1011,7 +1088,12 @@ func (h *Host) Serve(ctx context.Context, t Transport) error {
 	if err != nil {
 		return err
 	}
-	hc := &hostConn{core: core, cancels: make(map[uint64]*callCancel), wake: make(chan struct{}, 1)}
+	serveCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	hc := &hostConn{
+		core: core, cancels: make(map[uint64]*callCancel), wake: make(chan struct{}, 1),
+		stop: stop, completed: make(chan *callCancel, h.cfg.maxPending),
+	}
 	h.mu.Lock()
 	if h.closed {
 		h.mu.Unlock()
@@ -1021,14 +1103,14 @@ func (h *Host) Serve(ctx context.Context, t Transport) error {
 	h.conns[hc] = struct{}{}
 	h.mu.Unlock()
 	defer func() {
+		stop()
+		h.cancelHandlers(hc, nil, true)
+		h.drainHandlers(hc)
 		h.mu.Lock()
 		delete(h.conns, hc)
 		h.mu.Unlock()
 		_ = core.close()
 	}()
-
-	serveCtx, stop := context.WithCancel(ctx)
-	defer stop()
 
 	if err := h.serveHandshake(serveCtx, t, hc); err != nil {
 		return err
@@ -1038,10 +1120,12 @@ func (h *Host) Serve(ctx context.Context, t Transport) error {
 
 // serveHandshake runs the hello/policy/ready exchange.
 func (h *Host) serveHandshake(ctx context.Context, t Transport, hc *hostConn) error {
+	ctx, stop := context.WithTimeout(ctx, sessionHandshakeTimeout)
+	defer stop()
 	raw, err := t.Recv(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return ctx.Err()
+			return err
 		}
 		return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: handshake recv: %v", err))
 	}
@@ -1059,6 +1143,9 @@ func (h *Host) serveHandshake(ctx context.Context, t Transport, hc *hostConn) er
 		return NewRpcError(ErrorCodeUnauthenticated, "syntra: no credential policy configured")
 	}
 	principal, perr := policy(ctx, hello.GetHello().GetCredential())
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if perr != nil {
 		var rerr *RpcError
 		if errors.As(perr, &rerr) {
@@ -1070,9 +1157,10 @@ func (h *Host) serveHandshake(ctx context.Context, t Transport, hc *hostConn) er
 	if aerr != nil {
 		return aerr
 	}
+	hc.principal = principal
 	if serr := t.Send(ctx, readyFrame); serr != nil {
 		if errors.Is(serr, context.Canceled) || errors.Is(serr, context.DeadlineExceeded) {
-			return ctx.Err()
+			return serr
 		}
 		return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: handshake send: %v", serr))
 	}
@@ -1088,17 +1176,25 @@ func (h *Host) serveLoop(ctx context.Context, t Transport, hc *hostConn) error {
 	if err := h.flush(ctx, t, hc); err != nil {
 		return err
 	}
-	pumpCtx, pumpStop := context.WithCancel(context.Background())
-	defer pumpStop()
-	go func() {
+	pumpCtx, pumpStop := context.WithCancel(ctx)
+	recvCh := make(chan recvResult, 1)
+	recvDone := make(chan struct{})
+	defer func() {
+		pumpStop()
+		// Bound teardown: a conforming Transport.Recv returns promptly on
+		// pumpCtx cancellation and this resolves immediately. A Recv that
+		// violates its context contract must not hang Serve forever, so
+		// wait at most the handler drain grace (1s, consistent with
+		// handlerShutdownGrace) before abandoning the pump. The abandoned
+		// Recv goroutine exits when Recv finally returns; it never touches
+		// the closed core or caller transport afterwards.
 		select {
-		case <-ctx.Done():
-			pumpStop()
-		case <-pumpCtx.Done():
+		case <-recvDone:
+		case <-time.After(handlerShutdownGrace):
 		}
 	}()
-	recvCh := make(chan recvResult, 1)
 	go func() {
+		defer close(recvDone)
 		for {
 			raw, err := t.Recv(pumpCtx)
 			select {
@@ -1118,6 +1214,11 @@ func (h *Host) serveLoop(ctx context.Context, t Transport, hc *hostConn) error {
 		case <-ctx.Done():
 			h.cancelHandlers(hc, nil, true)
 			return nil
+		case cc := <-hc.completed:
+			hc.workers--
+			if err := h.finishReadyHandler(ctx, t, hc, cc); err != nil {
+				return err
+			}
 		case <-hc.wake:
 			if err := h.flush(ctx, t, hc); err != nil {
 				h.cancelHandlers(hc, nil, true)
@@ -1150,7 +1251,9 @@ func (h *Host) serveLoop(ctx context.Context, t Transport, hc *hostConn) error {
 				return fatal
 			}
 			for _, id := range cancelIDs {
-				h.cancelHandler(hc, id)
+				if err := h.cancelHandler(ctx, t, hc, id); err != nil {
+					return err
+				}
 			}
 			for _, resp := range responses {
 				if serr := t.Send(ctx, resp); serr != nil {
@@ -1166,7 +1269,9 @@ func (h *Host) serveLoop(ctx context.Context, t Transport, hc *hostConn) error {
 				if !ok {
 					break
 				}
-				h.dispatch(ctx, t, hc, id, req)
+				if err := h.dispatch(ctx, t, hc, id, req); err != nil {
+					return err
+				}
 			}
 			h.reapHandlers(ctx, hc)
 			if err := h.flush(ctx, t, hc); err != nil {
@@ -1187,54 +1292,68 @@ func validSuccess(res *RpcResult) bool {
 	return ok
 }
 
-// dispatch runs one validated request on the handler with the effective
-// budget and answers exactly once. Completion wins over a concurrent
-// cancel or budget expiry: a handler that returns success delivers
-// success; a handler that abandons after cancel answers CANCELLED; a
-// handler still running at budget expiry answers DEADLINE_EXCEEDED.
-func (h *Host) dispatch(ctx context.Context, t Transport, hc *hostConn, id uint64, req *RpcRequest) {
+// dispatch runs at most maxPending callbacks per connection, including
+// callbacks still running after a terminal cancel/deadline. Only Serve
+// touches the core or sends results; workers publish one bounded completion.
+func (h *Host) dispatch(ctx context.Context, t Transport, hc *hostConn, id uint64, req *RpcRequest) error {
+	// Consume available completions before rejecting a new worker. A
+	// cancelled, non-cooperative callback does NOT free a worker slot.
+drain:
+	for {
+		select {
+		case cc := <-hc.completed:
+			hc.workers--
+			if err := h.finishReadyHandler(ctx, t, hc, cc); err != nil {
+				return err
+			}
+		default:
+			break drain
+		}
+	}
+	if hc.workers >= h.cfg.maxPending {
+		return h.answer(ctx, t, hc, id, NewWireErrorResult(ErrorCodeResourceExhausted, "syntra: too many running handlers"))
+	}
 	budget := h.cfg.timeout
 	if req.GetTimeoutMs() > 0 {
 		budget = time.Duration(req.GetTimeoutMs()) * time.Millisecond
 	}
 	hctx, stop := context.WithTimeout(ctx, budget)
-	cc := &callCancel{stop: stop}
+	cc := &callCancel{stop: stop, id: id, result: make(chan *RpcResult, 1)}
 	h.mu.Lock()
 	hc.cancels[id] = cc
 	h.mu.Unlock()
+	hc.workers++
+	authorize := h.cfg.authorize
+	principal := hc.principal
+	method := req.GetMethod()
 	go func() {
-		defer func() {
-			h.mu.Lock()
-			if cur, ok := hc.cancels[id]; ok && cur == cc {
-				delete(hc.cancels, id)
-			}
-			h.mu.Unlock()
-			stop()
-		}()
 		handler := h.cfg.handler
 		var out *RpcResult
-		if handler == nil {
-			out = NewWireErrorResult(ErrorCodeUnimplemented, "syntra: unknown method")
-		} else {
-			res, herr := handler(hctx, req)
-			if ctx.Err() != nil {
-				// The connection is going away; drop the outcome.
-				// In-flight correlation is reaped on teardown.
-				return
-			}
-			if hctx.Err() != nil && !validSuccess(res) {
-				// The per-call budget fired or the peer cancelled
-				// while the handler ran, and the handler did not win
-				// the race with a success. CANCELLED when the peer
-				// asked; otherwise the budget owns the outcome
-				// (SNTR-RPC-004/005).
-				if hc.core.isCancelled(id) {
-					out = NewWireErrorResult(ErrorCodeCancelled, "syntra: cancelled")
+		if authorize != nil {
+			if aerr := authorize(hctx, principal, method); aerr != nil {
+				if hctx.Err() != nil {
+					out = NewWireErrorResult(mapContextErr(hctx.Err()).Code, "syntra: handler context ended")
 				} else {
-					out = NewWireErrorResult(ErrorCodeDeadlineExceeded, "syntra: deadline exceeded")
+					var rerr *RpcError
+					if errors.As(aerr, &rerr) && rerr.Code == ErrorCodeUnauthenticated {
+						out = NewWireErrorResult(ErrorCodeUnauthenticated, "syntra: credential not accepted")
+					} else {
+						// Generic deny without oracle: policy internals
+						// never reach the wire (SNTR-ERR-003), mirroring
+						// the Rust Host sanitization.
+						out = NewWireErrorResult(ErrorCodePermissionDenied, "syntra: access denied")
+					}
 				}
+			}
+		}
+		if out == nil {
+			if handler == nil {
+				out = NewWireErrorResult(ErrorCodeUnimplemented, "syntra: unknown method")
 			} else {
+				res, herr := handler(hctx, req)
 				switch {
+				case hctx.Err() != nil && !validSuccess(res):
+					out = NewWireErrorResult(mapContextErr(hctx.Err()).Code, "syntra: handler context ended")
 				case herr != nil:
 					var rerr *RpcError
 					if errors.As(herr, &rerr) {
@@ -1243,53 +1362,63 @@ func (h *Host) dispatch(ctx context.Context, t Transport, hc *hostConn, id uint6
 						out = NewWireErrorResult(ErrorCodeInternal, "syntra: internal error")
 					}
 				case validSuccess(res):
-					// Completion wins, even against a concurrent
-					// cancel or budget expiry (SNTR-RPC-005/031).
 					out = res
-				case res != nil:
-					out = NewWireErrorResult(ErrorCodeInternal, "syntra: internal error")
 				default:
 					out = NewWireErrorResult(ErrorCodeInternal, "syntra: internal error")
 				}
 			}
 		}
-		resp, expired, aerr := hc.core.answer(id, out)
-		if aerr != nil || expired {
-			// Expired answers were already replaced by an automatic
-			// DEADLINE_EXCEEDED result; validation failures here are
-			// core bugs that must not kill the connection pump.
-			h.flushDetached(ctx, t, hc)
-			return
-		}
-		h.sendDetached(ctx, t, hc, resp)
+		cc.result <- out
+		stop()
+		// Capacity covers ALL admitted callbacks, even if Serve has
+		// finished its bounded shutdown drain. This never blocks a late
+		// worker or lets it access a destroyed core/caller-owned transport.
+		hc.completed <- cc
 	}()
+	return nil
 }
 
-// sendDetached transmits one frame from a handler goroutine. Transport
-// implementations MUST be safe for concurrent Send; loopback and the
-// socket adapters this binding targets are.
-func (h *Host) sendDetached(ctx context.Context, t Transport, hc *hostConn, frame []byte) {
-	if len(frame) == 0 {
-		return
+// finishReadyHandler commits a published completion only while this exact
+// callback still owns its ID. Late callbacks cannot answer a reused ID.
+func (h *Host) finishReadyHandler(ctx context.Context, t Transport, hc *hostConn, cc *callCancel) error {
+	h.mu.Lock()
+	current := hc.cancels[cc.id] == cc
+	h.mu.Unlock()
+	if !current {
+		return nil
 	}
-	_ = t.Send(ctx, frame)
-	h.flushDetached(ctx, t, hc)
+	select {
+	case out := <-cc.result:
+		h.mu.Lock()
+		delete(hc.cancels, cc.id)
+		h.mu.Unlock()
+		cc.stop()
+		return h.answer(ctx, t, hc, cc.id, out)
+	default:
+		return nil
+	}
 }
 
-// flushDetached drains queued outbound frames after an async answer.
-func (h *Host) flushDetached(ctx context.Context, t Transport, hc *hostConn) {
-	for {
-		frame, ok := hc.core.nextOutbound()
-		if !ok {
-			return
-		}
-		if len(frame) == 0 {
-			continue
-		}
+func (h *Host) answer(ctx context.Context, t Transport, hc *hostConn, id uint64, out *RpcResult) error {
+	frame, expired, err := hc.core.answer(id, out)
+	if err != nil {
+		return err
+	}
+	if !expired && len(frame) > 0 {
 		if err := t.Send(ctx, frame); err != nil {
-			return
+			return hostSendError(ctx, err)
 		}
 	}
+	return h.flush(ctx, t, hc)
+}
+
+// A transport-local cancellation/deadline is a failed write unless the
+// connection's own context ended. Never swallow it and keep reading.
+func hostSendError(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return nil
+	}
+	return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: send: %v", err))
 }
 
 // flush drains queued outbound frames on the serve pump.
@@ -1303,10 +1432,7 @@ func (h *Host) flush(ctx context.Context, t Transport, hc *hostConn) error {
 			continue
 		}
 		if err := t.Send(ctx, frame); err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return nil
-			}
-			return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: send: %v", err))
+			return hostSendError(ctx, err)
 		}
 	}
 }
@@ -1318,13 +1444,45 @@ func (h *Host) reapHandlers(_ context.Context, hc *hostConn) {
 	h.cancelHandlers(hc, expired, false)
 }
 
-// cancelHandler abandons one handler after a peer cancel.
-func (h *Host) cancelHandler(hc *hostConn, id uint64) {
+// cancelHandler commits CANCELLED without waiting for host code to
+// cooperate. A completion already published at this decision wins.
+func (h *Host) cancelHandler(ctx context.Context, t Transport, hc *hostConn, id uint64) error {
 	h.mu.Lock()
 	cc, ok := hc.cancels[id]
 	h.mu.Unlock()
-	if ok {
-		cc.stop()
+	if !ok {
+		return nil
+	}
+	if err := h.finishReadyHandler(ctx, t, hc, cc); err != nil {
+		return err
+	}
+	h.mu.Lock()
+	current := hc.cancels[id] == cc
+	delete(hc.cancels, id)
+	h.mu.Unlock()
+	if !current {
+		return nil
+	}
+	cc.stop()
+	return h.answer(ctx, t, hc, id, NewWireErrorResult(ErrorCodeCancelled, "syntra: cancelled"))
+}
+
+// drainHandlers joins cooperative callbacks without an unbounded wait on
+// non-cooperative application code. Late completions fit in completed and
+// cannot call into the core after Serve closes it.
+func (h *Host) drainHandlers(hc *hostConn) {
+	if hc.workers == 0 {
+		return
+	}
+	timer := time.NewTimer(handlerShutdownGrace)
+	defer timer.Stop()
+	for hc.workers > 0 {
+		select {
+		case <-hc.completed:
+			hc.workers--
+		case <-timer.C:
+			return
+		}
 	}
 }
 
@@ -1383,7 +1541,8 @@ func (h *Host) NotifyAll(payload []byte) error {
 // Close releases the factory: new Serve calls fail fast and served
 // connections are abandoned (their handlers observe ctx cancellation via
 // the Serve ctx, and transports stay owned by their callers). A second
-// Close reports FailedPrecondition.
+// Close reports FailedPrecondition. Close signals shutdown without waiting;
+// callers join their Serve calls to await the bounded callback drain.
 func (h *Host) Close() error {
 	if h == nil {
 		return NewRpcError(ErrorCodeInternal, "syntra: nil host")
@@ -1394,6 +1553,9 @@ func (h *Host) Close() error {
 		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: host already closed")
 	}
 	h.closed = true
+	for hc := range h.conns {
+		hc.stop()
+	}
 	h.mu.Unlock()
 	return nil
 }

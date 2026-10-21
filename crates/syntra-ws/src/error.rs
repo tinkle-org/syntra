@@ -43,14 +43,23 @@ impl TransportError {
                 code: ErrorCode::FailedPrecondition,
                 message: m.clone(),
             },
-            Self::Tls(m) => SyntraError::Handshake {
-                code: ErrorCode::Unauthenticated,
-                message: format!("tls failure: {m}"),
-            },
+            // TLS endpoint validation precedes Syntra authentication. A TLS
+            // failure is not rejection of ClientHello.credential.
+            Self::Tls(m) => SyntraError::Unavailable(format!("tls failure: {m}")),
             Self::TooBig => SyntraError::ResourceExhausted("message too big".to_string()),
             Self::UpgradeRejected(m) | Self::Connect(m) => SyntraError::Unavailable(m.clone()),
             Self::Closed(m) => SyntraError::Closed(m.clone()),
             Self::Io(m) => SyntraError::Transport(m.clone()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn tls_failure_is_unavailable_not_syntra_authentication() {
+        let error = super::TransportError::Tls("certificate rejected".into()).to_syntra_error();
+        assert_eq!(error.code(), syntra_core::ErrorCode::Unavailable);
+        assert!(!matches!(error, syntra_core::SyntraError::Handshake { .. }));
     }
 }

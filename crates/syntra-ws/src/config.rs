@@ -8,6 +8,8 @@ pub struct WsConfig {
     /// Full URL, e.g. `wss://gateway.example.com/syntra/v1/ws`.
     /// The path MUST be `/syntra/v1/ws` (case-sensitive, no trailing slash
     /// variant unless the deployment documents aliasing).
+    /// Query strings (including empty ones) are not supported; credentials
+    /// belong only in `ClientHello.credential`, never in the Upgrade target.
     pub url: String,
     /// When false (default), only `wss://` is accepted. Set true only for
     /// loopback endpoints (`ws://127.0.0.1/...`); production
@@ -15,7 +17,8 @@ pub struct WsConfig {
     pub allow_insecure: bool,
     /// Expected host for TLS hostname verification is derived from the URL;
     /// this override exists only for tests with custom resolvers and
-    /// changes the `Host` header the client sends.
+    /// changes only the `Host` authority the native client sends (include
+    /// the port when needed). It does NOT override SNI or TLS verification.
     pub sni_override: Option<String>,
     /// TCP + TLS + WS Upgrade timeout.
     pub connect_timeout: Duration,
@@ -74,6 +77,14 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
+    /// HTTP Host authority, preserving IPv6 brackets and non-default ports.
+    pub fn authority(&self) -> String {
+        match self.port {
+            Some(port) => format!("{}:{port}", self.host),
+            None => self.host.clone(),
+        }
+    }
+
     pub fn parse(
         url_str: &str,
         allow_insecure: bool,
@@ -86,9 +97,9 @@ impl Endpoint {
                 "credentials must not appear in the URL".to_string(),
             ));
         }
-        if url.query().map(looks_like_secret).unwrap_or(false) {
+        if url.query().is_some() {
             return Err(crate::error::TransportError::InvalidUrl(
-                "query must not carry credential patterns".to_string(),
+                "query strings are not supported".to_string(),
             ));
         }
         let scheme = url.scheme().to_string();
@@ -138,11 +149,6 @@ impl Endpoint {
     }
 }
 
-fn looks_like_secret(q: &str) -> bool {
-    let l = q.to_ascii_lowercase();
-    l.contains("token") || l.contains("credential") || l.contains("auth") || l.contains("secret")
-}
-
 fn is_loopback(host: url::Host<&str>) -> bool {
     match host {
         url::Host::Domain(name) => name == "localhost",
@@ -151,14 +157,81 @@ fn is_loopback(host: url::Host<&str>) -> bool {
     }
 }
 
+/// Browser establishment has its own budget, before the Syntra handshake
+/// timer exists. Dropping ws_stream_wasm's connect future cancels the socket
+/// attempt and unregisters its callbacks (the library's cancellation guard).
+#[cfg(any(target_arch = "wasm32", test))]
+pub(crate) async fn connect_with_timeout<T>(
+    connect: impl std::future::Future<Output = Result<T, crate::TransportError>>,
+    timeout: Duration,
+) -> Result<T, crate::TransportError> {
+    tokio::select! {
+        biased;
+        result = connect => result,
+        _ = syntra_runtime::sleep_for(timeout) => Err(crate::TransportError::Connect("ws connect timed out".into())),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn connect_deadline_cancels_pending_establishment() {
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+        struct Dropped(Arc<AtomicBool>);
+        impl Drop for Dropped {
+            fn drop(&mut self) {
+                self.0.store(true, Ordering::SeqCst);
+            }
+        }
+        let dropped = Arc::new(AtomicBool::new(false));
+        let guard = Dropped(dropped.clone());
+        let attempt = async move {
+            let _guard = guard;
+            std::future::pending::<Result<(), crate::TransportError>>().await
+        };
+        let result = connect_with_timeout(attempt, Duration::from_millis(10)).await;
+        assert!(matches!(result, Err(crate::TransportError::Connect(_))));
+        assert!(
+            dropped.load(Ordering::SeqCst),
+            "attempt must be dropped, not detached"
+        );
+    }
+
+    #[tokio::test]
+    async fn completed_establishment_wins_deadline_tie() {
+        assert!(connect_with_timeout(async { Ok(()) }, Duration::ZERO)
+            .await
+            .is_ok());
+    }
 
     #[test]
     fn rejects_credentials_in_url() {
         assert!(Endpoint::parse("wss://user:pass@h/syntra/v1/ws", false).is_err());
         assert!(Endpoint::parse("wss://h/syntra/v1/ws?token=abc", false).is_err());
+    }
+
+    #[test]
+    fn rejects_every_query_including_encoded_keys_and_empty_queries() {
+        for query in [
+            "?%74oken=x",
+            "?key=x",
+            "?x=secret-value",
+            "?",
+            "?harmless=1",
+        ] {
+            assert!(
+                matches!(
+                    Endpoint::parse(&format!("wss://h/syntra/v1/ws{query}"), false),
+                    Err(crate::TransportError::InvalidUrl(_))
+                ),
+                "query must be rejected: {query}"
+            );
+        }
     }
 
     #[test]
@@ -168,6 +241,18 @@ mod tests {
         assert!(Endpoint::parse("ws://h/syntra/v1/ws", false).is_err());
         assert!(Endpoint::parse("ws://127.0.0.1/syntra/v1/ws", true).is_ok());
         assert!(Endpoint::parse("https://h/syntra/v1/ws", false).is_err());
+    }
+
+    #[test]
+    fn authority_preserves_non_default_ports_and_ipv6_brackets() {
+        for (url, authority) in [
+            ("wss://example.com:8443/syntra/v1/ws", "example.com:8443"),
+            ("ws://[::1]:8080/syntra/v1/ws", "[::1]:8080"),
+            ("wss://[::1]/syntra/v1/ws", "[::1]"),
+            ("wss://example.com:443/syntra/v1/ws", "example.com"),
+        ] {
+            assert_eq!(Endpoint::parse(url, true).unwrap().authority(), authority);
+        }
     }
 
     #[test]

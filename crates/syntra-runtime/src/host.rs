@@ -50,8 +50,9 @@ use syntra_core::{
 
 use crate::connection::{
     fill_random, sleep_until, spawn_task, Connection, ConnectionConfig, Role, Shared, TaskHandle,
+    SHUTDOWN_GRACE,
 };
-use crate::session::{AuthError, Authenticator, Session, SessionManager};
+use crate::session::{AuthError, Authenticator, Principal, Session, SessionManager};
 
 /// Handler outcome for one dispatched RPC.
 #[derive(Debug, Clone)]
@@ -72,7 +73,32 @@ impl HandlerOutcome {
 /// Application handler: owns method semantics. Payloads are opaque bytes;
 /// the core never validates them. Handlers SHOULD honor `cancel` promptly
 /// but completion still wins races at the core layer.
+///
+/// Authorization is fail-closed by default: the provided `authorize`
+/// default denies every RPC with `PERMISSION_DENIED` (generic message, no
+/// oracle). This is a deliberate compatibility break for handlers written
+/// against the pre-policy trait, which only implemented `handle` and were
+/// implicitly permissive. Migration paths:
+/// - implement `authorize` with a principal-aware per-method policy
+///   (preferred for protected methods; must be nonblocking and may
+///   re-check expiry/revocation);
+/// - wrap a legacy permissive handler in [`AllowAll`] to restore the old
+///   allow behavior explicitly (tests, trusted embeds);
+/// - use [`FnHandler`] for closures, which remains allow-all by
+///   construction and is unchanged by this default.
+/// Only generic authentication/authorization codes and messages are
+/// exposed on the wire; policy internals must never leak.
 pub trait Handler: Send + Sync {
+    /// Host-owned per-method policy, evaluated for every RPC using the
+    /// connection's bound principal, before handler effects. Implementations
+    /// must be nonblocking and may re-check expiry/revocation here. The
+    /// default denies access (fail-closed); only generic
+    /// authentication/authorization codes and messages are exposed on the
+    /// wire.
+    fn authorize(&self, _principal: &Principal, _method: &str) -> Result<(), AuthError> {
+        Err(AuthError::denied())
+    }
+
     fn handle(
         &self,
         method: String,
@@ -83,7 +109,39 @@ pub trait Handler: Send + Sync {
 
 pub type HandlerFut = std::pin::Pin<Box<dyn std::future::Future<Output = HandlerOutcome> + Send>>;
 
-/// Blanket adapter so closures can serve as handlers in tests and embeds.
+/// Explicit opt-in allow-all wrapper for migration. Wrapping a legacy
+/// permissive `Handler` in `AllowAll` restores the pre-policy behavior
+/// (every bound principal may invoke every method) without changing the
+/// inner handler's method semantics. Prefer a principal-aware `authorize`
+/// implementation for protected methods; use this wrapper only for trusted
+/// tests/embeds where the allow-all posture is intentional and documented
+/// at the construction site.
+pub struct AllowAll<H>(pub H);
+
+impl<H> Handler for AllowAll<H>
+where
+    H: Handler,
+{
+    fn authorize(&self, _principal: &Principal, _method: &str) -> Result<(), AuthError> {
+        Ok(())
+    }
+
+    fn handle(
+        &self,
+        method: String,
+        payload: Vec<u8>,
+        cancel: crate::connection::CancelToken,
+    ) -> HandlerFut {
+        self.0.handle(method, payload, cancel)
+    }
+}
+
+/// Legacy allow-all adapter so closures can serve as handlers in tests and
+/// embeds. Constructing this adapter explicitly allows every bound principal
+/// (including anonymous) to invoke the closure. Behavior is unchanged by
+/// the fail-closed `Handler::authorize` default: `FnHandler` overrides
+/// `authorize` to allow. For protected methods use a
+/// `Handler` implementation with a principal-aware `authorize` policy instead.
 pub struct FnHandler<F>(pub F);
 
 impl<F, Fut> Handler for FnHandler<F>
@@ -91,6 +149,10 @@ where
     F: Fn(String, Vec<u8>, crate::connection::CancelToken) -> Fut + Send + Sync,
     Fut: std::future::Future<Output = HandlerOutcome> + Send + 'static,
 {
+    fn authorize(&self, _principal: &Principal, _method: &str) -> Result<(), AuthError> {
+        Ok(())
+    }
+
     fn handle(
         &self,
         method: String,
@@ -116,6 +178,7 @@ pub struct Host {
     inflight: Arc<Mutex<HashMap<u64, InflightEntry>>>,
     /// The `connection_id` bound by this connection's handshake, if any.
     bound_id: Mutex<Option<String>>,
+    handshake_task: Mutex<Option<TaskHandle>>,
 }
 
 impl Host {
@@ -153,24 +216,23 @@ impl Host {
             host_supported,
             inflight: Arc::new(Mutex::new(HashMap::new())),
             bound_id: Mutex::new(None),
+            handshake_task: Mutex::new(None),
         });
         // Handshake timer (SNTR-HS-002/011): ACTIVE or explicit close.
-        let timer_host = host.clone();
-        let timeout = config.handshake_timeout;
-        spawn_task(async move {
-            sleep_until(Instant::now() + timeout).await;
-            if timer_host.conn.state().await != ConnectionState::Active
-                && !timer_host.conn.is_closed()
-            {
-                timer_host
-                    .conn
-                    .fail_handshake_and_close(
-                        ErrorCode::DeadlineExceeded,
-                        "handshake timed out".to_string(),
-                    )
-                    .await;
+        let timer_conn = host.conn.clone();
+        let mut closed = timer_conn.subscribe_close();
+        let deadline = Instant::now() + config.handshake_timeout;
+        let task = spawn_task(async move {
+            tokio::select! {
+                biased;
+                _ = closed.changed() => {},
+                _ = sleep_until(deadline) => timer_conn.expire_handshake().await,
             }
         });
+        *host
+            .handshake_task
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some(task);
         (host, wrx)
     }
 
@@ -194,7 +256,10 @@ impl Host {
 
     /// Number of in-flight (accepted, unterminated) RPCs.
     pub fn inflight_len(&self) -> usize {
-        self.inflight.lock().unwrap().len()
+        self.inflight
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .len()
     }
 
     /// Ingest one transport unit (exactly one serialized `Frame`).
@@ -220,7 +285,7 @@ impl Host {
                 SyntraError::Protocol { code, message } => (code, message),
                 other => (other.code(), other.to_string()),
             };
-            self.conn.fail_handshake_and_close(code, message).await;
+            self.fail_handshake_and_close(code, message).await;
             return;
         }
         // ACTIVE-phase: a well-formed `request` that failed semantic
@@ -236,7 +301,7 @@ impl Host {
                         .conn
                         .transition(StateEvent::ProtocolViolationFatal)
                         .await;
-                    self.conn.close().await;
+                    self.close().await;
                     return;
                 }
                 _ => {}
@@ -247,7 +312,7 @@ impl Host {
                     .conn
                     .transition(StateEvent::ProtocolViolationFatal)
                     .await;
-                self.conn.close().await;
+                self.close().await;
                 return;
             }
             if let Some(Body::Request(_)) = &frame.body {
@@ -266,7 +331,7 @@ impl Host {
                     if code == ErrorCode::ResourceExhausted {
                         // Oversize envelope: connection-level exhaustion.
                         warn!("oversize envelope in ACTIVE; closing");
-                        self.conn.close().await;
+                        self.close().await;
                         return;
                     }
                 }
@@ -275,7 +340,7 @@ impl Host {
         // Any other ACTIVE-phase decode failure: count misbehavior;
         // close only on exhaustion or repeated abuse.
         if matches!(e.code(), ErrorCode::ResourceExhausted) {
-            self.conn.close().await;
+            self.close().await;
             return;
         }
         let n = self
@@ -286,7 +351,7 @@ impl Host {
         debug!(error = ?e, "ACTIVE decode failure");
         if n >= 8 {
             warn!("too many malformed frames; closing");
-            self.conn.close().await;
+            self.close().await;
         }
     }
 
@@ -367,20 +432,33 @@ impl Host {
                 .conn
                 .transition(StateEvent::ProtocolViolationFatal)
                 .await;
-            self.conn.close().await;
+            self.close().await;
         } else {
-            self.conn
-                .fail_handshake_and_close(code, message.to_string())
+            self.fail_handshake_and_close(code, message.to_string())
                 .await;
         }
     }
 
+    async fn fail_handshake_and_close(&self, code: ErrorCode, message: String) {
+        self.conn.fail_handshake_and_close(code, message).await;
+        self.unbind_session().await;
+        self.abort_inflight().await;
+        self.stop_handshake_timer().await;
+    }
+
     async fn on_hello(&self, frame_version: u32, hello: syntra_core::proto::ClientHello) {
-        let _ = frame_version;
+        if frame_version != hello.max_version {
+            self.fail_handshake_and_close(
+                ErrorCode::InvalidArgument,
+                "hello frame version must equal proposed maximum".to_string(),
+            )
+            .await;
+            return;
+        }
         // Shape BEFORE policy (SNTR-HS-030): range first...
         if let Err(e) = syntra_core::validate_hello_range(hello.min_version, hello.max_version) {
             let (code, message) = err_parts(e);
-            self.conn.fail_handshake_and_close(code, message).await;
+            self.fail_handshake_and_close(code, message).await;
             return;
         }
         // ...version selection (highest overlap) before any credential
@@ -393,28 +471,41 @@ impl Host {
             Ok(v) => v,
             Err(e) => {
                 let (code, message) = err_parts(e);
-                self.conn.fail_handshake_and_close(code, message).await;
+                self.fail_handshake_and_close(code, message).await;
                 return;
             }
         };
-        let _ = self.conn.transition(StateEvent::HelloSent).await;
-        let _ = self.conn.transition(StateEvent::VersionAccepted).await;
+        {
+            let mut state = self.conn.shared.state.write().await;
+            if *state != ConnectionState::Connected || self.conn.is_closed() {
+                drop(state);
+                self.protocol_violation(ErrorCode::FailedPrecondition, "unexpected hello")
+                    .await;
+                return;
+            }
+            let next = state
+                .transition(StateEvent::HelloSent)
+                .and_then(|s| s.transition(StateEvent::VersionAccepted));
+            let Ok(next) = next else {
+                return;
+            };
+            *state = next;
+        }
         // A live `connection_id` presented as a credential is rejected
         // outright (SNTR-SESS-002/020): it is a diagnostic, never auth.
         if credential_is_live_session(&self.sessions, &hello.credential) {
-            self.conn
-                .fail_handshake_and_close(
-                    ErrorCode::Unauthenticated,
-                    "credential not accepted".to_string(),
-                )
-                .await;
+            self.fail_handshake_and_close(
+                ErrorCode::Unauthenticated,
+                "credential not accepted".to_string(),
+            )
+            .await;
             return;
         }
         // ...then authentication (SNTR-HS-004).
         let principal = match self.auth.authenticate(&hello.credential) {
             Ok(p) => p,
             Err(AuthError { code, message }) => {
-                self.conn.fail_handshake_and_close(code, message).await;
+                self.fail_handshake_and_close(code, message).await;
                 return;
             }
         };
@@ -422,13 +513,10 @@ impl Host {
         let connection_id = match generate_connection_id() {
             Ok(id) => id,
             Err(e) => {
-                self.conn
-                    .fail_handshake_and_close(ErrorCode::Internal, e)
-                    .await;
+                self.fail_handshake_and_close(ErrorCode::Internal, e).await;
                 return;
             }
         };
-        *self.conn.shared.version.write().await = Some(selected);
         let ready = Frame {
             version: selected,
             request_id: 0,
@@ -437,30 +525,39 @@ impl Host {
             })),
         };
         if validate_frame(&ready, self.conn.ctx().await).is_err() {
-            self.conn
-                .fail_handshake_and_close(
-                    ErrorCode::Internal,
-                    "ready validation failed".to_string(),
-                )
-                .await;
+            self.fail_handshake_and_close(
+                ErrorCode::Internal,
+                "ready validation failed".to_string(),
+            )
+            .await;
             return;
         }
-        let bytes = ready.encode_to_vec();
-        if self.conn.send_bytes(bytes).await.is_err() {
-            self.conn
-                .fail_handshake(SyntraError::Closed("transport gone".to_string()))
-                .await;
-            self.conn.close().await;
+        // Reserve capacity without holding lifecycle locks. Authentication
+        // and backpressure may suspend while close/timeout wins the race.
+        let permit = match self.conn.reserve_writer().await {
+            Ok(permit) => permit,
+            Err(_) => return,
+        };
+        let mut state = self.conn.shared.state.write().await;
+        if *state != ConnectionState::Authenticating || self.conn.is_closed() {
             return;
         }
-        let _ = self.conn.transition(StateEvent::ReadyReceived).await;
+        let Ok(active) = state.transition(StateEvent::ReadyReceived) else {
+            return;
+        };
+        *self.conn.shared.version.write().await = Some(selected);
+        // Bind before exposing ACTIVE or queueing ready. Close uses the
+        // same state lock, then unbinds; it can never miss a late binding.
         self.sessions.bind(Session {
             connection_id: connection_id.clone(),
             principal,
             version: selected,
             established_at: Instant::now(),
         });
-        *self.bound_id.lock().unwrap() = Some(connection_id.clone());
+        *self.bound_id.lock().unwrap_or_else(|e| e.into_inner()) = Some(connection_id.clone());
+        *state = active;
+        permit.send(ready.encode_to_vec());
+        drop(state);
         self.conn
             .complete_handshake(crate::connection::HandshakeDone { connection_id })
             .await;
@@ -479,6 +576,7 @@ impl Host {
     }
 
     async fn on_request(&self, id: u64, version: u32, req: RpcRequest) {
+        let deadline = Instant::now() + self.effective_timeout(req.timeout_ms);
         let negotiated = self.version_or_zero().await;
         if version != negotiated {
             warn!("version mismatch in ACTIVE; closing");
@@ -486,7 +584,7 @@ impl Host {
                 .conn
                 .transition(StateEvent::ProtocolViolationFatal)
                 .await;
-            self.conn.close().await;
+            self.close().await;
             return;
         }
         // Method shape was validated at decode; re-check cheaply so a
@@ -499,46 +597,76 @@ impl Host {
             .await;
             return;
         }
-        // Concurrency bound: reject excess, keep usable (SNTR-RPC-008).
-        if self.inflight_len() >= self.conn.shared.config.max_outstanding {
+        let state = self.conn.shared.state.read().await;
+        if *state != ConnectionState::Active || self.conn.is_closed() {
+            return;
+        }
+        let session = {
+            let bound = self.bound_id.lock().unwrap_or_else(|e| e.into_inner());
+            bound.as_deref().and_then(|id| self.sessions.get(id))
+        };
+        let Some(session) = session else {
+            drop(state);
             self.send_result(
                 id,
-                outcome_error(ErrorCode::ResourceExhausted, "too many outstanding RPCs"),
+                outcome_error(ErrorCode::Unauthenticated, "credential not accepted"),
             )
             .await;
             return;
+        };
+        let admitted = self.start_request(id, negotiated, req, session, deadline);
+        drop(state);
+        if let Err((code, message)) = admitted {
+            self.send_result(id, outcome_error(code, message)).await;
+        }
+    }
+
+    // Synchronous admission makes it impossible to hold the blocking table
+    // lock over an await. Caller holds the state read lock through insertion.
+    fn start_request(
+        &self,
+        id: u64,
+        negotiated: u32,
+        req: RpcRequest,
+        session: Session,
+        deadline: Instant,
+    ) -> Result<(), (ErrorCode, &'static str)> {
+        // Concurrency bound: reject excess, keep usable (SNTR-RPC-008).
+        let mut inflight_guard = self.inflight.lock().unwrap_or_else(|e| e.into_inner());
+        let rejection = if inflight_guard.contains_key(&id) {
+            Some((ErrorCode::FailedPrecondition, "duplicate request_id"))
+        } else if inflight_guard.len() >= self.conn.shared.config.max_outstanding {
+            Some((ErrorCode::ResourceExhausted, "too many outstanding RPCs"))
+        } else {
+            None
+        };
+        if let Some((code, message)) = rejection {
+            return Err((code, message));
         }
         // Responder deadline starts BEFORE queue admission (measured from
         // receipt of the complete validated frame, SNTR-RPC-004/1F).
-        let deadline = Instant::now() + self.effective_timeout(req.timeout_ms);
         let cancel = crate::connection::CancelToken::new();
         // Duplicate outstanding id on the host side (retransmit storm):
         // keep the original, reject the duplicate attempt. Locks are
         // scoped tightly and never held across an await (the guard is
         // !Send; holding it would poison every spawned future).
-        if self.inflight.lock().unwrap().contains_key(&id) {
-            self.send_result(
-                id,
-                outcome_error(ErrorCode::FailedPrecondition, "duplicate request_id"),
-            )
-            .await;
-            return;
-        }
-        self.inflight.lock().unwrap().insert(
-            id,
-            InflightEntry {
-                cancel: cancel.clone(),
-                // Replaced with the real task handle below.
-                task: spawn_task(async {}),
-            },
-        );
         let handler = self.handler.clone();
         let method = req.method.clone();
         let payload = req.payload.to_vec();
         let sender = self.conn.clone();
         let inflight = self.inflight.clone();
         let cancel_task = cancel.clone();
+        let sessions = self.sessions.clone();
         let task = spawn_task(async move {
+            if sender.is_closed() {
+                cancel_task.cancel();
+                sessions.unbind(&session.connection_id);
+                inflight
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&id);
+                return;
+            }
             // Completion wins races (biased, handler branch first);
             // cancel-vs-deadline ties prefer CANCELLED (recorded B10).
             // Single terminal send: this task is the ONLY sender for the
@@ -547,7 +675,13 @@ impl Host {
             // every target, including wasm where abort is unavailable.
             let outcome = tokio::select! {
                 biased;
-                res = handler.handle(method.clone(), payload, cancel_task.clone()) => res,
+                res = async {
+                    match handler.authorize(&session.principal, &method) {
+                        Ok(()) => handler.handle(method.clone(), payload, cancel_task.clone()).await,
+                        Err(e) if e.code == ErrorCode::Unauthenticated => HandlerOutcome::error(ErrorCode::Unauthenticated, "credential not accepted"),
+                        Err(_) => HandlerOutcome::error(ErrorCode::PermissionDenied, "access denied"),
+                    }
+                } => res,
                 _ = cancel_task.cancelled() => HandlerOutcome::error(ErrorCode::Cancelled, "cancelled"),
                 _ = sleep_until(deadline) => {
                     if cancel_task.is_cancelled() {
@@ -557,7 +691,7 @@ impl Host {
                     }
                 }
             };
-            let _ = cancel_task;
+            cancel_task.cancel();
             let outcome_value = match outcome {
                 HandlerOutcome::Payload(b) => outcome_payload(b),
                 HandlerOutcome::Error { code, message } => {
@@ -572,17 +706,21 @@ impl Host {
                 })),
             };
             let bytes = frame.encode_to_vec();
-            let _ = sender.send_bytes(bytes).await;
+            if sender.send_bytes(bytes).await.is_err() {
+                sessions.unbind(&session.connection_id);
+            }
             // Release the id only after the terminal result is queued:
             // until now, a duplicate id is a duplicate (original wins).
-            inflight.lock().unwrap().remove(&id);
+            inflight
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(&id);
         });
-        // A fast handler may already have removed the entry. Only attach
-        // the task to a live request; never resurrect a completed id or
-        // replace the cancellation token that already owns this request.
-        if let Some(entry) = self.inflight.lock().unwrap().get_mut(&id) {
-            entry.task = task;
-        }
+        // Admission, task ownership, and insertion share one short lock.
+        // A fast worker cannot remove an entry before it is installed;
+        // close cannot drain a placeholder and miss the real worker.
+        inflight_guard.insert(id, InflightEntry { cancel, task });
+        Ok(())
     }
 
     async fn on_cancel(&self, id: u64) {
@@ -593,7 +731,12 @@ impl Host {
         // ids are ignored (race tolerance). The request task remains the
         // sole sender of the terminal result, so completion still wins
         // and no second `result` is ever emitted.
-        if let Some(entry) = self.inflight.lock().unwrap().get(&id) {
+        if let Some(entry) = self
+            .inflight
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&id)
+        {
             entry.cancel.cancel();
         }
     }
@@ -609,7 +752,7 @@ impl Host {
         };
         let bytes = frame.encode_to_vec();
         if self.conn.send_bytes(bytes).await.is_err() {
-            self.conn.on_transport_lost().await;
+            self.on_transport_lost().await;
         }
     }
 
@@ -628,38 +771,73 @@ impl Host {
             version,
             request_id: 0,
             body: Some(Body::Notification(syntra_core::proto::Notification {
-                payload: payload.into(),
+                payload,
             })),
         };
         validate_frame(&frame, self.conn.ctx().await)?;
         let bytes = frame.encode_to_vec();
-        self.conn.send_bytes(bytes).await
+        let result = self.conn.send_bytes(bytes).await;
+        if result.is_err() {
+            self.on_transport_lost().await;
+        }
+        result
     }
 
     /// Graceful close: stop new RPCs, abort in-flight with terminal
     /// mapping, unbind the session, teardown (SNTR-HS-006/013).
     pub async fn close(&self) {
-        self.abort_inflight().await;
         self.conn.close().await;
         self.unbind_session().await;
+        self.abort_inflight().await;
+        self.stop_handshake_timer().await;
     }
 
     /// Abrupt transport loss: `UNAVAILABLE` (unknown outcome) to all
     /// in-flight RPCs, session discarded (SNTR-SESS-004).
     pub async fn on_transport_lost(&self) {
-        self.abort_inflight().await;
         self.conn.on_transport_lost().await;
         self.unbind_session().await;
+        self.abort_inflight().await;
+        self.stop_handshake_timer().await;
     }
 
     async fn abort_inflight(&self) {
         let entries: Vec<InflightEntry> = {
-            let mut g = self.inflight.lock().unwrap();
+            let mut g = self.inflight.lock().unwrap_or_else(|e| e.into_inner());
             g.drain().map(|(_, e)| e).collect()
         };
+        for e in &entries {
+            // Signalling the initiating handler's own token would make
+            // its select! drop this shutdown future at the first join.
+            // Let it complete cleanup and unwind naturally instead.
+            if !e.task.is_current() {
+                e.cancel.cancel();
+                e.task.abort();
+            }
+        }
         for e in entries {
-            e.cancel.cancel();
-            e.task.abort();
+            // Bounded wait: native `abort` preempts so the join completes
+            // immediately (fast path unchanged); on wasm `abort` is a
+            // no-op and a non-cooperative handler would otherwise hang
+            // `close` forever, so `SHUTDOWN_GRACE` (1s, mirroring Go
+            // `handlerShutdownGrace` and WS `shutdown_grace`) bounds the
+            // wait and detaches best-effort.
+            e.task.join_bounded(SHUTDOWN_GRACE).await;
+        }
+    }
+
+    async fn stop_handshake_timer(&self) {
+        let task = self
+            .handshake_task
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take();
+        if let Some(task) = task {
+            task.abort();
+            // Same bound as in-flight drain: the timer observes close and
+            // exits promptly, but a stalled wasm timer must not hang
+            // shutdown.
+            task.join_bounded(SHUTDOWN_GRACE).await;
         }
     }
 
@@ -667,7 +845,12 @@ impl Host {
         // Hosts own exactly one connection and bind at most one session
         // for it; unbind that id (if any) so CLOSED discards all
         // per-connection state except diagnostics (SNTR-HS-006).
-        if let Some(id) = self.bound_id.lock().unwrap().take() {
+        if let Some(id) = self
+            .bound_id
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+        {
             self.sessions.unbind(&id);
         }
     }
@@ -680,7 +863,7 @@ impl Host {
 }
 
 fn outcome_payload(b: Vec<u8>) -> syntra_core::proto::rpc_result::Outcome {
-    syntra_core::proto::rpc_result::Outcome::Payload(b.into())
+    syntra_core::proto::rpc_result::Outcome::Payload(b)
 }
 
 fn outcome_error(code: ErrorCode, message: &str) -> syntra_core::proto::rpc_result::Outcome {
@@ -762,6 +945,503 @@ mod tests {
                 HandlerOutcome::Payload(payload)
             },
         ))
+    }
+
+    #[tokio::test]
+    async fn hello_frame_version_must_equal_proposed_max_before_auth() {
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        let mut frame = Frame::decode(hello_frame(1, 1, vec![]).as_slice()).unwrap();
+        frame.version = 2;
+        host.ingest(&frame.encode_to_vec()).await;
+        assert!(host.is_closed());
+        assert_eq!(host.sessions.count(), 0);
+        assert!(writer.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn close_while_ready_is_backpressured_cannot_bind_session() {
+        let (host, mut writer) = Host::new(
+            ConnectionConfig {
+                writer_capacity: 1,
+                ..ConnectionConfig::default()
+            },
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.conn.shared.writer.try_send(vec![0]).unwrap();
+        let hello = hello_frame(1, 1, vec![]);
+        let mut handshake = Box::pin(host.ingest(&hello));
+        assert!(futures_util::poll!(&mut handshake).is_pending());
+        host.close().await;
+        assert_eq!(writer.try_recv().unwrap(), vec![0]);
+        handshake.await;
+        assert_eq!(host.state().await, ConnectionState::Closed);
+        assert_eq!(
+            host.sessions.count(),
+            0,
+            "authentication must not resurrect a binding"
+        );
+        assert!(host.bound_id.lock().unwrap().is_none());
+        assert!(writer.try_recv().is_err(), "no ready after close");
+    }
+
+    #[tokio::test]
+    async fn handlers_without_authorization_fail_closed() {
+        struct NoPolicy;
+        impl Handler for NoPolicy {
+            fn handle(&self, _: String, _: Vec<u8>, _: crate::CancelToken) -> HandlerFut {
+                panic!("a handler without an authorization policy must not execute")
+            }
+        }
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            Arc::new(NoPolicy),
+        );
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: vec![],
+                timeout_ms: 500,
+            },
+        )
+        .await;
+        let bytes = tokio::time::timeout(Duration::from_secs(1), writer.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let frame = Frame::decode(bytes.as_slice()).unwrap();
+        assert!(
+            matches!(frame.body, Some(Body::Result(RpcResult { outcome: Some(syntra_core::proto::rpc_result::Outcome::Error(e)) })) if e.code == ErrorCode::PermissionDenied.as_i32())
+        );
+        assert_eq!(host.state().await, ConnectionState::Active);
+        host.close().await;
+    }
+
+    #[tokio::test]
+    async fn allow_all_wrapper_restores_explicit_permissive_behavior() {
+        struct Legacy {
+            effects: Arc<std::sync::atomic::AtomicUsize>,
+        }
+        impl Handler for Legacy {
+            fn handle(&self, _: String, payload: Vec<u8>, _: crate::CancelToken) -> HandlerFut {
+                self.effects
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Box::pin(async move { HandlerOutcome::Payload(payload) })
+            }
+        }
+        let effects = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        // Without the wrapper the fail-closed default denies without effects.
+        let (denied, mut denied_rx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            Arc::new(Legacy {
+                effects: effects.clone(),
+            }),
+        );
+        denied.ingest(&hello_frame(1, 1, vec![])).await;
+        denied_rx.recv().await.unwrap();
+        denied
+            .on_request(
+                1,
+                1,
+                RpcRequest {
+                    method: "/example.Echo/Echo".into(),
+                    payload: b"deny-me".to_vec(),
+                    timeout_ms: 500,
+                },
+            )
+            .await;
+        let bytes = tokio::time::timeout(Duration::from_secs(1), denied_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let frame = Frame::decode(bytes.as_slice()).unwrap();
+        assert!(
+            matches!(frame.body, Some(Body::Result(RpcResult { outcome: Some(syntra_core::proto::rpc_result::Outcome::Error(e)) })) if e.code == ErrorCode::PermissionDenied.as_i32())
+        );
+        assert_eq!(
+            effects.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "denied call must not execute handler effects"
+        );
+        denied.close().await;
+        // With explicit AllowAll the same handler executes (opt-in legacy).
+        let (allowed, mut allowed_rx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            Arc::new(AllowAll(Legacy {
+                effects: effects.clone(),
+            })),
+        );
+        allowed.ingest(&hello_frame(1, 1, vec![])).await;
+        allowed_rx.recv().await.unwrap();
+        allowed
+            .on_request(
+                2,
+                1,
+                RpcRequest {
+                    method: "/example.Echo/Echo".into(),
+                    payload: b"allow-me".to_vec(),
+                    timeout_ms: 500,
+                },
+            )
+            .await;
+        let bytes = tokio::time::timeout(Duration::from_secs(1), allowed_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let frame = Frame::decode(bytes.as_slice()).unwrap();
+        assert!(
+            matches!(frame.body, Some(Body::Result(RpcResult { outcome: Some(syntra_core::proto::rpc_result::Outcome::Payload(p)) })) if p == b"allow-me".to_vec())
+        );
+        assert_eq!(
+            effects.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "AllowAll must restore handler effects exactly once"
+        );
+        allowed.close().await;
+    }
+
+    #[tokio::test]
+    async fn explicit_authorize_allow_permits_handler_effects() {
+        struct ExplicitAllow;
+        impl Handler for ExplicitAllow {
+            fn authorize(&self, _: &Principal, _: &str) -> Result<(), AuthError> {
+                Ok(())
+            }
+            fn handle(&self, _: String, payload: Vec<u8>, _: crate::CancelToken) -> HandlerFut {
+                Box::pin(async move { HandlerOutcome::Payload(payload) })
+            }
+        }
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            Arc::new(ExplicitAllow),
+        );
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: b"explicit".to_vec(),
+                timeout_ms: 500,
+            },
+        )
+        .await;
+        let bytes = tokio::time::timeout(Duration::from_secs(1), writer.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let frame = Frame::decode(bytes.as_slice()).unwrap();
+        assert!(
+            matches!(frame.body, Some(Body::Result(RpcResult { outcome: Some(syntra_core::proto::rpc_result::Outcome::Payload(p)) })) if p == b"explicit".to_vec())
+        );
+        host.close().await;
+    }
+
+    #[tokio::test]
+    async fn fn_handler_behavior_unchanged_allow_all() {
+        // FnHandler remains allow-all for closures; regression guard for
+        // the fail-closed default change.
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: b"fn".to_vec(),
+                timeout_ms: 500,
+            },
+        )
+        .await;
+        let bytes = tokio::time::timeout(Duration::from_secs(1), writer.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let frame = Frame::decode(bytes.as_slice()).unwrap();
+        assert!(
+            matches!(frame.body, Some(Body::Result(RpcResult { outcome: Some(syntra_core::proto::rpc_result::Outcome::Payload(p)) })) if p == b"fn".to_vec())
+        );
+        host.close().await;
+    }
+
+    #[tokio::test]
+    async fn authorization_uses_bound_principal_and_method_on_every_call() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        struct Policy {
+            calls: AtomicUsize,
+            effects: AtomicUsize,
+        }
+        impl Handler for Policy {
+            fn authorize(&self, principal: &Principal, method: &str) -> Result<(), AuthError> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                if principal.subject == "svc-allowed" && method == "/example.Echo/Echo" {
+                    Ok(())
+                } else {
+                    Err(AuthError {
+                        code: ErrorCode::PermissionDenied,
+                        message: "private-policy-details".into(),
+                    })
+                }
+            }
+            fn handle(&self, _: String, payload: Vec<u8>, _: crate::CancelToken) -> HandlerFut {
+                self.effects.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async move { HandlerOutcome::Payload(payload) })
+            }
+        }
+        let policy = Arc::new(Policy {
+            calls: AtomicUsize::new(0),
+            effects: AtomicUsize::new(0),
+        });
+        for (auth, credential, allowed) in [
+            (
+                Arc::new(crate::StaticToken::new(b"token-a".to_vec(), "svc-allowed"))
+                    as Arc<dyn Authenticator>,
+                b"token-a".to_vec(),
+                true,
+            ),
+            (
+                Arc::new(crate::StaticToken::new(b"token-b".to_vec(), "svc-denied")),
+                b"token-b".to_vec(),
+                false,
+            ),
+            (Arc::new(AllowAnonymous), vec![], false),
+        ] {
+            let (client, host) =
+                crate::loopback_pair(auth, policy.clone(), ConnectionConfig::default());
+            client.handshake(credential).await.unwrap();
+            for method in ["/example.Echo/Echo", "/example.KV/Put"] {
+                let result = client.call(method, b"opaque".to_vec(), 1000).await;
+                if allowed && method == "/example.Echo/Echo" {
+                    assert_eq!(result.unwrap(), b"opaque");
+                } else {
+                    let error = result.unwrap_err();
+                    assert_eq!(error.code(), ErrorCode::PermissionDenied);
+                    assert!(!error.to_string().contains("private-policy-details"));
+                }
+                assert_eq!(host.state().await, ConnectionState::Active);
+            }
+            host.close().await;
+        }
+        assert_eq!(policy.calls.load(Ordering::SeqCst), 6);
+        assert_eq!(policy.effects.load(Ordering::SeqCst), 1);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn close_during_authentication_does_not_wait_for_policy_or_bind_late() {
+        struct BlockedAuth {
+            started: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+            release: Mutex<std::sync::mpsc::Receiver<()>>,
+        }
+        impl Authenticator for BlockedAuth {
+            fn authenticate(&self, _: &[u8]) -> Result<Principal, AuthError> {
+                self.started
+                    .lock()
+                    .unwrap()
+                    .take()
+                    .unwrap()
+                    .send(())
+                    .unwrap();
+                self.release.lock().unwrap().recv().unwrap();
+                Ok(Principal::new("svc-a"))
+            }
+        }
+        let (started, observed) = tokio::sync::oneshot::channel();
+        let (release, released) = std::sync::mpsc::channel();
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(BlockedAuth {
+                started: Mutex::new(Some(started)),
+                release: Mutex::new(released),
+            }),
+            echo_handler(),
+        );
+        let runtime = tokio::runtime::Handle::current();
+        let worker_host = host.clone();
+        let worker = tokio::task::spawn_blocking(move || {
+            runtime.block_on(worker_host.ingest(&hello_frame(1, 1, vec![])))
+        });
+        observed.await.unwrap();
+        // Always release/join the worker even when shutdown fails, so a
+        // failing lock-order regression cannot strand spawn_blocking.
+        let closed = tokio::time::timeout(Duration::from_secs(1), host.close()).await;
+        release.send(()).unwrap();
+        worker.await.unwrap();
+        closed.expect("shutdown must not hold a lifecycle lock across authentication");
+        assert!(host.is_closed());
+        assert_eq!(host.sessions.count(), 0);
+        assert!(writer.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn handshake_timer_closes_backpressured_ready_without_binding() {
+        let (host, mut writer) = Host::new(
+            ConnectionConfig {
+                writer_capacity: 1,
+                handshake_timeout: Duration::from_millis(10),
+                ..ConnectionConfig::default()
+            },
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.conn.shared.writer.try_send(vec![0]).unwrap();
+        let hello = hello_frame(1, 1, vec![]);
+        tokio::time::timeout(Duration::from_secs(1), host.ingest(&hello))
+            .await
+            .expect("timer must interrupt ready queueing");
+        assert!(host.is_closed());
+        assert_eq!(host.sessions.count(), 0);
+        assert_eq!(writer.try_recv().unwrap(), vec![0]);
+        assert!(writer.try_recv().is_err());
+        host.close().await;
+    }
+
+    #[tokio::test]
+    async fn close_cancels_and_joins_owned_workers() {
+        struct Dropped(Arc<std::sync::atomic::AtomicBool>);
+        impl Drop for Dropped {
+            fn drop(&mut self) {
+                self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (started, mut observed) = mpsc::channel(1);
+        let handler = Arc::new(FnHandler({
+            let dropped = dropped.clone();
+            move |_, _, cancel: crate::CancelToken| {
+                let guard = Dropped(dropped.clone());
+                let started = started.clone();
+                async move {
+                    let _guard = guard;
+                    started.send(cancel).await.unwrap();
+                    std::future::pending::<HandlerOutcome>().await
+                }
+            }
+        }));
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            handler,
+        );
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: vec![],
+                timeout_ms: 5000,
+            },
+        )
+        .await;
+        let cancel = observed.recv().await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), host.close())
+            .await
+            .unwrap();
+        assert!(cancel.is_cancelled());
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "close must join the aborted worker"
+        );
+        assert_eq!(host.inflight_len(), 0);
+        assert_eq!(host.sessions.count(), 0);
+    }
+
+    #[tokio::test]
+    async fn close_with_non_cooperative_handler_completes_bounded() {
+        // Native simulation of the wasm hang shape: the handler ignores its
+        // `CancelToken` entirely (no select on cancel/deadline) and pends
+        // forever. `close` must still return promptly: natively via
+        // preemptive `abort`, on wasm via the bounded `SHUTDOWN_GRACE`
+        // detach. Guards against reintroducing an unbounded join.
+        let handler = Arc::new(FnHandler(|_, _, _: crate::CancelToken| async move {
+            std::future::pending::<HandlerOutcome>().await
+        }));
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            handler,
+        );
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: vec![],
+                timeout_ms: 5000,
+            },
+        )
+        .await;
+        tokio::time::timeout(Duration::from_secs(1), host.close())
+            .await
+            .expect("close must not hang on a non-cooperative handler");
+        assert!(host.is_closed());
+        assert_eq!(host.inflight_len(), 0);
+        assert_eq!(host.sessions.count(), 0);
+    }
+
+    #[tokio::test]
+    async fn handler_initiated_close_does_not_join_itself() {
+        let weak_host = Arc::new(Mutex::new(std::sync::Weak::<Host>::new()));
+        let (finished, mut observed) = mpsc::channel(1);
+        let handler = Arc::new(FnHandler({
+            let weak_host = weak_host.clone();
+            move |_, _, _| {
+                let host = weak_host.lock().unwrap().upgrade().unwrap();
+                let finished = finished.clone();
+                async move {
+                    host.close().await;
+                    finished.send(()).await.unwrap();
+                    HandlerOutcome::Payload(vec![])
+                }
+            }
+        }));
+        let (host, mut writer) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            handler,
+        );
+        *weak_host.lock().unwrap() = Arc::downgrade(&host);
+        host.ingest(&hello_frame(1, 1, vec![])).await;
+        writer.recv().await.unwrap();
+        host.on_request(
+            1,
+            1,
+            RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: vec![],
+                timeout_ms: 5000,
+            },
+        )
+        .await;
+        tokio::time::timeout(Duration::from_secs(1), observed.recv())
+            .await
+            .expect("handler shutdown must finish without self-join")
+            .unwrap();
+        assert!(host.is_closed());
+        assert_eq!(host.inflight_len(), 0);
+        assert_eq!(host.sessions.count(), 0);
     }
 
     #[tokio::test]

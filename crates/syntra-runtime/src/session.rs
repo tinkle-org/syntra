@@ -109,10 +109,17 @@ impl Authenticator for RejectAll {
 /// Accepts exactly one static bearer token (constant-time compare),
 /// binding the configured subject. The token bytes live only in this
 /// struct; callers MUST zeroize/drop them when rotated.
-#[derive(Debug)]
 pub struct StaticToken {
     token: Vec<u8>,
     subject: String,
+}
+
+impl std::fmt::Debug for StaticToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StaticToken")
+            .field("token", &"[REDACTED]")
+            .finish_non_exhaustive()
+    }
 }
 
 impl StaticToken {
@@ -126,7 +133,10 @@ impl StaticToken {
 
 impl Authenticator for StaticToken {
     fn authenticate(&self, credential: &[u8]) -> Result<Principal, AuthError> {
-        if credential.len() != self.token.len() {
+        // Empty credentials are anonymous attempts, never bearer tokens.
+        // Keep the infallible constructor compatible, but fail closed for
+        // an empty/misconfigured token on every authentication attempt.
+        if self.token.is_empty() || credential.len() != self.token.len() {
             return Err(AuthError::unauthenticated());
         }
         let mut diff = 0u8;
@@ -203,6 +213,25 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn static_token_debug_redacts_credentials() {
+        let auth = StaticToken::new(b"unique-secret".to_vec(), "svc-a");
+        let debug = format!("{auth:?}");
+        assert!(!debug.contains("unique-secret"));
+        assert!(
+            !debug.contains("117, 110, 105"),
+            "byte arrays are secrets too"
+        );
+        assert!(debug.contains("REDACTED"));
+    }
+
+    #[test]
+    fn empty_static_token_fails_closed() {
+        let auth = StaticToken::new(vec![], "svc-a");
+        assert!(auth.authenticate(b"").is_err());
+        assert!(auth.authenticate(b"nonempty").is_err());
+    }
 
     #[test]
     fn anonymous_policy() {

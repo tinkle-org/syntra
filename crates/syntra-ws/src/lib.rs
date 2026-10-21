@@ -9,7 +9,10 @@
 //! serialized Syntra `Frame`. No TCP length prefix inside WS messages.
 //! Binary only; text (0x1) is rejected (close 1003). Empty binary is
 //! rejected (`INVALID_ARGUMENT`). Assembled messages exceeding
-//! 1 MiB are rejected during assembly (close 1009). Control frames
+//! 1 MiB are rejected during assembly (close 1009) on native. Browsers
+//! reject only after browser-managed assembly and cannot send 1009 from
+//! application code; see the `wasm` module for the conformance limitations.
+//! Control frames
 //! (Ping/Pong/Close) never reach the Syntra core.
 //!
 //! Credentials travel only in `ClientHello.credential`, never in URLs,

@@ -7,8 +7,8 @@ Writes only disposable generated/build outputs; never updates baselines/locks.
 Committed-generation model (see docs/schema-registry.md §11): `proto/` is
 the sole source of truth; pinned `buf generate` output is COMMITTED into
 the tree (crates/** for Rust, bindings/go/** for Go) and drift-checked here
-and in CI. Distribution is Git tags + GitHub Releases only — no BSR push,
-no registries. The ignored .tmp/ directory hosts only disposable
+and in CI. Distribution uses crates.io, nested Go module tags, and GitHub
+Releases (no BSR push). The ignored .tmp/ directory hosts only disposable
 reproducibility smoke tests, never the committed output.
 """
 
@@ -79,39 +79,34 @@ def generated_hashes():
 
 
 def _tracked_set():
-    """Return the set of git-tracked paths, or None outside a checkout."""
+    """Require a Git checkout so untracked output cannot stand in for commits."""
     try:
-        out = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
-                             text=True, timeout=30)
-    except (OSError, ValueError):
-        return None
-    if out.returncode != 0:
-        return None
-    return set(out.stdout.splitlines())
+        out = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True,
+                             text=True, timeout=30, check=True)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        raise SystemExit(f"Cannot establish tracked generated files: {exc}") from exc
+    return set(out.stdout.split("\0")) - {""}
 
 
 def _collect_committed_files():
-    """Return {suffix -> bytes} for TRACKED committed generated types.
-
-    Only git-tracked files count as committed: untracked working-tree files
-    (e.g. another workstream's in-progress generation) never fail the drift
-    check — they are enforced when committed and pushed through CI.
-    Returns {} when the committed trees are absent (bootstrap).
-    """
+    """Collect both required trees, preserving paths and rejecting missing files."""
     tracked = _tracked_set()
     out = {}
-    if COMMITTED_GO_GEN.is_dir():
-        for path in COMMITTED_GO_GEN.rglob("*.pb.go"):
-            rel = str(path.relative_to(ROOT))
-            if tracked is not None and rel not in tracked:
-                continue
-            out["go/" + path.name] = path.read_bytes()
-    if COMMITTED_RUST_GEN.is_dir():
-        for path in COMMITTED_RUST_GEN.rglob("*.rs"):
-            rel = str(path.relative_to(ROOT))
-            if tracked is not None and rel not in tracked:
-                continue
-            out["rust/" + path.name] = path.read_bytes()
+    for language, folder, pattern in (
+        ("go", COMMITTED_GO_GEN, "*.pb.go"),
+        ("rust", COMMITTED_RUST_GEN, "*.rs"),
+    ):
+        prefix = folder.relative_to(ROOT).as_posix() + "/"
+        paths = set(folder.rglob(pattern))
+        paths.update(ROOT / name for name in tracked
+                     if name.startswith(prefix) and Path(name).match(pattern))
+        for path in sorted(paths):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel not in tracked:
+                raise SystemExit(f"Generated file is not git-tracked: {rel}")
+            if not path.is_file() or path.is_symlink():
+                raise SystemExit(f"Tracked generated file is missing or not a regular file: {rel}")
+            out[f"{language}/{path.relative_to(folder).as_posix()}"] = path.read_bytes()
     return out
 
 
@@ -122,10 +117,10 @@ def _collect_fresh_files():
     rust_gen = RUST_OUT / "gen"
     if go_gen.is_dir():
         for path in go_gen.rglob("*.pb.go"):
-            out["go/" + path.name] = path.read_bytes()
+            out["go/" + path.relative_to(go_gen).as_posix()] = path.read_bytes()
     if rust_gen.is_dir():
         for path in rust_gen.rglob("*.rs"):
-            out["rust/" + path.name] = path.read_bytes()
+            out["rust/" + path.relative_to(rust_gen).as_posix()] = path.read_bytes()
     return out
 
 
@@ -149,28 +144,20 @@ def generate_to_tmp():
 
 
 def check_drift(fresh=None):
-    """Diff pinned regeneration against the committed tree. Bootstrap-safe.
-
-    Passes with a notice when the committed trees do not exist yet;
-    fails closed on drift once they do. Returns 0/1 via SystemExit on drift.
-    """
+    """Diff pinned regeneration against both required committed trees, fail closed."""
     if fresh is None:
         fresh = generate_to_tmp()
     committed = _collect_committed_files()
-    if not committed:
-        print("No TRACKED committed generated types "
-              f"({COMMITTED_GO_GEN.relative_to(ROOT)}, "
-              f"{COMMITTED_RUST_GEN.relative_to(ROOT)} have no git-tracked "
-              "files); drift check skipped (bootstrap — untracked "
-              "work-in-progress is enforced when committed). "
-              ".tmp reproducibility still enforced.", flush=True)
-        return
+    for label, files in (("fresh", fresh), ("committed", committed)):
+        for language in ("go", "rust"):
+            if not any(key.startswith(language + "/") for key in files):
+                raise SystemExit(f"Missing {label} {language} generated types")
     errors = []
     for key, fresh_bytes in sorted(fresh.items()):
         if key not in committed:
             # New file from a schema change: maintainer must commit it.
             errors.append(f"uncommitted generated file: {key} "
-                          f"(regenerate with scripts/validate-schema.py and commit)")
+                          "(run buf generate --template buf.gen.yaml and commit)")
         elif committed[key] != fresh_bytes:
             errors.append(f"drift in committed generated file: {key} "
                           f"(committed output is stale; regenerate and commit)")
@@ -201,8 +188,7 @@ def main():
         run(["buf", "format", "--diff", "--exit-code"])
         run(["buf", "lint"])
         run(["buf", "build"])
-        generate_to_tmp()
-        check_drift(_collect_fresh_files())
+        check_drift(generate_to_tmp())
         return
     run(["buf", "format", "--diff", "--exit-code"])
     run(["buf", "lint"])

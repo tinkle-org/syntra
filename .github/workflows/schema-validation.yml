@@ -1,7 +1,7 @@
 # Schema validation — runs on every PR and on main. Credential-less: validates only, never publishes.
-# No BSR: distribution is Git tags + GitHub Releases only. Breaking checks
+# No BSR: breaking checks
 # compare against committed Git baselines (compatibility/v1-initial/image.json),
-# never --against-registry. CI never creates tags.
+# never --against-registry. This workflow never publishes or creates tags.
 name: schema-validation
 
 on:
@@ -25,9 +25,9 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4  # pinned major; see docs/schema-registry.md §14 for SHA-pinning hardening
+      - uses: actions/checkout@v4
 
       - uses: bufbuild/buf-setup-action@v1
         with:

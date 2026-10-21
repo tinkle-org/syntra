@@ -1,52 +1,43 @@
-# Release — native registries (crates.io + Go module proxy) with GitHub Releases.
-#
-# Distribution contract (see docs/schema-registry.md, RELEASE.md):
-# - Rust: crates.io via release-plz (release-plz.yml publishes on merge of the
-#   Release PR) + GitHub Releases for notes/assets. Trusted Publishing (OIDC)
-#   preferred, token fallback for bootstrap.
-# - Go: go.dev / pkg.go.dev via proxy.golang.org. No `go publish` exists;
-#   pushing bindings/go/vX.Y.Z triggers indexing. go-proxy-warmup below warms
-#   the proxy and pkg.go.dev after release.
-# - CI creates Rust per-package tags via release-plz release; Go nested tags
-#   are synced by release-plz release + verified here. Manual recovery tags
-#   remain supported (`RELEASE.md` §4).
-# - Tag model:
-#     main tags:            vX.Y.Z (and vX.Y.Z-rc.N prereleases)
-#     nested Go module tags: bindings/go/vX.Y.Z (same suffix and revision,
-#       including bindings/go/vX.Y.Z-rc.N for vX.Y.Z-rc.N;
-#       required for Go MVS to resolve the nested module).
-#   The validate job resolves both tags and fails closed on mismatch.
-# - Consumers:
-#     libtinkle consumes the Rust crates directly via git (tagged revision).
-#     Go servers use bindings/go (CGO wrapper) + the prebuilt Linux native
-#       libs attached here (cdylib/staticlib + header).
+# Schema/Go artifacts belong to syntra-core's per-crate release tag.
+# Called directly after release-plz publishes; maintainer tag pushes and manual
+# dispatch support recovery. No release-event recursion or global v* tags.
 name: release
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing syntra-core-vX.Y.Z tag to finish or recover
+        required: true
+        type: string
   push:
     tags:
-      - "v[0-9]*.[0-9]*.[0-9]*"
-      - "v[0-9]*.[0-9]*.[0-9]*-rc.[0-9]*"
-      - "bindings/go/v[0-9]*.[0-9]*.[0-9]*"
-      - "bindings/go/v[0-9]*.[0-9]*.[0-9]*-rc.[0-9]*"
-      - "syntra-*-v[0-9]*.[0-9]*.[0-9]*"
-  release:
-    types: [published]
+      - "syntra-core-v[0-9]*.[0-9]*.[0-9]*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-artifacts-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   validate:
+    if: github.repository == 'tinklehq/syntra'
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.info.outputs.tag }}
       version: ${{ steps.info.outputs.version }}
-      is_main_tag: ${{ steps.info.outputs.is_main_tag }}
+      sha: ${{ steps.info.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,339 +45,116 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
-      - name: Resolve tag identity (CI never creates tags)
+      - name: Resolve tag identity
         id: info
-        run: |
-          set -eu
-          REF="${GITHUB_REF#refs/tags/}"
-          echo "tag=$REF" >> "$GITHUB_OUTPUT"
-          if [[ "$REF" == bindings/go/v* ]]; then
-            VERSION="${REF#bindings/go/v}"
-            IS_MAIN=false
-          elif [[ "$REF" == v* ]]; then
-            VERSION="${REF#v}"
-            IS_MAIN=true
-          else
-            echo "error: unexpected tag ref $REF (expected vX.Y.Z or bindings/go/vX.Y.Z)" >&2
-            exit 1
-          fi
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-            echo "error: version '$VERSION' must look like X.Y.Z or X.Y.Z-rc.N" >&2
-            exit 1
-          fi
-          # The tag must already exist (pushed by a maintainer). CI never runs
-          # `git tag` / `git push --tags` anywhere in this workflow by design.
-          git show-ref --verify --quiet "refs/tags/$REF" || {
-            echo "error: tag refs/tags/$REF not found locally; CI never creates tags" >&2
-            exit 1
-          }
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "is_main_tag=$IS_MAIN" >> "$GITHUB_OUTPUT"
-          echo "Tag: $REF (version $VERSION)"
-          echo "SHA: $(git rev-parse "refs/tags/$REF")"
-
-      - name: Validate version string
         env:
-          VERSION: ${{ steps.info.outputs.version }}
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
-          set -eu
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-            echo "error: version '$VERSION' must look like X.Y.Z or X.Y.Z-rc.N" >&2
+          set -euo pipefail
+          TAG="${REQUESTED_TAG:-${GITHUB_REF#refs/tags/}}"
+          if [[ ! "$TAG" =~ ^syntra-core-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$ ]]; then
+            echo "error: expected syntra-core-vX.Y.Z or syntra-core-vX.Y.Z-rc.N" >&2
             exit 1
           fi
-
-      - name: Validate workspace versions match the tag
-        env:
-          VERSION: ${{ steps.info.outputs.version }}
-        run: |
-          set -eu
-          # Rust workspace (when present): every member version must equal the tag.
-          if [ -f Cargo.toml ]; then
-            MISMATCH="$(grep -rhoE '^version *= *"[^"]+"' --include=Cargo.toml crates/ Cargo.toml 2>/dev/null | sort -u || true)"
-            echo "Workspace versions found:"
-            echo "$MISMATCH"
-            if echo "$MISMATCH" | grep -qv "\"$VERSION\""; then
-              echo "error: Cargo workspace version(s) above do not all equal tag version $VERSION" >&2
-              exit 1
-            fi
-          else
-            echo "No Cargo.toml yet; Rust version check skipped (bootstrap)."
-          fi
-          # Nested Go module (when present): its version is the tag itself
-          # (Go uses the tag, not a version field). Verify go.mod exists.
-          if [ -f bindings/go/go.mod ]; then
-            echo "bindings/go/go.mod present."
-            grep -q '^module ' bindings/go/go.mod || { echo "error: bindings/go/go.mod has no module line" >&2; exit 1; }
-          else
-            echo "No bindings/go/go.mod yet; Go module check skipped (bootstrap)."
-          fi
-
-      - uses: bufbuild/buf-setup-action@v1
-        with:
-          version: "1.59.0"
+          SHA="$(git rev-parse --verify "refs/tags/$TAG^{commit}")"
+          git checkout --detach "$SHA"
+          # A release cannot be made from an unmerged branch or PR revision.
+          git merge-base --is-ancestor "$SHA" origin/main
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#syntra-core-v}"
+            echo "sha=$SHA"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
 
-      - name: Install validator dependencies
-        run: pip install pyyaml
-
-      - name: Schema gates (format, lint, build, breaking vs Git baseline)
-        run: |
-          set -eu
-          buf format --diff --exit-code
-          buf lint
-          buf build
-          buf breaking --against 'compatibility/v1-initial/image.json'
-
-      - name: Repository boundary + links
-        run: |
-          set -eu
-          python3 scripts/validate-repo.py boundary links markdown
-
-      - name: Committed generated-types freshness
-        run: python3 scripts/validate-schema.py --drift-only
-
-      - name: Verify nested Go module tag resolves to the same revision
-        # Go MVS resolves a nested module ONLY via its own tag
-        # (bindings/go/vX.Y.Z). Both tags must point at the same commit.
+      - name: Validate package version and Go module identity
         env:
-          IS_MAIN: ${{ steps.info.outputs.is_main_tag }}
           VERSION: ${{ steps.info.outputs.version }}
         run: |
-          set -eu
-          if [ "$IS_MAIN" != "true" ]; then
-            echo "Nested-tag trigger; main-tag check runs on the v$VERSION workflow run."
-            exit 0
-          fi
-          if [ ! -f bindings/go/go.mod ]; then
-            echo "No bindings/go/go.mod yet; nested-tag check skipped (bootstrap)."
-            exit 0
-          fi
-          MAIN_SHA="$(git rev-parse "refs/tags/v$VERSION^{commit}")"
-          if git show-ref --verify --quiet "refs/tags/bindings/go/v$VERSION"; then
-            GO_SHA="$(git rev-parse "refs/tags/bindings/go/v$VERSION^{commit}")"
-            echo "v$VERSION -> $MAIN_SHA"
-            echo "bindings/go/v$VERSION -> $GO_SHA"
-            if [ "$MAIN_SHA" != "$GO_SHA" ]; then
-              echo "error: bindings/go/v$VERSION ($GO_SHA) != v$VERSION ($MAIN_SHA); both tags must resolve to the same revision" >&2
-              exit 1
-            fi
-            echo "Nested Go module tag matches."
-          else
-            echo "error: tag v$VERSION exists but bindings/go/v$VERSION is missing; cut both tags at the same revision (RELEASE.md §4)" >&2
-            exit 1
-          fi
-
-  build-native-amd64:
-    needs: [validate]
-    if: needs.validate.outputs.is_main_tag == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.88"
-
-      - name: Build syntra-ffi (linux amd64, release)
-        env:
-          TAG: ${{ needs.validate.outputs.tag }}
-        run: |
-          set -eu
-          test -f crates/syntra-ffi/Cargo.toml || { echo "error: crates/syntra-ffi/Cargo.toml missing at tag $TAG" >&2; exit 1; }
-          cargo build --locked --release -p syntra-ffi
-          ls -lh target/release/libsyntra_ffi.so target/release/libsyntra_ffi.a
-
-      - name: Generate C header (cbindgen, committed fallback)
-        run: |
-          set -eu
-          mkdir -p dist/native/linux-amd64
-          if command -v cbindgen >/dev/null 2>&1; then
-            cbindgen --crate syntra-ffi --output dist/native/linux-amd64/syntra_ffi.h
-          elif [ -f crates/syntra-ffi/include/syntra_ffi.h ]; then
-            cp crates/syntra-ffi/include/syntra_ffi.h dist/native/linux-amd64/
-          else
-            cargo install cbindgen --locked
-            cbindgen --crate syntra-ffi --output dist/native/linux-amd64/syntra_ffi.h
-          fi
-          cp target/release/libsyntra_ffi.so target/release/libsyntra_ffi.a dist/native/linux-amd64/
-          ls -lh dist/native/linux-amd64/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-linux-amd64
-          path: dist/native/linux-amd64/
-          if-no-files-found: error
-
-  build-native-arm64:
-    needs: [validate]
-    if: needs.validate.outputs.is_main_tag == 'true'
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.88"
-
-      - name: Build syntra-ffi (linux arm64, release)
-        env:
-          TAG: ${{ needs.validate.outputs.tag }}
-        run: |
-          set -eu
-          test -f crates/syntra-ffi/Cargo.toml || { echo "error: crates/syntra-ffi/Cargo.toml missing at tag $TAG" >&2; exit 1; }
-          cargo build --locked --release -p syntra-ffi
-          ls -lh target/release/libsyntra_ffi.so target/release/libsyntra_ffi.a
-
-      - name: Generate C header (cbindgen, committed fallback)
-        run: |
-          set -eu
-          mkdir -p dist/native/linux-arm64
-          if command -v cbindgen >/dev/null 2>&1; then
-            cbindgen --crate syntra-ffi --output dist/native/linux-arm64/syntra_ffi.h
-          elif [ -f crates/syntra-ffi/include/syntra_ffi.h ]; then
-            cp crates/syntra-ffi/include/syntra_ffi.h dist/native/linux-arm64/
-          else
-            cargo install cbindgen --locked
-            cbindgen --crate syntra-ffi --output dist/native/linux-arm64/syntra_ffi.h
-          fi
-          cp target/release/libsyntra_ffi.so target/release/libsyntra_ffi.a dist/native/linux-arm64/
-          ls -lh dist/native/linux-arm64/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-linux-arm64
-          path: dist/native/linux-arm64/
-          if-no-files-found: error
-
-  build-wasm:
-    needs: [validate]
-    if: needs.validate.outputs.is_main_tag == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.88"
-          targets: wasm32-unknown-unknown
-
-      - name: Build browser WASM archive (syntra-ffi)
-        env:
-          TAG: ${{ needs.validate.outputs.tag }}
-        run: |
-          set -eu
-          test -f crates/syntra-ffi/Cargo.toml || { echo "error: crates/syntra-ffi/Cargo.toml missing at tag $TAG" >&2; exit 1; }
-          cargo build --locked --release -p syntra-ffi --target wasm32-unknown-unknown
-          mkdir -p dist/wasm
-          cp target/wasm32-unknown-unknown/release/syntra_ffi.wasm dist/wasm/ 2>/dev/null \
-            || cp target/wasm32-unknown-unknown/release/libsyntra_ffi.wasm dist/wasm/syntra_ffi.wasm
-          (cd dist/wasm && tar -czf "syntra-wasm-$TAG.tar.gz" ./*.wasm)
-          ls -lh dist/wasm/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wasm-browser
-          path: dist/wasm/
-          if-no-files-found: error
-
-  package-and-release:
-    permissions:
-      contents: write  # attach assets to the GitHub Release; no packages, no GHCR
-    needs: [validate, build-native-amd64, build-native-arm64, build-wasm]
-    if: needs.validate.outputs.is_main_tag == 'true'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.validate.outputs.tag }}
-          fetch-depth: 0
-          fetch-tags: true
-          persist-credentials: false
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, pathlib, tomllib
+          root = tomllib.loads(pathlib.Path('Cargo.toml').read_text())
+          package = tomllib.loads(pathlib.Path('crates/syntra-core/Cargo.toml').read_text())['package']
+          version = package['version']
+          if isinstance(version, dict) and version.get('workspace') is True:
+              version = root['workspace']['package']['version']
+          if package['name'] != 'syntra-core' or version != os.environ['VERSION']:
+              raise SystemExit('syntra-core package version must equal the release tag')
+          # Go v2+ needs an explicit module-path migration before pairing tags.
+          if os.environ['VERSION'].split('.')[0] not in ('0', '1'):
+              raise SystemExit('Go v2+ module-path migration required before release')
+          lines = pathlib.Path('bindings/go/go.mod').read_text().splitlines()
+          modules = [line.split('//', 1)[0].split() for line in lines if line.strip().startswith('module ')]
+          if modules != [['module', 'github.com/tinklehq/syntra/bindings/go']]:
+              raise SystemExit('unexpected nested Go module identity')
+          PY
 
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+      - name: Install validator dependencies
+        run: pip install pyyaml
+      - name: Release tooling regression tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Schema gates
+        run: |
+          set -euo pipefail
+          buf format --diff --exit-code
+          buf lint
+          buf build
+          buf breaking --against 'compatibility/v1-initial/image.json'
+          python3 scripts/validate-repo.py boundary links markdown
+          python3 scripts/validate-schema.py --drift-only
 
-      - uses: actions/download-artifact@v4
+  package-and-release:
+    needs: validate
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
         with:
-          name: native-linux-amd64
-          path: release-staging/native/linux-amd64
-
-      - uses: actions/download-artifact@v4
+          ref: ${{ needs.validate.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          name: native-linux-arm64
-          path: release-staging/native/linux-arm64
-
-      - uses: actions/download-artifact@v4
+          toolchain: "1.88"
+      - uses: bufbuild/buf-setup-action@v1
         with:
-          name: wasm-browser
-          path: release-staging/wasm
+          version: "1.59.0"
 
       - name: Assemble release payload
         env:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          set -eu
+          set -euo pipefail
           OUT="release-staging/syntra-$TAG"
-          mkdir -p "$OUT/descriptor" "$OUT/manifests" "$OUT/test-vectors" "$OUT/rust" "$OUT/go"
-          # Descriptor + manifests + vectors at the tagged revision.
+          mkdir -p "$OUT/descriptor" "$OUT/manifests" "$OUT/test-vectors" "$OUT/assets"
           buf build -o "$OUT/descriptor/image.json"
           buf export -o "$OUT/descriptor/proto"
           cp conformance/manifest/*.yaml "$OUT/manifests/"
           cp -r conformance/test-vectors/. "$OUT/test-vectors/"
-          for f in CHANGELOG.md RELEASE.md GOVERNANCE.md LICENSE; do
-            cp "$f" "$OUT/"
+          for file in CHANGELOG.md RELEASE.md GOVERNANCE.md LICENSE; do
+            cp "$file" "$OUT/assets/"
           done
-          # Rust source / crate archives (offline-friendly; no registry).
-          if [ -f Cargo.toml ]; then
-            cp Cargo.toml Cargo.lock release-plz.toml "$OUT/rust/" 2>/dev/null || cp Cargo.toml "$OUT/rust/"
-            tar --exclude='./target' --exclude='./dist' -czf "$OUT/rust/syntra-rust-source-$TAG.tar.gz" \
-              Cargo.toml Cargo.lock release-plz.toml buf.yaml proto crates 2>/dev/null || \
-            tar -czf "$OUT/rust/syntra-rust-source-$TAG.tar.gz" Cargo.toml buf.yaml proto crates
-            # Per-crate .crate files when the workspace exists (cargo package).
-            if cargo --version >/dev/null 2>&1; then
-              for manifest in crates/*/Cargo.toml; do
-                (cd "$(dirname "$manifest")" && cargo package --locked --no-verify --allow-dirty) || true
-              done
-              find target/package -name '*.crate' -exec cp {} "$OUT/rust/" \; 2>/dev/null || true
-            fi
-          fi
-          # Committed Go module source (CGO wrapper; resolved via nested tag).
-          if [ -d bindings/go ]; then
-            tar --exclude-vcs -czf "$OUT/go/syntra-go-bindings-$TAG.tar.gz" bindings/go
-          fi
-          # Native libs + header + WASM (downloaded artifacts).
-          cp -r release-staging/native "$OUT/"
-          cp -r release-staging/wasm "$OUT/"
-          # Native filenames collide across architectures; upload named archives.
-          for arch in linux-amd64 linux-arm64; do
-            tar -czf "$OUT/native/syntra-native-$arch-$TAG.tar.gz" -C "$OUT/native/$arch" .
-          done
-          tar -czf "$OUT/syntra-schema-$TAG.tar.gz" -C "$OUT" descriptor manifests test-vectors
-          # GitHub Release assets are flat. Stage exactly the upload set, and
-          # reject duplicate basenames rather than silently replacing an asset.
-          mkdir -p "$OUT/assets"
-          for asset in "$OUT"/rust/* "$OUT"/go/* "$OUT"/native/*.tar.gz "$OUT"/wasm/* "$OUT/descriptor/image.json" "$OUT/syntra-schema-$TAG.tar.gz" "$OUT/CHANGELOG.md" "$OUT/RELEASE.md" "$OUT/GOVERNANCE.md" "$OUT/LICENSE"; do
-            name="$(basename "$asset")"
-            test ! -e "$OUT/assets/$name" || { echo "error: duplicate release asset $name" >&2; exit 1; }
-            cp "$asset" "$OUT/assets/$name"
-          done
-          find "$OUT" -type f -print
+          # Archive the exact source snapshot, including build scripts/protos.
+          # Dependencies are not vendored: this is not an offline build bundle.
+          git archive --format=tar.gz --output="$OUT/assets/syntra-source-$TAG.tar.gz" HEAD
+          tar --exclude-vcs -czf "$OUT/assets/syntra-go-bindings-$TAG.tar.gz" bindings/go
+          # Packaging failures are fatal, and stale runner output cannot mask them.
+          # syntra-ffi default builds export no C ABI (empty fixture crate by
+          # design); its archive is expected noise, not native support.
+          rm -rf target/package
+          cargo package --workspace --locked --no-verify
+          cp target/package/*.crate "$OUT/assets/"
+          tar -czf "$OUT/assets/syntra-schema-$TAG.tar.gz" -C "$OUT" descriptor manifests test-vectors
+          cp "$OUT/descriptor/image.json" "$OUT/assets/"
           echo "OUT=$OUT" >> "$GITHUB_ENV"
 
       - name: Write SHA256SUMS
@@ -402,64 +170,74 @@ jobs:
           mv "$SUMS" SHA256SUMS
           cat SHA256SUMS
 
-      - name: Attach to GitHub Release (tag already exists; CI creates no tags)
+      - name: Create or verify nested Go tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          SHA: ${{ needs.validate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          GO_TAG="bindings/go/v$VERSION"
+          # Query the remote even on reruns; compare peeled commits, not tag objects.
+          if git ls-remote --exit-code --tags origin "refs/tags/$GO_TAG" >/dev/null; then
+            git fetch origin "refs/tags/$GO_TAG:refs/tags/$GO_TAG"
+          else
+            # The API only creates missing refs; it never force-updates a tag.
+            # A concurrent creation is checked by the fetch/commit comparison.
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$GO_TAG" -f "sha=$SHA" || {
+                git ls-remote --exit-code --tags origin "refs/tags/$GO_TAG" >/dev/null
+              }
+            git fetch origin "refs/tags/$GO_TAG:refs/tags/$GO_TAG"
+          fi
+          GO_SHA="$(git rev-parse "refs/tags/$GO_TAG^{commit}")"
+          test "$GO_SHA" = "$SHA" || {
+            echo "error: $GO_TAG resolves to $GO_SHA, expected $SHA ($TAG); never move a published tag" >&2
+            exit 1
+          }
+
+      - name: Attach to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          set -eu
-          # gh release create attaches assets; the tag itself was pushed by a
-          # maintainer or release-plz (push.tags / release trigger).
+          set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG exists; uploading assets."
             gh release upload "$TAG" "$OUT"/assets/* --clobber
           else
-            NOTES="$(mktemp)"
-            {
-              echo "Syntra $TAG"
-              echo ""
-              echo "Distribution: crates.io + Go module proxy + GitHub Releases (no BSR)."
-              echo "SHA: $(git rev-parse "refs/tags/$TAG")"
-              echo ""
-              sed -n '1,60p' CHANGELOG.md
-            } > "$NOTES"
             set --
             if [[ "$TAG" =~ -rc\.[0-9]+$ ]]; then
               set -- --prerelease
             fi
-            gh release create "$TAG" --title "Syntra $TAG" --notes-file "$NOTES" "$@" \
-              "$OUT"/assets/*
+            gh release create "$TAG" --verify-tag --title "Syntra schema $TAG" \
+              --notes-file RELEASE.md "$@" "$OUT"/assets/*
           fi
 
   go-proxy-warmup:
-    needs: [validate]
-    if: needs.validate.outputs.is_main_tag == 'true'
+    needs: [validate, package-and-release]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-      - name: Warm Go module proxy and pkg.go.dev
+          go-version: "1.26.4"
+          cache: false
+      - name: Warm Go module proxy and request pkg.go.dev indexing
         env:
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          set -eu
+          set -euo pipefail
           MOD="github.com/tinklehq/syntra/bindings/go"
-          echo "Warming $MOD@$VERSION via proxy.golang.org"
-          TMP="$(mktemp -d)"
-          cd "$TMP"
-          go mod init warmup >/dev/null 2>&1
+          cd "$(mktemp -d)"
           for i in 1 2 3 4 5; do
-            if GOPROXY=https://proxy.golang.org,direct GOSUMDB=sum.golang.org go get "$MOD@$VERSION"; then
-              echo "warmed $MOD@$VERSION"
-              break
+            # Proxy only: a direct fallback would hide a failed proxy warmup.
+            if GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org go mod download "$MOD@v$VERSION"; then
+              # Documentation indexing is asynchronous and best-effort.
+              curl -fsSL "https://pkg.go.dev/$MOD@v$VERSION" -o /dev/null || \
+                echo "pkg.go.dev indexing pending"
+              exit 0
             fi
-            echo "attempt $i failed; waiting for proxy to see the tag..."
-            sleep 30
+            if [ "$i" -lt 5 ]; then sleep 30; fi
           done
-          curl -fsSL "https://pkg.go.dev/$MOD@$VERSION" -o /dev/null || true
+          echo "error: Go proxy did not resolve $MOD@v$VERSION after 5 attempts" >&2
+          exit 1

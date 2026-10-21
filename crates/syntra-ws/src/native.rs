@@ -28,7 +28,8 @@ use std::sync::{
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::mpsc;
+use tokio::io::AsyncReadExt;
+use tokio::sync::{mpsc, oneshot};
 use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame, Message};
 
 use syntra_core::{ErrorCode, SyntraError};
@@ -49,6 +50,36 @@ pub struct WsHandle {
     pub version: u32,
     shutdown_tx: Option<mpsc::Sender<CloseCode>>,
     closed: Arc<AtomicBool>,
+    tasks: Option<PumpTasks>,
+    shutdown_grace: Duration,
+}
+
+// Task ownership also covers cancellation of connect while handshaking.
+struct PumpTasks(Vec<tokio::task::JoinHandle<()>>);
+
+impl PumpTasks {
+    async fn join(&mut self, grace: Duration) {
+        for task in &mut self.0 {
+            if tokio::time::timeout(grace, &mut *task).await.is_err() {
+                task.abort();
+                let _ = task.await;
+            }
+        }
+    }
+}
+
+impl Drop for PumpTasks {
+    fn drop(&mut self) {
+        for task in &self.0 {
+            task.abort();
+        }
+    }
+}
+
+enum ReadExit {
+    Close(CloseCode),
+    FlushRemoteClose,
+    Lost,
 }
 
 impl WsHandle {
@@ -59,6 +90,9 @@ impl WsHandle {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(CloseCode::Normal).await;
         }
+        if let Some(mut tasks) = self.tasks.take() {
+            tasks.join(self.shutdown_grace).await;
+        }
         self.closed.store(true, Ordering::Relaxed);
     }
 
@@ -68,6 +102,29 @@ impl WsHandle {
 
     pub fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Relaxed)
+    }
+}
+
+impl Drop for WsHandle {
+    fn drop(&mut self) {
+        // A dropped handle must not leave cloned Initiators active after
+        // their pumps have disappeared. This is one bounded teardown per
+        // connection, never per-message work; it owns and joins the pumps.
+        if let Some(mut tasks) = self.tasks.take() {
+            self.closed.store(true, Ordering::Relaxed);
+            if let Some(tx) = self.shutdown_tx.take() {
+                let _ = tx.try_send(CloseCode::Normal);
+            }
+            if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                let conn = self.conn.clone();
+                let grace = self.shutdown_grace;
+                runtime.spawn(async move {
+                    conn.on_transport_lost().await;
+                    tasks.join(grace).await;
+                });
+            }
+            // If the executor is already gone, PumpTasks::drop aborts.
+        }
     }
 }
 
@@ -132,6 +189,11 @@ pub async fn connect(
     conn_cfg: ConnectionConfig,
 ) -> Result<WsHandle, TransportError> {
     let endpoint = Endpoint::parse(&cfg.url, cfg.allow_insecure)?;
+    if cfg.ping_interval.is_zero() {
+        return Err(TransportError::InvalidUrl(
+            "ping interval must be nonzero".into(),
+        ));
+    }
     if !endpoint.is_secure {
         tracing::warn!("insecure WS enabled: restricted-development only, never public traffic");
     }
@@ -140,7 +202,10 @@ pub async fn connect(
     // No Authorization/Cookie/credential headers are ever set: browsers
     // forbid them and native code carries credentials only in
     // ClientHello.credential after 101.
-    let host_header = cfg.sni_override.clone().unwrap_or(endpoint.host.clone());
+    let host_header = cfg
+        .sni_override
+        .clone()
+        .unwrap_or_else(|| endpoint.authority());
     let request = {
         use tokio_tungstenite::tungstenite::http::Request;
         Request::builder()
@@ -196,6 +261,9 @@ pub async fn connect(
     let (conn, mut wrx) = Initiator::new(conn_cfg.clone());
     let (close_tx, mut close_rx) = mpsc::channel::<CloseCode>(4);
     let (ctrl_tx, mut ctrl_rx) = mpsc::channel::<Message>(16);
+    // Unlike an atomic flag, this wakes an idle writer on EVERY read exit.
+    // Separate from the bounded control queue, so Close cannot be starved.
+    let (read_done_tx, mut read_done_rx) = oneshot::channel();
     let closed = Arc::new(AtomicBool::new(false));
     let last_pong = Arc::new(AtomicU64::new(now_millis()));
 
@@ -211,38 +279,38 @@ pub async fn connect(
     let write_conn = conn.clone();
     let write_closed = closed.clone();
     let write_grace = cfg.write_grace;
+    let close_grace = cfg.close_grace;
+    let mut tasks = PumpTasks(Vec::with_capacity(3));
     let writer_task = tokio::spawn(async move {
+        let mut read_to_drain = None;
         loop {
-            if write_closed.load(Ordering::Relaxed) {
-                break;
-            }
             tokio::select! {
                 biased;
                 code = close_rx.recv() => {
                     let code = code.unwrap_or(CloseCode::Normal);
-                    send_close(&mut ws_write, code, "closing").await;
+                    bounded_close(&mut ws_write, code, "closing", close_grace).await;
                     break;
                 }
-                msg = wrx.recv() => {
-                    match msg {
-                        Some(bytes) => {
-                            if bytes.len() > syntra_core::MAX_FRAME_BYTES {
-                                tracing::warn!("outgoing frame exceeds bound; dropping");
-                                continue;
-                            }
-                            let send = ws_write.send(Message::Binary(bytes.into()));
-                            match tokio::time::timeout(write_grace, send).await {
-                                Ok(Ok(())) => {}
-                                _ => {
-                                    tracing::warn!("slow receiver; closing");
-                                    send_close(&mut ws_write, CloseCode::Away, "slow receiver").await;
-                                    break;
-                                }
-                            }
+                exit = &mut read_done_rx => {
+                    let action = match exit {
+                        Ok((action, read)) => {
+                            read_to_drain = Some(read);
+                            action
                         }
-                        None => break,
+                        Err(_) => ReadExit::Lost,
+                    };
+                    match action {
+                        ReadExit::Close(code) => bounded_close(&mut ws_write, code, "inbound rejected", close_grace).await,
+                        ReadExit::FlushRemoteClose => {
+                            // tungstenite queues the peer's exact Close response
+                            // during read; sending a new Close is not equivalent.
+                            let _ = tokio::time::timeout(close_grace, ws_write.flush()).await;
+                        }
+                        ReadExit::Lost => {}
                     }
+                    break;
                 }
+                // Control traffic must not starve behind a full RPC queue.
                 ctrl = ctrl_rx.recv() => {
                     match ctrl {
                         Some(msg) => {
@@ -258,11 +326,57 @@ pub async fn connect(
                         None => break,
                     }
                 }
+                msg = wrx.recv() => {
+                    match msg {
+                        Some(bytes) => {
+                            if bytes.len() > syntra_core::MAX_FRAME_BYTES {
+                                tracing::warn!("outgoing frame exceeds bound; dropping");
+                                continue;
+                            }
+                            let send = ws_write.send(Message::Binary(bytes.into()));
+                            match tokio::time::timeout(write_grace, send).await {
+                                Ok(Ok(())) => {}
+                                _ => {
+                                    tracing::warn!("slow receiver; closing");
+                                    bounded_close(&mut ws_write, CloseCode::Away, "slow receiver", close_grace).await;
+                                    break;
+                                }
+                            }
+                        }
+                        None => break,
+                    }
+                }
             }
         }
         write_closed.store(true, Ordering::Relaxed);
         write_conn.on_transport_lost().await;
+        // Wake/join the reader logically and recover the whole socket before
+        // release. Draining a bounded amount of raw transport bytes avoids
+        // resetting TCP with unread oversized input before the peer can see
+        // our Close. Do not ask the failed WS parser to assemble that input.
+        if read_to_drain.is_none() {
+            if let Ok(Ok((_, read))) = tokio::time::timeout(close_grace, &mut read_done_rx).await {
+                read_to_drain = Some(read);
+            }
+        }
+        if let Some(read) = read_to_drain {
+            if let Ok(mut socket) = ws_write.reunite(read) {
+                let _ = tokio::time::timeout(close_grace, async {
+                    let mut buffer = [0u8; 8192];
+                    let mut remaining = syntra_core::MAX_FRAME_BYTES * 2;
+                    while remaining > 0 {
+                        let limit = remaining.min(buffer.len());
+                        match socket.get_mut().read(&mut buffer[..limit]).await {
+                            Ok(0) | Err(_) => break,
+                            Ok(n) => remaining -= n,
+                        }
+                    }
+                })
+                .await;
+            }
+        }
     });
+    tasks.0.push(writer_task);
 
     // Liveness: Ping at ping_interval; allow a full interval plus the
     // Pong latency bound since the previous Pong before closing (1001).
@@ -274,11 +388,16 @@ pub async fn connect(
     let live_close = close_tx.clone();
     let ping_interval = cfg.ping_interval;
     let pong_timeout = cfg.pong_timeout;
-    tokio::spawn(async move {
+    let mut live_stop = conn.subscribe_close();
+    let liveness_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(ping_interval);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
-            interval.tick().await;
+            tokio::select! {
+                biased;
+                _ = live_stop.changed() => break,
+                _ = interval.tick() => {}
+            }
             if live_closed.load(Ordering::Relaxed) {
                 break;
             }
@@ -286,18 +405,19 @@ pub async fn connect(
             if u128::from(silent) > ping_interval.saturating_add(pong_timeout).as_millis() {
                 tracing::warn!("liveness timeout; closing");
                 live_conn.on_transport_lost().await;
-                let _ = live_close.send(CloseCode::Away).await;
+                let _ = live_close.try_send(CloseCode::Away);
                 break;
             }
             if live_ctrl
-                .send(Message::Ping(b"syntra-ping".to_vec().into()))
-                .await
+                .try_send(Message::Ping(b"syntra-ping".to_vec().into()))
                 .is_err()
             {
+                let _ = live_close.try_send(CloseCode::Away);
                 break;
             }
         }
     });
+    tasks.0.push(liveness_task);
 
     // Read pump: binary -> ingest; text -> close 1003; empty -> reject;
     // oversize -> close 1009; Ping answered, Pong feeds liveness;
@@ -306,49 +426,62 @@ pub async fn connect(
     let read_closed = closed.clone();
     let read_pong = last_pong.clone();
     let read_ctrl = ctrl_tx.clone();
-    let read_close = close_tx.clone();
+    let mut read_stop = conn.subscribe_close();
     let reader_task = tokio::spawn(async move {
-        while let Some(msg) = ws_read.next().await {
+        let exit = loop {
+            let msg = tokio::select! {
+                biased;
+                _ = read_stop.changed() => break ReadExit::Close(CloseCode::Normal),
+                msg = ws_read.next() => match msg {
+                    Some(msg) => msg,
+                    None => break ReadExit::Lost,
+                }
+            };
             match msg {
                 Ok(Message::Binary(data)) => {
                     if data.is_empty() {
                         tracing::warn!("empty binary message rejected");
-                        let _ = read_close.send(CloseCode::Invalid).await;
-                        break;
+                        break ReadExit::Close(CloseCode::Invalid);
                     }
                     if data.len() > syntra_core::MAX_FRAME_BYTES {
                         tracing::warn!("assembled message exceeds bound");
-                        let _ = read_close.send(CloseCode::Size).await;
-                        break;
+                        break ReadExit::Close(CloseCode::Size);
                     }
                     read_conn.ingest(&data).await;
                     if read_conn.is_closed() {
-                        break;
+                        break ReadExit::Close(CloseCode::Protocol);
                     }
                 }
                 Ok(Message::Text(_)) => {
                     tracing::warn!("text message rejected (binary required)");
-                    let _ = read_close.send(CloseCode::Unsupported).await;
-                    break;
+                    break ReadExit::Close(CloseCode::Unsupported);
                 }
                 Ok(Message::Ping(payload)) => {
                     // Answered at the WS layer; never reaches the core.
-                    let _ = read_ctrl.send(Message::Pong(payload)).await;
+                    if read_ctrl.try_send(Message::Pong(payload)).is_err() {
+                        break ReadExit::Close(CloseCode::Away);
+                    }
                 }
                 Ok(Message::Pong(_)) => {
                     read_pong.store(now_millis(), Ordering::Relaxed);
                 }
-                Ok(Message::Close(_)) => break,
+                Ok(Message::Close(_)) => break ReadExit::FlushRemoteClose,
                 Ok(Message::Frame(_)) => {}
                 Err(e) => {
                     tracing::debug!(error = %e, "ws read error");
-                    break;
+                    break match e {
+                        tungstenite::Error::Capacity(_) => ReadExit::Close(CloseCode::Size),
+                        tungstenite::Error::Protocol(_) => ReadExit::Close(CloseCode::Protocol),
+                        _ => ReadExit::Lost,
+                    };
                 }
             }
-        }
+        };
+        let _ = read_done_tx.send((exit, ws_read));
         read_closed.store(true, Ordering::Relaxed);
         read_conn.on_transport_lost().await;
     });
+    tasks.0.push(reader_task);
 
     // Syntra handshake: exactly one hello first, then await ready.
     // No Syntra byte was sent before TLS + 101 (WSS section 1F).
@@ -357,22 +490,28 @@ pub async fn connect(
     match conn.handshake(credential).await {
         Ok(connection_id) => {
             let version = conn.negotiated_version().await.unwrap_or(1);
-            // Pumps live until shutdown/close (detached tasks).
             Ok(WsHandle {
                 conn,
                 connection_id,
                 version,
                 shutdown_tx: Some(close_tx),
                 closed,
+                tasks: Some(tasks),
+                shutdown_grace: cfg
+                    .write_grace
+                    .saturating_add(cfg.close_grace.saturating_mul(3)),
             })
         }
         Err(e) => {
             // Spec-mapped close before teardown; never downgrade/retry.
             let _ = close_tx.send(handshake_close_code(&e)).await;
             // Let the write pump flush the close, then stop the pumps.
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            writer_task.abort();
-            reader_task.abort();
+            tasks
+                .join(
+                    cfg.write_grace
+                        .saturating_add(cfg.close_grace.saturating_mul(3)),
+                )
+                .await;
             conn.on_transport_lost().await;
             Err(TransportError::Connect(format!(
                 "syntra handshake failed: {e}"
@@ -401,6 +540,14 @@ where
     if let Err(e) = ws.send(Message::Close(Some(frame))).await {
         tracing::debug!(error = ?e, "close send failed");
     }
+}
+
+async fn bounded_close<S>(ws: &mut S, code: CloseCode, reason: &str, grace: Duration)
+where
+    S: futures_util::Sink<Message> + Unpin,
+    S::Error: std::fmt::Debug,
+{
+    let _ = tokio::time::timeout(grace, send_close(ws, code, reason)).await;
 }
 
 fn map_tungstenite_error(e: &tungstenite::Error) -> TransportError {

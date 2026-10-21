@@ -7,19 +7,19 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
-description = "Versioned C ABI over the Syntra runtime (init/handshake/call/cancel/notify/close). No application types."
+description = "Quarantined native C ABI test fixture. No production FFI; no default ABI exports; WASM unsupported."
 
 [lib]
 name = "syntra_ffi"
 crate-type = ["cdylib", "staticlib"]
 
-[dependencies]
-syntra-core = { path = "../syntra-core", version = "0.1.0" }
-syntra-runtime = { path = "../syntra-runtime", version = "0.1.0" }
-tokio = { version = "1", default-features = false, features = ["sync", "time", "rt", "macros"] }
+[features]
+default = []
+# Test-only loopback ABI, NOT a production transport. Never enable in shipped
+# binaries (including via --all-features). Default builds expose no C ABI.
+test-fixture = ["dep:syntra-core", "dep:syntra-runtime", "dep:tokio"]
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }
-
-[dev-dependencies]
-tokio = { workspace = true }
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+syntra-core = { path = "../syntra-core", version = "0.1.0", optional = true }
+syntra-runtime = { path = "../syntra-runtime", version = "0.1.0", optional = true }
+tokio = { version = "1", default-features = false, features = ["sync", "time", "rt-multi-thread", "macros"], optional = true }

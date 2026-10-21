@@ -8,12 +8,15 @@
 //!
 //! Hardening (SNTR-SER-006/007/008, SNTR-WIRE-002/004):
 //! - unknown wire fields are tolerated per SNTR-SER-003, EXCEPT reserved
-//!   numbers 16/17, which are rejected;
+//!   top-level numbers 16/17, which are rejected. Numbers 16/17 inside
+//!   nested messages are unassigned and tolerated;
 //! - an unset `body` with unknown top-level content is an unknown variant
 //!   (`UNIMPLEMENTED`), while an unset `body` with no unknown content is
 //!   an empty body (`INVALID_ARGUMENT`);
 //! - duplicate `body` alternatives on the wire (two `oneof` members, or
 //!   the same member twice — prost would collapse them) are rejected;
+//!   duplicate `version`/`request_id` scalars follow protobuf merge
+//!   semantics (last wins) and are not rejected;
 //! - nesting depth is schema-bounded (known message fields only) with a
 //!   hard cap of 32, and no single length prefix may exceed the envelope
 //!   bound, before prost decodes anything.
@@ -121,6 +124,14 @@ pub fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, Syntr
 
 /// Validate an already-decoded `Frame` (also used before sending).
 pub fn validate_frame(frame: &Frame, ctx: ValidationContext) -> Result<FrameKind, SyntraError> {
+    // Size is validation step 1 for every body and every entry point,
+    // including already-decoded frames passed directly to the runtime.
+    if frame.encoded_len() > MAX_FRAME_BYTES {
+        return Err(SyntraError::Protocol {
+            code: ErrorCode::ResourceExhausted,
+            message: "frame exceeds maximum envelope size".to_string(),
+        });
+    }
     let body = frame.body.as_ref().ok_or(SyntraError::Protocol {
         code: ErrorCode::InvalidArgument,
         message: "frame body must be set".to_string(),
@@ -213,13 +224,20 @@ pub fn validate_frame(frame: &Frame, ctx: ValidationContext) -> Result<FrameKind
             }
             _ => {}
         },
-        ConnectionState::Closing | ConnectionState::Closed => {
-            if matches!(kind, FrameKind::Request) {
+        ConnectionState::Closing => {
+            // Only drain existing RPCs. No re-handshake or event delivery.
+            if !matches!(kind, FrameKind::Result | FrameKind::Cancel) {
                 return Err(SyntraError::Protocol {
                     code: ErrorCode::FailedPrecondition,
-                    message: "no new RPCs in CLOSING/CLOSED".to_string(),
+                    message: "only result/cancel legal in CLOSING".to_string(),
                 });
             }
+        }
+        ConnectionState::Closed => {
+            return Err(SyntraError::Protocol {
+                code: ErrorCode::FailedPrecondition,
+                message: "no frames legal in CLOSED".to_string(),
+            });
         }
     }
 
@@ -239,17 +257,6 @@ pub fn validate_frame(frame: &Frame, ctx: ValidationContext) -> Result<FrameKind
         }
         Body::Request(req) => {
             crate::rpc::validate_method(&req.method)?;
-            // Payload bytes + envelope overhead must fit MAX_FRAME_BYTES.
-            // A 1 MiB payload alone does not fit (rpc.md section 1D, open
-            // B8); enforce the envelope bound on serialized bytes at send
-            // time (see also decode-time bound in decode_frame).
-            let encoded = frame.encoded_len();
-            if encoded > MAX_FRAME_BYTES {
-                return Err(SyntraError::Protocol {
-                    code: ErrorCode::ResourceExhausted,
-                    message: "request exceeds maximum envelope size".to_string(),
-                });
-            }
         }
         Body::Result(res) => {
             // outcome must be set, including for empty success (SNTR-RPC-006).
@@ -285,10 +292,15 @@ struct ScanStats {
 /// Scan top-level protobuf wire bytes before prost decodes.
 ///
 /// Enforces, in one bounded pass:
-/// - reserved numbers 16/17 rejected (SNTR-SER-008; prost drops unknown
-///   fields, so detection must happen on raw bytes);
+/// - reserved top-level numbers 16/17 rejected (SNTR-SER-008; prost drops
+///   unknown fields, so detection must happen on raw bytes). Numbers 16/17
+///   inside nested messages are unassigned, not reserved, and are tolerated
+///   per SNTR-SER-003 (see `check_nested`);
 /// - duplicate `body` alternatives rejected (SNTR-WIRE-002; prost would
 ///   collapse two `oneof` members into one, hiding the violation);
+///   duplicate `version`/`request_id` scalars follow protobuf merge
+///   semantics (last wins) and are not rejected here, matching the Go
+///   binding and SNTR-SER-002 non-canonical tolerance;
 /// - unknown-top-level-content flag for unknown-variant handling
 ///   (SNTR-WIRE-004);
 /// - allocation bound: no length prefix may exceed `MAX_FRAME_BYTES`
@@ -388,7 +400,10 @@ enum Schema {
 
 /// Schema-aware nested check. Only known message-typed fields are
 /// descended into; opaque `bytes`/`string` fields are skipped whole.
-/// Reserved numbers are rejected at every message level (SNTR-SER-008).
+/// Field numbers 16/17 are reserved only at the top-level `Frame`
+/// (SNTR-SER-008); inside nested messages they are unassigned unknown
+/// fields tolerated per SNTR-SER-003, matching the Go binding. Only the
+/// top-level scan rejects them.
 fn check_nested(bytes: &[u8], schema: Schema, depth: u32) -> Result<(), SyntraError> {
     if depth > MAX_DECODE_DEPTH {
         return Err(SyntraError::Protocol {
@@ -405,7 +420,6 @@ fn check_nested(bytes: &[u8], schema: Schema, depth: u32) -> Result<(), SyntraEr
         i = next;
         let field = (tag >> 3) as u32;
         let wire = (tag & 0x07) as u8;
-        reject_reserved(field)?;
         match wire {
             0 => i = skip_varint(bytes, i)?,
             1 => i = skip_fixed(bytes, i, 8, "truncated nested fixed64")?,

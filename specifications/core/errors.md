@@ -28,7 +28,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 - `OUT_OF_RANGE (11)`: value outside supported range.
 - `UNIMPLEMENTED (12)`: unknown method, unknown `Frame.body` variant, unsupported capability/transport feature.
 - `INTERNAL (13)`: host-internal failure; message MUST be generic.
-- `UNAVAILABLE (14)`: transport loss, host shutdown, or transient unavailability; the only code that implies unknown handler outcome.
+- `UNAVAILABLE (14)`: transport loss, host shutdown, or transient unavailability; reports unknown handler outcome for loss/shutdown. `DEADLINE_EXCEEDED`, `INTERNAL`, and `UNKNOWN` equally leave execution unknown (see RFC 0004 D3; `SyntraError::is_unknown_outcome` covers all four). No single code proves non-execution or idempotency by itself.
 - `DATA_LOSS (15)`: unrecoverable corruption/loss detected.
 - `UNAUTHENTICATED (16)`: credential missing/invalid/expired/revoked or auth required.
 

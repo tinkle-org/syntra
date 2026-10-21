@@ -16,7 +16,7 @@ data model, or internal architecture.
   public IDL tooling present; behavioral acceptance pending, see
   [Status](#current-protocol-status) and `SESSION-OPEN-QUESTIONS.md`)
 - IDL: Protocol Buffers (proto3), governed by Buf v2, distributed via
-  Git tags + GitHub Releases (see [Schema distribution](#schema-distribution))
+  crates.io, nested Go module tags, and GitHub Releases (see [Schema distribution](#schema-distribution))
 - Reference implementation: Rust (forthcoming, non-normative)
 - Methodology: Specification-Driven Development — specifications first,
   code second
@@ -145,8 +145,8 @@ specifications/decisions/      — ADRs 001–010 (each with an owner)
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
-crates/                        — Rust workspace (schema types, syntra-ffi cdylib/staticlib; committed prost output, drift-checked)
-bindings/go/                   — committed Go protobuf types + CGO wrapper (drift-checked)
+crates/                        — Rust workspace (schema types; syntra-ffi is default-empty with test-fixture only, no production FFI, WASM unsupported; committed prost output, drift-checked)
+bindings/go/                   — committed Go protobuf types + unsupported CGO adapter proposal + supported pure-Go core (drift-checked; default tags only)
 tests/schema/                  — descriptor and codec validation (committed generation drift-checked; .tmp/ holds disposable repro only)
 conformance/                   — executable conformance suite (manifests,
   profiles, test vectors, claims, declarations)
@@ -164,28 +164,25 @@ ordered reading path.
 
 This repository is the authoring authority for the Syntra protocol: normative
 sources plus the Rust/Go generated types and the tooling that validates them.
-There is no Buf Schema Registry publication and no package-registry
-publication (no crates.io, no Go proxy default beyond the Git-backed module,
-no GHCR).
+Rust crates are published to crates.io by release-plz after a reviewed Release
+PR merges. Go modules are fetched through the Go proxy using nested module
+tags. There is no Buf Schema Registry publication or GHCR image.
 
 ```text
 Syntra Git repository
         │
         │ contains source schemas + committed generated types
         ▼
-Git tags (vX.Y.Z) + GitHub Releases
+Per-crate tags (<crate>-vX.Y.Z) + crates.io + GitHub Releases
         │
-        ├── Rust source / crate archives + SHA256SUMS
-        ├── native libs (syntra-ffi cdylib/staticlib, linux amd64/arm64) + C header
-        ├── browser WASM archive
+        ├── Rust source / crate archives + SHA256SUMS (syntra-core release)
         ├── descriptor (image.json) + manifests + test vectors
         │       │
         │       ▼
-        │   libtinkle consumes the Rust crates directly via git
-        │   (tagged revision; no registry)
+        │   Rust consumers pin crates.io versions or exact Git revisions
         │
-        └── Go servers use bindings/go (CGO wrapper) + the prebuilt
-            Linux native libs above (same tagged revision)
+        └── Go consumers use bindings/go/vX.Y.Z at the syntra-core revision
+            (default pure-Go mode; native CGO mode is unsupported)
 ```
 
 Normative (the specification):
@@ -205,16 +202,16 @@ Supporting (validation, process, explanation):
   `.tmp/` holds only disposable reproducibility output and must never be
   committed
 
-Distribution (Git tags + GitHub Releases only):
+Distribution:
 
-- Git tags `vX.Y.Z` (and `vX.Y.Z-rc.N` prereleases) plus nested Go module
-  tags `bindings/go/vX.Y.Z` at the same revision (verified by
-  `.github/workflows/release.yml`); branches never define releases
-- GitHub Releases carry Rust source/crate archives, Linux amd64/arm64
-  native libs + header, browser WASM archive, descriptor/manifests/vectors,
-  and SHA256SUMS (see `RELEASE.md` §5)
-- `release-plz.toml` versions Rust crates (Apache-2.0, `publish = false`;
-  never crates.io) and opens Release PRs; CI never creates tags
+- release-plz creates `<crate>-vX.Y.Z` tags and crates.io releases. The
+  `syntra-core-vX.Y.Z` tag anchors schema assets and the nested Go module tag
+  `bindings/go/vX.Y.Z` at the same commit. Global `vX.Y.Z` tags are not used.
+- The syntra-core GitHub Release carries source/crate archives,
+  descriptor/manifests/vectors, and SHA256SUMS (see `RELEASE.md` §5).
+- `release-plz.yml` calls `release.yml` directly after publishing syntra-core;
+  `release.yml` creates or verifies the nested Go tag and warms the Go proxy.
+  Maintainers authorize releases through reviewed Release PRs.
 
 External and non-normative (never in this repository):
 
@@ -234,11 +231,11 @@ event streams, TCP framing, HTTP transport, or WebSocket transport (see
 
 ## Schema distribution
 
-Schemas and generated types ship from this repository via Git tags +
+Schemas and generated types ship via crates.io, Git-backed Go modules, and
 GitHub Releases — there is no Buf Schema Registry module and no
 `buf push` (see `buf.yaml`: no registry `name:` by design):
 
-- Tag consumed: `vX.Y.Z` (and `vX.Y.Z-rc.N` prereleases) plus nested Go
+- Schema tag consumed: `syntra-core-vX.Y.Z` (and `-rc.N` prereleases) plus nested Go
   module tag `bindings/go/vX.Y.Z` at the same revision
 - Package defined: `syntra.v1` (`proto/syntra/v1/*.proto`)
 - Consumer contract, pinning, version mapping, and release policy:
@@ -250,9 +247,12 @@ correlation, idempotency, retries, event streams, TCP framing, HTTP
 transport, or WebSocket transport — that is your implementation's job
 (see [`docs/implementer-guide.md`](docs/implementer-guide.md) and the
 [FAQ](docs/faq.md)). See [Repository boundary](#repository-boundary)
-for what lives where. `libtinkle` consumes the Rust crates directly via git;
-Go servers use `bindings/go` (CGO wrapper) plus the prebuilt Linux native
-libs attached to the GitHub Release.
+for what lives where. Pin Rust crate versions or exact Git revisions; Go
+consumers use the default pure-Go module. **Go native mode (`syntranative`)
+is unsupported:** its session ABI does not match the Rust C ABI. No native
+library or browser WASM release asset is currently promised. Restoring that
+distribution requires matching ABI/header ownership and cross-language
+link/runtime tests; a Rust compile check alone is insufficient.
 
 ## Conformance model
 
@@ -342,8 +342,8 @@ SESSION-OPEN-QUESTIONS.md      — release-blocking open questions
 rfcs/                          — public RFC process, template, RFCs 0001–0005
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
-crates/                        — Rust workspace (schema types + syntra-ffi; committed generation)
-bindings/go/                   — committed Go protobuf types + CGO wrapper
+crates/                        — Rust workspace (schema types; syntra-ffi default-empty fixture, test-fixture only; committed generation)
+bindings/go/                   — committed Go protobuf types + supported pure-Go core (syntranative adapter unsupported)
 specifications/                — charter, core, transports, security, schema, ADRs
 specifications/schema/         — IDL reference, generation and compatibility docs
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
@@ -404,6 +404,6 @@ vulnerability reporting for this repository as described in
 
 ## License
 
-Apache-2.0 — see [`LICENSE`](LICENSE). All Rust packages carry
-`license = "Apache-2.0"` and `publish = false` (Git tags + GitHub Releases
-only, never crates.io). See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7.
+Apache-2.0 — see [`LICENSE`](LICENSE). Rust packages inherit
+`license = "Apache-2.0"` and are eligible for crates.io publication through
+release-plz. See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7.

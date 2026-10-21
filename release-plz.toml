@@ -1,37 +1,17 @@
-# release-plz: Rust-native release automation (NOT release-please).
-# https://release-plz.dev/docs/configuration
-# Flow: conventional commits on main -> release-plz opens a Release PR
-# (version bumps + CHANGELOG via git-cliff + semver-checks) -> review and
-# merge the PR -> release-plz release publishes to crates.io, cuts tags,
-# and creates GitHub Releases. Native artifacts + Go proxy warmup attach
-# in .github/workflows/release.yml on release published.
-#
-# Distribution contract (see docs/schema-registry.md, RELEASE.md):
-# - Rust: crates.io (native registry) + GitHub Releases for notes/assets.
-# - Go: go.dev / pkg.go.dev via the Go module proxy. No `go publish` step
-#   exists; pushing the nested bindings/go/vX.Y.Z tag triggers indexing.
-#   release.yml warms proxy.golang.org and pkg.go.dev after release.
-# - Every package MUST keep Apache-2.0 license + repository metadata so
-#   `cargo publish` succeeds. Do not set `publish = false` on shippable crates.
-# - Consumers:
-#     Rust apps use `cargo add syntra-core` (crates.io); git pinned only for pre-release.
-#     Go servers use bindings/go via MVS plus optional prebuilt Linux
-#       native libs attached to the GitHub Release (see release.yml).
-# - Tag model:
-#     Rust crates: <package>-vX.Y.Z (release-plz default per-package tags).
-#     Nested Go module: bindings/go/vX.Y.Z (same revision as the release
-#       commit; created by release.yml Go-tag sync and verified there).
-#   Tag protection rules SHOULD restrict tag creation to maintainers.
-#   Deleting or moving a release tag is forbidden; fix forward.
+# Rust registry releases use explicit per-package tags. syntra-core's tag is
+# the schema/Go anchor; release-plz.yml directly calls release.yml for artifacts
+# and nested Go tag creation. No global v* tag or release-event handoff.
+# https://release-plz.ieni.dev/docs/config
 
 [workspace]
+release_always = false
+git_tag_name = "{{ package }}-v{{ version }}"
+git_release_type = "auto"
 # Derive semver from conventional commits; detect breaking API changes.
 semver_check = true
 # Update CHANGELOG.md per crate with git-cliff (keep-a-changelog style).
 changelog_update = true
-# Per-package tags (<name>-vX.Y.Z). The nested Go module tag
-# (bindings/go/vX.Y.Z) is synced by release.yml after publish.
-# Create a GitHub Release per tag (native assets attached by release.yml).
+# Create a GitHub Release per crate; schema/source assets attach to syntra-core.
 git_release_enable = true
 git_release_draft = false
 # Native registry publishing: crates.io via trusted publishing or token.

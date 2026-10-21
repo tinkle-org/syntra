@@ -42,14 +42,16 @@ for:
 - Enforcing the review bar (`rfcs/README.md`): requirement IDs, client/
   server obligations, bounded resources, unknown-field handling, security
   and compatibility considerations, testable acceptance criteria.
-- Tagging releases and publishing notes per Sec. 5; no other role may
-  tag a release. CI never creates tags; the release workflow only
-  validates tags and attaches assets.
-- Custody of release and reporting secrets (GitHub Release attachments via
-  the automatic `github.token`, private vulnerability reports): least
+- Authorizing releases and notes per Sec. 5 through reviewed Release PRs.
+  release-plz publishes Rust crates and per-crate tags on their behalf;
+  the artifact workflow owns the matching nested Go tag. Maintainers alone
+  may create recovery tags or dispatch artifact recovery (`RELEASE.md` §4).
+- Custody of release and reporting credentials (crates.io Trusted Publishing
+  OIDC or bootstrap `CARGO_REGISTRY_TOKEN`, automatic `github.token`, private
+  vulnerability reports): least
   privilege, no exposure in logs or PR jobs, rotation on suspected
-  exposure. There are no registry push tokens (no BSR, no crates.io, no
-  GHCR).
+  exposure. Registry credentials belong only in the publishing job; there
+  is no BSR or GHCR publishing path.
 - Keeping `CHANGELOG.md`, `MIGRATION.md`, and the conformance suite
   consistent with every normative merge.
 
@@ -73,8 +75,7 @@ for:
       rule changes) follow this same bar, plus a clean `buf lint`,
       `buf build`, and `buf breaking` gate. Wire-incompatible schema
       changes are breaking (Sec. 4). GitHub Release assets attach only on
-      reviewed version tags via the gated release workflow (CI never
-      creates tags).
+       reviewed per-crate version tags via the gated release workflow.
    - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
      to conformance tests (or tracked placeholders).
 - **Governance / process changes** (this file, `CONTRIBUTING.md`,
@@ -120,7 +121,8 @@ capabilities); this subsection states who approves and records it:
 
 ## 5. How a protocol release becomes stable
 
-A `vX.Y.Z` release is stable when **all** hold:
+A protocol release is stable when **all** hold (a package version alone
+does not assert protocol stability):
 
 1. All normative specifications, schemas, and transport/security
    profiles in scope for the release are accepted and indexed with
@@ -129,8 +131,10 @@ A `vX.Y.Z` release is stable when **all** hold:
    least two independent implementations (or one implementation plus
    independent packet-fixture verification, during bootstrap).
 3. `CHANGELOG.md` lists every wire-affecting change with migration notes.
-4. Maintainers tag the release and publish notes. The tag is the
-   release; branches do not define stability.
+4. Maintainers authorize the release and notes. release-plz creates
+   `<crate>-vX.Y.Z` tags; the schema/Go release uses `syntra-core-vX.Y.Z`
+   paired with `bindings/go/vX.Y.Z` at the same commit. Branches do not
+   define stability; see `RELEASE.md` §4 for recovery and ownership.
 
 Pre-stable development happens on `main` under `Unreleased`. No
 stability is implied until a tag meeting the above criteria exists.
@@ -149,9 +153,9 @@ stability is implied until a tag meeting the above criteria exists.
 
 ## 7. License — Apache-2.0
 
-The project is licensed under Apache-2.0 — see `LICENSE`. All Rust
-packages carry `license = "Apache-2.0"` and `publish = false` (Git tags +
-GitHub Releases only, never crates.io).
+The project is licensed under Apache-2.0 — see the complete terms in
+`LICENSE`. Rust packages inherit `license = "Apache-2.0"` and are eligible
+for crates.io publication through the reviewed release-plz flow.
 
 The selection was made by maintainers via a public proposal before the
 first stable release. Alternatives considered and why Apache-2.0 was

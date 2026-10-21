@@ -24,7 +24,7 @@ pub mod initiator;
 pub mod session;
 
 pub use connection::{CancelToken, Connection, ConnectionConfig};
-pub use host::{FnHandler, Handler, HandlerFut, HandlerOutcome, Host};
+pub use host::{AllowAll, FnHandler, Handler, HandlerFut, HandlerOutcome, Host};
 pub use initiator::Initiator;
 pub use session::{
     AllowAnonymous, AuthError, Authenticator, Principal, RejectAll, Session, SessionManager,

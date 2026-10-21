@@ -8,20 +8,18 @@ package syntra
 #include <stdlib.h>
 #include <string.h>
 
-// ---- crates/syntra-ffi C ABI contract (expected, version 1) ----
+// ---- UNSUPPORTED: proposed Go adapter ABI, not the Rust C ABI ----
 //
-// The native library is built from crates/syntra-ffi and distributed as
-// a GitHub Release artifact (libsyntra_ffi.so / .a plus syntra_ffi.h).
-// Install one asset set for your platform where the toolchain finds it
-// (e.g. /usr/local/lib and /usr/local/include, or point CGO_LDFLAGS /
-// CGO_CFLAGS at it) and build this module with `-tags syntranative`.
-// The declarations below mirror the symbols the Rust side MUST export;
-// once the shipped syntra_ffi.h lands, prefer `#include "syntra_ffi.h"`
-// over these local declarations and keep CheckABI as the compatibility
-// gate: it fails closed when syntra_ffi_abi_version does not equal
-// NativeABIVersion.
+// These declarations are retained as an unimplemented adapter proposal.
+// crates/syntra-ffi default builds export no C ABI; the explicit
+// test-fixture feature exports syntra_* loopback operations with u64
+// handles (native tests only), not this syntra_ffi_* frame-pump API with
+// pointer handles. Version packing, statuses, strings and buffer ownership
+// also differ. Installing a Release library cannot make this build link;
+// CheckABI cannot run before those missing symbols are resolved. See
+// README.md. CI runs default tags only and never enables this adapter.
 //
-// Buffer ownership (applies to every function below):
+// Proposed buffer ownership (NOT the current Rust contract):
 //   - `const uint8_t*` inputs are BORROWED: the library copies what it
 //     retains before returning. The caller keeps ownership and frees
 //     with the usual Go/C rules (C.CBytes/C.CString results are freed
@@ -119,15 +117,16 @@ import (
 	"unsafe"
 )
 
-// NativeABIVersion is the crates/syntra-ffi C ABI version this binding
-// speaks. CheckABI compares it against syntra_ffi_abi_version at runtime;
-// the native library MUST bump its version on any incompatible change
-// (removed/renamed symbols, changed struct layouts or status meanings).
-// Additive changes (new symbols) keep the version.
+// NativeABIVersion is the proposed Go adapter ABI version. The current Rust
+// FFI instead returns a packed major/minor/patch from syntra_abi_version;
+// its version 1.0.0 is 0x10000, not this value. Native integration is unsupported.
 const NativeABIVersion = 1
 
-// FFI status codes. These mirror the negative int32_t returns of the C
-// ABI and map to Go control errors via ffiStatus.
+// Proposed Go adapter statuses, NOT crates/syntra-ffi's SYNTRA_E_* table.
+// Deferred until ABI reconciliation: Rust -1 is PANIC, -2 ARG, -3 HANDSHAKE,
+// -4 RPC, -5 TIMEOUT, -6 CANCELLED, -7 UNAVAILABLE, -8 RESOURCE, -9 VERSION,
+// -10 UTF8; +1 is AGAIN. Relabeling these alone would leave incompatible
+// symbols, handles, ownership and per-RPC error semantics in place.
 const (
 	ffiOK       = 0
 	ffiInvalid  = -1
@@ -161,13 +160,15 @@ func ffiStatus(st C.int32_t, op string) error {
 }
 
 // NativeAvailable reports whether the process links the native
-// libsyntra_ffi core. It is true in the syntranative build (this file
-// compiled only when the library resolved at link time).
+// adapter. It is true if this unsupported syntranative build links against
+// a custom implementation of the proposed ABI; it is not a support guarantee.
 func NativeAvailable() bool { return true }
 
 // CheckABI queries syntra_ffi_abi_version and fails closed unless it
 // equals NativeABIVersion. Call it after process start (or lazily on
 // first Open) before trusting any other native call.
+// The current Rust library does not export this symbol, so linking fails
+// before this check can run.
 func CheckABI() error {
 	v := uint32(C.syntra_ffi_abi_version())
 	if v != NativeABIVersion {
@@ -505,6 +506,10 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	}
 	c := &ffiHostCore{}
 	var handle *C.syntra_ffi_host_t
+	// Deferred with ABI reconciliation: cfg.timeout is lost here because
+	// this proposed host_open has no default-timeout argument. Rust's actual
+	// syntra_open uses ConnectionConfig::default() (30 s) and exposes no host
+	// config API. Adding an argument locally cannot change the Rust contract.
 	st := C.syntra_ffi_host_open(C.uint32_t(cfg.minVersion), C.uint32_t(cfg.maxVersion),
 		C.uint32_t(cfg.maxPending), &handle)
 	if err := ffiStatus(st, "host_open"); err != nil {

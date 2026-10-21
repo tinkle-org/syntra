@@ -1,30 +1,31 @@
 # Syntra Schema Registry — distribution and consumer contract
 
-- Status: Active (Git tags + GitHub Releases; no BSR module, no registry publication)
+- Status: Active distribution policy (crates.io, Git-backed Go modules, GitHub Releases; no BSR module)
 - Scope: How Syntra's Protobuf schemas and generated types are distributed, what consumers are guaranteed, and what generated packages do **not** provide. Protocol behavior is owned by `specifications/`; this document owns only schema distribution.
 - Normative references: `buf.yaml`, `proto/syntra/v1/*.proto`, `specifications/core/versioning.md` (SNTR-VER-*), `specifications/schema/compatibility.md`, `GOVERNANCE.md`, `CHANGELOG.md`, `conformance/profiles.yaml`, `RELEASE.md` §§4–6, `.github/workflows/release.yml`, `release-plz.toml`. (A root `buf.gen.yaml` MAY exist: it pins the committed `crates/` + `bindings/go/` generation. See §11.)
 - Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
 
 ## 1. Distribution identity (A)
 
-There is **no BSR module**. Distribution identity is Git + GitHub Releases:
+There is **no BSR module**. Rust packages use crates.io and per-crate Git
+tags. The schema/Go release is anchored specifically to syntra-core:
 
 ```text
-Git tag vX.Y.Z      ↔ bindings/go/vX.Y.Z      (same revision)
-Git tag vX.Y.Z-rc.N ↔ bindings/go/vX.Y.Z-rc.N (same suffix and revision)
+syntra-core-vX.Y.Z      ↔ bindings/go/vX.Y.Z      (same commit)
+syntra-core-vX.Y.Z-rc.N ↔ bindings/go/vX.Y.Z-rc.N (same suffix and commit)
 ```
 
-- Release tags are cut by maintainers only (`RELEASE.md` §4; `GOVERNANCE.md` §5). Branches never define releases. CI never creates tags.
-- `buf.yaml` carries **no registry `name:`** by design. A registry identity is only needed for `buf push` / `--against-registry` breaking checks, and this repository never pushes to a registry. Breaking baselines are committed Git artifacts (`compatibility/v1-initial/image.json`, §9). Do not re-add a registry name without a maintainer decision recorded on a governance RFC.
-- The nested Go module tag (`bindings/go/vX.Y.Z`, or `bindings/go/vX.Y.Z-rc.N` for a prerelease) is required for Go MVS to resolve the `bindings/go` module. Preserve the main tag's exact version suffix. `.github/workflows/release.yml` verifies both tags resolve to the same revision and fails closed otherwise.
+- Maintainers authorize releases by reviewing and merging Release PRs. release-plz creates `<crate>-vX.Y.Z` tags; `release.yml` owns creation/verification of the paired Go tag (`RELEASE.md` §4). Global `vX.Y.Z` tags are not used. Branches never define releases.
+- `buf.yaml` carries **no registry `name:`** by design. A BSR identity is only needed for `buf push` / `--against-registry` breaking checks; this repository never pushes schemas to the BSR. Breaking baselines are committed Git artifacts (`compatibility/v1-initial/image.json`, §9). Do not re-add a BSR name without a maintainer decision recorded on a governance RFC.
+- The nested Go module tag is required for Go version resolution. Preserve syntra-core's exact version suffix. `release.yml` creates a missing Go ref at the peeled syntra-core commit and fails closed on an existing mismatch; it never moves a tag. Go v2+ requires a module-path migration first.
 
 | Item | Policy |
 |---|---|
 | Module ownership | Held by the Syntra maintainers (interim: repository owners per `GOVERNANCE.md` §2). |
 | Visibility | **Public** Git repository; GitHub Releases carry the downloadable assets. |
-| Public status | Released only via tagged GitHub Releases. Until the first tag, the `main` head is the only distribution point. |
+| Public status | A configured publishing path is not evidence of a completed release. Verify the registry version, tag, and assets before pinning a dependency. |
 | Source repository relationship | Git is the authoring authority AND the distribution point for tagged revisions (§2). |
-| Release/tag relationship | A Git tag `vX.Y.Z` pairs with `bindings/go/vX.Y.Z`; a prerelease `vX.Y.Z-rc.N` pairs with `bindings/go/vX.Y.Z-rc.N`. Each pair identifies the same revision and defines the release and Go module views. GitHub Releases attach the release asset set (`RELEASE.md` §5). |
+| Release/tag relationship | Each Rust crate has its own tag/version. Only `syntra-core-vX.Y.Z` pairs with `bindings/go/vX.Y.Z` and carries the schema/source asset set (`RELEASE.md` §5). Other crate releases do not create Go tags. |
 
 ## 2. Source of truth (B)
 
@@ -33,12 +34,12 @@ Git repository (proto/syntra/v1/*.proto)   ← sole authoring authority
         │  pinned buf generate (reviewed change only)
         ▼
 Committed generated types (crates/**, bindings/go/**)  ← reviewed, drift-checked
-        │  maintainer tag vX.Y.Z[-rc.N] (+ bindings/go/vX.Y.Z[-rc.N])
+        │  reviewed Release PR → per-crate tags and crates.io publication
         ▼
-GitHub Release (assets + SHA256SUMS)       ← published distribution
-        │  git / tarball consumption
+syntra-core GitHub Release (assets + SHA256SUMS) + paired Go tag
+        │  registry / git / tarball consumption
         ▼
-Consumers (libtinkle via git; Go servers via CGO + prebuilt libs)
+Consumers (Rust version/Git pins; Go module in default pure-Go mode)
 ```
 
 - **Git** is where schemas are written, reviewed (RFC + quorum per `GOVERNANCE.md` §3), linted, breaking-checked, and generated types are committed. Nothing is authoritative because it appeared in a release asset; it is in the asset because it was approved in Git.
@@ -109,9 +110,9 @@ Five independent dimensions (SNTR-VER-001). The table below is the precise mappi
 | Dimension | Identifier | Examples | Governed by |
 |---|---|---|---|
 | Git commit | SHA | `92e5f28…` | Git history; every change lands here first |
-| Git tag (release) | `vX.Y.Z` or `vX.Y.Z-rc.N` | `v1.0.0`, `v1.0.0-rc.1` | Maintainer tag after `GOVERNANCE.md` §5 criteria hold |
-| Nested Go module tag | `bindings/go/vX.Y.Z` or `bindings/go/vX.Y.Z-rc.N` | `bindings/go/v1.0.0`, `bindings/go/v1.0.0-rc.1` | Same suffix and revision as the main tag (verified by release.yml) |
-| GitHub Release | tag assets + SHA256SUMS | `syntra-v1.0.0` assets | Attached by `.github/workflows/release.yml` |
+| Git tag (package release) | `<crate>-vX.Y.Z` or `-rc.N` | `syntra-core-v1.0.0-rc.1` | release-plz after a reviewed Release PR; protocol stability separately governed by `GOVERNANCE.md` §5 |
+| Nested Go module tag | `bindings/go/vX.Y.Z` or `-rc.N` | `bindings/go/v1.0.0-rc.1` | Same suffix and commit as syntra-core (created/verified by release.yml) |
+| GitHub Release | syntra-core tag assets + SHA256SUMS | `syntra-core-v1.0.0` assets | Attached by `.github/workflows/release.yml` |
 | Syntra Core version | protocol behavior | Syntra Core v1 | `specifications/core/versioning.md` |
 | Protobuf package version | representation namespace | `syntra.v1` | `proto/` + Buf FILE checks |
 
@@ -124,13 +125,13 @@ Rules:
 
 ## 8. Release labels (H)
 
-There are no registry labels. Channel semantics live in Git tag + GitHub Release metadata:
+Channel semantics live in exact package versions, Git tags, and GitHub Release metadata:
 
 | Channel | GitHub mechanism | Git counterpart |
 |---|---|---|
 | `development` | `main` head (no release) | Commit on `main`, pre-tag |
-| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | `vX.Y.Z-rc.N` + `bindings/go/vX.Y.Z-rc.N` at the same revision |
-| `stable` | GitHub Release marked **latest** from a final tag | `vX.Y.Z` + `bindings/go/vX.Y.Z` at the same revision, after `GOVERNANCE.md` §5 criteria hold |
+| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | `syntra-core-vX.Y.Z-rc.N` + `bindings/go/vX.Y.Z-rc.N` at the same commit |
+| `stable` | Final release meeting the protocol stability criteria | `syntra-core-vX.Y.Z` + `bindings/go/vX.Y.Z` at the same commit, after `GOVERNANCE.md` §5 criteria hold; package final/latest metadata alone is insufficient |
 
 Releases move forward only: re-pointing a release at an older commit is forbidden and is treated as an incident (audit, announce, re-release). No other channel vocabulary is introduced; anything fancier stays in Git metadata (notes, release notes), not in a registry.
 
@@ -145,7 +146,9 @@ pull request
   ↓  buf build
   ↓  buf breaking --against <Git baseline>
   ↓  committed-generation drift check (--drift-only)
-  ↓  cargo test / go test / WASM check
+  ↓  cargo test (default workspace + syntra-ffi test-fixture + build_contract.py)
+  ↓  go test (default tags only, no syntranative)
+  ↓  WASM check (non-FFI success + expected syntra-ffi failure)
   ↓  merge allowed (only on green + required reviews)
 ```
 
@@ -158,29 +161,47 @@ pull request
 | Event | Action |
 |---|---|
 | Pull request | Validate only (format, lint, build, breaking vs Git baseline, generation drift, tests). No credentials present; nothing attached. |
-| Merge to `main` | Re-validate. **No automatic release.** Release PRs are opened by release-plz (version bumps + CHANGELOG); maintainers merge them, then cut tags manually. |
-| Version tag `vX.Y.Z` or `vX.Y.Z-rc.N` | Re-validate, then build native libs (amd64/arm64) + WASM + archives and attach to the GitHub Release. Tags are the only path to a release. The matching nested Go tag `bindings/go/vX.Y.Z` or `bindings/go/vX.Y.Z-rc.N`, respectively, must exist at the same revision (verified, fails closed). |
-| Local developer machine | MUST NOT be treated as an official release under any circumstances. Maintainer-run pushes outside the tag workflow do not exist. |
+| Ordinary merge to `main` | Re-validate; maintain the Release PR. `release_always = false` prevents ordinary commits from publishing crates. |
+| Release PR merge | release-plz publishes crates.io versions, per-crate tags, and GitHub Releases. Its syntra-core output directly calls reusable `release.yml`; GITHUB_TOKEN-created events do not trigger artifact runs. |
+| `syntra-core-vX.Y.Z[-rc.N]` maintainer tag push, or recovery dispatch | Re-validate the existing merged tag, package schema/source/crate assets, create/verify the nested Go tag, attach assets, and warm the proxy. Does not run cargo publish. |
+| Local developer machine | Can validate and prepare source, but does not bypass maintainer release authorization. Manual recovery is defined in `RELEASE.md` §4. |
 
-Unreviewed pushes can never become a `stable` release: the release workflow requires a tag event, validates versions/revision plus the nested Go tag identity, and only attaches assets — three independent gates (§14). CI never creates tags.
+Release automation checks tag identity, syntra-core's actual package version,
+merged ancestry, schema gates, and nested Go commit equality. It cannot prove
+RFC approval or protocol conformance. Maintainer review, branch/tag protection,
+and `GOVERNANCE.md` §5 remain required. Schema/Go-only changes need an explicit
+reviewed syntra-core version bump to release a new paired version.
 
 ## 11. Committed generated-types consumer documentation (K)
 
-Consumers obtain types from the committed tree or the release assets — never from a registry. Generated source IS committed here: `crates/**` (Rust) and `bindings/go/**` (Go, incl. `*.pb.go`), drift-checked by `scripts/validate-schema.py --drift-only` (CI-enforced). Repository-side codec tests run against the committed output; `.tmp/` holds only disposable reproducibility output and must never be committed (boundary check fails if it is).
+Consumers obtain types from crates.io, the Go module proxy, the committed tree,
+or release assets. Generated source IS committed under `crates/**` and
+`bindings/go/**` and drift-checked by `scripts/validate-schema.py --drift-only`.
+Both generated trees must be tracked and byte-identical at their expected
+relative paths; missing trees, empty maps, and untracked replacements fail
+closed. `.tmp/` holds disposable reproducibility output and must not be tracked.
 
 Per-ecosystem guide (versions below are the versions pinned for this repository's validation in `specifications/schema/generation.md`, not floating `latest`):
 
-- **Rust (primary):** depend on crates.io (`cargo add syntra-core`) at the released version; use a git pin at the tagged revision only for pre-release verification. For `libtinkle`, distinguish the generated schema types (compiled into `syntra-core`) from the runtime/FFI crate `syntra-ffi`. Generated schema types provide message/enum types only — no networking, gRPC, or transport — using `prost` at the pinned version. Separately, `syntra-ffi` exposes connection open/close, handshake, RPC calls, cancellation, and notification APIs backed by `syntra-runtime`. Branch on `ErrorCode`, never on message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005 — generated getters alone do not implement that policy. `release-plz.toml` versions the crates (Apache-2.0, published); the GitHub Release carries source + `.crate` archives alongside the registry versions.
-- **Go:** use the `bindings/go` module (`github.com/tinklehq/syntra/bindings/go`) via the nested tag `bindings/go/vX.Y.Z` (`go get ...@vX.Y.Z`; proxy.golang.org + pkg.go.dev index automatically, warmed by `go-proxy-warmup`), plus the prebuilt Linux native libs (`libsyntra_ffi.so`/`.a` + `syntra_ffi.h`) attached to the GitHub Release for the CGO wrapper. `buf generate` with the remote plugin `buf.build/protocolbuffers/go:v1.36.6` (revision 1 in this repo's validation), `paths=source_relative`, against the pinned schema commit. Runtime: `google.golang.org/protobuf` at the pinned version.
+- **Rust (primary):** pin released crates.io versions, for example `cargo add syntra-core@X.Y.Z`, or an exact crate tag/commit for Git consumers. Generated schema types provide message/enum types using the pinned `prost` runtime; they provide no networking or transport. Runtime/FFI crates are separate non-normative code. Branch on `ErrorCode`, never message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005. Generated getters alone do not implement that policy. The syntra-core GitHub Release also carries source and `.crate` archives; third-party dependencies are not vendored.
+- **Go:** fetch `github.com/tinklehq/syntra/bindings/go@vX.Y.Z` through the paired nested tag. Default pure-Go mode is the documented path. Import generated types from `.../bindings/go/gen/syntra/v1`; generator `buf.build/protocolbuffers/go:v1.36.6`, revision 1, with `paths=source_relative`; runtime `google.golang.org/protobuf` at the pinned version. Proxy warmup verifies the leading-`v` version; pkg.go.dev indexing is asynchronous and best-effort.
 - **Other languages:** generate from `buf export` output of the tagged revision with a pinned local compiler and record the toolchain version in the consumer's lockfile.
 
-In every case: pin the Git tag (exact `vX.Y.Z`), pin the generator plugin version + revision, and vendor or lock the Protobuf runtime. Rebuild bindings deliberately; never float.
+**Native Go mode (`syntranative`) is unsupported.** Its client/host session
+declarations differ from Rust's C ABI exports, signatures, and ownership
+contract. Do not link the wrapper to Rust binaries based only on an ABI
+version number. Native libraries/headers and browser WASM binaries are not
+published by this release workflow. FFI/Go owners must align the contract and
+add linked runtime tests before those support claims or assets return.
+
+Pin exact package versions or Git revisions, generator plugin versions and
+revisions, and the Protobuf runtime. Rebuild bindings deliberately; never float.
 
 ## 12. Reproducibility (L)
 
 Production consumers pin **exact** revisions:
 
-1. Pin the source: Git tag `vX.Y.Z` (preferred) or commit SHA; for the Go module, the nested tag `bindings/go/vX.Y.Z` at the same revision.
+1. Pin the source: `syntra-core-vX.Y.Z` or commit SHA for schema assets; exact per-crate versions for Rust, and `bindings/go/vX.Y.Z` at the same commit for Go.
 2. Pin the generator: remote plugin version **and** revision (as this repository's validation pins do — see `specifications/schema/generation.md` and `scripts/validate-schema.py`), plus the Protobuf runtime version in the consumer's own lockfile. Verify `SHA256SUMS` on release assets.
 3. Record all three (Git tag, plugin version + revision, runtime version) where the consumer records dependencies, so a rebuild years later reproduces identical types.
 4. Upgrades are deliberate PRs in the consumer: bump one pin at a time, regenerate, rerun the consumer's Syntra conformance subset, and review `CHANGELOG.md` entries since the previously pinned tag.
@@ -197,10 +218,10 @@ Per SNTR-VER-006 and `GOVERNANCE.md` §4, deprecating any schema element follows
 
 ## 14. Release security (N)
 
-- **Release credentials:** the release workflow uses only the automatic `github.token` with `contents: write` to attach assets to the GitHub Release — no long-lived push tokens, no registry credentials in code, logs, or artifacts. No `BUF_TOKEN`, no `bsr-publish` environment, no GHCR login.
+- **Release credentials:** release-plz uses crates.io Trusted Publishing (`id-token: write`) or a scoped bootstrap `CARGO_REGISTRY_TOKEN`, plus `GITHUB_TOKEN` for tags/releases/PRs. The artifact workflow receives no registry secret and uses its automatic token with `contents: write` only in the packaging/tag/attachment job. No `BUF_TOKEN`, BSR publishing environment, or GHCR login.
 - **CI secrets:** PR jobs receive **no** release credentials (validation is credential-less apart from the read-only checkout). `pull_request_target` is not used.
-- **Least privilege:** the token cannot manage modules, owners, or other repositories. Rotation follows GitHub's automatic token rotation; exposure handling is per `SECURITY.md`.
-- **Pull-request security:** validation runs on the PR's code but attaches nothing; the release path triggers only on tags, and tag protection rules restrict who can create `v*` and `bindings/go/v*` tags, so a malicious PR cannot self-release by adding a tag workflow.
+- **Least privilege:** registry credentials are confined to the crates publishing job. Artifact validation uses read-only permissions; tag creation/attachment uses repository contents write. Exposure handling is per `SECURITY.md`.
+- **Pull-request security:** PR validation attaches nothing. Protect main and the `syntra-*-v*` and `bindings/go/v*` namespaces, permitting the release automation identity as needed. Release workflows run only in the upstream repository; privileged workflow changes require maintainer review.
 - **Supply-chain implications:** remote generation submits schema text (including comments) to public generators — publishable content only, never production payloads or credentials (already policy in `specifications/schema/generation.md`). Consumers pin plugin revisions to blunt generator-side substitution.
 - **Untrusted forks:** fork PRs run validation with no secrets (`pull_request`, not `push` semantics for forks); maintainer approval is required before any privileged context touches fork code.
 
@@ -210,21 +231,25 @@ Authoritative relationships at a glance (see §7 for rules):
 
 | You want… | Use… | Example (illustrative) |
 |---|---|---|
-| Exact schema bytes | Git tag (or pre-release: Git SHA) | `v1.0.0` / `92e5f28…` |
-| A release line | Git tag `vX.Y.Z` | `v1.0.0` |
+| Exact schema bytes | syntra-core tag or Git SHA | `syntra-core-v1.0.0` / `92e5f28…` |
+| A package release | Per-crate tag and crates.io version | `syntra-core-v1.0.0` |
 | Nested Go module | Go module tag `bindings/go/vX.Y.Z` (same revision) | `bindings/go/v1.0.0` |
 | Current development | `main` head | moves with each accepted merge |
-| Release candidate | GitHub prerelease / paired `-rc` tags at the same revision | `v1.1.0-rc.1` + `bindings/go/v1.1.0-rc.1` |
-| Production dependency | GitHub Release marked latest / final tag | `v1.1.0` |
+| Release candidate | GitHub prerelease / paired `-rc` tags at the same commit | `syntra-core-v1.1.0-rc.1` + `bindings/go/v1.1.0-rc.1` |
+| Production dependency | Reviewed exact version meeting the needed stability criteria | `syntra-core-v1.1.0`; see `GOVERNANCE.md` §5 |
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |
 | Transport conformance | Transport profile ID | `SNTR-WSS-H1-V1` (see `conformance/profiles.yaml`) |
-| Native libs / WASM | Release assets (+ SHA256SUMS) | `libsyntra_ffi.so`, `syntra_ffi.h`, `syntra-wasm-v1.0.0.tar.gz` |
+| Native Go / browser WASM binaries | Unsupported distribution; no release assets | Requires ABI alignment and linked runtime tests |
 
-Git tags look like `v1.0.0`, **not** `proto-v1.0.0`. The `proto-` prefix scheme is retired: schema and implementation releases share the single `vX.Y.Z` line, with the nested Go tag covering the module path (ADR-010: implementation versions never version the protocol, but they share the release vehicle).
+Per-crate tags such as `syntra-core-v1.0.0` are explicit. Neither global
+`v1.0.0` nor `proto-v1.0.0` tags drive this workflow. Implementation versions
+do not version the protocol (ADR-010).
 
 ## 16. What GitHub Releases provide — and do not
 
-Provides: immutable Git tags, downloadable release assets (Rust source/crates, native libs + header, WASM archive, descriptor, manifests, vectors, SHA256SUMS), and a public browseable release page.
+Provides: source/package/schema assets and SHA256SUMS on the syntra-core
+release, plus per-crate release pages. Tags must never be moved; checksums
+detect corruption but are not signatures or an immutability mechanism.
 
 Does not provide: protocol behavior, state machines, transport implementations, authentication, RPC runtime semantics, conformance verdicts, security review, or any guarantee beyond "these bytes are the tagged revision." A green release workflow means the tag validated and assets attached — it says nothing about whether an implementation conforms (only `conformance/` says that).

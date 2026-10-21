@@ -7,12 +7,22 @@
 //! (`ClientHello.credential` -> `ServerReady`), never HTTP-layer
 //! credentials.
 //!
-//! Mapping (identical to native): binary-only (opcode 0x2); text is
+//! Mapping: binary-only (opcode 0x2); text is
 //! rejected; empty binary is rejected (`INVALID_ARGUMENT`); assembled
-//! messages exceeding 1 MiB are rejected; control handling stays in the
+//! messages exceeding 1 MiB are rejected AFTER browser reassembly; control handling stays in the
 //! browser stack and never reaches the Syntra core; Ping/Pong liveness
 //! is the browser's (documented), with handshake/RPC timers enforced by
 //! the runtime on top.
+//!
+//! Browser limitations: the WebSocket API exposes only assembled messages
+//! and does not permit application close codes 1003/1009 (only 1000 or
+//! 3000..=4999). On text/empty/oversize input we discard without ingesting
+//! and initiate a browser-managed Close with no supplied code. We do not
+//! promise a 1009 wire close or bounded receive assembly here. Additionally,
+//! ws_stream_wasm queues complete messages internally without a configurable
+//! byte cap. This adapter is NOT full SNTR-WS-035/WSS-030 resource-bound
+//! conformance; use native transport for that claim. TLS policy and network
+//! buffering are controlled by the browser, not by this adapter.
 
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -77,9 +87,15 @@ pub async fn connect(
     // set. No Authorization/Cookie/credential headers exist here by
     // construction (the platform forbids them), which enforces the
     // credential-placement rule at the API level.
-    let (meta, ws_stream) = ws_stream_wasm::WsMeta::connect(&cfg.url, vec![SUBPROTOCOL])
-        .await
-        .map_err(|e| TransportError::Connect(format!("ws connect failed: {e}")))?;
+    let (meta, ws_stream) = crate::config::connect_with_timeout(
+        async {
+            ws_stream_wasm::WsMeta::connect(&cfg.url, vec![SUBPROTOCOL])
+                .await
+                .map_err(|e| TransportError::Connect(format!("ws connect failed: {e}")))
+        },
+        cfg.connect_timeout,
+    )
+    .await?;
 
     // The server must have selected our subprotocol (WS section 1C).
     // ws_stream_wasm surfaces the URL/protocol via WsMeta.

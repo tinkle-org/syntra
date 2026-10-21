@@ -9,6 +9,8 @@
 //!   `tls13_connector` (fails closed without roots; handshake tests
 //!   never touch plaintext for production claims).
 
+#![cfg(not(target_arch = "wasm32"))]
+
 #[path = "../../../tests/interoperability/vectors.rs"]
 mod vectors;
 

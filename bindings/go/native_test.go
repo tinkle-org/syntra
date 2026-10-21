@@ -1,5 +1,9 @@
 //go:build syntranative
 
+// Unsupported adapter tests: require a custom implementation of the
+// proposed syntra_ffi_* ABI that the current crates/syntra-ffi does not
+// export, so linking fails. Skipped by default (no -tags); CI runs
+// default tags only. Do not enable in CI or releases.
 package syntra
 
 import (

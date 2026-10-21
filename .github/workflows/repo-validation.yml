@@ -2,8 +2,7 @@
 # only, never publishes. Fails closed: any error blocks the RC checklist
 # (RELEASE.md). Network use is limited to pinned Buf remote plugins invoked
 # by scripts/validate-schema.py; no credentials are required or read.
-# Distribution is Git tags + GitHub Releases only: no BSR push, no GHCR,
-# no crates.io publish. CI never creates tags.
+# Publishing and tag creation belong to release-plz.yml/release.yml.
 name: repo-validation
 
 on:
@@ -26,6 +25,14 @@ jobs:
 
       - name: Install validator dependencies
         run: pip install pyyaml
+
+      - name: Release and validator regression tests (offline)
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
 
       - name: A1 markdown validation (hygiene, fences, EOF newlines)
         run: python3 scripts/validate-repo.py markdown
@@ -78,8 +85,7 @@ jobs:
 
   generated-freshness:
     # Committed Rust/Go generated types must match a pinned regeneration.
-    # Bootstrap-safe: passes with a notice when the committed trees do not
-    # exist yet; fails closed on drift once they do.
+    # Both language trees are required; missing/untracked output fails closed.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -99,7 +105,9 @@ jobs:
         run: python3 scripts/validate-schema.py --drift-only
 
   rust-tests:
-    # Runs once the Rust workspace lands (crates/*). Skipped until then.
+    # Default workspace tests (syntra-ffi default-empty, no ABI) plus the
+    # explicit native fixture tests. The fixture feature is test-only and
+    # never enabled in shipped binaries (including via --all-features).
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -117,17 +125,28 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         with:
           toolchain: "1.88"
+          targets: wasm32-unknown-unknown
 
-      - name: cargo test (locked workspace)
+      - name: cargo test (locked workspace, default features)
         if: steps.detect.outputs.present == 'true'
         run: cargo test --locked --workspace
+
+      - name: cargo test (syntra-ffi native fixture only)
+        if: steps.detect.outputs.present == 'true'
+        run: cargo test --locked -p syntra-ffi --features test-fixture
+
+      - name: FFI build contract (default empty + fixture + WASM rejection)
+        if: steps.detect.outputs.present == 'true'
+        run: python3 crates/syntra-ffi/tests/build_contract.py
 
       - name: No Rust workspace yet (bootstrap skip)
         if: steps.detect.outputs.present != 'true'
         run: echo "No Cargo.toml/Cargo.lock yet; rust-tests skipped (bootstrap)."
 
   go-tests:
-    # Runs once the committed Go module lands (bindings/go/go.mod).
+    # Supported pure-Go build only (no -tags). The syntranative adapter is
+    # unsupported: native_test.go requires missing symbols and is skipped by
+    # default; CI MUST NOT pass -tags syntranative.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -147,12 +166,12 @@ jobs:
           go-version: "1.26.4"
           cache-dependency-path: bindings/go/go.sum
 
-      - name: go build (committed bindings)
+      - name: go build (committed bindings, default tags only)
         if: steps.detect.outputs.present == 'true'
         run: go build ./...
         working-directory: bindings/go
 
-      - name: go test (committed bindings)
+      - name: go test (committed bindings, default tags only)
         if: steps.detect.outputs.present == 'true'
         run: go test -count=1 -v ./...
         working-directory: bindings/go
@@ -162,7 +181,9 @@ jobs:
         run: echo "No bindings/go/go.mod yet; go-tests skipped (bootstrap)."
 
   wasm-check:
-    # Browser WASM compile check for the FFI crate once it lands.
+    # syntra-ffi rejects all WASM targets by design (compile_error). This job
+    # asserts that expected failure plus the non-FFI WASM compile check.
+    # No browser WASM archive is produced; WASM checks are gates, not SDK claims.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -182,9 +203,26 @@ jobs:
           toolchain: "1.88"
           targets: wasm32-unknown-unknown
 
-      - name: WASM compile check (syntra-ffi)
+      - name: WASM compile check (non-FFI crates must succeed)
         if: steps.detect.outputs.present == 'true'
-        run: cargo check --locked -p syntra-ffi --target wasm32-unknown-unknown
+        run: cargo check --locked -p syntra-core -p syntra-runtime -p syntra-ws -p syntra-web --target wasm32-unknown-unknown
+
+      - name: WASM rejection check (syntra-ffi must fail with diagnostic)
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          set +e
+          cargo check --locked -p syntra-ffi --target wasm32-unknown-unknown 2>&1 | tee /tmp/ffi-wasm.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "error: expected syntra-ffi WASM check to fail (blocking fixture is native-only)" >&2
+            exit 1
+          fi
+          grep -q "syntra-ffi does not support WASM" /tmp/ffi-wasm.log || {
+            echo "error: syntra-ffi WASM failure lacks expected diagnostic" >&2
+            exit 1
+          }
 
       - name: No FFI crate yet (bootstrap skip)
         if: steps.detect.outputs.present != 'true'

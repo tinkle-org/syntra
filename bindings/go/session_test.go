@@ -2,9 +2,10 @@
 // context cancellation, notifications, concurrency, and deterministic
 // close over a loopback transport. All method fixtures are neutral
 // (/example.Echo/Echo, /example.KV/Get, /example.Slow/Wait); no
-// messenger semantics appear here. The same tests exercise whichever
-// core is linked (pure-Go by default, Rust-backed with -tags
-// syntranative); TestCoreBackend logs the selection.
+// messenger semantics appear here. Tests run on the supported pure-Go
+// core in default builds (no -tags). The syntranative adapter is
+// unsupported and is not exercised here; TestCoreBackend logs the
+// linked selection.
 package syntra
 
 import (
@@ -69,6 +70,7 @@ type pair struct {
 	cancel   context.CancelFunc
 	a, b     Transport
 	t        *testing.T
+	cleanup  sync.Once
 }
 
 func newPair(t *testing.T, ccfg ClientConfig, hcfg HostConfig) *pair {
@@ -84,11 +86,13 @@ func newPair(t *testing.T, ccfg ClientConfig, hcfg HostConfig) *pair {
 	a, b := LoopbackPair()
 	ctx, cancel := context.WithCancel(context.Background())
 	p := &pair{client: client, host: host, runErr: make(chan error, 1), serveErr: make(chan error, 1), cancel: cancel, a: a, b: b, t: t}
+	t.Cleanup(p.Cleanup)
 	go func() { p.serveErr <- host.Serve(ctx, a) }()
 	go func() { p.runErr <- client.Run(ctx, b) }()
-	deadline := time.Now().Add(3 * time.Second)
+	warmupCtx, warmupStop := context.WithTimeout(ctx, 3*time.Second)
+	defer warmupStop()
 	for {
-		out, err := client.Call(ctx, "/example.Echo/Echo", []byte("warmup"), 1000)
+		out, err := client.Call(warmupCtx, "/example.Echo/Echo", []byte("warmup"), 1000)
 		if err == nil && string(out) == "warmup" {
 			return p
 		}
@@ -96,7 +100,7 @@ func newPair(t *testing.T, ccfg ClientConfig, hcfg HostConfig) *pair {
 		if errors.As(err, &rerr) && IsFailedPrecondition(rerr.Code) {
 			t.Fatalf("handshake failed: %v", err)
 		}
-		if time.Now().After(deadline) {
+		if warmupCtx.Err() != nil {
 			t.Fatalf("handshake never completed: %v", err)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -105,11 +109,20 @@ func newPair(t *testing.T, ccfg ClientConfig, hcfg HostConfig) *pair {
 
 // Cleanup stops the session deterministically.
 func (p *pair) Cleanup() {
-	p.cancel()
-	_ = p.client.Close()
-	_ = p.host.Close()
-	_ = p.a.Close()
-	_ = p.b.Close()
+	p.cleanup.Do(func() {
+		p.cancel()
+		_ = p.client.Close()
+		_ = p.host.Close()
+		_ = p.a.Close()
+		_ = p.b.Close()
+		for _, done := range []<-chan error{p.runErr, p.serveErr} {
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				p.t.Error("session pump did not stop during cleanup")
+			}
+		}
+	})
 }
 
 func callCode(t *testing.T, err error) ErrorCode {

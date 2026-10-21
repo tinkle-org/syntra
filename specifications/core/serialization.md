@@ -26,7 +26,9 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-SER-007** — Malformed input behavior: truncated varints, illegal wire types, overlong lengths, invalid UTF-8 in `string` fields (e.g., `method`, `connection_id`, `RpcError.message`), or depth/size violations MUST be rejected deterministically. In RPC context → `ERROR_CODE_INVALID_ARGUMENT` or `RESOURCE_EXHAUSTED`; in handshake → handshake failure + close; at framing layer → connection error per `framing.md`. Implementations MUST NOT panic, MUST NOT allocate unboundedly, and MUST NOT leak private state in the resulting error.
 
-**SNTR-SER-008** — `reserved 16, 17` and `reserved "event", "resume", "ack"` MUST be preserved. Decoders MUST reject any wire occurrence of a reserved field number as malformed; encoders MUST never emit them.
+**SNTR-SER-008** — `reserved 16, 17` and `reserved "event", "resume", "ack"` MUST be preserved. Decoders MUST reject any wire occurrence of reserved field numbers 16/17 at the top-level `Frame` as malformed; encoders MUST never emit them. Numbers 16/17 inside nested messages (`RpcResult`, `RpcError`, `ClientHello`, etc.) are unassigned unknown fields, not reserved occurrences, and MUST be tolerated per SNTR-SER-003 (forward compatibility). `reserved` names are schema reservations, not binary wire strings.
+
+**SNTR-SER-008A** — Duplicate scalar clarification (RFC 0001 B4): duplicate `version`/`request_id` occurrences on the wire follow protobuf merge semantics (last value wins) and MUST NOT be rejected as malformed; validators type-check each occurrence and validate the merged value. Duplicate `body` alternatives remain rejected per SNTR-WIRE-002. Duplicate `Cancel` inner content is unknown-field tolerance, not a violation: `Cancel` carries no defined fields, so any well-formed inner bytes MUST be tolerated per SNTR-SER-003 (malformed inner wire still fails as `INVALID_ARGUMENT`).
 
 ## 2. Client behavior
 

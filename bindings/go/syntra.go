@@ -3,13 +3,11 @@
 // Distribution note: `go get github.com/tinklehq/syntra/bindings/go`
 // installs the Go sources in this module only (generated Protobuf types
 // plus the pure-Go validation, codec, handshake, and session logic).
-// The optional native accelerator (libsyntra_ffi from the crates/syntra-ffi
-// C ABI, shipped as a GitHub Release artifact) is a separate prerequisite:
-// this module never downloads binaries. Without the native library — the
-// default build — sessions run on the pure-Go core with identical protocol
-// semantics. Build with `-tags syntranative` (plus CGO and the installed
-// library) to link the Rust-backed core. See native.go for the C ABI
-// contract and ownership rules.
+// Sessions use the supported pure-Go core; no native library is required
+// and this module never downloads binaries. The syntranative adapter is
+// unsupported: its proposed syntra_ffi_* ABI is incompatible with the
+// current crates/syntra-ffi exports. Release-built Rust libraries cannot
+// enable it. See README.md for the ABI reconciliation blockers.
 //
 // The binding implements the transport-independent core only
 // (specifications/core/{framing,rpc,serialization,errors,handshake}.md and
@@ -1358,12 +1356,16 @@ func MarshalFrame(f *Frame) ([]byte, error) {
 }
 
 // UnmarshalFrame decodes exactly one Frame from data. It rejects empty
-// inputs, trailing bytes, reserved numbers, and duplicate bodies before
-// running structural validation. Request methods are validated by the host
-// so malformed methods receive per-RPC errors. proto.Unmarshal owns decoding; the
-// pre-scan owns protocol strictness the generated codec does not enforce
-// (reserved 16/17, duplicate body alternatives, unexpected top-level
-// fields).
+// inputs, trailing bytes, reserved top-level numbers 16/17, and duplicate
+// bodies before running structural validation. Duplicate version/request_id
+// occurrences are type-checked but follow protobuf merge semantics
+// (last wins), matching the Rust core. Cancel inner bytes and nested
+// unassigned numbers are tolerated as unknown fields per SNTR-SER-003.
+// Request methods are validated by the host so malformed methods receive
+// per-RPC errors. proto.Unmarshal owns decoding; the pre-scan owns protocol
+// strictness the generated codec does not enforce (reserved 16/17 and
+// duplicate body alternatives). Unknown fields alongside a known body remain
+// forward-compatible metadata.
 func UnmarshalFrame(data []byte) (*Frame, error) {
 	if err := ValidateFrameSize(len(data)); err != nil {
 		return nil, err
@@ -1377,6 +1379,13 @@ func UnmarshalFrame(data []byte) (*Frame, error) {
 	var f Frame
 	if err := proto.Unmarshal(data, &f); err != nil {
 		return nil, NewRpcError(ErrorCodeInvalidArgument, fmt.Sprintf("syntra: malformed frame: %v", err))
+	}
+	// Match the Rust core's unknown-only classification (SNTR-WIRE-004).
+	// There is no allocated future-body tag range: with a known body,
+	// unknown fields must remain tolerated (SNTR-SER-003). Distinguishing
+	// mixed unknown bodies from metadata needs the discriminator in RFC B5.
+	if BodyKindOf(&f) == BodyKindNone && len(f.ProtoReflect().GetUnknown()) > 0 {
+		return nil, NewRpcError(ErrorCodeUnimplemented, "syntra: unknown frame variant")
 	}
 	// proto.Unmarshal consumed every tag the pre-scan walked, so a
 	// successful unmarshal here consumed exactly one Frame.
@@ -1402,9 +1411,13 @@ func UnmarshalFrame(data []byte) (*Frame, error) {
 
 // scanFrameTags walks top-level tags to enforce strictness before
 // proto.Unmarshal: reserved 16/17 rejected, duplicate bodies rejected,
-// unexpected fields rejected, version/request_id type-checked.
+// unknown fields skipped, version/request_id type-checked. Duplicate
+// version/request_id occurrences follow protobuf merge semantics
+// (last value wins in proto.Unmarshal); they are type-checked here but
+// not rejected, matching the Rust core and SNTR-SER-002
+// non-canonical tolerance. Duplicate bodies remain rejected per
+// SNTR-WIRE-002 (see RFC 0001 B4).
 func scanFrameTags(data []byte) error {
-	seen := map[protowire.Number]bool{}
 	bodySeen := false
 	raw := data
 	for len(raw) > 0 {
@@ -1421,10 +1434,6 @@ func scanFrameTags(data []byte) error {
 			if typ != protowire.VarintType {
 				return NewRpcError(ErrorCodeInvalidArgument, "syntra: malformed version")
 			}
-			if seen[num] {
-				return NewRpcError(ErrorCodeInvalidArgument, "syntra: duplicate frame field")
-			}
-			seen[num] = true
 			v, m := protowire.ConsumeVarint(raw)
 			if m < 0 {
 				return NewRpcError(ErrorCodeInvalidArgument, "syntra: malformed version")
@@ -1437,10 +1446,6 @@ func scanFrameTags(data []byte) error {
 			if typ != protowire.VarintType {
 				return NewRpcError(ErrorCodeInvalidArgument, "syntra: malformed request_id")
 			}
-			if seen[num] {
-				return NewRpcError(ErrorCodeInvalidArgument, "syntra: duplicate frame field")
-			}
-			seen[num] = true
 			_, m := protowire.ConsumeVarint(raw)
 			if m < 0 {
 				return NewRpcError(ErrorCodeInvalidArgument, "syntra: malformed request_id")
@@ -1459,9 +1464,10 @@ func scanFrameTags(data []byte) error {
 				return NewRpcError(ErrorCodeInvalidArgument, "syntra: frame has multiple bodies set")
 			}
 			bodySeen = true
-			if num == 14 && len(v) != 0 {
-				return NewRpcError(ErrorCodeInvalidArgument, "syntra: cancel must be empty")
-			}
+			// Cancel carries no defined fields; any inner bytes are
+			// unknown fields tolerated per SNTR-SER-003 (forward
+			// compatibility), matching the Rust core. Malformed inner
+			// wire still fails in proto.Unmarshal below.
 			if err := scanNested(num, v); err != nil {
 				return err
 			}

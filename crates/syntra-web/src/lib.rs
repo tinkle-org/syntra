@@ -153,13 +153,24 @@ pub async fn call(
 #[wasm_bindgen]
 pub async fn poll_notify(client_id: u32, timeout_ms: u32) -> Result<Option<Vec<u8>>, JsValue> {
     let initiator = with_client(client_id, |c| c.initiator.clone())?;
+    poll_notification(&initiator, timeout_ms).await.map_err(err)
+}
+
+// Keep the result typed until the JS boundary (also testable natively,
+// where constructing a JsValue error is unsupported by wasm-bindgen).
+async fn poll_notification(
+    initiator: &Initiator,
+    timeout_ms: u32,
+) -> Result<Option<Vec<u8>>, syntra_core::SyntraError> {
     // Executor-agnostic race: runtime sleep is JS timers on wasm.
-    let res = tokio::select! {
+    tokio::select! {
         biased;
-        n = initiator.next_notification() => Ok(n),
+        n = initiator.next_notification() => match n {
+            Some(payload) => Ok(Some(payload)),
+            None => Err(syntra_core::SyntraError::Closed("connection closed and notifications drained".into())),
+        },
         _ = syntra_runtime::sleep_for(std::time::Duration::from_millis(timeout_ms as u64)) => Ok(None),
-    };
-    res
+    }
 }
 
 /// Graceful close + registry release. Resolves false for unknown ids.
@@ -180,4 +191,70 @@ pub async fn close(client_id: u32) -> bool {
 #[wasm_bindgen]
 pub fn client_count() -> u32 {
     clients().lock().unwrap().len() as u32
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn close_drains_admitted_notifications_before_rejecting() {
+        let (initiator, _host) = syntra_runtime::loopback_pair(
+            Arc::new(AllowAnonymous),
+            fixture_handler(),
+            ConnectionConfig::default(),
+        );
+        initiator.handshake(vec![]).await.unwrap();
+        let notification = syntra_core::Frame {
+            version: 1,
+            request_id: 0,
+            body: Some(syntra_core::proto::frame::Body::Notification(
+                syntra_core::Notification {
+                    payload: b"admitted".to_vec(),
+                },
+            )),
+        };
+        let bytes =
+            syntra_core::encode_frame(&notification, syntra_core::ValidationContext::active(1))
+                .unwrap();
+        initiator.ingest(&bytes).await;
+        initiator.close().await;
+        assert_eq!(
+            poll_notification(&initiator, 0).await.unwrap(),
+            Some(b"admitted".to_vec())
+        );
+        assert!(matches!(
+            poll_notification(&initiator, 0).await,
+            Err(syntra_core::SyntraError::Closed(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn closed_notification_poll_is_not_a_timeout() {
+        let (initiator, _writer) = Initiator::new(ConnectionConfig::default());
+        initiator.close().await;
+        assert!(matches!(
+            poll_notification(&initiator, 10).await,
+            Err(syntra_core::SyntraError::Closed(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn close_during_notification_poll_rejects_promptly() {
+        let (initiator, _writer) = Initiator::new(ConnectionConfig::default());
+        let (result, ()) = tokio::join!(
+            tokio::time::timeout(
+                std::time::Duration::from_millis(200),
+                poll_notification(&initiator, 10_000)
+            ),
+            async {
+                tokio::task::yield_now().await;
+                initiator.on_transport_lost().await;
+            }
+        );
+        assert!(matches!(
+            result.expect("close must wake poll"),
+            Err(syntra_core::SyntraError::Closed(_))
+        ));
+    }
 }

@@ -11,21 +11,18 @@ import (
 //
 // When the syntranative build tag is absent, sessions run on this
 // in-process core built from the syntra.go primitives (Connection,
-// Tracker, codec). Protocol behavior — validation order, correlation,
-// deadlines, cancellation, error normalization — is identical to the
-// Rust-backed core; only the execution substrate differs. NativeAvailable
+// Tracker, codec). This is the supported Go session backend. NativeAvailable
 // reports false in this configuration, and no CGO or native library is
-// required to build, vet, or test the module.
+// required to build, vet, or test the module. The proposed native adapter
+// does not match the current Rust FFI and is unsupported.
 
 // NativeAvailable reports whether the process links the native
-// libsyntra_ffi core. It is false here; build with -tags syntranative
-// (plus CGO and the installed library) to enable it.
+// libsyntra_ffi core. It is false in the supported pure-Go build.
 func NativeAvailable() bool { return false }
 
 // CheckABI verifies the linked native core's C ABI version. With no
-// native library linked there is nothing to check; the pure-Go core
-// implements the same session contract, so this returns nil. The native
-// build queries syntra_ffi_abi_version and fails closed on mismatch.
+// native library linked there is nothing to check, so this returns nil.
+// It does not establish compatibility with the unsupported native adapter.
 func CheckABI() error { return nil }
 
 // newClientCore opens a pure-Go initiator core.
@@ -186,11 +183,17 @@ func (g *goClientCore) beginCall(requestID uint64, method string, payload []byte
 	if err := ValidatePayloadSize(len(payload)); err != nil {
 		return nil, err
 	}
+	req := &RpcRequest{Method: method, Payload: payload, TimeoutMs: timeoutMs}
+	raw, err := MarshalFrame(NewRequestFrame(g.negotiated, requestID, req))
+	if err != nil {
+		return nil, err
+	}
+	// Encoding can fail even when the payload fits: envelope overhead also
+	// counts toward MaxFrameBytes. Only track requests we can transmit.
 	if err := g.tracker.StartWithBudget(time.Now(), requestID, method, timeoutMs); err != nil {
 		return nil, err
 	}
-	req := &RpcRequest{Method: method, Payload: payload, TimeoutMs: timeoutMs}
-	return MarshalFrame(NewRequestFrame(g.negotiated, requestID, req))
+	return raw, nil
 }
 
 func (g *goClientCore) cancelCall(requestID uint64) []byte {
@@ -263,6 +266,11 @@ type pendingReq struct {
 	id  uint64
 	req *RpcRequest
 }
+
+// hostNotificationBacklogLimit bounds notification admission against the
+// shared outbound backlog. Terminal RPC results remain admissible at capacity.
+// Each frame is also bounded by MaxFrameBytes.
+const hostNotificationBacklogLimit = 256
 
 // goHostCore is the pure-Go responder core for one connection.
 type goHostCore struct {
@@ -462,6 +470,9 @@ func (g *goHostCore) notify(payload []byte) error {
 	if err := ValidatePayloadSize(len(payload)); err != nil {
 		return err
 	}
+	if len(g.outbound) >= hostNotificationBacklogLimit {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: outbound notification backlog full")
+	}
 	raw, err := MarshalFrame(NewNotificationFrame(g.negotiated, &Notification{Payload: payload}))
 	if err != nil {
 		return err
@@ -477,7 +488,11 @@ func (g *goHostCore) nextOutbound() ([]byte, bool) {
 		return nil, false
 	}
 	raw := g.outbound[0]
+	g.outbound[0] = nil // Do not retain a drained frame in the backing array.
 	g.outbound = g.outbound[1:]
+	if len(g.outbound) == 0 {
+		g.outbound = nil
+	}
 	return raw, true
 }
 

@@ -166,6 +166,8 @@ impl SyntraError {
 
     /// True when the handler may have executed and the outcome is unknown.
     /// Such failures MUST NOT be blindly retried for non-idempotent ops.
+    /// A peer-reported deadline or unavailability is not proof of rollback
+    /// or non-execution, even when received as a terminal RPC error.
     pub fn is_unknown_outcome(&self) -> bool {
         matches!(
             self,
@@ -173,7 +175,8 @@ impl SyntraError {
         ) || matches!(
             self,
             Self::Rpc { code, .. }
-                if matches!(code, ErrorCode::Internal | ErrorCode::Unknown)
+                if matches!(code, ErrorCode::Internal | ErrorCode::Unknown
+                    | ErrorCode::DeadlineExceeded | ErrorCode::Unavailable)
         )
     }
 }
@@ -185,5 +188,39 @@ impl From<RpcError> for SyntraError {
             raw_code: e.raw_code,
             message: e.message,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rpc_unknown_outcome_is_conservative_for_loss_deadline_and_internal_errors() {
+        for raw in 1..=16 {
+            let (code, _) = ErrorCode::from_i32_lossy(raw);
+            let error = SyntraError::from(RpcError::new(code, "public failure"));
+            assert_eq!(
+                error.is_unknown_outcome(),
+                matches!(
+                    code,
+                    ErrorCode::DeadlineExceeded
+                        | ErrorCode::Unavailable
+                        | ErrorCode::Internal
+                        | ErrorCode::Unknown
+                ),
+                "{code:?}"
+            );
+        }
+        assert!(SyntraError::Unavailable("lost".into()).is_unknown_outcome());
+        assert!(SyntraError::DeadlineExceeded("expired".into()).is_unknown_outcome());
+        assert!(SyntraError::Closed("closed".into()).is_unknown_outcome());
+        let (code, raw_code) = ErrorCode::from_i32_lossy(1000);
+        assert!(SyntraError::Rpc {
+            code,
+            raw_code,
+            message: "future failure".into()
+        }
+        .is_unknown_outcome());
     }
 }

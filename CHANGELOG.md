@@ -74,17 +74,25 @@ tags + GitHub Releases only (no BSR, no registries); license is Apache-2.0
 
 ### Added
 
-- Apache-2.0 `LICENSE` (consistent with libtinkle); all Rust packages are
-  Apache-2.0 with `publish = false` (Git tags + GitHub Releases only).
-- `release-plz.toml` (Rust workspace versioning + Release PRs, no crates.io
-  publish) and `.github/workflows/release.yml` (tag-triggered Linux
-  amd64/arm64 `syntra-ffi` native libs + header, browser WASM archive,
-  Rust/Go archives, descriptor/manifests/vectors, SHA256SUMS attached to
-  the GitHub Release; nested `bindings/go/vX.Y.Z` tag verified to the same
-  revision; CI never creates tags).
+- Apache-2.0 `LICENSE`; all Rust packages are Apache-2.0 and publish
+  to crates.io via release-plz Trusted Publishing (OIDC, with scoped
+  `CARGO_REGISTRY_TOKEN` bootstrap fallback).
+- `release-plz.toml` (Rust workspace versioning + Release PRs, crates.io
+  publish enabled) and `.github/workflows/release.yml` (per-crate tags,
+  crates.io publication on Release PR merge, then schema/source/crate/Go
+  archives, descriptor/manifests/vectors, SHA256SUMS attached to the
+  syntra-core GitHub Release; nested `bindings/go/vX.Y.Z` tag verified to
+  the same revision; no native/header/browser-WASM assets; CI never creates
+  tags).
+- `crates/syntra-ffi` is default-empty (no C ABI exports) with an explicit
+  native `test-fixture` feature only for tests; all WASM targets are
+  rejected at compile time. CI runs default workspace tests plus
+  `--features test-fixture` tests and `build_contract.py`, and asserts the
+  expected WASM failure alongside non-FFI WASM checks.
 - Committed generated types under `crates/` (Rust) and `bindings/go/` (Go,
   incl. `*.pb.go`), drift-checked by `scripts/validate-schema.py
-  --drift-only` and CI jobs (`cargo test`, `go test`, WASM check).
+  --drift-only` and CI jobs (default + fixture `cargo test`, default-tag
+  `go test`, expected-failure WASM check).
 - Seven-file public IDL in `proto/syntra/v1`, preserving the
   existing message names, field numbers, oneofs, enum registry and reservations.
   Session control/capability messages and requested extensions remain deferred
@@ -188,12 +196,13 @@ tags + GitHub Releases only (no BSR, no registries); license is Apache-2.0
   preservation plan without adding wire types or changing protocol semantics.
 - BSR publication path: deleted `.github/workflows/schema-publish.yml`, removed
   the `buf.build/tinklecorp/syntra` registry identity from `buf.yaml`, and
-  retired `proto-v*` tags / BSR labels. Releases are Git tags `vX.Y.Z`
-  (+ nested `bindings/go/vX.Y.Z` at the same revision) with GitHub Release
-  assets (native libs + header, WASM, Rust/Go archives, descriptor,
-  manifests, vectors, SHA256SUMS); no crates.io, no GHCR, no `buf push`.
-  `libtinkle` consumes the Rust crates directly via git; Go servers use the
-  committed `bindings/go` CGO wrapper plus the prebuilt Linux libs.
+  retired `proto-v*` tags / BSR labels. Releases are per-crate tags
+  `<crate>-vX.Y.Z` (+ nested `bindings/go/vX.Y.Z` at the syntra-core
+  revision) with crates.io publication plus GitHub Release assets (source,
+  crate, Go-bindings archives, descriptor, manifests, vectors, SHA256SUMS);
+  no native/header/browser-WASM assets, no GHCR, no `buf push`. Go servers
+  use the default pure-Go module; `syntranative` is unsupported and
+  withheld.
 - `.tmp/`-only generation model: committed generated types now live under
   `crates/` (Rust) and `bindings/go/` (Go, incl. `*.pb.go`), drift-checked
   by `scripts/validate-schema.py --drift-only` (CI-enforced). No wire or

@@ -121,6 +121,94 @@ impl Default for CancelToken {
 mod cancel_tests {
     use super::*;
 
+    fn connection() -> Connection {
+        let (writer, _rx) = mpsc::channel(1);
+        let (shared, notifications) =
+            Shared::new(Role::Initiator, writer, ConnectionConfig::default(), 1, 1);
+        Connection::wrap(shared, notifications)
+    }
+
+    #[tokio::test]
+    async fn notification_waiters_wake_on_close_and_late_subscribers_see_close() {
+        let conn = connection();
+        let mut first = Box::pin(conn.next_notification());
+        let mut second = Box::pin(conn.next_notification());
+        assert!(futures_util::poll!(&mut first).is_pending());
+        assert!(futures_util::poll!(&mut second).is_pending());
+        conn.close().await;
+        assert!(*conn.subscribe_close().borrow());
+        tokio::time::timeout(Duration::from_secs(1), async {
+            assert_eq!(first.await, None);
+            assert_eq!(second.await, None);
+            assert_eq!(conn.next_notification().await, None);
+        })
+        .await
+        .expect("close must wake all notification consumers");
+    }
+
+    #[tokio::test]
+    async fn notifications_drain_in_order_after_transport_loss() {
+        let conn = connection();
+        conn.shared
+            .notif_tx
+            .try_send(Bytes::from_static(b"one"))
+            .unwrap();
+        conn.shared.notif_tx.try_send(Bytes::new()).unwrap();
+        conn.on_transport_lost().await;
+        tokio::time::timeout(Duration::from_secs(1), async {
+            assert_eq!(conn.next_notification().await, Some(b"one".to_vec()));
+            assert_eq!(conn.next_notification().await, Some(vec![]));
+            assert_eq!(conn.next_notification().await, None);
+        })
+        .await
+        .expect("closed notification queue must terminate after draining");
+    }
+
+    #[tokio::test]
+    async fn transitions_never_reopen_a_closed_connection() {
+        for _ in 0..256 {
+            let conn = connection();
+            let (result, ()) = tokio::join!(conn.transition(StateEvent::HelloSent), conn.close());
+            let _ = result;
+            assert_eq!(conn.state().await, ConnectionState::Closed);
+            assert!(conn.transition(StateEvent::VersionAccepted).await.is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn ready_transition_races_close_on_another_thread() {
+        const ROUNDS: usize = 4096;
+        let connections: Arc<Vec<_>> = Arc::new((0..ROUNDS).map(|_| connection()).collect());
+        for conn in connections.iter() {
+            *conn.shared.state.write().await = ConnectionState::Authenticating;
+        }
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let runtime = tokio::runtime::Handle::current();
+        let other = connections.clone();
+        let other_barrier = barrier.clone();
+        let worker = std::thread::spawn(move || {
+            for conn in other.iter() {
+                other_barrier.wait();
+                let _ = runtime.block_on(conn.transition(StateEvent::ReadyReceived));
+                other_barrier.wait();
+            }
+        });
+        let mut reopened = Vec::new();
+        for (round, conn) in connections.iter().enumerate() {
+            barrier.wait();
+            conn.close().await;
+            barrier.wait();
+            if conn.state().await != ConnectionState::Closed {
+                reopened.push(round);
+            }
+        }
+        worker.join().unwrap();
+        assert!(
+            reopened.is_empty(),
+            "terminal state overwritten in rounds {reopened:?}"
+        );
+    }
+
     #[tokio::test]
     async fn cancellation_wakes_all_waiters_and_future_waiters() {
         let token = CancelToken::new();
@@ -169,6 +257,38 @@ mod cancel_tests {
         canceller.join().unwrap();
         assert_eq!(missed, None, "cancellation notification was lost");
     }
+
+    /// Regression for the wasm `Host::close` hang: `TaskHandle::abort` is a
+    /// no-op on wasm, so a handler that ignores its `CancelToken` would hang
+    /// `abort_inflight`/`stop_handshake_timer` forever without a bound. This
+    /// natively simulates that non-cooperative case by intentionally *not*
+    /// aborting a pending task and asserting `join_bounded` still returns
+    /// within the grace (best-effort detach, mirroring the 1s Go
+    /// `handlerShutdownGrace` and WS `shutdown_grace`).
+    #[tokio::test]
+    async fn join_bounded_detaches_non_cooperative_task_within_grace() {
+        // Pending forever, never observes cancellation: the wasm hang shape.
+        let task = spawn_task(async {
+            std::future::pending::<()>().await;
+        });
+        // Deliberately do not call `abort` (wasm no-op simulation).
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            task.join_bounded(Duration::from_millis(50)),
+        )
+        .await
+        .expect("bounded join must not hang on a non-cooperative task");
+    }
+
+    /// Cooperative tasks still join promptly through the bounded path (no
+    /// added delay on the native fast path).
+    #[tokio::test]
+    async fn join_bounded_joins_completed_task_immediately() {
+        let task = spawn_task(async {});
+        tokio::time::timeout(Duration::from_secs(1), task.join_bounded(SHUTDOWN_GRACE))
+            .await
+            .expect("completed task must join without waiting for the grace");
+    }
 }
 
 /// Sleep without depending on a timer driver (works on native and wasm).
@@ -214,20 +334,78 @@ pub(crate) async fn sleep_until(deadline: std::time::Instant) {
     }
 }
 
+/// Bounded shutdown grace for targets where `TaskHandle::abort` is
+/// cooperative-only (wasm32 `spawn_local` has no preemptive cancel).
+/// Mirrors the Go binding's `handlerShutdownGrace` (1s) and the WS
+/// `close_grace`/`shutdown_grace` budgets: shutdown signals cancellation,
+/// then waits at most this long before detaching. Native `abort` still
+/// preempts immediately, so the fast path is unchanged; the bound only
+/// decides how long a non-cooperative wasm task can delay `close`.
+pub(crate) const SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
+
 /// Spawn a background task. Native uses the tokio runtime; wasm uses the
 /// browser microtask queue (`spawn_local`). The returned handle aborts
 /// the task on native; on wasm cancellation is cooperative only
 /// (documented: browser handlers MUST honor `CancelToken`).
 pub(crate) struct TaskHandle {
+    scope: Arc<()>,
     #[cfg(not(target_arch = "wasm32"))]
     inner: Option<tokio::task::JoinHandle<()>>,
+    #[cfg(target_arch = "wasm32")]
+    done: oneshot::Receiver<()>,
+}
+
+tokio::task_local! {
+    // Works with both native tasks and browser spawn_local futures; never
+    // expose this runtime ownership marker as a protocol/session identity.
+    static TASK_SCOPE: Arc<()>;
 }
 
 impl TaskHandle {
+    pub(crate) fn is_current(&self) -> bool {
+        TASK_SCOPE
+            .try_with(|scope| Arc::ptr_eq(scope, &self.scope))
+            .unwrap_or(false)
+    }
+
     pub(crate) fn abort(&self) {
+        // A handler can initiate shutdown. Let that task finish its
+        // cleanup instead of cancelling itself at the next join await.
+        if self.is_current() {
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(h) = &self.inner {
             h.abort();
+        }
+    }
+
+    pub(crate) async fn join(self) {
+        // Awaiting our own JoinHandle would deadlock forever. It will
+        // unwind naturally once the initiating handler returns.
+        if self.is_current() {
+            return;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(h) = self.inner {
+            let _ = h.await;
+        }
+        #[cfg(target_arch = "wasm32")]
+        let _ = self.done.await;
+    }
+
+    /// Join with a bounded wait. Native callers still `abort` first, so the
+    /// join completes immediately and the grace never fires (fast path
+    /// unchanged). On wasm `abort` is a no-op: a handler that ignores its
+    /// `CancelToken` would otherwise hang `close` forever, so the grace
+    /// bounds the wait and detaches best-effort (the `spawn_local` future
+    /// keeps running; its completion send is ignored). Dropping the losing
+    /// branch is the detach: no owned task is left joined.
+    pub(crate) async fn join_bounded(self, grace: Duration) {
+        tokio::select! {
+            biased;
+            _ = self.join() => {},
+            _ = sleep(grace) => {},
         }
     }
 }
@@ -237,8 +415,10 @@ pub(crate) fn spawn_task<F>(fut: F) -> TaskHandle
 where
     F: std::future::Future<Output = ()> + Send + 'static,
 {
+    let scope = Arc::new(());
     TaskHandle {
-        inner: Some(tokio::spawn(fut)),
+        inner: Some(tokio::spawn(TASK_SCOPE.scope(scope.clone(), fut))),
+        scope,
     }
 }
 
@@ -250,8 +430,13 @@ pub(crate) fn spawn_task<F>(fut: F) -> TaskHandle
 where
     F: std::future::Future<Output = ()> + 'static,
 {
-    wasm_bindgen_futures::spawn_local(fut);
-    TaskHandle {}
+    let scope = Arc::new(());
+    let (done_tx, done) = oneshot::channel();
+    wasm_bindgen_futures::spawn_local(TASK_SCOPE.scope(scope.clone(), async move {
+        fut.await;
+        let _ = done_tx.send(());
+    }));
+    TaskHandle { scope, done }
 }
 
 /// Fill `buf` with cryptographic randomness (OS-backed on every target).
@@ -369,35 +554,57 @@ impl Connection {
     }
 
     pub fn is_closed(&self) -> bool {
-        self.shared.closed.load(Ordering::Relaxed)
+        self.shared.closed.load(Ordering::Acquire)
     }
 
     pub(crate) async fn ctx(&self) -> syntra_core::ValidationContext {
-        let s = *self.shared.state.read().await;
+        let s = self.shared.state.read().await;
         let v = *self.shared.version.read().await;
         syntra_core::ValidationContext {
-            state: s,
+            state: *s,
             negotiated_version: v,
         }
     }
 
     pub(crate) async fn transition(&self, ev: StateEvent) -> Result<(), SyntraError> {
-        let cur = *self.shared.state.read().await;
+        // Read/validate/write is one operation. In particular a suspended
+        // transition must never write a pre-close snapshot over CLOSED.
+        let mut state = self.shared.state.write().await;
+        let cur = *state;
         let next = cur.transition(ev)?;
-        *self.shared.state.write().await = next;
+        *state = next;
         debug!(from = ?cur, to = ?next, event = ?ev, role = ?self.shared.role, "syntra state");
         Ok(())
     }
 
     pub(crate) async fn send_bytes(&self, bytes: Vec<u8>) -> Result<(), SyntraError> {
+        let permit = self.reserve_writer().await?;
+        // Close and queue admission linearize on state. No lifecycle lock
+        // is held while waiting for channel capacity.
+        let _state = self.shared.state.read().await;
         if self.is_closed() {
             return Err(SyntraError::Closed("connection closed".to_string()));
         }
-        self.shared
-            .writer
-            .send(bytes)
-            .await
-            .map_err(|_| SyntraError::Closed("transport writer gone".to_string()))
+        permit.send(bytes);
+        Ok(())
+    }
+
+    pub(crate) async fn reserve_writer(&self) -> Result<mpsc::Permit<'_, Vec<u8>>, SyntraError> {
+        let mut closed = self.subscribe_close();
+        if self.is_closed() {
+            return Err(SyntraError::Closed("connection closed".to_string()));
+        }
+        tokio::select! {
+            biased;
+            _ = closed.changed() => Err(SyntraError::Closed("connection closed".to_string())),
+            result = self.shared.writer.reserve() => match result {
+                Ok(permit) => Ok(permit),
+                Err(_) => {
+                    self.on_transport_lost().await;
+                    Err(SyntraError::Closed("transport writer gone".to_string()))
+                }
+            },
+        }
     }
 
     /// Terminal handshake failure: surface the typed code locally to the
@@ -409,15 +616,8 @@ impl Connection {
         code: syntra_core::ErrorCode,
         message: String,
     ) {
-        self.fail_handshake(SyntraError::Handshake { code, message })
+        self.finish_close(SyntraError::Handshake { code, message }, false, false)
             .await;
-        self.mark_closed_via_closing().await;
-    }
-
-    pub(crate) async fn fail_handshake(&self, e: SyntraError) {
-        if let Some(tx) = self.shared.handshake_tx.lock().await.take() {
-            let _ = tx.send(Err(e));
-        }
     }
 
     pub(crate) async fn complete_handshake(&self, done: HandshakeDone) {
@@ -431,54 +631,81 @@ impl Connection {
     /// dropping; the core itself ends at CLOSED with in-flight RPCs
     /// mapped to `UNAVAILABLE` (SNTR-HS-006/013).
     pub async fn close(&self) {
-        let st = self.state().await;
-        if st == ConnectionState::Active {
-            let _ = self.transition(StateEvent::GracefulClose).await;
-        }
-        self.mark_closed_via_closing().await;
+        self.finish_close(
+            SyntraError::Closed("connection closed".to_string()),
+            false,
+            false,
+        )
+        .await;
     }
 
     /// Abrupt transport loss: `UNAVAILABLE` (unknown outcome) to all
     /// in-flight RPCs, handshake waiter fails, state moves to CLOSED.
     pub async fn on_transport_lost(&self) {
-        self.fail_handshake(SyntraError::Unavailable(
-            "transport lost (outcome unknown)".to_string(),
-        ))
+        self.finish_close(
+            SyntraError::Unavailable("transport lost (outcome unknown)".to_string()),
+            true,
+            false,
+        )
         .await;
-        self.mark_closed_abrupt().await;
     }
 
-    async fn mark_closed_via_closing(&self) {
-        self.shared.closed.store(true, Ordering::Relaxed);
-        let cur = *self.shared.state.read().await;
-        let next = match cur {
-            ConnectionState::Closed => ConnectionState::Closed,
-            ConnectionState::Closing => ConnectionState::Closed,
-            _ => {
-                // Handshake failures and graceful close pass through
-                // CLOSING first (SNTR-HS-006/040).
-                match cur.transition(StateEvent::HandshakeFailed) {
-                    Ok(s) => s,
-                    Err(_) => match cur.transition(StateEvent::GracefulClose) {
+    async fn finish_close(&self, failure: SyntraError, abrupt: bool, handshake_only: bool) {
+        let mut state = self.shared.state.write().await;
+        if handshake_only
+            && matches!(
+                *state,
+                ConnectionState::Active | ConnectionState::Closing | ConnectionState::Closed
+            )
+        {
+            return;
+        }
+        // Same lock order as handshake registration and ready commit.
+        // Take the waiter before mutating state, so cancellation while
+        // acquiring locks cannot leave a half-closed connection. No new
+        // handshake can register between waiter failure and terminal state.
+        let mut waiter = self.shared.handshake_tx.lock().await;
+        let cur = *state;
+        let next = if abrupt {
+            ConnectionState::Closed
+        } else {
+            match cur {
+                ConnectionState::Closed => ConnectionState::Closed,
+                ConnectionState::Closing => ConnectionState::Closed,
+                _ => {
+                    // Handshake failures and graceful close pass through
+                    // CLOSING first (SNTR-HS-006/040).
+                    match cur.transition(StateEvent::HandshakeFailed) {
                         Ok(s) => s,
-                        Err(_) => ConnectionState::Closed,
-                    },
+                        Err(_) => match cur.transition(StateEvent::GracefulClose) {
+                            Ok(s) => s,
+                            Err(_) => ConnectionState::Closed,
+                        },
+                    }
                 }
             }
         };
-        *self.shared.state.write().await = next;
+        *state = next;
         if next == ConnectionState::Closing {
-            *self.shared.state.write().await = ConnectionState::Closed;
+            *state = ConnectionState::Closed;
         }
+        self.shared.closed.store(true, Ordering::Release);
         self.shared.pending.drain_transport_lost();
+        if let Some(tx) = waiter.take() {
+            let _ = tx.send(Err(failure));
+        }
         self.fire_closed();
     }
 
-    async fn mark_closed_abrupt(&self) {
-        self.shared.closed.store(true, Ordering::Relaxed);
-        *self.shared.state.write().await = ConnectionState::Closed;
-        self.shared.pending.drain_transport_lost();
-        self.fire_closed();
+    /// Atomically arbitrate ready vs. the handshake timer. A timer that
+    /// observed AUTHENTICATING must not later close a committed ACTIVE.
+    pub(crate) async fn expire_handshake(&self) {
+        self.finish_close(
+            SyntraError::DeadlineExceeded("handshake timed out".to_string()),
+            false,
+            true,
+        )
+        .await;
     }
 
     /// Subscribe to the close broadcast. Fires (with `true`) on every
@@ -489,13 +716,27 @@ impl Connection {
     }
 
     fn fire_closed(&self) {
-        let _ = self.shared.closed_tx.send(true);
+        // Retain the terminal value even when no subscribers exist yet.
+        self.shared.closed_tx.send_replace(true);
     }
 
     /// Take the next notification payload (opaque application bytes).
     /// Returns None when the connection is closed and drained.
     pub async fn next_notification(&self) -> Option<Vec<u8>> {
-        self.notif_rx.lock().await.recv().await.map(|b| b.to_vec())
+        let mut closed = self.subscribe_close();
+        let mut rx = self.notif_rx.lock().await;
+        if !self.is_closed() {
+            tokio::select! {
+                biased;
+                _ = closed.changed() => {},
+                value = rx.recv() => return value.map(|b| b.to_vec()),
+            }
+        }
+        // Closing the receiver rejects future producers but preserves the
+        // already admitted queue. Never take this mutex on the close path:
+        // an idle consumer holds it while waiting for the close broadcast.
+        rx.close();
+        rx.recv().await.map(|b| b.to_vec())
     }
 
     /// Number of outstanding RPCs (for backpressure observability).
