@@ -1,0 +1,94 @@
+CHANGELOG.md
+  s_a74863c60534a9::t_b45998c0aaf7a3 83-88
+  s_a74863c60534a9::t_8a596aecc195a0 17-21
+docs/server-implementation.md
+  s_9541c6633b48b6::t_9ee39eaff7fcef 109-111
+GOVERNANCE.md
+  s_a74863c60534a9::t_380fb58804594e 49-53
+crates/syntra-web/tests/browser.md
+  s_c53542a433716b::t_8d6e7497bfe050 35-39
+bindings/go/session.go
+  s_c53542a433716b::t_f7f4aca73ca955 194-198
+  s_c53542a433716b::t_0f5ea791de6fc9 1073-1076
+  s_c53542a433716b::t_f6d9bd9f0904ec 1399-1402,1416-1422
+  s_c53542a433716b::t_dbc765c65ac607 1047-1052
+  s_c53542a433716b::t_43d2540eb570e2 1352-1355
+scripts/collect-release-artifacts.sh
+  s_a74863c60534a9::t_d1fa09959ed739 4-6,8-16
+  s_a74863c60534a9::t_47cc8565f79ac5 81-82
+  s_a74863c60534a9::t_6ada511cd837f5 38,41
+  s_c53542a433716b::t_83f2d4b43085b3 19,22,25,39
+crates/syntra-ws/src/native.rs
+  s_3e62c4b783cf3d::t_b50d0d3b24c3f4 408-410,412
+  s_3e62c4b783cf3d::t_fe2caed4e7881d 322
+.github/workflows/release.yml
+  s_a74863c60534a9::t_a3ece9357b3783 227
+  s_a74863c60534a9::t_1be22619c7c58c 48-60
+scripts/validate-repo.py
+  s_a74863c60534a9::t_e0c03db5c82ae7 723-724
+  s_a74863c60534a9::t_d0f423c72cabfd 770-771
+crates/syntra-runtime/src/host.rs
+  s_9541c6633b48b6::t_916b0d676beb91 804-805,809,814,818-828,831,849-854,859-863,871-875
+  s_9541c6633b48b6::t_a840228b049c89 456
+  s_9541c6633b48b6::t_cef821745cbfb7 43
+  s_9541c6633b48b6::t_6b4c3635f31b66 215,225,228-230,233,239
+  s_9541c6633b48b6::t_847391eb91b2b4 574-579
+  s_9541c6633b48b6::t_c63fca65da778f 182-185
+crates/syntra-ffi/src/fixture.rs
+  s_9541c6633b48b6::t_c7d3f90a2bfd0f 337,341-342
+  s_9541c6633b48b6::t_4ceba88a65c12c 722
+  s_9541c6633b48b6::t_e68f02004904c5 803
+  s_9541c6633b48b6::t_9ea87e9aec208e 644
+  s_9541c6633b48b6::t_449cfb71fe760c 395,398
+  s_9541c6633b48b6::t_c223ad76c41e51 92-94
+  s_9541c6633b48b6::t_b9710590151f08 177-202,213-221
+  s_9541c6633b48b6::t_33dd659113c223 421-424
+  s_9541c6633b48b6::t_9d515d1068efb6 249-250
+  s_9541c6633b48b6::t_b7d3eee15ba287 274
+  s_9541c6633b48b6::t_91a7e1fa638488 292-293
+  s_9541c6633b48b6::t_407de0a01a2c07 352-355,363-365
+  s_9541c6633b48b6::t_e4713d361c990f 661
+  s_9541c6633b48b6::t_8582c2dc506d7d 222
+RELEASE.md
+  s_a74863c60534a9::t_4c1255b13b2918 246-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "49b197a241ee3a2f858b39b33fbf730a9fbc93b8",
+  "prompts": {},
+  "sessions": {
+    "s_3e62c4b783cf3d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ea05dea49ffe3kL6q7pLJCQzHj",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": null
+    },
+    "s_9541c6633b48b6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ea05dea3cffeiOoTDmAF5QIeJB",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_a74863c60534a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ea05dea60ffeN4tKli1GpdB4GG",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_c53542a433716b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_ea05dea1bffe45RqaYBH6xkdSd",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
