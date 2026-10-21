@@ -319,6 +319,7 @@ pub async fn connect(
                                 Ok(Ok(())) => {}
                                 _ => {
                                     tracing::warn!("control write stalled; closing");
+                                    bounded_close(&mut ws_write, CloseCode::Away, "slow receiver", close_grace).await;
                                     break;
                                 }
                             }
@@ -404,8 +405,11 @@ pub async fn connect(
             let silent = now_millis().saturating_sub(live_pong.load(Ordering::Relaxed));
             if u128::from(silent) > ping_interval.saturating_add(pong_timeout).as_millis() {
                 tracing::warn!("liveness timeout; closing");
-                live_conn.on_transport_lost().await;
+                // Queue Away before waking the reader: the writer prefers
+                // close_rx (biased select), so this preserves 1001 instead
+                // of the reader's Normal (1000) exit racing ahead.
                 let _ = live_close.try_send(CloseCode::Away);
+                live_conn.on_transport_lost().await;
                 break;
             }
             if live_ctrl

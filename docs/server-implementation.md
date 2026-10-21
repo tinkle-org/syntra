@@ -106,8 +106,9 @@ or TCP FIN per profile). In-flight RPCs receive `UNAVAILABLE` or
 `CANCELLED`. Abrupt loss maps to `UNAVAILABLE` with unknown outcome for all
 in-flight RPCs; never synthesize a `result` the host did not send; never
 report loss as success. There is no `CloseSession` message in v1. Shutdown
-joins are bounded: Rust `Host::close` waits at most `SHUTDOWN_GRACE` (1s)
-when `TaskHandle::abort` is cooperative-only (wasm), mirroring Go
+joins are bounded: Rust `Host::close` waits at most one shared
+`SHUTDOWN_GRACE` (1s total across in-flight workers and the handshake
+timer) when `TaskHandle::abort` is cooperative-only (wasm), mirroring Go
 `handlerShutdownGrace` (1s) and WS `shutdown_grace`; Go `Serve` likewise
 bounds a `Transport.Recv` that violates its context contract to the same
 grace instead of hanging teardown.

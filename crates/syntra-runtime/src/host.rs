@@ -40,7 +40,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use prost::Message;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tracing::{debug, warn};
 
 use syntra_core::{
@@ -179,6 +179,10 @@ pub struct Host {
     /// The `connection_id` bound by this connection's handshake, if any.
     bound_id: Mutex<Option<String>>,
     handshake_task: Mutex<Option<TaskHandle>>,
+    /// Signalled when the handshake commits ACTIVE so the detached
+    /// handshake timer exits promptly instead of retaining the
+    /// `Connection` until the handshake deadline.
+    handshake_done: Arc<Notify>,
 }
 
 impl Host {
@@ -208,6 +212,7 @@ impl Host {
             syntra_core::MIN_VERSION,
             syntra_core::MAX_VERSION,
         );
+        let handshake_done = Arc::new(Notify::new());
         let host = Arc::new(Self {
             conn: Connection::wrap(shared, notif_rx),
             auth,
@@ -217,15 +222,21 @@ impl Host {
             inflight: Arc::new(Mutex::new(HashMap::new())),
             bound_id: Mutex::new(None),
             handshake_task: Mutex::new(None),
+            handshake_done: handshake_done.clone(),
         });
         // Handshake timer (SNTR-HS-002/011): ACTIVE or explicit close.
+        // The `handshake_done` signal lets a successful handshake stop the
+        // detached timer immediately; otherwise dropping an ACTIVE `Host`
+        // would retain the `Connection` until the handshake deadline.
         let timer_conn = host.conn.clone();
         let mut closed = timer_conn.subscribe_close();
+        let done = handshake_done.clone();
         let deadline = Instant::now() + config.handshake_timeout;
         let task = spawn_task(async move {
             tokio::select! {
                 biased;
                 _ = closed.changed() => {},
+                _ = done.notified() => {},
                 _ = sleep_until(deadline) => timer_conn.expire_handshake().await,
             }
         });
@@ -442,8 +453,7 @@ impl Host {
     async fn fail_handshake_and_close(&self, code: ErrorCode, message: String) {
         self.conn.fail_handshake_and_close(code, message).await;
         self.unbind_session().await;
-        self.abort_inflight().await;
-        self.stop_handshake_timer().await;
+        self.shutdown_tasks().await;
     }
 
     async fn on_hello(&self, frame_version: u32, hello: syntra_core::proto::ClientHello) {
@@ -561,6 +571,12 @@ impl Host {
         self.conn
             .complete_handshake(crate::connection::HandshakeDone { connection_id })
             .await;
+        // Handshake committed ACTIVE: wake the timer so it exits
+        // promptly, then reclaim it. Without this a dropped ACTIVE
+        // `Host` leaves the detached timer retaining the `Connection`
+        // until the handshake deadline.
+        self.handshake_done.notify_one();
+        self.stop_handshake_timer().await;
     }
 
     fn effective_timeout(&self, timeout_ms: u32) -> Duration {
@@ -785,23 +801,34 @@ impl Host {
 
     /// Graceful close: stop new RPCs, abort in-flight with terminal
     /// mapping, unbind the session, teardown (SNTR-HS-006/013).
+    /// Bounded by one shared `SHUTDOWN_GRACE` across in-flight workers
+    /// and the handshake timer (not per-join).
     pub async fn close(&self) {
         self.conn.close().await;
         self.unbind_session().await;
-        self.abort_inflight().await;
-        self.stop_handshake_timer().await;
+        self.shutdown_tasks().await;
     }
 
     /// Abrupt transport loss: `UNAVAILABLE` (unknown outcome) to all
     /// in-flight RPCs, session discarded (SNTR-SESS-004).
+    /// Bounded by one shared `SHUTDOWN_GRACE` (see `close`).
     pub async fn on_transport_lost(&self) {
         self.conn.on_transport_lost().await;
         self.unbind_session().await;
-        self.abort_inflight().await;
-        self.stop_handshake_timer().await;
+        self.shutdown_tasks().await;
     }
 
-    async fn abort_inflight(&self) {
+    /// Drain in-flight workers and the handshake timer under one shared
+    /// shutdown deadline. Sequential per-task `SHUTDOWN_GRACE` joins would
+    /// let `close` exceed 1s on wasm (N workers + timer); sharing the
+    /// deadline keeps the total bounded.
+    async fn shutdown_tasks(&self) {
+        let deadline = Instant::now() + SHUTDOWN_GRACE;
+        self.abort_inflight_until(deadline).await;
+        self.stop_handshake_timer_until(deadline).await;
+    }
+
+    async fn abort_inflight_until(&self, deadline: Instant) {
         let entries: Vec<InflightEntry> = {
             let mut g = self.inflight.lock().unwrap_or_else(|e| e.into_inner());
             g.drain().map(|(_, e)| e).collect()
@@ -819,14 +846,21 @@ impl Host {
             // Bounded wait: native `abort` preempts so the join completes
             // immediately (fast path unchanged); on wasm `abort` is a
             // no-op and a non-cooperative handler would otherwise hang
-            // `close` forever, so `SHUTDOWN_GRACE` (1s, mirroring Go
-            // `handlerShutdownGrace` and WS `shutdown_grace`) bounds the
-            // wait and detaches best-effort.
-            e.task.join_bounded(SHUTDOWN_GRACE).await;
+            // `close` forever. The wait shares the shutdown deadline with
+            // the handshake timer (mirroring Go `handlerShutdownGrace`
+            // and WS `shutdown_grace`) and detaches best-effort.
+            e.task
+                .join_bounded(deadline.saturating_duration_since(Instant::now()))
+                .await;
         }
     }
 
     async fn stop_handshake_timer(&self) {
+        self.stop_handshake_timer_until(Instant::now() + SHUTDOWN_GRACE)
+            .await;
+    }
+
+    async fn stop_handshake_timer_until(&self, deadline: Instant) {
         let task = self
             .handshake_task
             .lock()
@@ -834,10 +868,11 @@ impl Host {
             .take();
         if let Some(task) = task {
             task.abort();
-            // Same bound as in-flight drain: the timer observes close and
-            // exits promptly, but a stalled wasm timer must not hang
-            // shutdown.
-            task.join_bounded(SHUTDOWN_GRACE).await;
+            // Shares the shutdown deadline with the in-flight drain: the
+            // timer observes close/handshake-done and exits promptly, but
+            // a stalled wasm timer must not hang shutdown.
+            task.join_bounded(deadline.saturating_duration_since(Instant::now()))
+                .await;
         }
     }
 

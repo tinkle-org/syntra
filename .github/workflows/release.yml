@@ -45,6 +45,19 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Authorize recovery dispatch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          PERM="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR/permission" --jq .permission)"
+          case "$PERM" in
+            admin|maintain) ;;
+            *) echo "error: workflow_dispatch recovery requires maintainer (admin/maintain); actor $ACTOR has permission $PERM" >&2; exit 1;;
+          esac
+
       - name: Resolve tag identity
         id: info
         env:
@@ -211,7 +224,7 @@ jobs:
               set -- --prerelease
             fi
             gh release create "$TAG" --verify-tag --title "Syntra schema $TAG" \
-              --notes-file RELEASE.md "$@" "$OUT"/assets/*
+              --notes-file CHANGELOG.md "$@" "$OUT"/assets/*
           fi
 
   go-proxy-warmup:

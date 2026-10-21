@@ -191,7 +191,11 @@ type HandlerFunc func(ctx context.Context, req *RpcRequest) (*RpcResult, error)
 // to allow selected methods. Only generic Unauthenticated
 // ("syntra: credential not accepted") and PermissionDenied
 // ("syntra: access denied") codes/messages reach the wire, so policy
-// internals never leak (SNTR-ERR-003).
+// internals never leak (SNTR-ERR-003). Returning Unauthenticated signals
+// an expired/revoked binding: the per-RPC UNAUTHENTICATED error is sent,
+// then Serve closes the connection by default (SNTR-AUTH-008/SNTR-ASEC-006);
+// use PermissionDenied for per-method denials that keep the connection
+// usable (SNTR-AUTH-009).
 type AuthorizeFunc func(ctx context.Context, principal string, method string) error
 
 // DenyAllAuthorize matches the Rust Handler::authorize fail-closed default:
@@ -1040,6 +1044,12 @@ type callCancel struct {
 	stop   context.CancelFunc
 	id     uint64
 	result chan *RpcResult // one completion; publish before notifying Serve
+	// authRevoked marks an Authorize Unauthenticated denial (expired/revoked
+	// bound principal). The per-RPC UNAUTHENTICATED error is sent first,
+	// then Serve terminates the connection per SNTR-AUTH-008/SNTR-ASEC-006
+	// default-close. PermissionDenied denials never set this and keep the
+	// connection usable per SNTR-AUTH-009.
+	authRevoked bool
 }
 
 // OpenHost creates a responder session factory. It validates the config
@@ -1060,8 +1070,10 @@ func OpenHost(cfg HostConfig) (*Host, error) {
 // answer UNIMPLEMENTED; handler failures answer their mapped code; the
 // connection stays usable. When HostConfig.Authorize is set it is checked
 // with the bound principal before handler effects on every call; denials
-// answer generic Unauthenticated/PermissionDenied and the connection stays
-// usable. A nil Authorize preserves the legacy allow-everything behavior
+// answer generic Unauthenticated/PermissionDenied. PermissionDenied keeps
+// the connection usable; Unauthenticated (expired/revoked binding) sends
+// the per-RPC error then closes the connection by default per
+// SNTR-AUTH-008/SNTR-ASEC-006. A nil Authorize preserves the legacy allow-everything behavior
 // (divergent from the Rust fail-closed default; see AuthorizeFunc). ctx
 // end cancels in-flight handlers and closes the connection. Serve returns
 // nil on a clean handshake-completed close and the fatal error otherwise.
@@ -1337,6 +1349,10 @@ drain:
 					var rerr *RpcError
 					if errors.As(aerr, &rerr) && rerr.Code == ErrorCodeUnauthenticated {
 						out = NewWireErrorResult(ErrorCodeUnauthenticated, "syntra: credential not accepted")
+						// Expired/revoked bound principal: binding is
+						// withdrawn. Send the per-RPC UNAUTHENTICATED
+						// first; finishReadyHandler closes afterwards.
+						cc.authRevoked = true
 					} else {
 						// Generic deny without oracle: policy internals
 						// never reach the wire (SNTR-ERR-003), mirroring
@@ -1380,6 +1396,10 @@ drain:
 
 // finishReadyHandler commits a published completion only while this exact
 // callback still owns its ID. Late callbacks cannot answer a reused ID.
+// An Authorize Unauthenticated completion (expired/revoked binding) sends
+// the per-RPC UNAUTHENTICATED error first, then returns a terminal
+// Unauthenticated error so Serve closes the connection by default
+// (SNTR-AUTH-008, SNTR-ASEC-006).
 func (h *Host) finishReadyHandler(ctx context.Context, t Transport, hc *hostConn, cc *callCancel) error {
 	h.mu.Lock()
 	current := hc.cancels[cc.id] == cc
@@ -1393,7 +1413,13 @@ func (h *Host) finishReadyHandler(ctx context.Context, t Transport, hc *hostConn
 		delete(hc.cancels, cc.id)
 		h.mu.Unlock()
 		cc.stop()
-		return h.answer(ctx, t, hc, cc.id, out)
+		if err := h.answer(ctx, t, hc, cc.id, out); err != nil {
+			return err
+		}
+		if cc.authRevoked {
+			return NewRpcError(ErrorCodeUnauthenticated, "syntra: credential revoked")
+		}
+		return nil
 	default:
 		return nil
 	}

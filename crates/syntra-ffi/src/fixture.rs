@@ -89,7 +89,9 @@ struct FfiConn {
     initiator: Initiator,
     /// Kept alive: owns the host side + its pump tasks.
     _host: Arc<Host>,
-    current_cancel: Mutex<Option<(u64, Arc<CancelToken>)>>,
+    /// All currently tracked call tokens (concurrent `syntra_call`s share
+    /// one handle). Newest entry is the most recently started call.
+    current_cancel: Mutex<Vec<(u64, Arc<CancelToken>)>>,
     last_error: Mutex<Option<String>>,
 }
 
@@ -172,6 +174,32 @@ fn read_c_str(ptr: *const c_char) -> Result<String, i32> {
     s.to_str().map(|s| s.to_string()).map_err(|_| SYNTRA_E_UTF8)
 }
 
+/// Method bound mirrors `syntra_core::validate_method` (1..512 bytes).
+/// Surfaced as `SYNTRA_E_RESOURCE` at this boundary to avoid an unbounded
+/// scan/allocation before the runtime can reject the frame.
+const MAX_FFI_METHOD_BYTES: usize = 512;
+
+fn read_c_str_bounded(ptr: *const c_char, max_len: usize) -> Result<String, i32> {
+    if ptr.is_null() {
+        return Err(SYNTRA_E_ARG);
+    }
+    // Bounded NUL scan: avoids an unbounded `CStr::from_ptr` walk and a
+    // huge `to_string` allocation for an oversized valid buffer.
+    let mut len = 0usize;
+    unsafe {
+        while len <= max_len {
+            if *ptr.add(len) == 0 {
+                break;
+            }
+            len += 1;
+        }
+    }
+    if len > max_len {
+        return Err(SYNTRA_E_RESOURCE);
+    }
+    read_c_str(ptr)
+}
+
 fn read_bytes(ptr: *const u8, len: usize) -> Result<Vec<u8>, i32> {
     if len > 0 && ptr.is_null() {
         return Err(SYNTRA_E_ARG);
@@ -180,6 +208,16 @@ fn read_bytes(ptr: *const u8, len: usize) -> Result<Vec<u8>, i32> {
         return Ok(Vec::new());
     }
     Ok(unsafe { slice::from_raw_parts(ptr, len) }.to_vec())
+}
+
+/// Bound the FFI length before copying: a huge valid buffer would
+/// otherwise make `to_vec` attempt an aborting allocation before the
+/// runtime can reject it with `ResourceExhausted`.
+fn read_bytes_bounded(ptr: *const u8, len: usize, max: usize) -> Result<Vec<u8>, i32> {
+    if len > max {
+        return Err(SYNTRA_E_RESOURCE);
+    }
+    read_bytes(ptr, len)
 }
 
 fn emit_bytes(out_ptr: *mut *mut u8, out_len: *mut usize, data: Vec<u8>) -> i32 {
@@ -208,7 +246,8 @@ fn emit_bytes(out_ptr: *mut *mut u8, out_len: *mut usize, data: Vec<u8>) -> i32 
 #[no_mangle]
 pub extern "C" fn syntra_open(auth_mode: u32, token_ptr: *const u8, token_len: usize) -> i64 {
     let r = catch_unwind(AssertUnwindSafe(|| -> Result<u64, i32> {
-        let token = read_bytes(token_ptr, token_len)?;
+        let token =
+            read_bytes_bounded(token_ptr, token_len, syntra_core::MAX_CREDENTIAL_BYTES)?;
         // Everything async (Host::new spawns its handshake timer) must
         // run inside the runtime context.
         global_runtime().block_on(async {
@@ -232,7 +271,7 @@ pub extern "C" fn syntra_open(auth_mode: u32, token_ptr: *const u8, token_len: u
                 Arc::new(FfiConn {
                     initiator,
                     _host: host,
-                    current_cancel: Mutex::new(None),
+                    current_cancel: Mutex::new(Vec::new()),
                     last_error: Mutex::new(None),
                 }),
             );
@@ -250,7 +289,8 @@ pub extern "C" fn syntra_open(auth_mode: u32, token_ptr: *const u8, token_len: u
 #[no_mangle]
 pub extern "C" fn syntra_handshake(handle: u64, cred_ptr: *const u8, cred_len: usize) -> i32 {
     let r = catch_unwind(AssertUnwindSafe(|| -> i32 {
-        let cred = match read_bytes(cred_ptr, cred_len) {
+        let cred = match read_bytes_bounded(cred_ptr, cred_len, syntra_core::MAX_CREDENTIAL_BYTES)
+        {
             Ok(c) => c,
             Err(code) => return code,
         };
@@ -294,11 +334,12 @@ pub extern "C" fn syntra_call(
             *out_ptr = ptr::null_mut();
             *out_len = 0;
         }
-        let method = match read_c_str(method_ptr) {
+        let method = match read_c_str_bounded(method_ptr, MAX_FFI_METHOD_BYTES) {
             Ok(m) => m,
             Err(code) => return code,
         };
-        let payload = match read_bytes(payload_ptr, payload_len) {
+        let payload = match read_bytes_bounded(payload_ptr, payload_len, syntra_core::MAX_FRAME_BYTES)
+        {
             Ok(p) => p,
             Err(code) => return code,
         };
@@ -308,8 +349,10 @@ pub extern "C" fn syntra_call(
                 let cancel = Arc::new(CancelToken::new());
                 // The tracked API exposes its id only after completion.
                 // Until an id-allocation callback is available, 0 means
-                // unknown; cancel_current signals this token directly.
-                *c.current_cancel.lock().unwrap() = Some((0, cancel.clone()));
+                // unknown; cancel_current signals the newest tracked token.
+                // Retain every concurrent token so a newer call completing
+                // first cannot orphan an older still-running call.
+                c.current_cancel.lock().unwrap().push((0, cancel.clone()));
                 global_runtime().block_on(async {
                     let (_id, res) = c
                         .initiator
@@ -317,13 +360,9 @@ pub extern "C" fn syntra_call(
                         .await;
                     {
                         let mut current = c.current_cancel.lock().unwrap();
-                        // An older call must not clear a newer call's token.
-                        if current
-                            .as_ref()
-                            .is_some_and(|(_, t)| Arc::ptr_eq(t, &cancel))
-                        {
-                            *current = None;
-                        }
+                        // Remove only this call's token; newer and older
+                        // concurrent calls keep theirs.
+                        current.retain(|(_, t)| !Arc::ptr_eq(t, &cancel));
                     }
                     match res {
                         Ok(data) => emit_bytes(out_ptr, out_len, data),
@@ -353,9 +392,10 @@ pub extern "C" fn syntra_cancel(handle: u64, request_id: u64) -> i32 {
                     // Cancel the tracked in-flight call if the ids line
                     // up; always forward the protocol-level cancel too
                     // (unknown ids are ignored by the runtime).
-                    if let Some((id, token)) = c.current_cancel.lock().unwrap().clone() {
+                    for (id, token) in c.current_cancel.lock().unwrap().clone() {
                         if id != 0 && id == request_id {
                             token.cancel();
+                            break;
                         }
                     }
                     match c.initiator.cancel(request_id).await {
@@ -378,7 +418,10 @@ pub extern "C" fn syntra_cancel_current(handle: u64) -> i32 {
         with_conn(
             handle,
             |c| {
-                let entry = c.current_cancel.lock().unwrap().clone();
+                // Newest tracked token wins; older concurrent calls stay
+                // tracked so a newer call completing first cannot orphan
+                // them.
+                let entry = c.current_cancel.lock().unwrap().last().cloned();
                 if let Some((_id, token)) = entry {
                     token.cancel();
                 }
@@ -598,7 +641,7 @@ mod tests {
         assert_eq!(got, b"ping");
         assert!(with_conn(
             h,
-            |c| c.current_cancel.lock().unwrap().is_none(),
+            |c| c.current_cancel.lock().unwrap().is_empty(),
             false,
         ));
         assert_eq!(syntra_close(h), SYNTRA_OK);
@@ -615,7 +658,7 @@ mod tests {
         assert_eq!(rc, SYNTRA_E_RPC);
         assert!(with_conn(
             h,
-            |c| c.current_cancel.lock().unwrap().is_none(),
+            |c| c.current_cancel.lock().unwrap().is_empty(),
             false,
         ));
         // Connection still usable.
@@ -676,7 +719,7 @@ mod tests {
                     Arc::new(FfiConn {
                         initiator,
                         _host: host,
-                        current_cancel: Mutex::new(None),
+                        current_cancel: Mutex::new(Vec::new()),
                         last_error: Mutex::new(None),
                     }),
                 );
@@ -757,7 +800,7 @@ mod tests {
             assert_eq!(caller.join().unwrap(), SYNTRA_E_CANCELLED);
             assert!(with_conn(
                 h,
-                |c| c.current_cancel.lock().unwrap().is_none(),
+                |c| c.current_cancel.lock().unwrap().is_empty(),
                 false,
             ));
             assert_eq!(syntra_cancel_current(h), SYNTRA_OK);

@@ -243,9 +243,14 @@ runtime tests. The default pure-Go module is the documented Go path. Rust
 and WASM compile checks are useful gates, not native-Go integration proof
 or a browser SDK support claim.
 
-`scripts/collect-release-artifacts.sh <tag>` reproduces only the
-descriptor/manifests/vectors + docs subset under `dist/release/<tag>/`.
-It does not publish a release.
+`sh scripts/collect-release-artifacts.sh syntra-core-vX.Y.Z` (or
+`sh scripts/collect-release-artifacts.sh vX.Y.Z syntra-core-vX.Y.Z` for a
+version-named directory with an explicit `syntra-core-v…` ref) reproduces
+only the descriptor/manifests/vectors + docs subset under
+`dist/release/<name>/`. It does not publish a release. The default lookup
+resolves `refs/tags/syntra-core-v…` (falling back from a bare `v…` name to
+`refs/tags/syntra-core-v…`); otherwise supply the explicit `syntra-core-v…`
+ref.
 
 ## 6. GitHub Release association (no BSR)
 

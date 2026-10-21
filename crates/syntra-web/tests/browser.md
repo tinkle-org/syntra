@@ -32,7 +32,11 @@ Open the HTML with these explicit query parameters (URL-encode each value):
 
 The page displays PASS/FAIL and sets `document.documentElement.dataset.result`
 for an external browser runner. An omitted endpoint is a failure, not a skip.
-No credentials or query strings are sent to these test endpoints. It checks
+The fixture supplies empty Syntra credentials (empty `ClientHello.credential`)
+and appends no query strings to the endpoint URLs; it cannot prevent
+browser-managed cookies/credentials the browser attaches for the endpoint
+origin during the WebSocket handshake — use an isolated endpoint origin if a
+credential-free handshake is required. It checks
 that oversized input is rejected locally and closes the transport, not that
 the browser emits 1009: browser JS cannot choose 1009 and cannot cap assembly
 or the ws_stream_wasm internal receive queue. Browser TLS version/certificate

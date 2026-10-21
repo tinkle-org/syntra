@@ -14,9 +14,11 @@ plan, not a release announcement: the tag MUST NOT be created until
 `RELEASE.md` §1 is fully evidenced and `audits/v1-release-readiness.md`
 shows no BLOCKED area in RC scope. Known blockers: P0 findings F-01–F-06
 (`audits/v1-consistency-review.md`), SESSION-OPEN-QUESTIONS items 1–11,
-pending RFCs 0001–0005, no stable release tagged yet. Distribution is Git
-tags + GitHub Releases only (no BSR, no registries); license is Apache-2.0
-(`LICENSE`, `GOVERNANCE.md` §7).
+pending RFCs 0001–0005, no stable release tagged yet. Distribution is
+per-crate tags `<crate>-vX.Y.Z` with crates.io publication plus GitHub
+Release assets (no BSR, no GHCR); license is Apache-2.0
+(`LICENSE`, `GOVERNANCE.md` §7). Where this plan differs from `Unreleased`,
+the crates.io model governs.
 
 ### Added
 
@@ -78,12 +80,12 @@ tags + GitHub Releases only (no BSR, no registries); license is Apache-2.0
   to crates.io via release-plz Trusted Publishing (OIDC, with scoped
   `CARGO_REGISTRY_TOKEN` bootstrap fallback).
 - `release-plz.toml` (Rust workspace versioning + Release PRs, crates.io
-  publish enabled) and `.github/workflows/release.yml` (per-crate tags,
-  crates.io publication on Release PR merge, then schema/source/crate/Go
-  archives, descriptor/manifests/vectors, SHA256SUMS attached to the
-  syntra-core GitHub Release; nested `bindings/go/vX.Y.Z` tag verified to
-  the same revision; no native/header/browser-WASM assets; CI never creates
-  tags).
+  publish enabled, per-crate tags on Release PR merge) and
+  `.github/workflows/release.yml` (schema/source/crate/Go archives,
+  descriptor/manifests/vectors, SHA256SUMS attached to the syntra-core
+  GitHub Release; nested `bindings/go/vX.Y.Z` tag created-or-verified at
+  the same revision by the release workflow; no native/header/browser-WASM
+  assets).
 - `crates/syntra-ffi` is default-empty (no C ABI exports) with an explicit
   native `test-fixture` feature only for tests; all WASM targets are
   rejected at compile time. CI runs default workspace tests plus

@@ -46,6 +46,11 @@ for:
   release-plz publishes Rust crates and per-crate tags on their behalf;
   the artifact workflow owns the matching nested Go tag. Maintainers alone
   may create recovery tags or dispatch artifact recovery (`RELEASE.md` §4).
+  The artifact workflow enforces this for `workflow_dispatch` by requiring
+  `admin`/`maintain` repository permission before the `contents: write` job
+  runs; `syntra-*-v*` and `bindings/go/v*` tag namespaces additionally
+  require ruleset restriction to maintainers plus the release automation
+  identity.
 - Custody of release and reporting credentials (crates.io Trusted Publishing
   OIDC or bootstrap `CARGO_REGISTRY_TOKEN`, automatic `github.token`, private
   vulnerability reports): least

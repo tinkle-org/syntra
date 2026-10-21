@@ -720,7 +720,8 @@ def check_markdown():
 #            bindings/go/** (committed Go types, incl. *.pb.go).
 #   FORBIDDEN: legacy gen//generated/ trees, bindings/ roots outside
 #            bindings/go/ (root confusion), and tracked .tmp/ build output.
-# Distribution is Git tags + GitHub Releases only (no BSR, no registries).
+# Distribution is per-crate tags with crates.io publication plus GitHub
+# Release assets (no BSR, no GHCR).
 LEGACY_GEN_DIRS = ("gen", "generated")
 
 # First lines that identify machine-generated language sources. Allowed ONLY
@@ -766,7 +767,8 @@ def check_boundary():
       bindings/go/ (e.g. bindings/rust, bindings/gen); tracked .tmp/ output.
     Text mentions in docs, fixture names, and tooling discussion are NOT
     flagged — only paths that violate the layout contract.
-    Distribution is Git tags + GitHub Releases only (no BSR, no registries).
+    Distribution is per-crate tags with crates.io publication plus GitHub
+    Release assets (no BSR, no GHCR).
     """
     tracked = _tracked_files()
     if tracked is None:
