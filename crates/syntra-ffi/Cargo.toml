@@ -1,0 +1,20 @@
+[package]
+name = "syntra-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Versioned C ABI over the Syntra runtime (init/handshake/call/cancel/notify/close). No application types."
+publish = false
+
+[lib]
+name = "syntra_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+syntra-core = { path = "../syntra-core", version = "0.1.0" }
+syntra-runtime = { path = "../syntra-runtime", version = "0.1.0" }
+tokio = { version = "1", default-features = false, features = ["sync", "time", "rt", "macros"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

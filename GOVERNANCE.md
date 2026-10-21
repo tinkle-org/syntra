@@ -43,10 +43,13 @@ for:
   server obligations, bounded resources, unknown-field handling, security
   and compatibility considerations, testable acceptance criteria.
 - Tagging releases and publishing notes per Sec. 5; no other role may
-  tag a release or push to the schema registry.
-- Custody of publication and reporting secrets (BSR push token, private
-  vulnerability reports): least privilege, no exposure in logs or PR
-  jobs, rotation on suspected exposure.
+  tag a release. CI never creates tags; the release workflow only
+  validates tags and attaches assets.
+- Custody of release and reporting secrets (GitHub Release attachments via
+  the automatic `github.token`, private vulnerability reports): least
+  privilege, no exposure in logs or PR jobs, rotation on suspected
+  exposure. There are no registry push tokens (no BSR, no crates.io, no
+  GHCR).
 - Keeping `CHANGELOG.md`, `MIGRATION.md`, and the conformance suite
   consistent with every normative merge.
 
@@ -66,11 +69,12 @@ for:
      Security fixes with exploitation risk are developed privately per
      `SECURITY.md` and disclosed via advisory + `CHANGELOG.md` entry;
      embargo details MUST NOT appear in public issues or PRs.
-   - Schema changes (field addition/deprecation/option change, `buf.yaml`
-     rule changes) follow this same bar, plus a clean `buf lint`,
-     `buf build`, and `buf breaking` gate. Wire-incompatible schema
-     changes are breaking (Sec. 4). BSR publication happens only on
-     reviewed version tags via the gated publish workflow.
+    - Schema changes (field addition/deprecation/option change, `buf.yaml`
+      rule changes) follow this same bar, plus a clean `buf lint`,
+      `buf build`, and `buf breaking` gate. Wire-incompatible schema
+      changes are breaking (Sec. 4). GitHub Release assets attach only on
+      reviewed version tags via the gated release workflow (CI never
+      creates tags).
    - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
      to conformance tests (or tracked placeholders).
 - **Governance / process changes** (this file, `CONTRIBUTING.md`,
@@ -143,13 +147,15 @@ stability is implied until a tag meeting the above criteria exists.
   in a PR MUST become an RFC or a recorded blocker — never an
   undocumented implementation choice.
 
-## 7. License — alternatives, no selection
+## 7. License — Apache-2.0
 
-> **No license has been selected.** There is no `LICENSE` file.
-> All rights reserved pending maintainer decision.
+The project is licensed under Apache-2.0 — see `LICENSE`. All Rust
+packages carry `license = "Apache-2.0"` and `publish = false` (Git tags +
+GitHub Releases only, never crates.io).
 
-Maintainers will select a license via a public proposal before the first
-stable release. Suitable alternatives under consideration:
+The selection was made by maintainers via a public proposal before the
+first stable release. Alternatives considered and why Apache-2.0 was
+chosen:
 
 | Candidate | Implications for this project |
 |-----------|-------------------------------|
@@ -158,15 +164,11 @@ stable release. Suitable alternatives under consideration:
 | **BSD-3-Clause** | Permissive like MIT with non-endorsement clause; no patent grant language. Similar reuse profile. |
 | **Dual-license / spec + code split** (e.g., CC-BY-4.0 for spec text + Apache-2.0/MIT for code/schemas) | Respects that specifications and code have different reuse concerns; adds complexity and needs clear file-level labeling. |
 
-Considerations maintainers will weigh publicly: patent clarity,
-compatibility with downstream ecosystems (Rust crates, Go modules, etc.),
-whether spec text needs a Creative Commons component, and contributor
-comfort (DCO sign-off in `CONTRIBUTING.md` anticipates any of the above).
+Considerations weighed: patent clarity, compatibility with downstream
+ecosystems (Rust crates, Go modules, etc.), and contributor comfort
+(DCO sign-off in `CONTRIBUTING.md` anticipates Apache-2.0).
 
-Until a `LICENSE` file is added by maintainers, do not assume any
-license. Contributions are accepted under the DCO with the understanding
-that the future license will be one of the permissive options above or
-a reasoned equivalent proposed in public.
+Contributions are accepted under the DCO under the Apache-2.0 license.
 
 ## 8. Amendments
 

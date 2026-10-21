@@ -1,4 +1,7 @@
 # Schema validation — runs on every PR and on main. Credential-less: validates only, never publishes.
+# No BSR: distribution is Git tags + GitHub Releases only. Breaking checks
+# compare against committed Git baselines (compatibility/v1-initial/image.json),
+# never --against-registry. CI never creates tags.
 name: schema-validation
 
 on:
@@ -40,7 +43,9 @@ jobs:
         run: buf build
 
       - name: buf breaking against stable baseline
-        # Bootstrap baseline: the committed initial snapshot. Replace with the
-        # stable BSR commit once the first release is published (reviewed PR;
-        # see docs/schema-registry.md §9). Never an arbitrary branch.
+        # Bootstrap baseline: the committed initial snapshot. Replaced only by
+        # a reviewed PR that points at a newer committed Git baseline
+        # (compatibility/ image or tagged-revision descriptor) per
+        # docs/schema-registry.md §9. Never an arbitrary branch, never a
+        # registry label — this repository has no BSR module identity.
         run: buf breaking --against 'compatibility/v1-initial/image.json'

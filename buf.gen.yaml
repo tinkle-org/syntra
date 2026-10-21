@@ -1,0 +1,31 @@
+# Committed-generation template (Buf v2) for the Syntra IDL.
+#
+# Pins match specifications/schema/generation.md where possible:
+#   Buf CLI ............ 1.59.0
+#   Rust generator ..... buf.build/community/neoeinstein-prost:v0.4.0, revision 1
+#   Go generator ....... buf.build/protocolbuffers/go:v1.36.6, revision 1
+#                        (opt: paths=source_relative)
+#   Rust runtime ....... prost =0.13.5 (see crates/syntra-core/Cargo.toml)
+#   Go runtime ......... google.golang.org/protobuf v1.36.6
+#   Go toolchain ....... 1.26.4 (go.mod floor 1.22) ; Python 3.14 (tooling)
+#
+# Rust output is committed under crates/syntra-core/src/generated/ and
+# compiled into syntra-core (see that crate). Regeneration MUST be
+# byte-identical (drift-checked); never hand-edit files under that dir.
+#
+# Go output belongs to bindings/go/ (committed Go module, owned by the
+# schema-publish track). Do NOT run the Go half of this template on a
+# branch that does not own bindings/go/: `clean: true` would wipe that
+# tree. Rust-only regeneration:
+#   buf generate --template <(printf 'version: v2\nclean: true\nplugins:\n  - remote: buf.build/community/neoeinstein-prost:v0.4.0\n    revision: 1\n    out: crates/syntra-core/src/generated\n')
+version: v2
+clean: true
+plugins:
+  - remote: buf.build/community/neoeinstein-prost:v0.4.0
+    revision: 1
+    out: crates/syntra-core/src/generated
+  - remote: buf.build/protocolbuffers/go:v1.36.6
+    revision: 1
+    out: bindings/go
+    opt:
+      - paths=source_relative

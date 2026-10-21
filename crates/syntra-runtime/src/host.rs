@@ -1,0 +1,862 @@
+//! Host (server) engine: handshake acceptance, request dispatch,
+//! cancellation, and connection-bound sessions.
+//!
+//! The host validates `hello` shape and size bounds BEFORE policy
+//! evaluation, selects (or rejects) deterministically, emits exactly one
+//! terminal handshake outcome, binds exactly one principal for the
+//! connection lifetime, and never dispatches handlers or emits
+//! notifications before ACTIVE.
+//!
+//! Spec mapping:
+//! - version-range check first, credential semantics second
+//!   (SNTR-HS-003); mismatch → `UNIMPLEMENTED` + close;
+//! - auth rejection → `UNAUTHENTICATED`/`PERMISSION_DENIED` (generic
+//!   message, no oracle) + close;
+//! - handshake timeout and transport loss abort with `DEADLINE_EXCEEDED`
+//!   / `UNAVAILABLE` and explicitly close the core;
+//! - unexpected messages pre-`ACTIVE` (second `hello`, `ready`,
+//!   `request`, `result`, `cancel`, `notification`, unknown variant)
+//!   → `FAILED_PRECONDITION` (`UNIMPLEMENTED` for unknown variants,
+//!   which arrive as decode errors) + close (handshake.md section 1B;
+//!   carrier B1: the typed code is surfaced locally, no `Frame` is
+//!   emitted to carry it, and re-handshake on the transport is
+//!   forbidden);
+//! - malformed methods in ACTIVE → terminal `INVALID_ARGUMENT`
+//!   `result`, connection stays usable (no socket close);
+//! - unknown methods (valid shape, no handler) → terminal
+//!   `UNIMPLEMENTED`, connection stays usable;
+//! - overload → terminal `RESOURCE_EXHAUSTED`, connection stays usable
+//!   (offenders isolated, SNTR-REL-007/008);
+//! - per-RPC responder deadlines start BEFORE queue admission
+//!   (measured from receipt of the complete validated frame);
+//!   completion wins races; cancel-vs-deadline ties prefer `CANCELLED`
+//!   (recorded tie-break for open B10);
+//! - every accepted RPC ends with exactly one terminal `result`
+//!   (SNTR-RPC-002/006/030); a second `result` for the same id is never
+//!   sent.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use prost::Message;
+use tokio::sync::mpsc;
+use tracing::{debug, warn};
+
+use syntra_core::{
+    decode_frame, proto::frame::Body, validate_frame, ConnectionState, ErrorCode, Frame,
+    RpcRequest, RpcResult, StateEvent, SyntraError,
+};
+
+use crate::connection::{
+    fill_random, sleep_until, spawn_task, Connection, ConnectionConfig, Role, Shared, TaskHandle,
+};
+use crate::session::{AuthError, Authenticator, Session, SessionManager};
+
+/// Handler outcome for one dispatched RPC.
+#[derive(Debug, Clone)]
+pub enum HandlerOutcome {
+    Payload(Vec<u8>),
+    Error { code: ErrorCode, message: String },
+}
+
+impl HandlerOutcome {
+    pub fn error(code: ErrorCode, message: impl Into<String>) -> Self {
+        Self::Error {
+            code,
+            message: message.into(),
+        }
+    }
+}
+
+/// Application handler: owns method semantics. Payloads are opaque bytes;
+/// the core never validates them. Handlers SHOULD honor `cancel` promptly
+/// but completion still wins races at the core layer.
+pub trait Handler: Send + Sync {
+    fn handle(
+        &self,
+        method: String,
+        payload: Vec<u8>,
+        cancel: crate::connection::CancelToken,
+    ) -> HandlerFut;
+}
+
+pub type HandlerFut = std::pin::Pin<Box<dyn std::future::Future<Output = HandlerOutcome> + Send>>;
+
+/// Blanket adapter so closures can serve as handlers in tests and embeds.
+pub struct FnHandler<F>(pub F);
+
+impl<F, Fut> Handler for FnHandler<F>
+where
+    F: Fn(String, Vec<u8>, crate::connection::CancelToken) -> Fut + Send + Sync,
+    Fut: std::future::Future<Output = HandlerOutcome> + Send + 'static,
+{
+    fn handle(
+        &self,
+        method: String,
+        payload: Vec<u8>,
+        cancel: crate::connection::CancelToken,
+    ) -> HandlerFut {
+        Box::pin((self.0)(method, payload, cancel))
+    }
+}
+
+struct InflightEntry {
+    cancel: crate::connection::CancelToken,
+    task: TaskHandle,
+}
+
+/// Transport-independent Syntra host.
+pub struct Host {
+    conn: Connection,
+    auth: Arc<dyn Authenticator>,
+    handler: Arc<dyn Handler>,
+    sessions: SessionManager,
+    host_supported: Vec<u32>,
+    inflight: Arc<Mutex<HashMap<u64, InflightEntry>>>,
+    /// The `connection_id` bound by this connection's handshake, if any.
+    bound_id: Mutex<Option<String>>,
+}
+
+impl Host {
+    /// Create a host in `CONNECTED`. Returns the host plus the receiver
+    /// the transport pump must drain (one serialized `Frame` per item).
+    /// Starts the handshake timer: if ACTIVE is not reached in time the
+    /// core is explicitly closed with `DEADLINE_EXCEEDED`.
+    pub fn new(
+        config: ConnectionConfig,
+        auth: Arc<dyn Authenticator>,
+        handler: Arc<dyn Handler>,
+    ) -> (Arc<Self>, mpsc::Receiver<Vec<u8>>) {
+        Self::new_with_versions(config, auth, handler, vec![syntra_core::MAX_VERSION])
+    }
+
+    pub fn new_with_versions(
+        config: ConnectionConfig,
+        auth: Arc<dyn Authenticator>,
+        handler: Arc<dyn Handler>,
+        host_supported: Vec<u32>,
+    ) -> (Arc<Self>, mpsc::Receiver<Vec<u8>>) {
+        let (wtx, wrx) = mpsc::channel(config.writer_capacity);
+        let (shared, notif_rx) = Shared::new(
+            Role::Host,
+            wtx,
+            config.clone(),
+            syntra_core::MIN_VERSION,
+            syntra_core::MAX_VERSION,
+        );
+        let host = Arc::new(Self {
+            conn: Connection::wrap(shared, notif_rx),
+            auth,
+            handler,
+            sessions: SessionManager::new(),
+            host_supported,
+            inflight: Arc::new(Mutex::new(HashMap::new())),
+            bound_id: Mutex::new(None),
+        });
+        // Handshake timer (SNTR-HS-002/011): ACTIVE or explicit close.
+        let timer_host = host.clone();
+        let timeout = config.handshake_timeout;
+        spawn_task(async move {
+            sleep_until(Instant::now() + timeout).await;
+            if timer_host.conn.state().await != ConnectionState::Active
+                && !timer_host.conn.is_closed()
+            {
+                timer_host
+                    .conn
+                    .fail_handshake_and_close(
+                        ErrorCode::DeadlineExceeded,
+                        "handshake timed out".to_string(),
+                    )
+                    .await;
+            }
+        });
+        (host, wrx)
+    }
+
+    /// Current state (for diagnostics; not a wire value).
+    pub async fn state(&self) -> ConnectionState {
+        self.conn.state().await
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.conn.is_closed()
+    }
+
+    /// Subscribe to the close broadcast (transport-pump use).
+    pub fn subscribe_close(&self) -> tokio::sync::watch::Receiver<bool> {
+        self.conn.subscribe_close()
+    }
+
+    pub fn sessions(&self) -> &SessionManager {
+        &self.sessions
+    }
+
+    /// Number of in-flight (accepted, unterminated) RPCs.
+    pub fn inflight_len(&self) -> usize {
+        self.inflight.lock().unwrap().len()
+    }
+
+    /// Ingest one transport unit (exactly one serialized `Frame`).
+    pub async fn ingest(&self, bytes: &[u8]) {
+        let ctx = self.conn.ctx().await;
+        let frame = match decode_frame(bytes, ctx) {
+            Ok(f) => f,
+            Err(e) => {
+                self.on_decode_error(bytes, e).await;
+                return;
+            }
+        };
+        self.dispatch(frame).await;
+    }
+
+    async fn on_decode_error(&self, raw: &[u8], e: SyntraError) {
+        let st = self.conn.state().await;
+        if !st.is_active() {
+            // Handshake-phase failures are terminal for the connection
+            // (handshake.md section 5; carrier B1: code surfaced locally,
+            // connection closed, no Frame emitted).
+            let (code, message) = match e {
+                SyntraError::Protocol { code, message } => (code, message),
+                other => (other.code(), other.to_string()),
+            };
+            self.conn.fail_handshake_and_close(code, message).await;
+            return;
+        }
+        // ACTIVE-phase: a well-formed `request` that failed semantic
+        // validation (method shape) still gets its terminal RPC error —
+        // the connection stays usable. Classify from the raw bytes
+        // (prost decode only; validation already ran).
+        if let Ok(frame) = Frame::decode(raw) {
+            match &frame.body {
+                // hello/ready in ACTIVE: fatal protocol violation + close.
+                Some(Body::Hello(_)) | Some(Body::Ready(_)) => {
+                    warn!("hello/ready in ACTIVE; closing");
+                    let _ = self
+                        .conn
+                        .transition(StateEvent::ProtocolViolationFatal)
+                        .await;
+                    self.conn.close().await;
+                    return;
+                }
+                _ => {}
+            }
+            if frame.version != self.version_or_zero().await {
+                warn!("version mismatch in ACTIVE; closing");
+                let _ = self
+                    .conn
+                    .transition(StateEvent::ProtocolViolationFatal)
+                    .await;
+                self.conn.close().await;
+                return;
+            }
+            if let Some(Body::Request(_)) = &frame.body {
+                if frame.request_id != 0 {
+                    let code = e.code();
+                    if code == ErrorCode::InvalidArgument {
+                        // Method-shape failure (or sibling shape error):
+                        // terminal INVALID_ARGUMENT, no dispatch, no close.
+                        self.send_result(
+                            frame.request_id,
+                            outcome_error(ErrorCode::InvalidArgument, "invalid request"),
+                        )
+                        .await;
+                        return;
+                    }
+                    if code == ErrorCode::ResourceExhausted {
+                        // Oversize envelope: connection-level exhaustion.
+                        warn!("oversize envelope in ACTIVE; closing");
+                        self.conn.close().await;
+                        return;
+                    }
+                }
+            }
+        }
+        // Any other ACTIVE-phase decode failure: count misbehavior;
+        // close only on exhaustion or repeated abuse.
+        if matches!(e.code(), ErrorCode::ResourceExhausted) {
+            self.conn.close().await;
+            return;
+        }
+        let n = self
+            .conn
+            .shared
+            .misbehavior
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        debug!(error = ?e, "ACTIVE decode failure");
+        if n >= 8 {
+            warn!("too many malformed frames; closing");
+            self.conn.close().await;
+        }
+    }
+
+    async fn version_or_zero(&self) -> u32 {
+        self.conn.negotiated_version().await.unwrap_or(0)
+    }
+
+    async fn dispatch(&self, frame: Frame) {
+        let st = self.conn.state().await;
+        match frame.body {
+            Some(Body::Hello(h)) => {
+                if st != ConnectionState::Connected {
+                    // Second hello (or hello outside handshake): terminal
+                    // handshake failure / ACTIVE violation.
+                    self.protocol_violation(ErrorCode::FailedPrecondition, "unexpected hello")
+                        .await;
+                    return;
+                }
+                self.on_hello(frame.version, h).await;
+            }
+            Some(Body::Ready(_)) => {
+                // Hosts never receive ready.
+                self.protocol_violation(ErrorCode::FailedPrecondition, "unexpected ready")
+                    .await;
+            }
+            Some(Body::Request(req)) => {
+                if !st.is_active() {
+                    self.protocol_violation(ErrorCode::FailedPrecondition, "request before ACTIVE")
+                        .await;
+                    return;
+                }
+                self.on_request(frame.request_id, frame.version, req).await;
+            }
+            Some(Body::Result(_)) => {
+                if !st.is_active() {
+                    // Pre-ACTIVE results fail the handshake (SNTR-HS-012;
+                    // carrier B1: local code + close, emit nothing).
+                    self.protocol_violation(ErrorCode::FailedPrecondition, "result before ACTIVE")
+                        .await;
+                    return;
+                }
+                // Hosts send no requests: unknown-id diagnostic, no storm.
+                debug!("result for unknown request_id; ignoring");
+            }
+            Some(Body::Cancel(_)) => {
+                if !st.is_active() {
+                    self.protocol_violation(ErrorCode::FailedPrecondition, "cancel before ACTIVE")
+                        .await;
+                    return;
+                }
+                self.on_cancel(frame.request_id).await;
+            }
+            Some(Body::Notification(_)) => {
+                if !st.is_active() {
+                    // Handshake.md section 1B governs (fail/close);
+                    // the events-draft ignore default is recorded as
+                    // conflict B2 and NOT applied here.
+                    self.protocol_violation(
+                        ErrorCode::FailedPrecondition,
+                        "notification before ACTIVE",
+                    )
+                    .await;
+                    return;
+                }
+                // Initiator->host notifications have no meaning; ignore
+                // with a diagnostic (never complete an RPC).
+                debug!("initiator notification ignored");
+            }
+            None => {}
+        }
+    }
+
+    /// Pre-ACTIVE: terminal handshake failure + explicit close.
+    /// ACTIVE: fatal protocol violation + close.
+    async fn protocol_violation(&self, code: ErrorCode, message: &str) {
+        if self.conn.state().await.is_active() {
+            let _ = self
+                .conn
+                .transition(StateEvent::ProtocolViolationFatal)
+                .await;
+            self.conn.close().await;
+        } else {
+            self.conn
+                .fail_handshake_and_close(code, message.to_string())
+                .await;
+        }
+    }
+
+    async fn on_hello(&self, frame_version: u32, hello: syntra_core::proto::ClientHello) {
+        let _ = frame_version;
+        // Shape BEFORE policy (SNTR-HS-030): range first...
+        if let Err(e) = syntra_core::validate_hello_range(hello.min_version, hello.max_version) {
+            let (code, message) = err_parts(e);
+            self.conn.fail_handshake_and_close(code, message).await;
+            return;
+        }
+        // ...version selection (highest overlap) before any credential
+        // semantics (SNTR-HS-003).
+        let selected = match syntra_core::negotiate_version(
+            hello.min_version,
+            hello.max_version,
+            &self.host_supported,
+        ) {
+            Ok(v) => v,
+            Err(e) => {
+                let (code, message) = err_parts(e);
+                self.conn.fail_handshake_and_close(code, message).await;
+                return;
+            }
+        };
+        let _ = self.conn.transition(StateEvent::HelloSent).await;
+        let _ = self.conn.transition(StateEvent::VersionAccepted).await;
+        // A live `connection_id` presented as a credential is rejected
+        // outright (SNTR-SESS-002/020): it is a diagnostic, never auth.
+        if credential_is_live_session(&self.sessions, &hello.credential) {
+            self.conn
+                .fail_handshake_and_close(
+                    ErrorCode::Unauthenticated,
+                    "credential not accepted".to_string(),
+                )
+                .await;
+            return;
+        }
+        // ...then authentication (SNTR-HS-004).
+        let principal = match self.auth.authenticate(&hello.credential) {
+            Ok(p) => p,
+            Err(AuthError { code, message }) => {
+                self.conn.fail_handshake_and_close(code, message).await;
+                return;
+            }
+        };
+        // Exactly one terminal success outcome: ready + ACTIVE.
+        let connection_id = match generate_connection_id() {
+            Ok(id) => id,
+            Err(e) => {
+                self.conn
+                    .fail_handshake_and_close(ErrorCode::Internal, e)
+                    .await;
+                return;
+            }
+        };
+        *self.conn.shared.version.write().await = Some(selected);
+        let ready = Frame {
+            version: selected,
+            request_id: 0,
+            body: Some(Body::Ready(syntra_core::proto::ServerReady {
+                connection_id: connection_id.clone(),
+            })),
+        };
+        if validate_frame(&ready, self.conn.ctx().await).is_err() {
+            self.conn
+                .fail_handshake_and_close(
+                    ErrorCode::Internal,
+                    "ready validation failed".to_string(),
+                )
+                .await;
+            return;
+        }
+        let bytes = ready.encode_to_vec();
+        if self.conn.send_bytes(bytes).await.is_err() {
+            self.conn
+                .fail_handshake(SyntraError::Closed("transport gone".to_string()))
+                .await;
+            self.conn.close().await;
+            return;
+        }
+        let _ = self.conn.transition(StateEvent::ReadyReceived).await;
+        self.sessions.bind(Session {
+            connection_id: connection_id.clone(),
+            principal,
+            version: selected,
+            established_at: Instant::now(),
+        });
+        *self.bound_id.lock().unwrap() = Some(connection_id.clone());
+        self.conn
+            .complete_handshake(crate::connection::HandshakeDone { connection_id })
+            .await;
+    }
+
+    fn effective_timeout(&self, timeout_ms: u32) -> Duration {
+        let budget = if timeout_ms == 0 {
+            self.conn.shared.config.default_timeout
+        } else {
+            Duration::from_millis(timeout_ms as u64)
+        };
+        // Documented policy: clamp to the deployment maximum (never
+        // silently unbounded). The alternative (reject) would need an
+        // RFC-level error contract; clamping keeps one terminal path.
+        budget.min(self.conn.shared.config.max_rpc_timeout)
+    }
+
+    async fn on_request(&self, id: u64, version: u32, req: RpcRequest) {
+        let negotiated = self.version_or_zero().await;
+        if version != negotiated {
+            warn!("version mismatch in ACTIVE; closing");
+            let _ = self
+                .conn
+                .transition(StateEvent::ProtocolViolationFatal)
+                .await;
+            self.conn.close().await;
+            return;
+        }
+        // Method shape was validated at decode; re-check cheaply so a
+        // direct dispatch path can never skip it (defense in depth).
+        if syntra_core::validate_method(&req.method).is_err() {
+            self.send_result(
+                id,
+                outcome_error(ErrorCode::InvalidArgument, "invalid method"),
+            )
+            .await;
+            return;
+        }
+        // Concurrency bound: reject excess, keep usable (SNTR-RPC-008).
+        if self.inflight_len() >= self.conn.shared.config.max_outstanding {
+            self.send_result(
+                id,
+                outcome_error(ErrorCode::ResourceExhausted, "too many outstanding RPCs"),
+            )
+            .await;
+            return;
+        }
+        // Responder deadline starts BEFORE queue admission (measured from
+        // receipt of the complete validated frame, SNTR-RPC-004/1F).
+        let deadline = Instant::now() + self.effective_timeout(req.timeout_ms);
+        let cancel = crate::connection::CancelToken::new();
+        // Duplicate outstanding id on the host side (retransmit storm):
+        // keep the original, reject the duplicate attempt. Locks are
+        // scoped tightly and never held across an await (the guard is
+        // !Send; holding it would poison every spawned future).
+        if self.inflight.lock().unwrap().contains_key(&id) {
+            self.send_result(
+                id,
+                outcome_error(ErrorCode::FailedPrecondition, "duplicate request_id"),
+            )
+            .await;
+            return;
+        }
+        self.inflight.lock().unwrap().insert(
+            id,
+            InflightEntry {
+                cancel: cancel.clone(),
+                // Replaced with the real task handle below.
+                task: spawn_task(async {}),
+            },
+        );
+        let handler = self.handler.clone();
+        let method = req.method.clone();
+        let payload = req.payload.to_vec();
+        let sender = self.conn.clone();
+        let inflight = self.inflight.clone();
+        let cancel_task = cancel.clone();
+        let task = spawn_task(async move {
+            // Completion wins races (biased, handler branch first);
+            // cancel-vs-deadline ties prefer CANCELLED (recorded B10).
+            // Single terminal send: this task is the ONLY sender for the
+            // id. Cancellation only sets the token (no abort, no second
+            // send), so at most one result frame is ever emitted — on
+            // every target, including wasm where abort is unavailable.
+            let outcome = tokio::select! {
+                biased;
+                res = handler.handle(method.clone(), payload, cancel_task.clone()) => res,
+                _ = cancel_task.cancelled() => HandlerOutcome::error(ErrorCode::Cancelled, "cancelled"),
+                _ = sleep_until(deadline) => {
+                    if cancel_task.is_cancelled() {
+                        HandlerOutcome::error(ErrorCode::Cancelled, "cancelled")
+                    } else {
+                        HandlerOutcome::error(ErrorCode::DeadlineExceeded, "deadline exceeded")
+                    }
+                }
+            };
+            let _ = cancel_task;
+            let outcome_value = match outcome {
+                HandlerOutcome::Payload(b) => outcome_payload(b),
+                HandlerOutcome::Error { code, message } => {
+                    outcome_error(sanitize_code(code), &message)
+                }
+            };
+            let frame = Frame {
+                version: negotiated,
+                request_id: id,
+                body: Some(Body::Result(RpcResult {
+                    outcome: Some(outcome_value),
+                })),
+            };
+            let bytes = frame.encode_to_vec();
+            let _ = sender.send_bytes(bytes).await;
+            // Release the id only after the terminal result is queued:
+            // until now, a duplicate id is a duplicate (original wins).
+            inflight.lock().unwrap().remove(&id);
+        });
+        self.inflight
+            .lock()
+            .unwrap()
+            .insert(id, InflightEntry { cancel, task });
+    }
+
+    async fn on_cancel(&self, id: u64) {
+        if id == 0 {
+            return;
+        }
+        // Best-effort: signal the handler. Unknown or already-completed
+        // ids are ignored (race tolerance). The request task remains the
+        // sole sender of the terminal result, so completion still wins
+        // and no second `result` is ever emitted.
+        if let Some(entry) = self.inflight.lock().unwrap().get(&id) {
+            entry.cancel.cancel();
+        }
+    }
+
+    async fn send_result(&self, id: u64, outcome: syntra_core::proto::rpc_result::Outcome) {
+        let version = self.version_or_zero().await;
+        let frame = Frame {
+            version,
+            request_id: id,
+            body: Some(Body::Result(RpcResult {
+                outcome: Some(outcome),
+            })),
+        };
+        let bytes = frame.encode_to_vec();
+        if self.conn.send_bytes(bytes).await.is_err() {
+            self.conn.on_transport_lost().await;
+        }
+    }
+
+    /// Emit a host->initiator notification (opaque application bytes).
+    /// Only legal in ACTIVE; notifications never complete an RPC
+    /// (SNTR-RPC-020, SNTR-EVENT-005). Empty payloads are valid events.
+    pub async fn notify(&self, payload: Vec<u8>) -> Result<(), SyntraError> {
+        if self.conn.state().await != ConnectionState::Active {
+            return Err(SyntraError::Protocol {
+                code: ErrorCode::FailedPrecondition,
+                message: "notifications require ACTIVE connection".to_string(),
+            });
+        }
+        let version = self.version_or_zero().await;
+        let frame = Frame {
+            version,
+            request_id: 0,
+            body: Some(Body::Notification(syntra_core::proto::Notification {
+                payload: payload.into(),
+            })),
+        };
+        validate_frame(&frame, self.conn.ctx().await)?;
+        let bytes = frame.encode_to_vec();
+        self.conn.send_bytes(bytes).await
+    }
+
+    /// Graceful close: stop new RPCs, abort in-flight with terminal
+    /// mapping, unbind the session, teardown (SNTR-HS-006/013).
+    pub async fn close(&self) {
+        self.abort_inflight().await;
+        self.conn.close().await;
+        self.unbind_session().await;
+    }
+
+    /// Abrupt transport loss: `UNAVAILABLE` (unknown outcome) to all
+    /// in-flight RPCs, session discarded (SNTR-SESS-004).
+    pub async fn on_transport_lost(&self) {
+        self.abort_inflight().await;
+        self.conn.on_transport_lost().await;
+        self.unbind_session().await;
+    }
+
+    async fn abort_inflight(&self) {
+        let entries: Vec<InflightEntry> = {
+            let mut g = self.inflight.lock().unwrap();
+            g.drain().map(|(_, e)| e).collect()
+        };
+        for e in entries {
+            e.cancel.cancel();
+            e.task.abort();
+        }
+    }
+
+    async fn unbind_session(&self) {
+        // Hosts own exactly one connection and bind at most one session
+        // for it; unbind that id (if any) so CLOSED discards all
+        // per-connection state except diagnostics (SNTR-HS-006).
+        if let Some(id) = self.bound_id.lock().unwrap().take() {
+            self.sessions.unbind(&id);
+        }
+    }
+
+    /// Test hook: inject raw bytes as the transport would deliver them.
+    #[cfg(test)]
+    pub async fn inject(&self, bytes: &[u8]) {
+        self.ingest(bytes).await;
+    }
+}
+
+fn outcome_payload(b: Vec<u8>) -> syntra_core::proto::rpc_result::Outcome {
+    syntra_core::proto::rpc_result::Outcome::Payload(b.into())
+}
+
+fn outcome_error(code: ErrorCode, message: &str) -> syntra_core::proto::rpc_result::Outcome {
+    syntra_core::proto::rpc_result::Outcome::Error(syntra_core::proto::RpcError {
+        code: code.as_i32(),
+        message: message.to_string(),
+    })
+}
+
+/// UNSPECIFIED (0) MUST NOT appear in a failure outcome (SNTR-ERR-001);
+/// normalize it to UNKNOWN defensively.
+fn sanitize_code(code: ErrorCode) -> ErrorCode {
+    match code {
+        ErrorCode::Unspecified => ErrorCode::Unknown,
+        other => other,
+    }
+}
+
+fn err_parts(e: SyntraError) -> (ErrorCode, String) {
+    match e {
+        SyntraError::Protocol { code, message } => (code, message),
+        SyntraError::Handshake { code, message } => (code, message),
+        other => (other.code(), other.to_string()),
+    }
+}
+
+/// 128-bit unguessable connection diagnostic (SNTR-HS-004), hex-encoded.
+/// Never encodes principal or session information (SNTR-SESS-002).
+fn generate_connection_id() -> Result<String, String> {
+    let mut bytes = [0u8; 16];
+    fill_random(&mut bytes)?;
+    let mut s = String::with_capacity(32);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    Ok(s)
+}
+
+/// A live `connection_id` presented as a credential is rejected
+/// outright (SNTR-SESS-002/020): it is a diagnostic, never auth.
+fn credential_is_live_session(sessions: &SessionManager, credential: &[u8]) -> bool {
+    if credential.is_empty() || credential.len() > 256 {
+        return false;
+    }
+    if let Ok(s) = std::str::from_utf8(credential) {
+        if sessions.get(s).is_some() {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::{AllowAnonymous, RejectAll};
+    use syntra_core::proto::ClientHello;
+    use syntra_core::ValidationContext;
+
+    fn hello_frame(min: u32, max: u32, cred: Vec<u8>) -> Vec<u8> {
+        Frame {
+            version: max,
+            request_id: 0,
+            body: Some(Body::Hello(ClientHello {
+                min_version: min,
+                max_version: max,
+                credential: cred.into(),
+            })),
+        }
+        .encode_to_vec()
+    }
+
+    fn echo_handler() -> Arc<dyn Handler> {
+        Arc::new(FnHandler(
+            |method: String, payload: Vec<u8>, _cancel| async move {
+                let _ = method;
+                HandlerOutcome::Payload(payload)
+            },
+        ))
+    }
+
+    #[tokio::test]
+    async fn accept_anonymous_binds_session() {
+        let (host, mut wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.inject(&hello_frame(1, 1, vec![])).await;
+        let bytes = wrx.recv().await.expect("ready sent");
+        let ctx = ValidationContext::pre_handshake(ConnectionState::Negotiating);
+        let ready = decode_frame(&bytes, ctx).expect("valid ready");
+        assert_eq!(ready.version, 1);
+        assert_eq!(host.state().await, ConnectionState::Active);
+        assert_eq!(host.sessions.count(), 1);
+        let _ = ready;
+    }
+
+    #[tokio::test]
+    async fn version_mismatch_rejected() {
+        let (host, _wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.inject(&hello_frame(2, 3, vec![])).await;
+        assert!(host.conn.is_closed());
+    }
+
+    #[tokio::test]
+    async fn auth_rejection_closes() {
+        let (host, _wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(RejectAll),
+            echo_handler(),
+        );
+        host.inject(&hello_frame(1, 1, vec![])).await;
+        assert!(host.conn.is_closed());
+        assert_eq!(host.sessions.count(), 0);
+    }
+
+    #[tokio::test]
+    async fn pre_active_request_fails() {
+        let (host, _wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        let req = Frame {
+            version: 1,
+            request_id: 7,
+            body: Some(Body::Request(RpcRequest {
+                method: "/example.Echo/Echo".into(),
+                payload: vec![].into(),
+                timeout_ms: 100,
+            })),
+        }
+        .encode_to_vec();
+        host.inject(&req).await;
+        assert!(host.conn.is_closed());
+    }
+
+    #[tokio::test]
+    async fn malformed_method_terminal_without_close() {
+        let (host, mut wrx) = Host::new(
+            ConnectionConfig::default(),
+            Arc::new(AllowAnonymous),
+            echo_handler(),
+        );
+        host.inject(&hello_frame(1, 1, vec![])).await;
+        let _ready = wrx.recv().await.unwrap();
+        // Valid envelope shape, bad method: prost-decodes fine, semantic
+        // validation fails -> terminal INVALID_ARGUMENT, usable conn.
+        let bad = Frame {
+            version: 1,
+            request_id: 9,
+            body: Some(Body::Request(RpcRequest {
+                method: "nope".into(),
+                payload: vec![].into(),
+                timeout_ms: 100,
+            })),
+        }
+        .encode_to_vec();
+        host.inject(&bad).await;
+        let out = wrx.recv().await.expect("terminal result");
+        let ctx = ValidationContext::active(1);
+        let res = decode_frame(&out, ctx).expect("valid result");
+        match res.body {
+            Some(Body::Result(r)) => match r.outcome {
+                Some(syntra_core::proto::rpc_result::Outcome::Error(e)) => {
+                    assert_eq!(e.code, ErrorCode::InvalidArgument.as_i32())
+                }
+                other => panic!("expected error, got {other:?}"),
+            },
+            other => panic!("expected result, got {other:?}"),
+        }
+        assert_eq!(host.state().await, ConnectionState::Active);
+    }
+}

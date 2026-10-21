@@ -9,7 +9,7 @@ Release authority: `GOVERNANCE.md` Sec. 5 (stability criteria),
 `GOVERNANCE.md` Sec. 3 (approval quorum), `GOVERNANCE.md` Sec. 4 +
 Deprecation (breaking/deprecation handling), `rfcs/README.md` (RFC
 lifecycle — only **Accepted** RFCs may modify normative behavior),
-`docs/schema-registry.md` (BSR publication contract),
+`docs/schema-registry.md` (Git-tags + GitHub-Releases distribution contract),
 `docs/schema-release-checklist.md` (per-schema-release gates).
 
 Status terms: an RC is a **candidate**, not a stable release. Tagging an
@@ -37,11 +37,15 @@ An unchecked box blocks tagging.
 - [ ] WSS profile complete
 - [ ] Proto lint passes
 - [ ] Proto breaking checks pass
+- [ ] Committed generated types fresh (`validate-schema.py --drift-only`)
+- [ ] Rust tests pass (`cargo test --locked --workspace`)
+- [ ] Go tests pass (`go test ./...` in `bindings/go`)
+- [ ] WASM compile check passes (`syntra-ffi --target wasm32-unknown-unknown`)
 - [ ] Conformance requirements complete
 - [ ] Test vectors validated
 - [ ] Consistency audit has no P0 blockers
-- [ ] BSR publication ready
-- [ ] License approved
+- [ ] GitHub Release assets ready (native libs + WASM + archives)
+- [ ] License present (Apache-2.0 `LICENSE`)
 - [ ] Security process documented
 - [ ] CHANGELOG updated
 
@@ -57,8 +61,9 @@ Evidence mapping (where each box is verified):
 | Conformance requirements complete | `requirements.yaml` covers every defined ID; no `not_testable` without a stated reason (`validate-repo.py requirements manifests`) |
 | Test vectors validated | `validate-repo.py vectors` green (hex parses, protobuf decodes against `proto/`, TCP lengths match, malformed vectors intentionally malformed) |
 | Consistency audit no P0 | `audits/v1-consistency-review.md` P0 list empty or all P0s closed by Accepted RFCs; readiness report shows no BLOCKED area required for the RC scope |
-| BSR publication ready | `docs/schema-registry.md` §1 module identity approved (no placeholder); `buf push --dry-run` semantics verified; publish workflow gates pass |
-| License approved | `LICENSE` file added by maintainers per `GOVERNANCE.md` Sec. 7 |
+| Committed generation fresh | `scripts/validate-schema.py --drift-only` green (committed `crates/` + `bindings/go/` match pinned regeneration); `cargo test`, `go test`, WASM check green |
+| GitHub Release assets ready | `release-plz.toml` (Apache-2.0, `publish = false`) + `.github/workflows/release.yml` green: Linux amd64/arm64 native libs + header, WASM archive, Rust source/crate archives, descriptor/manifests/vectors, SHA256SUMS |
+| License present | Apache-2.0 `LICENSE` file present per `GOVERNANCE.md` Sec. 7 |
 | Security process documented | `SECURITY.md` private reporting channel live; embargo handling per `GOVERNANCE.md` Sec. 3 |
 | CHANGELOG updated | `## [v1.0.0-rc.1]` section with Added/Changed/Deprecated/Removed/Security; every wire-affecting change has migration notes |
 
@@ -173,44 +178,53 @@ git push origin v1.0.0-rc.1
 Rules: annotated (preferably signed) tags only; tag names `vX.Y.Z` for
 candidates and finals, with `-rc.N` suffix for prerelease rounds
 (`v1.0.0-rc.2`, …); branches never define releases (`GOVERNANCE.md`
-Sec. 5). Tag protection rules SHOULD restrict tag creation to
-maintainers. Deleting or moving a release tag is forbidden; fix forward
-with a new tag.
+Sec. 5). For every main tag `vX.Y.Z`, cut a nested Go module tag
+`bindings/go/vX.Y.Z` at the SAME revision (required for Go MVS to resolve
+the `bindings/go` module; `.github/workflows/release.yml` verifies both
+tags resolve to the same commit and fails closed). Tag protection rules
+SHOULD restrict tag creation to maintainers. Deleting or moving a release
+tag is forbidden; fix forward with a new tag. CI never creates tags.
 
 ## 5. Release artifacts
 
-For each RC tag, `scripts/collect-release-artifacts.sh <tag>` assembles
-(never publishes; no tagging inside):
+For each tag, `.github/workflows/release.yml` assembles and attaches to the
+GitHub Release (never publishes elsewhere; no tagging inside; no crates.io,
+no GHCR, no BSR push):
 
 - `descriptor/` — `buf build -o descriptor/image.json` (FileDescriptorSet
   of exactly the tagged revision) plus `buf export` tree for inspection.
 - `manifests/` — copy of `conformance/manifest/*.yaml` at the tag.
 - `test-vectors/` — copy of `conformance/test-vectors/` at the tag.
-- `CHANGELOG.md`, `RELEASE.md`, `GOVERNANCE.md` (as tagged).
+- `rust/` — Rust source archive + per-crate `.crate` files (offline-friendly;
+  `publish = false`, Apache-2.0) when the workspace exists.
+- `go/` — `bindings/go` source archive (CGO wrapper + committed `*.pb.go`).
+- `native/linux-amd64/`, `native/linux-arm64/` — `syntra-ffi` cdylib
+  (`libsyntra_ffi.so`), staticlib (`libsyntra_ffi.a`), and C header
+  (`syntra_ffi.h`) built `--locked --release` on each arch.
+- `wasm/` — browser WASM archive (`syntra_ffi.wasm` tarball, built for
+  `wasm32-unknown-unknown`).
+- `CHANGELOG.md`, `RELEASE.md`, `GOVERNANCE.md`, `LICENSE` (as tagged).
 - `SHA256SUMS` — checksums for every file above, generated locally.
 
-Artifacts live under `dist/release/<tag>/` (gitignored; reproducible on
-any checkout of the tag). Checksums are the integrity contract for
-downloadable artifacts; the tag + checksums together define the RC.
+`scripts/collect-release-artifacts.sh <tag>` reproduces the
+descriptor/manifests/vectors + docs subset locally under
+`dist/release/<tag>/` (gitignored). Checksums are the integrity contract
+for downloadable artifacts; the tag + checksums together define the RC.
 
-## 6. BSR release association (prepared, not executed)
+## 6. GitHub Release association (no BSR)
 
-`buf push` runs only via `.github/workflows/schema-publish.yml`, which
-requires ALL of: a schema tag event, `BSR_MODULE` equal to exactly
-`buf.build/tinklecorp/syntra`, and manual approval of the `bsr-publish`
-environment holding the least-privilege `BUF_TOKEN`. See
-`docs/schema-registry.md` §§1, 8–10 and `docs/schema-release-checklist.md`
-§B–C.
+There is no BSR module and no `buf push`. Release identity lives entirely
+in Git + GitHub Releases (see `docs/schema-registry.md` §§1, 8–10 and
+`docs/schema-release-checklist.md` §B–C):
 
 Tag namespaces are distinct by design: repository releases use
-`vX.Y.Z` (§4 above); schema publication follows `proto-vX.Y.Z` tags
-(see `docs/schema-registry.md` §1; the `proto-v*` trigger and label
-mapping live in the publish workflow). A schema publication tag is cut
-only after the repository RC checklist (§1) holds for the schema scope
-AND the publication policy RFC is accepted. Association rules: Git tag
-`proto-vX.Y.Z` ↔ BSR commit in `buf.build/tinklecorp/syntra`; release
-identity via BSR labels (`candidate` for `-rc` tags, `stable` for
-finals); labels move forward only. Post-publish, the workflow verifies
-public module access and generated-SDK availability read-only (no
-credentials echoed; see workflow `verify` job). The preflight gate pins
-the exact approved module and fails closed on anything else — by design.
+`vX.Y.Z` (§4 above) and nested Go module tags use `bindings/go/vX.Y.Z`
+at the same revision (the `bindings/go/*` trigger in `release.yml` only
+verifies; it never releases twice). A release tag is cut only after the
+repository RC checklist (§1) holds. Association rules: Git tag `vX.Y.Z` ↔
+GitHub Release `vX.Y.Z` carrying the §5 assets; nested tag
+`bindings/go/vX.Y.Z` ↔ the same commit (verified, fails closed); release
+maturity via prerelease flags (`-rc` tags marked prerelease, finals marked
+latest) — never by moving a tag. Post-release, the workflow verifies asset
+checksums read-only (no credentials echoed). The preflight gate pins the
+exact tag format and fails closed on anything else — by design.

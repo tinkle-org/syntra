@@ -1,58 +1,57 @@
-# Syntra Schema Registry — publication and consumer contract
+# Syntra Schema Registry — distribution and consumer contract
 
-- Status: Draft (BSR module identity approved as `tinklecorp/syntra`; publication policy pending RFC; publication is **disabled** until then)
-- Scope: How Syntra's Protobuf schemas reach the Buf Schema Registry (BSR), what consumers are guaranteed, and what BSR does **not** provide. Protocol behavior is owned by `specifications/`; this document owns only schema distribution.
-- Normative references: `buf.yaml`, `proto/syntra/v1/*.proto`, `specifications/core/versioning.md` (SNTR-VER-*), `specifications/schema/compatibility.md`, `GOVERNANCE.md`, `CHANGELOG.md`, `conformance/profiles.yaml`. (There is intentionally no `buf.gen.yaml`: the repository performs no local binding generation. See §11.)
+- Status: Active (Git tags + GitHub Releases; no BSR module, no registry publication)
+- Scope: How Syntra's Protobuf schemas and generated types are distributed, what consumers are guaranteed, and what generated packages do **not** provide. Protocol behavior is owned by `specifications/`; this document owns only schema distribution.
+- Normative references: `buf.yaml`, `proto/syntra/v1/*.proto`, `specifications/core/versioning.md` (SNTR-VER-*), `specifications/schema/compatibility.md`, `GOVERNANCE.md`, `CHANGELOG.md`, `conformance/profiles.yaml`, `RELEASE.md` §§4–6, `.github/workflows/release.yml`, `release-plz.toml`. (A root `buf.gen.yaml` MAY exist: it pins the committed `crates/` + `bindings/go/` generation. See §11.)
 - Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
 
-## 1. BSR module identity (A)
+## 1. Distribution identity (A)
 
-The approved BSR module path is:
+There is **no BSR module**. Distribution identity is Git + GitHub Releases:
 
 ```text
-buf.build/tinklecorp/syntra
+Git tag vX.Y.Z (+ nested Go module tag bindings/go/vX.Y.Z, same revision)
 ```
 
-The module identity was approved by maintainer decision; the organization
-is `tinklecorp` and the module name is `syntra`. Do not change the module
-path without a new maintainer decision recorded on the publication RFC
-(see `docs/schema-release-checklist.md`). Publication itself remains
-disabled until the publication policy RFC is accepted and a maintainer
-cuts a `proto-v*` tag — approving the identity does not authorize any push.
+- Release tags are cut by maintainers only (`RELEASE.md` §4; `GOVERNANCE.md` §5). Branches never define releases. CI never creates tags.
+- `buf.yaml` carries **no registry `name:`** by design. A registry identity is only needed for `buf push` / `--against-registry` breaking checks, and this repository never pushes to a registry. Breaking baselines are committed Git artifacts (`compatibility/v1-initial/image.json`, §9). Do not re-add a registry name without a maintainer decision recorded on a governance RFC.
+- The nested Go module tag (`bindings/go/vX.Y.Z`) is required for Go MVS to resolve the `bindings/go` module. `.github/workflows/release.yml` verifies it resolves to the same revision as `vX.Y.Z` and fails closed otherwise.
 
 | Item | Policy |
 |---|---|
-| Module ownership | Held by the Syntra maintainers (interim: repository owners per `GOVERNANCE.md` §2). Ownership transfer or sharing requires the normative bar (`GOVERNANCE.md` §3). |
-| Module visibility | **Public** on first publication. Private staging (if ever used) must never be cited as the consumer contract. |
-| Public status | Not yet published. Until the first `buf push` to the approved module, the Git repository is the only distribution point. |
-| Source repository relationship | Git is the authoring authority; BSR is a read-only distribution mirror of tagged schema revisions (§2). |
-| Release/tag relationship | A Git tag of the form `proto-vX.Y.Z` (proposed; pending approval) triggers publication of exactly that revision. Branches never define releases (`GOVERNANCE.md` §5). BSR commits are content-addressed; human-meaningful release identity comes from BSR **labels** applied at push time (§8). |
+| Module ownership | Held by the Syntra maintainers (interim: repository owners per `GOVERNANCE.md` §2). |
+| Visibility | **Public** Git repository; GitHub Releases carry the downloadable assets. |
+| Public status | Released only via tagged GitHub Releases. Until the first tag, the `main` head is the only distribution point. |
+| Source repository relationship | Git is the authoring authority AND the distribution point for tagged revisions (§2). |
+| Release/tag relationship | A Git tag of the form `vX.Y.Z` (or `vX.Y.Z-rc.N` prerelease) defines the release; `bindings/go/vX.Y.Z` at the same revision defines the Go module view. GitHub Releases attach the §5 asset set. |
 
 ## 2. Source of truth (B)
 
 ```text
 Git repository (proto/syntra/v1/*.proto)   ← sole authoring authority
-        │  buf push (reviewed tag only)
+        │  pinned buf generate (reviewed change only)
         ▼
-BSR module (immutable commits + labels)     ← published distribution
-        │  buf generate (remote plugins, pinned)
+Committed generated types (crates/**, bindings/go/**)  ← reviewed, drift-checked
+        │  maintainer tag vX.Y.Z (+ bindings/go/vX.Y.Z)
         ▼
-Generated SDKs (message types only)         ← derived convenience artifacts
+GitHub Release (assets + SHA256SUMS)       ← published distribution
+        │  git / tarball consumption
+        ▼
+Consumers (libtinkle via git; Go servers via CGO + prebuilt libs)
 ```
 
-- **Git** is where schemas are written, reviewed (RFC + quorum per `GOVERNANCE.md` §3), linted, and breaking-checked. Nothing is authoritative because it appeared on BSR; it is on BSR because it was approved in Git.
-- **BSR** stores immutable schema commits. History is never rewritten; a bad publication is superseded by a new commit, never edited in place.
-- **Generated SDK code MUST NOT become normative.** Generated types are a convenience serialization of the schema; protocol state machines, transport framing, authentication, RPC correlation, deadlines, cancellation, and error semantics live in `specifications/` and the conformance suite. Any conflict between generated helper behavior and the specifications resolves in favor of the specifications (ADR-010; see §6).
+- **Git** is where schemas are written, reviewed (RFC + quorum per `GOVERNANCE.md` §3), linted, breaking-checked, and generated types are committed. Nothing is authoritative because it appeared in a release asset; it is in the asset because it was approved in Git.
+- **Generated types are committed and reviewed.** History shows every regeneration; a bad generation is superseded by a new commit, never edited in place without review.
+- **Generated code MUST NOT become normative.** Generated types are a convenience serialization of the schema; protocol state machines, transport framing, authentication, RPC correlation, deadlines, cancellation, and error semantics live in `specifications/` and the conformance suite. Any conflict between generated helper behavior and the specifications resolves in favor of the specifications (ADR-010; see §6).
 
 ## 3. Buf configuration review (C)
 
-Current `buf.yaml` (verified 2026-10-19 with Buf **1.59.0**; `buf lint` and `buf build` pass clean):
+Current `buf.yaml` (verified with Buf **1.59.0**; `buf lint` and `buf build` pass clean):
 
 ```yaml
 version: v2
 modules:
-  - path: proto        # single module root; sole source tree
-    name: buf.build/tinklecorp/syntra   # approved BSR identity (§1)
+  - path: proto        # single module root; sole source tree (no registry name)
 lint:
   use:
     - STANDARD          # no exceptions
@@ -67,13 +66,13 @@ Review findings:
 |---|---|
 | `version: v2` | Correct. |
 | Single module, root `proto` | Correct. `proto/syntra/v1` is the sole source of truth; no second root, no historical tree. |
-| Module `name` | Correct: `buf.build/tinklecorp/syntra`, matching the approved BSR identity (§1). Required for `buf push` and `--against-registry` breaking checks. Do not change without a maintainer decision on the publication RFC. |
+| Module `name` | Correct: **absent by design**. No `buf push` or `--against-registry` checks exist, so no registry identity is configured. Do not re-add one without a governance RFC. |
 | Lint `STANDARD`, no exceptions | Correct. No `ignore` or per-rule exceptions exist, so none need justification. Any future exception MUST cite its RFC and expiry in a `buf.yaml` comment. |
 | Breaking `FILE`, no exceptions | Correct and required: wire-only (`WIRE`) checks are insufficient for Syntra because moved types, import paths, and descriptor identity break consumers even when bytes do not (see `specifications/schema/compatibility.md`, three dimensions). Any future exception MUST cite its RFC and expiry. |
 | Dependencies | **None.** All imports are intra-module (`syntra/v1/*.proto`). |
 | Package layout | `package syntra.v1` in all seven files; import paths mirror the directory tree. No restructuring without a major-version RFC (SNTR-VER-003). |
 
-`buf.yaml` carries no lint/breaking exceptions; the only post-review change is the approved module `name` above, which enables (but never auto-triggers) publication.
+`buf.yaml` carries no lint/breaking exceptions and no registry identity.
 
 ## 4. Dependencies and buf.lock (D)
 
@@ -83,25 +82,24 @@ Rules going forward:
 
 1. Avoid third-party schema dependencies. Prefer self-contained definitions; a new external import is a reviewed dependency decision, not a convenience.
 2. If an external Protobuf module is ever imported: run `buf dep update`, commit the resulting `buf.lock`, and pin the dependency to an immutable commit (never a floating label).
-3. Dependency update procedure: open a PR that updates `buf.lock`, shows `buf build` + full breaking + conformance impact, and passes security review (see §5). Merging the PR is the approval; direct pushes to dependency pins are forbidden.
-4. Security review for dependency updates is mandatory: provenance of the dependency commit, change surface (new types/options that could alter generated code behavior), and supply-chain risk (maintainer identity, registry trust). Untrusted-fork dependencies are never accepted.
+3. Dependency update procedure: open a PR that updates `buf.lock`, shows `buf build` + full breaking + conformance impact, and passes security review (see §5). Merging the PR is the approval; direct pushes of dependency pins are forbidden.
+4. Security review for dependency updates is mandatory: provenance of the dependency commit, change surface (new types/options that could alter generated code behavior), and supply-chain risk. Untrusted-fork dependencies are never accepted.
 
 ## 5. Public package namespace (E)
 
 - Protobuf package: `package syntra.v1;` in all seven files. This is the wire-identity namespace and MUST NOT change within v1 (SNTR-VER-001/003).
 - Language options audit:
   - `option go_package` is set in all seven files to `github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1`.
-  - **Finding (publication blocker):** this value embeds a private organization path (`tinklehq`). For a public, BSR-published module it implies a private repository as the Go import home, which conflicts with the project's independence requirements. It is **not changed by this task** because `go_package` is covered by Buf's `FILE` breaking rules (`FILE_SAME_GO_PACKAGE`): changing it alters generated import paths for every Go consumer and therefore requires the normative bar (RFC + maintainer quorum + `CHANGELOG.md` migration note), not an undocumented edit.
-  - **Recommendation (pending maintainer decision):** adopt a neutral, stable public value at publication time, e.g. a path derived from the approved BSR module identity or the public repository home, and record the migration in `CHANGELOG.md` and `MIGRATION.md`. Until then, Go consumers generate from the published schema (or, pre-publication, from this repository's `proto/` tree with their own generation template) and MUST NOT treat the interim import path as a stability promise. Nothing in this repository is generated from it: there are no local bindings to copy.
-  - Java/C#/other languages: no explicit package options are set, and none are added by this task. Per policy, options are added only when the project decides they benefit consumers generally — never for a single private consumer.
+  - **Known wart:** this value embeds an organization path (`tinklehq`). Changing it alters generated import paths for every Go consumer and is therefore covered by Buf's `FILE` breaking rules (`FILE_SAME_GO_PACKAGE`): changing it requires the normative bar (RFC + maintainer quorum + `CHANGELOG.md` migration note), not an undocumented edit. The committed Go module lives at `bindings/go` with exactly this import path, so the wart is at least self-consistent until a migration RFC lands.
+  - Java/C#/other languages: no explicit package options are set, and none are added for a single private consumer. Options are added only when the project decides they benefit consumers generally.
 
-## 6. Generated SDK policy (F)
+## 6. Generated-code policy (F)
 
-BSR-generated SDKs are **convenience artifacts**. They provide generated Protobuf message types and nothing more. Stated prominently for every consumer:
+Committed generated types are **convenience artifacts**. They provide generated Protobuf message types and nothing more. Stated prominently for every consumer:
 
 - They **do** give you: typed `Frame`, `ClientHello`, `ServerReady`, `RpcRequest`, `RpcResult`, `Cancel`, `Notification`, `RpcError`, and `ErrorCode` values in your language, with serialization handled by the language's Protobuf runtime.
-- They **do not** implement: Syntra handshake, session lifecycle, authentication behavior, RPC correlation, idempotency, retries, event streams, TCP framing, HTTP transport, or WebSocket transport — nor, more broadly: connection state machines, session binding, length prefixes, TLS handling, HTTP/WS mappings, credential handling, RPC deadlines/cancellation, capability negotiation, event subscription semantics, error-mapping policy, or resource bounds. All of that is specified in `specifications/` and proven by `conformance/` — there is no runtime in the SDK to "just call." Those behaviors are implemented by separate protocol implementation projects, never by generated packages.
-- They are **not** the protocol. If generated convenience behavior ever appears to conflict with the specifications, the specifications win (ADR-010). SDK-only conveniences MUST remain non-normative and MUST NOT be cited in conformance claims.
+- They **do not** implement: Syntra handshake, session lifecycle, authentication behavior, RPC correlation, idempotency, retries, event streams, TCP framing, HTTP transport, or WebSocket transport — nor, more broadly: connection state machines, session binding, length prefixes, TLS handling, HTTP/WS mappings, credential handling, RPC deadlines/cancellation, capability negotiation, event subscription semantics, error-mapping policy, or resource bounds. All of that is specified in `specifications/` and proven by `conformance/` — there is no runtime in the generated package to "just call." Those behaviors are implemented by protocol implementation projects, never by generated packages.
+- They are **not** the protocol. If generated convenience behavior ever appears to conflict with the specifications, the specifications win (ADR-010). Generated-only conveniences MUST remain non-normative and MUST NOT be cited in conformance claims.
 
 ## 7. Versioning strategy (G)
 
@@ -110,79 +108,81 @@ Five independent dimensions (SNTR-VER-001). The table below is the precise mappi
 | Dimension | Identifier | Examples | Governed by |
 |---|---|---|---|
 | Git commit | SHA | `92e5f28…` | Git history; every change lands here first |
-| Git tag (schema) | `proto-vX.Y.Z` (proposed) | `proto-v1.0.0` | Maintainer tag after `GOVERNANCE.md` §5 criteria hold |
-| BSR commit | content hash | assigned at `buf push` | BSR immutability; never rewritten |
-| BSR label | release channel label | `stable`, plus version labels (see §8) | Applied at push; moves only forward to newer commits |
+| Git tag (release) | `vX.Y.Z` | `v1.0.0` | Maintainer tag after `GOVERNANCE.md` §5 criteria hold |
+| Nested Go module tag | `bindings/go/vX.Y.Z` | `bindings/go/v1.0.0` | Same revision as `vX.Y.Z` (verified by release.yml) |
+| GitHub Release | tag assets + SHA256SUMS | `syntra-v1.0.0` assets | Attached by `.github/workflows/release.yml` |
 | Syntra Core version | protocol behavior | Syntra Core v1 | `specifications/core/versioning.md` |
 | Protobuf package version | representation namespace | `syntra.v1` | `proto/` + Buf FILE checks |
 
 Rules:
 
-- Backward-compatible schema revisions (new optional field, new optional `oneof` member + capability, new enum value with tolerance handling, new file with new types) **may occur within `syntra.v1`** and keep the package name. They REQUIRE the additive path: RFC, `FILE` breaking pass, conformance coverage, `CHANGELOG.md` entry.
+- Backward-compatible schema revisions (new optional field, new optional `oneof` member + capability, new enum value with tolerance handling, new file with new types) **may occur within `syntra.v1`** and keep the package name. They REQUIRE the additive path: RFC, `FILE` breaking pass, conformance coverage, committed regeneration, `CHANGELOG.md` entry.
 - Breaking changes (repurposed number/name, changed type, new required behavior, altered state machine, weakened security, changed failure semantics, `reserved` reuse) **require `syntra.v2`** (new package, new directory `proto/syntra/v2`) or an explicitly approved alternative recorded in a major-version RFC — never a silent in-place break (SNTR-VER-003, `GOVERNANCE.md` §4).
 - The Core wire version (`Frame.version == 1`) and the package version (`syntra.v1`) advance independently: a `syntra.v1` additive revision does not change handshake negotiation; a Core v2 would require `syntra.v2` representation.
 - Implementation release versions never version the protocol (ADR-010).
 
 ## 8. Release labels (H)
 
-Only mechanisms BSR actually supports are used. BSR provides immutable commits and movable **labels** on commits; there is no built-in "channel" object. Channel semantics therefore live in label-application policy plus Git metadata:
+There are no registry labels. Channel semantics live in Git tag + GitHub Release metadata:
 
-| Channel | BSR mechanism | Git counterpart |
+| Channel | GitHub mechanism | Git counterpart |
 |---|---|---|
-| `development` | Label applied to pushes from `main` (if the project enables main-branch pushes at all) | Commit on `main`, pre-tag |
-| `candidate` | Label applied to a release-candidate tag push (e.g. `proto-v1.1.0-rc.1`) | The tag itself |
-| `stable` | Label applied **only** to a final release tag push (e.g. `proto-v1.1.0`) | The tag itself, after `GOVERNANCE.md` §5 criteria hold |
+| `development` | `main` head (no release) | Commit on `main`, pre-tag |
+| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | Tag `vX.Y.Z-rc.N` (+ nested Go tag) |
+| `stable` | GitHub Release marked **latest** from a final tag | Tag `vX.Y.Z` (+ nested Go tag), after `GOVERNANCE.md` §5 criteria hold |
 
-Labels move forward only: re-pointing `stable` to an older commit is forbidden and is treated as an incident (audit, announce, re-advance). No other channel vocabulary is introduced; anything fancier stays in Git metadata (notes, releases page), not in BSR.
+Releases move forward only: re-pointing a release at an older commit is forbidden and is treated as an incident (audit, announce, re-release). No other channel vocabulary is introduced; anything fancier stays in Git metadata (notes, release notes), not in a registry.
 
 ## 9. Breaking-change baseline (I)
 
-Breaking checks compare against the **most recent stable schema release**, never an arbitrary branch:
+Breaking checks compare against the **most recent stable Git baseline**, never an arbitrary branch:
 
 ```text
 pull request
   ↓  buf format --diff --exit-code
   ↓  buf lint
   ↓  buf build
-  ↓  buf breaking --against <stable baseline>
+  ↓  buf breaking --against <Git baseline>
+  ↓  committed-generation drift check (--drift-only)
+  ↓  cargo test / go test / WASM check
   ↓  merge allowed (only on green + required reviews)
 ```
 
-- Post-publication baseline: the BSR commit carrying the `stable` label (`--against-registry` once module names are configured, or an explicit pinned commit).
-- **Bootstrap baseline (current):** no stable release exists yet, so CI compares against the committed snapshot `compatibility/v1-initial/image.json` — the first seven-file layout image, built with Buf 1.59.0. Verified: current sources pass against it (`exit 0`). This is a floor, not a release: passing proves "no worse than the initial snapshot," and the snapshot is replaced by the first real stable baseline at publication (a reviewed change, never automatic).
+- Post-release baseline: the descriptor attached to the stable GitHub Release (or the tagged revision itself, e.g. `git show vX.Y.Z:descriptor/image.json`), adopted by a reviewed PR.
+- **Bootstrap baseline (current):** no stable release exists yet, so CI compares against the committed snapshot `compatibility/v1-initial/image.json` — the first seven-file layout image, built with Buf 1.59.0. Verified: current sources pass against it (`exit 0`). This is a floor, not a release: passing proves "no worse than the initial snapshot," and the snapshot is replaced by the first real stable baseline at release (a reviewed change, never automatic).
 - Baseline replacement is a reviewed PR that states the old baseline, the new baseline, and why the switch is legitimate. CI never rewrites baselines itself.
 
-## 10. Push policy (J)
+## 10. Release policy (J)
 
 | Event | Action |
 |---|---|
-| Pull request | Validate only (format, lint, build, breaking). No credentials present; no push possible. |
-| Merge to `main` | Re-validate. **No automatic BSR publication** until module identity and policy are approved; when enabled, main-branch pushes may publish under the `development` label only. |
-| Version tag `proto-vX.Y.Z` | Re-validate, then authenticated `buf push` + apply the release label (`candidate` for `-rc` tags, `stable` for finals). Tags are the only path to `stable`. |
+| Pull request | Validate only (format, lint, build, breaking vs Git baseline, generation drift, tests). No credentials present; nothing attached. |
+| Merge to `main` | Re-validate. **No automatic release.** Release PRs are opened by release-plz (version bumps + CHANGELOG); maintainers merge them, then cut tags manually. |
+| Version tag `vX.Y.Z` | Re-validate, then build native libs (amd64/arm64) + WASM + archives and attach to the GitHub Release. Tags are the only path to a release. Nested Go tag `bindings/go/vX.Y.Z` must exist at the same revision (verified, fails closed). |
 | Local developer machine | MUST NOT be treated as an official release under any circumstances. Maintainer-run pushes outside the tag workflow do not exist. |
 
-Unreviewed pushes can never become `stable`: the publish workflow requires a tag event, a protected environment with manual approval, and the exact approved module identity (`buf.build/tinklecorp/syntra`, rejecting anything else) — three independent gates (§14).
+Unreviewed pushes can never become a `stable` release: the release workflow requires a tag event, validates versions/revision plus the nested Go tag identity, and only attaches assets — three independent gates (§14). CI never creates tags.
 
-## 11. Generated SDK consumer documentation (K)
+## 11. Committed generated-types consumer documentation (K)
 
-Consumers obtain bindings by generating from the published schema — never by copying source from this repository. Generated source is never committed here: this repository contains no `bindings/`, `gen/`, or `generated/` directories, and CI fails if they (or generated `*.pb.go` / `*_grpc.pb.go` files) are committed. Repository-side codec smoke tests generate into the ignored `.tmp/` directory only, via `scripts/validate-schema.py` (see `specifications/schema/generation.md`).
+Consumers obtain types from the committed tree or the release assets — never from a registry. Generated source IS committed here: `crates/**` (Rust) and `bindings/go/**` (Go, incl. `*.pb.go`), drift-checked by `scripts/validate-schema.py --drift-only` (CI-enforced). Repository-side codec tests run against the committed output; `.tmp/` holds only disposable reproducibility output and must never be committed (boundary check fails if it is).
 
-Conceptual per-ecosystem guide (exact commands depend on the consumer's own pinned generation template; versions below are the versions pinned for this repository's validation in `specifications/schema/generation.md`, not floating `latest`):
+Per-ecosystem guide (versions below are the versions pinned for this repository's validation in `specifications/schema/generation.md`, not floating `latest`):
 
-- **Go:** `buf generate` with the remote plugin `buf.build/protocolbuffers/go:v1.36.6` (revision 1 in this repo's validation), `paths=source_relative`, against the pinned schema commit. Runtime: `google.golang.org/protobuf` at the pinned version. Branch on `ErrorCode`, never on message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005 — generated getters alone do not implement that policy.
-- **Rust:** `buf generate` with `buf.build/community/neoeinstein-prost:v0.4.0` (revision 1 in this repo's validation). Message/enum types only — no networking, no gRPC, no transport. Runtime `prost` at the pinned version.
-- **Other BSR-supported ecosystems:** generate with the corresponding BSR remote plugin at a pinned version + revision against the same pinned schema commit. BSR language support varies; do not assume every language has identical plugin coverage — check the registry's plugin list for the target language and pin whatever is used. If no supported plugin exists, generate locally from `buf export` output with a pinned local compiler and record the toolchain version in the consumer's lockfile.
+- **Rust (primary):** depend on the crates directly via git (e.g. `libtinkle` consumes `syntra-schema` / `syntra-ffi` at the tagged revision). Message/enum types only — no networking, no gRPC, no transport. Runtime: `prost` at the pinned version. Branch on `ErrorCode`, never on message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005 — generated getters alone do not implement that policy. `release-plz.toml` versions the crates (Apache-2.0, `publish = false`); the GitHub Release carries source + `.crate` archives.
+- **Go:** use the committed `bindings/go` module (`github.com/tinklehq/syntra/bindings/go`) at the tagged revision via the nested tag `bindings/go/vX.Y.Z`, plus the prebuilt Linux native libs (`libsyntra_ffi.so`/`.a` + `syntra_ffi.h`) attached to the GitHub Release for the CGO wrapper. `buf generate` with the remote plugin `buf.build/protocolbuffers/go:v1.36.6` (revision 1 in this repo's validation), `paths=source_relative`, against the pinned schema commit. Runtime: `google.golang.org/protobuf` at the pinned version.
+- **Other languages:** generate from `buf export` output of the tagged revision with a pinned local compiler and record the toolchain version in the consumer's lockfile.
 
-In every case: pin the schema commit (§12), pin the plugin version + revision, and vendor or lock the Protobuf runtime. Rebuild bindings deliberately; never float.
+In every case: pin the Git tag (exact `vX.Y.Z`), pin the generator plugin version + revision, and vendor or lock the Protobuf runtime. Rebuild bindings deliberately; never float.
 
 ## 12. Reproducibility (L)
 
-Production consumers pin **exact** revisions — "always use latest" is not an acceptable dependency policy:
+Production consumers pin **exact** revisions:
 
-1. Pin the schema: BSR commit hash (preferred) or an immutable tag; for pre-publication use, the Git commit SHA of the consumed tree.
-2. Pin the generator: remote plugin version **and** revision (as this repository's validation pins do — see `specifications/schema/generation.md` and `scripts/validate-schema.py`), plus the Protobuf runtime version in the consumer's own lockfile.
-3. Record all three (schema commit, plugin version + revision, runtime version) where the consumer records dependencies, so a rebuild years later reproduces identical types.
-4. Upgrades are deliberate PRs in the consumer: bump one pin at a time, regenerate, rerun the consumer's Syntra conformance subset, and review `CHANGELOG.md` entries since the previously pinned commit.
+1. Pin the source: Git tag `vX.Y.Z` (preferred) or commit SHA; for the Go module, the nested tag `bindings/go/vX.Y.Z` at the same revision.
+2. Pin the generator: remote plugin version **and** revision (as this repository's validation pins do — see `specifications/schema/generation.md` and `scripts/validate-schema.py`), plus the Protobuf runtime version in the consumer's own lockfile. Verify `SHA256SUMS` on release assets.
+3. Record all three (Git tag, plugin version + revision, runtime version) where the consumer records dependencies, so a rebuild years later reproduces identical types.
+4. Upgrades are deliberate PRs in the consumer: bump one pin at a time, regenerate, rerun the consumer's Syntra conformance subset, and review `CHANGELOG.md` entries since the previously pinned tag.
 
 ## 13. Deprecation (M)
 
@@ -194,12 +194,12 @@ Per SNTR-VER-006 and `GOVERNANCE.md` §4, deprecating any schema element follows
 4. Retain compatibility throughout v1 where promised: deprecated elements MUST remain functional until their documented removal version.
 5. Remove only under major-version policy: removing a mandatory element is major (`syntra.v2`); removing an optional element is minor-with-notice per SNTR-CAP-007 — and removal still requires the RFC, notice period, and conformance updates. Skipping any step is a process violation, not a shortcut.
 
-## 14. Publication security (N)
+## 14. Release security (N)
 
-- **Publishing credentials:** a dedicated BSR API token with the minimum scope (push to exactly the Syntra module). Stored as a GitHub environment secret (`BUF_TOKEN`) on the `bsr-publish` environment — never as a repository-wide secret, never in code, logs, or artifacts.
-- **CI secrets:** PR jobs receive **no** publishing credentials (workflows split: validation is credential-less; publishing requires the protected environment). `pull_request_target` is not used.
-- **Least privilege:** the token cannot manage the module, owners, or other repositories. Token rotation is documented in the release checklist and performed on role changes or suspected exposure.
-- **Pull-request security:** validation runs on the PR's code but publishes nothing; push paths trigger only on tags / `main` and additionally require environment approval, so a malicious PR cannot self-publish by adding a tag workflow — tag protection rules restrict who can create `proto-v*` tags.
+- **Release credentials:** the release workflow uses only the automatic `github.token` with `contents: write` to attach assets to the GitHub Release — no long-lived push tokens, no registry credentials in code, logs, or artifacts. No `BUF_TOKEN`, no `bsr-publish` environment, no GHCR login.
+- **CI secrets:** PR jobs receive **no** release credentials (validation is credential-less apart from the read-only checkout). `pull_request_target` is not used.
+- **Least privilege:** the token cannot manage modules, owners, or other repositories. Rotation follows GitHub's automatic token rotation; exposure handling is per `SECURITY.md`.
+- **Pull-request security:** validation runs on the PR's code but attaches nothing; the release path triggers only on tags, and tag protection rules restrict who can create `v*` and `bindings/go/v*` tags, so a malicious PR cannot self-release by adding a tag workflow.
 - **Supply-chain implications:** remote generation submits schema text (including comments) to public generators — publishable content only, never production payloads or credentials (already policy in `specifications/schema/generation.md`). Consumers pin plugin revisions to blunt generator-side substitution.
 - **Untrusted forks:** fork PRs run validation with no secrets (`pull_request`, not `push` semantics for forks); maintainer approval is required before any privileged context touches fork code.
 
@@ -209,19 +209,21 @@ Authoritative relationships at a glance (see §7 for rules):
 
 | You want… | Use… | Example (illustrative) |
 |---|---|---|
-| Exact schema bytes | BSR commit (or pre-publication: Git SHA) | BSR commit hash / `92e5f28…` |
-| A release line | Git tag `proto-vX.Y.Z` | `proto-v1.0.0` (proposed scheme) |
-| Current development | BSR `development` label / `main` head | moves with each accepted merge |
-| Release candidate | BSR `candidate` label / `-rc` tag | `proto-v1.1.0-rc.1` |
-| Production dependency | BSR `stable` label / final tag | `proto-v1.1.0` |
+| Exact schema bytes | Git tag (or pre-release: Git SHA) | `v1.0.0` / `92e5f28…` |
+| A release line | Git tag `vX.Y.Z` | `v1.0.0` |
+| Nested Go module | Go module tag `bindings/go/vX.Y.Z` (same revision) | `bindings/go/v1.0.0` |
+| Current development | `main` head | moves with each accepted merge |
+| Release candidate | GitHub prerelease / `-rc` tag | `v1.1.0-rc.1` |
+| Production dependency | GitHub Release marked latest / final tag | `v1.1.0` |
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |
 | Transport conformance | Transport profile ID | `SNTR-WSS-H1-V1` (see `conformance/profiles.yaml`) |
+| Native libs / WASM | Release assets (+ SHA256SUMS) | `libsyntra_ffi.so`, `syntra_ffi.h`, `syntra-wasm-v1.0.0.tar.gz` |
 
-Git tags look like `proto-v1.0.0`, **not** `v1.0.0`: the `proto-` prefix keeps schema releases distinct from future implementation releases, since implementation versions never version the protocol (ADR-010).
+Git tags look like `v1.0.0`, **not** `proto-v1.0.0`. The `proto-` prefix scheme is retired: schema and implementation releases share the single `vX.Y.Z` line, with the nested Go tag covering the module path (ADR-010: implementation versions never version the protocol, but they share the release vehicle).
 
-## 16. What BSR provides — and does not
+## 16. What GitHub Releases provide — and do not
 
-Provides: immutable schema commits, labels, breaking-change detection on push, remote code generation plugins, `buf export`/`buf convert`/`buf dep` consumption primitives, and a public browseable contract.
+Provides: immutable Git tags, downloadable release assets (Rust source/crates, native libs + header, WASM archive, descriptor, manifests, vectors, SHA256SUMS), and a public browseable release page.
 
-Does not provide: protocol behavior, state machines, transport implementations, authentication, RPC runtime semantics, conformance verdicts, security review, or any guarantee beyond "these bytes are the published schema." A green BSR push means the schema is well-formed and non-breaking — it says nothing about whether an implementation conforms (only `conformance/` says that).
+Does not provide: protocol behavior, state machines, transport implementations, authentication, RPC runtime semantics, conformance verdicts, security review, or any guarantee beyond "these bytes are the tagged revision." A green release workflow means the tag validated and assets attached — it says nothing about whether an implementation conforms (only `conformance/` says that).
