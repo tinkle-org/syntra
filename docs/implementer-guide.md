@@ -10,16 +10,17 @@ The sequence below is ordered so each step is testable before the next
 begins. After every step, run the corresponding conformance cases; do not
 proceed on failing cases.
 
-## 1. Obtain the schema from BSR
+## 1. Obtain the schema from Git
 
-Fetch the versioned schema module, not a copy pasted from somewhere else:
+Fetch the versioned schema from the Git tree, not a copy pasted from
+somewhere else:
 
-- Module: `buf.build/tinklecorp/syntra`, package `syntra.v1`
-  (approved module identity — see `docs/schema-registry.md` §1).
-- Until publication, the Git tree (`proto/syntra/v1/*.proto`) is the
-  distribution point. After publication, pin the exact BSR commit your
-  release builds against and record it with your declaration (see
-  `docs/schema-registry.md` §§11–12 on pinning and reproducibility).
+- Source: `proto/syntra/v1/*.proto` at a tagged revision
+  (`syntra-core-vX.Y.Z`), package `syntra.v1`. There is no registry
+  module — see `docs/schema-registry.md` §1.
+- Pin the exact tag or commit your release builds against and record it
+  with your declaration (see `docs/schema-registry.md` §§11–12 on
+  pinning and reproducibility).
 - Verify what you fetched: `buf build` and `buf lint` MUST pass clean
   (`STANDARD`, `FILE`, no exceptions). Any failure here means your input
   is wrong, not the protocol.

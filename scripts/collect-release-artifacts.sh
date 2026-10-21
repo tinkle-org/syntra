@@ -18,14 +18,11 @@ set -eu
 
 NAME="${1:?usage: sh scripts/collect-release-artifacts.sh syntra-core-v1.0.0-rc.1 [git-ref]}"
 
-case "$NAME" in
-  syntra-core-v[0-9]*.[0-9]*.[0-9]*|syntra-core-v[0-9]*.[0-9]*.[0-9]*-rc.[0-9]*|v[0-9]*.[0-9]*.[0-9]*|v[0-9]*.[0-9]*.[0-9]*-rc.[0-9]*)
-    ;;
-  *)
-    echo "error: name must look like syntra-core-v1.0.0 or syntra-core-v1.0.0-rc.1 (bare v1.0.0… accepted with explicit syntra-core-v… ref), got: $NAME" >&2
-    exit 1
-    ;;
-esac
+if ! printf '%s' "$NAME" | grep -Eq '^syntra-core-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$' \
+  && ! printf '%s' "$NAME" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.(0|[1-9][0-9]*))?$'; then
+  echo "error: name must look like syntra-core-v1.0.0 or syntra-core-v1.0.0-rc.1 (bare v1.0.0… accepted with explicit syntra-core-v… ref), got: $NAME" >&2
+  exit 1
+fi
 
 command -v buf >/dev/null 2>&1 || { echo "error: buf 1.59.0 required (see specifications/schema/generation.md)" >&2; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "error: git required" >&2; exit 1; }

@@ -17,8 +17,8 @@ Syntra is the protocol around it: handshake, sessions, errors, versions,
 profiles, and conformance. Changing framing never changes the Protobuf
 definition and vice versa (`SYN-ARCH-012`).
 
-**Does BSR implement Syntra?**
-No. BSR-generated packages contain message data structures only. They do
+**Do generated packages implement Syntra?**
+No. Generated packages contain message data structures only. They do
 not implement the handshake, sessions, RPC runtime, transport, or
 authentication — that is your implementation (see
 `docs/implementer-guide.md` and `docs/schema-registry.md` §6).

@@ -6,7 +6,7 @@
 //! method-shape validation, and typed errors. It never touches the
 //! network and never interprets application payloads.
 //!
-//! Wire sources: committed prost output of `buf.build/tinklecorp/syntra`
+//! Wire sources: committed prost output of `proto/syntra/v1/*.proto`
 //! (see `buf.gen.yaml`; pins in `specifications/schema/generation.md`).
 //! Generated types are data structures only; all behavior here is
 //! implemented against `specifications/`.

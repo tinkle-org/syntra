@@ -65,6 +65,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+          github_token: ${{ github.token }}
 
       - name: A3 buf format check
         run: buf format --diff --exit-code
@@ -93,6 +94,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+          github_token: ${{ github.token }}
 
       - uses: actions/setup-python@v5
         with:
@@ -243,6 +245,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+          github_token: ${{ github.token }}
 
       - name: A7 requirement ID validation (uniqueness, naming, registry refs)
         run: python3 scripts/validate-repo.py requirements

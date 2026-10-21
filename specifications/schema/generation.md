@@ -12,12 +12,12 @@ decision and remaining behavioral blockers.
 | Buf CLI | **1.59.0** | v2 module/compiler, STANDARD lint and FILE gate |
 | Rust generator | `buf.build/community/neoeinstein-prost:v0.4.0`, **revision 1** | Message/enum types, no networking or gRPC |
 | Go generator | `buf.build/protocolbuffers/go:v1.36.6`, **revision 1** | Message/enum types, `paths=source_relative` |
-| Rust toolchain | **1.85.1**, minimal profile | Codec tests; local `rust-toolchain.toml` |
-| Rust runtime | `prost = "=0.13.5"` | Runtime/derive alignment; transitive dependencies locked in test `Cargo.lock` |
+| Rust toolchain | **1.88**, minimal profile | Workspace tests; see `repo-validation.yml` and `release.yml` pins |
+| Rust runtime | `prost = "=0.13.5"` | Runtime/derive alignment; transitive dependencies locked in workspace `Cargo.lock` |
 | Rust test JSON parser | `serde_json = "=1.0.140"` | Shared fixture reader only |
-| Go runtime | `google.golang.org/protobuf v1.36.6` | Test module lockfile; checksums in `tests/schema/go/go.sum` |
+| Go runtime | `google.golang.org/protobuf v1.36.6` | Bindings module lockfile; checksums in `bindings/go/go.sum` |
 | Go toolchain tested | **1.26.4** | `go.mod` language floor is 1.22; older toolchains have not been tested here |
-| Python tested | **3.14.7** | Standard-library descriptor/tooling tests; no pip packages |
+| Python tested | **3.14** | Validator tooling (`pyyaml`); see workflow `setup-python` pins |
 
 Versions are deliberate pins, not claims to be latest. The Prost plugin's
 published dependency metadata permits the 0.13 line. Using runtime 0.13.1
@@ -25,19 +25,21 @@ with a resolved derive 0.13.5 failed compilation during verification;
 runtime 0.13.5 plus the checked-in lockfile is the tested combination.
 Tool upgrades are reviewed separately and rerun both language tests.
 
-There is no checked-in generation template: `buf.gen.yaml` was removed
-because its only purpose was producing repository-local bindings (see
-`docs/schema-registry.md`). `scripts/validate-schema.py` writes an
-equivalent pinned template into the ignored `.tmp/` directory at
-validation time, so the pins above remain the single source of truth for
-versions and revisions. Remote generation needs HTTPS access to the public
-Buf Schema Registry; it does not require locally installed Rust/Go
-generator binaries. Schema descriptors, including comments, are submitted
-to those public generators: use only public schema sources, never
-production payloads or credentials. No floating `latest`, private plugin,
-or unpinned fallback is configured. Registry availability/trust is still
-a dependency; pins do not make remote generation an offline build or attest
-the service's execution environment.
+The checked-in `buf.gen.yaml` pins the committed `crates/` +
+`bindings/go/` generation (see `docs/schema-registry.md` §11).
+`scripts/validate-schema.py` writes an equivalent pinned template into
+the ignored `.tmp/` directory at validation time, so the pins above
+remain the single source of truth for versions and revisions. Remote
+generation uses BSR-hosted plugins for byte-identical output only; it
+never pushes schemas and requires no registry identity (`buf.yaml` has
+no `name:`). It needs HTTPS access to those public generators, not
+locally installed Rust/Go generator binaries. Schema descriptors,
+including comments, are submitted to those public generators: use only
+public schema sources, never production payloads or credentials. No
+floating `latest`, private plugin, or unpinned fallback is configured.
+Generator availability/trust is still a dependency; pins do not make
+remote generation an offline build or attest the service's execution
+environment.
 
 Buf supplies the schema compiler. There is **no external `protoc` import
 or binary dependency** in this workflow; the installed `protoc 35.1` was
@@ -46,11 +48,11 @@ lockfile is required. Schema imports are all `syntra/v1/*.proto`.
 
 Install the exact Buf CLI release using the official
 [installation guide](https://buf.build/docs/cli/installation/), and check
-`buf --version` prints `1.59.0`. Install Rust 1.85.1 through rustup and use
+`buf --version` prints `1.59.0`. Install Rust 1.88 through rustup and use
 Go 1.26.4 (or `GOTOOLCHAIN=go1.26.4`). Do not set a global Rust default just
-for this repository: the test crate supplies its own toolchain file.
+for this repository: CI pins the toolchain per job.
 
-## Generate for validation (temporary output only)
+## Generate for validation (committed output plus temporary check)
 
 ```sh
 buf format --diff
@@ -68,16 +70,18 @@ descriptor sets in one pool: fully qualified types and a logical file path colli
 some generators produce descriptor-only output or no corresponding source
 file. Their existence does not mean those extensions are implemented.
 
-Generation happens only as a validation step, into the ignored `.tmp/`
-directory (see `.gitignore`). No `bindings/`, `gen/`, or `generated/`
-directory may exist in the repository, and no generated source may be
-committed — consumers obtain language bindings from the Buf Schema
-Registry instead (see `docs/schema-registry.md` §11). The validator writes
-a throwaway Go module and a throwaway generation template into `.tmp/`;
-both are deleted on the next run and are never tracked. Do not edit
-generated code: there is none in the repository. No server, client
-transport, HTTP status mapping, gRPC service, authentication validator, or
-cryptographic implementation is generated.
+Generation is committed: `buf generate --template buf.gen.yaml` writes
+Rust output into `crates/syntra-core/src/generated/` and Go output into
+`bindings/go/gen/`, both tracked and drift-checked (see
+`docs/schema-registry.md` §11). Validation also regenerates into the
+ignored `.tmp/` directory (see `.gitignore`) for reproducibility and
+drift comparison. Consumers obtain language bindings from crates.io, the
+Go module proxy, the committed tree, or GitHub Release assets — never a
+registry. The validator writes a throwaway Go module and a throwaway
+generation template into `.tmp/`; both are deleted on the next run and
+are never tracked. Do not hand-edit committed generated code. No server,
+client transport, HTTP status mapping, gRPC service, authentication
+validator, or cryptographic implementation is generated.
 
 ## Complete validation
 

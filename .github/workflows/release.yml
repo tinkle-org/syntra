@@ -109,6 +109,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+          github_token: ${{ github.token }}
       - name: Install validator dependencies
         run: pip install pyyaml
       - name: Release tooling regression tests
@@ -141,6 +142,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.59.0"
+          github_token: ${{ github.token }}
 
       - name: Assemble release payload
         env:
