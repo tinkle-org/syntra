@@ -55,6 +55,8 @@ Version/capability downgrade attacks are in scope: negotiation MUST run over int
 
 This document is the compatibility authority for process; `capabilities.md` is the mechanism; Buf + conformance suite are the enforcement. Transport-only revisions MUST NOT change wire behavior; wire majors MUST NOT be smuggled as transport revisions.
 
+Reliable sessions (`syntra.reliable-session/1`) are minor-additive per SNTR-VER-003: no new `Frame` variant, no new field number, no `reserved` reuse (SNTR-VER-005 preserved: `reserved 16,17` and `reserved "event","resume","ack"` untouched, verified by `buf lint`/`buf breaking` with zero `.proto` changes), no state-machine change (SNTR-HS-015), no new `ErrorCode`. Old peers interoperate mandatory-only; new peers gate all session control on SNTR-CAP-008 confirmation.
+
 ## 7. Conformance requirements
 
 - **SNTR-VER-900** — Fixtures: disjoint/overlapping ranges (low/high/exact); unknown-field tolerance across minors; unknown-variant `UNIMPLEMENTED`; reserved-reuse rejection (negative test with synthetic bytes); downgrade-refusal; deprecation-notice presence.

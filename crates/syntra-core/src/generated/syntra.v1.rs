@@ -244,7 +244,11 @@ pub mod frame {
 }
 /// Update/recovery profile payloads for ordered delivery, bounded replay,
 /// snapshot recovery, and committed progress (SYN-URP-001..007,
-/// SYN-URP-010..021; SYN-URP-008/009 reserved).
+/// SYN-URP-010..026; SYN-URP-008/009 reserved).
+///
+/// DRAFT proposal under RFC 0006, not accepted shipping authority. These
+/// comments describe proposed validation; generated codecs alone do not
+/// enforce it. No conformance or release claim may cite the draft as authority.
 ///
 /// All payloads are versioned bytes carried inside the existing request,
 /// result, and notification envelopes with no envelope changes. Each
@@ -256,20 +260,44 @@ pub mod frame {
 /// principal, at most 16 pending profile calls per connection, at most
 /// 262144 queued notification bytes per stream, at most 1048576 per
 /// connection, at most 64 serialized batches and 262144 total bytes per
-/// replay page with each serialized batch at most 262144 bytes, at most
+/// replay page with each serialized entry at most 262144 bytes, at most
 /// 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
 /// effective deadline 5 s where the request carries no explicit bounded
 /// deadline.
 ///
+/// Canonical generic RPC methods (SNTR-RPC-001, exactly two slashes) are:
+/// `/syntra.v1.UpdateRecovery/Negotiate`,
+/// `/syntra.v1.UpdateRecovery/Subscribe`,
+/// `/syntra.v1.UpdateRecovery/Replay`,
+/// `/syntra.v1.UpdateRecovery/CatchUp`,
+/// `/syntra.v1.UpdateRecovery/Confirm` (batch variant
+/// `RecoveryConfirmRequest`/`RecoveryConfirmResponse`),
+/// `/syntra.v1.UpdateRecovery/SnapshotConfirm` (snapshot-boundary variant
+/// `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled`),
+/// `/syntra.v1.UpdateRecovery/SnapshotOffer`
+/// (`RecoverySnapshotOfferRequest`/`RecoverySnapshotDescriptor`),
+/// `/syntra.v1.UpdateRecovery/SnapshotFetch`,
+/// `/syntra.v1.UpdateRecovery/Unsubscribe`
+/// (`RecoveryUnsubscribeRequest`/`RecoveryUnsubscribeResponse`).
+/// Notification payloads are versioned `RecoveryNotification` bytes carrying
+/// exactly one of `RecoveryBatch`, `RecoveryReplayComplete`, or
+/// `RecoveryBatchTrailer` with matching profile_version, inside the existing
+/// `Notification.payload` with no envelope changes.
+///
 /// Wire compatibility (SNTR-SER-003, SNTR-VER-004): unknown Protobuf fields
 /// inside profile payloads MUST be ignored on receipt unless a field comment
 /// explicitly marks that field `Critical`. Fields explicitly marked
-/// `Ignorable` in their comments MUST be ignored on receipt. All other
-/// defined fields are required and validated: profile_version and
-/// routing/identity fields (stream_selector, subscription_handle,
-/// snapshot_handle, checkpoints, boundaries, capability, versions) missing
-/// or mismatched MUST be rejected with FAILED_PRECONDITION, never silently
-/// applied. Unknown profile operations (method strings) MUST be rejected
+/// `Ignorable` in their comments MUST be ignored on receipt. Defined fields
+/// are validated per their field comments: profile_version and routing/identity
+/// fields (stream_selector, subscription_handle, snapshot_handle, capability,
+/// versions) missing or mismatched MUST be rejected with FAILED_PRECONDITION,
+/// never silently applied. Checkpoint/boundary/marker fields follow per-field
+/// emptiness rules, not a blanket non-empty rule: `start_checkpoint` empty
+/// means initial (SYN-URP-022), `continuation_marker` empty means first request
+/// or no further page (SYN-URP-022), `terminate_reason` empty means no
+/// termination unless the terminated outcome is selected (SYN-URP-026), and
+/// predecessor/result/boundary emptiness is governed by each field comment.
+/// Unknown profile operations (method strings) MUST be rejected
 /// with UNIMPLEMENTED.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -360,12 +388,30 @@ pub struct RecoverySubscribeResponse {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoveryUnsubscribeRequest {
     /// profile_version is the profile payload version. Valid value is 1.
+    /// Required.
     #[prost(uint32, tag="1")]
     pub profile_version: u32,
     /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
-    /// at most 256 bytes.
+    /// at most 256 bytes. Required.
     #[prost(bytes="vec", tag="2")]
     pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoveryUnsubscribeResponse acknowledges teardown of one targeted subscription.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryUnsubscribeResponse {
+    /// profile_version is the profile payload version. Valid value is 1.
+    /// Required.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the terminated stream. Opaque bytes, non-empty,
+    /// at most 256 bytes. Required. Echoes the request handle.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation at termination. Required.
+    /// Lets initiators fence late batches and duplicate unsubscribes.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
 }
 /// RecoveryReplayRequest asks for bounded replay from a confirmed checkpoint.
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -484,6 +530,23 @@ pub struct RecoveryCatchUpAccepted {
     #[prost(bytes="vec", tag="4")]
     pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
 }
+/// RecoverySnapshotOfferRequest accepts a snapshot offer for one targeted stream.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotOfferRequest {
+    /// profile_version is the profile payload version. Valid value is 1.
+    /// Required.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes. Required.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation at offer time. Required.
+    /// Binds the offer to the current generation for supersede fencing.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
+}
 /// RecoverySnapshotDescriptor offers a snapshot under a provider-proven boundary.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -588,7 +651,13 @@ pub struct RecoverySnapshotFetchRequest {
     #[prost(uint32, tag="3")]
     pub page_index: u32,
 }
-/// RecoveryConfirmRequest confirms a result or boundary checkpoint.
+/// RecoveryConfirmRequest confirms a batch result checkpoint (batch variant).
+/// Transport: `/syntra.v1.UpdateRecovery/Confirm`, yielding
+/// RecoveryConfirmResponse. Snapshot-boundary confirms use
+/// RecoverySnapshotConfirmRequest on
+/// `/syntra.v1.UpdateRecovery/SnapshotConfirm` and yield
+/// RecoverySnapshotInstalled. The two variants use distinct methods so batch
+/// and snapshot confirms are wire-distinguishable.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoveryConfirmRequest {
@@ -601,14 +670,54 @@ pub struct RecoveryConfirmRequest {
     #[prost(bytes="vec", tag="2")]
     pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
     /// generation is the continuity generation of the stream. Required.
+    /// MUST equal the current generation; cross-generation confirms MUST be
+    /// rejected with FAILED_PRECONDITION.
     #[prost(uint64, tag="3")]
     pub generation: u64,
-    /// checkpoint is the result checkpoint or the boundary checkpoint being
-    /// confirmed. Opaque bytes, non-empty, at most 4096 bytes. Required.
+    /// checkpoint is the batch result checkpoint being confirmed. Opaque bytes,
+    /// non-empty, at most 4096 bytes. Required. Re-presenting the same bytes is
+    /// idempotent and MUST return confirmed without side effects or generation
+    /// change (SYN-URP-025).
     #[prost(bytes="vec", tag="4")]
     pub checkpoint: ::prost::alloc::vec::Vec<u8>,
 }
-/// RecoveryConfirmResponse confirms the persisted checkpoint.
+/// RecoverySnapshotConfirmRequest confirms a snapshot boundary checkpoint
+/// (snapshot variant) on `/syntra.v1.UpdateRecovery/SnapshotConfirm`.
+/// Yields RecoverySnapshotInstalled with the new generation.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotConfirmRequest {
+    /// profile_version is the profile payload version. Valid value is 1.
+    /// Required.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes. Required.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation at confirm time (pre-install).
+    /// Required. MUST equal the current generation before a first install.
+    /// Draft retained-install retry exception (SYN-URP-025): after successful
+    /// installation, an exact duplicate for the same authorized subscription,
+    /// profile version, pre-install generation, and boundary bytes MAY carry
+    /// that pre-install generation only while its installed response is retained
+    /// and the current generation still equals that response's installed
+    /// generation. The host MUST return the original RecoverySnapshotInstalled
+    /// without reinstalling or advancing generation. Supersede, termination,
+    /// later continuity change, or retention expiry invalidates this exception;
+    /// other stale-generation requests MUST fail with FAILED_PRECONDITION.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
+    /// boundary_checkpoint is the offered boundary being confirmed. Opaque bytes,
+    /// non-empty, at most 4096 bytes. Required. MUST equal the offered
+    /// RecoverySnapshotDescriptor.boundary_checkpoint bytes; mismatch MUST be
+    /// rejected with FAILED_PRECONDITION without installing.
+    /// On the retained-install retry path, MUST equal the retained installed
+    /// boundary exactly; matching bytes alone do not authorize a stale confirm.
+    #[prost(bytes="vec", tag="4")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoveryConfirmResponse confirms the persisted batch checkpoint.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoveryConfirmResponse {
@@ -621,10 +730,12 @@ pub struct RecoveryConfirmResponse {
     #[prost(bytes="vec", tag="2")]
     pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
     /// confirmed_checkpoint is the persisted checkpoint. Opaque bytes, at most
-    /// 4096 bytes.
+    /// 4096 bytes. Required; echoes the request checkpoint on success including
+    /// idempotent retries.
     #[prost(bytes="vec", tag="3")]
     pub confirmed_checkpoint: ::prost::alloc::vec::Vec<u8>,
     /// generation is the continuity generation of the stream. Required.
+    /// Unchanged by batch confirms.
     #[prost(uint64, tag="4")]
     pub generation: u64,
 }
@@ -711,6 +822,42 @@ pub mod recovery_batch_trailer {
         /// can terminate one stream even when there is no outstanding invocation.
         #[prost(bool, tag="8")]
         Terminated(bool),
+    }
+}
+/// RecoveryNotification is the versioned discriminator/wrapper carried inside
+/// the opaque Notification.payload bytes with no envelope changes. Every
+/// profile Notification carries exactly one RecoveryNotification; the outer
+/// profile_version MUST equal the inner payload profile_version and MUST be 1.
+/// An unset notification outcome is representable by codecs but is not valid.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryNotification {
+    /// profile_version is the profile payload version. Valid value is 1.
+    /// Required. MUST equal the inner payload profile_version.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// notification selects the profile event for one targeted stream.
+    /// Exactly one is selected per Notification.
+    #[prost(oneof="recovery_notification::Notification", tags="2, 3, 4")]
+    pub notification: ::core::option::Option<recovery_notification::Notification>,
+}
+/// Nested message and enum types in `RecoveryNotification`.
+pub mod recovery_notification {
+    /// notification selects the profile event for one targeted stream.
+    /// Exactly one is selected per Notification.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Notification {
+        /// batch carries one ordered batch with predecessor/result pairing.
+        #[prost(message, tag="2")]
+        Batch(super::RecoveryBatch),
+        /// replay_complete signals the stream has reached live.
+        #[prost(message, tag="3")]
+        ReplayComplete(super::RecoveryReplayComplete),
+        /// trailer marks catch-up completion, snapshot need, continuity loss,
+        /// or targeted termination for one stream.
+        #[prost(message, tag="4")]
+        Trailer(super::RecoveryBatchTrailer),
     }
 }
 // @@protoc_insertion_point(module)

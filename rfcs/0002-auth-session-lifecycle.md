@@ -96,6 +96,26 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
 9. **Cross-transport binding** — blocker only if cross-transport resumption claimed.
 10. **HTTP profile bindings** — transport-profile RFCs must embody §1E principles.
 11. **Revocation-propagation bound, channel-binding, proxy propagation** — per security open questions.
+12. **Reliable-session/reliable-delivery shipping authority and wire contract** —
+    `sessions.md` §1H, `capabilities.md` SNTR-CAP-008/902, and
+    `reliability.md` §1C and the reliable-delivery coverage in §7
+    (e.g. SNTR-REL-902) remain proposals without an accepted authorizing
+    RFC. SNTR-REL-900/901 remain shipping baseline. This RFC does not
+    authorize them; RFC 0006 is a separate Draft
+    update/recovery proposal. Canonical negotiation/control methods,
+    versioned binary schemas, delivery-ID carriage, confirmation/fallback,
+    and deterministic fixtures are still required. Former `CONF-RS-001..005`
+    wire rows have been withdrawn from executable cases; the IDs and
+    intended coverage remain draft plans in `sessions.md` §7.1. In particular,
+    initial attachment uses epoch 1 and its first resume expects epoch 2;
+    SNTR-SESS-034 needs both planned idle-expiry (`CONF-RS-003`) and drain
+    (`CONF-RS-004`) coverage; attach/drain alone cannot establish CAP-902
+    negotiation. The draft reliability proposal now explicitly keeps a
+    bounded Pending/content fence while execution remains live, including
+    past nominal result/tombstone retention; deadline/cancel/loss alone
+    cannot prove execution stopped. Maintainer protocol/security review
+    and acceptance are outstanding. Existing implementation unit tests
+    remain useful local checks, not wire-conformance or shipping approval.
 
 ## Appendix: References
 

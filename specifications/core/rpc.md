@@ -142,6 +142,20 @@ The core never automatically retries (SNTR-REL-002). The initiator decides, usin
 
 Syntra MUST NOT classify every failed mutation as safe to retry: any automatic retry of a non-idempotent operation without an operation key is non-conformant.
 
+## 1J. Stable delivery IDs vs `request_id` (OPTIONAL, gated on `syntra.reliable-session/1`)
+
+> Draft-proposal notice: §§1J–1L (SNTR-RPC-011..013) are proposal-only and carry no normative force until the authorizing RFC is accepted. Until acceptance, implementations MUST NOT ship behavior from them, and no test, claim, or release MAY cite them as authority.
+
+**SNTR-RPC-011** — Delivery IDs are session-scoped stable keys distinct from `request_id`: a delivery ID is 16 opaque bytes (non-zero, initiator-chosen, stable across resends on the same session); a `request_id` is a `u64` connection-scoped correlation nonce (initiator-chosen, nonzero, unique among outstanding RPCs on that connection only). The two namespaces MUST NOT be conflated: correlation uses `request_id`; reconciliation uses the delivery ID. Resends MUST reuse the delivery ID with a fresh `request_id`; a delivery ID MUST NOT be reused for a different logical operation within one session (byte-mismatched reuse → `FAILED_PRECONDITION` per SNTR-REL-012). Delivery IDs are per-session keys: the same bytes presented in different sessions are distinct keys and MUST NOT be correlated across sessions; hosts MUST NOT retain unbounded cross-session key state.
+
+## 1K. Outcome reconciliation (OPTIONAL, gated)
+
+**SNTR-RPC-012** — Hosts confirming the capability MUST retain terminal outcomes keyed by delivery ID per SNTR-REL-013 and MUST answer explicit reconciliation with `Retained` (return the retained outcome, no re-execution), `Forgotten` (retention expired or explicitly forgotten; caller treats as a new application decision), `Unknown` (never seen), or `Pending` (dispatched, no terminal yet; caller MUST resend the same delivery ID, MUST NOT dispatch as new). Initiators MUST query reconciliation after loss/timeout before blindly re-executing non-idempotent operations and MUST NOT treat `Forgotten`/`Unknown`/`Pending` as execution proof. Retained success payloads are bit-identical returns, not new executions; business effects remain application-owned (no exactly-once claim).
+
+## 1L. Deadline/cancel tombstones (OPTIONAL, gated)
+
+**SNTR-RPC-013** — Hosts MUST retain deadline/cancel tombstones per delivery ID per SNTR-REL-014 so late duplicates (resends racing completion, retries after `DEADLINE_EXCEEDED`/`CANCELLED`) resolve to the same terminal code deterministically. Only `DEADLINE_EXCEEDED` and `CANCELLED` may tombstone; `UNAVAILABLE` follows the resend/`Pending` path, never tombstones. Tombstones MUST NOT be used for other codes, MUST expire per retention (then `Forgotten`), and MUST be bounded (exhaustion → `RESOURCE_EXHAUSTED`). Completion still wins races at the RPC layer (SNTR-RPC-005/§1G); tombstones only decide late-duplicate answers after the terminal outcome is already fixed.
+
 ## 2. Client behavior
 
 - **SNTR-RPC-020** — The client MUST generate unique nonzero IDs per outstanding RPC, MUST time out per SNTR-RPC-004, MUST handle interleaved `notification`s before `result` without completing the RPC, and MUST treat missing `outcome` as `INVALID_ARGUMENT` (protocol violation), not success.
@@ -169,6 +183,7 @@ New RPC semantics arrive via new methods (application) or new capabilities (prot
 
 - **SNTR-RPC-900** — Neutral fixtures: `/example.Echo/Echo` round-trip (empty, small, 1 MiB, arbitrary bytes); `/example.KV/Get` NOT_FOUND; malformed method; missing outcome; duplicate ID; cancel-before-completion vs cancel-after-completion; deadline expiry; interleaved notification; 16-concurrent RPCs; operation-ID vs request-ID independence proof.
 - **SNTR-RPC-901** — Exactly-once-terminal proof: no fixture yields zero or two terminal results for one `request_id` except connection-loss mapping to `UNAVAILABLE`.
+- **SNTR-RPC-902** — Reliable-delivery fixtures (OPTIONAL, gated): delivery-ID vs `request_id` independence; resend with same delivery ID returns retained outcome; mismatched content rejected; forgotten/unknown as new decisions; tombstone determinism. `CONF-RS-005`.
 
 ```mermaid
 sequenceDiagram

@@ -561,6 +561,41 @@ impl ProfileRecovery {
         vec![]
     }
 
+    /// Read-only pre-validation for [`Self::confirm_persisted`].
+    ///
+    /// Returns true only when [`Self::confirm_persisted`] would advance
+    /// committed progress (empty result with mutation). Idempotent
+    /// duplicates, rejected checkpoints, and untracked selectors return
+    /// false. No mutation.
+    pub fn can_confirm(&self, checkpoint: &ProfileCheckpoint) -> bool {
+        if checkpoint.stream_selector != self.stream_selector {
+            return false;
+        }
+        if checkpoint.generation < self.generation {
+            return false;
+        }
+        if checkpoint.generation == self.generation {
+            if checkpoint.result_cursor == self.committed {
+                return false;
+            }
+            if self.snapshot_pending {
+                return false;
+            }
+            match &self.pending {
+                Some(offer) if offer.checkpoint == *checkpoint => {},
+                _ => return false,
+            }
+            if checkpoint.base_cursor != self.committed {
+                return false;
+            }
+            return true;
+        }
+        match &self.pending {
+            Some(offer) if offer.checkpoint == *checkpoint && offer.is_snapshot => true,
+            _ => false,
+        }
+    }
+
     /// Alias for [`Self::confirm_persisted`].
     pub fn confirm(&mut self, checkpoint: &ProfileCheckpoint) -> Vec<ProfileAction> {
         self.confirm_persisted(checkpoint)

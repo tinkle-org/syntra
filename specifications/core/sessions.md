@@ -148,6 +148,48 @@ stateDiagram-v2
 
 Per-RPC deadlines (`timeout_ms` or bounded host default) and slow-client/inter-frame bounds are governed by SNTR-RPC-004, SNTR-REL-006, and SNTR-ASEC-021.
 
+## 1H. Reliable sessions (OPTIONAL capability `syntra.reliable-session/1`)
+
+> Draft-proposal notice: this §1H (SNTR-SESS-030..034, SNTR-SESS-902) is proposal-only and carries no normative force until its authorizing RFC is accepted. Until acceptance, implementations MUST NOT ship behavior from it, and no test, claim, or release MAY cite it as authority. Where this section and another core specification diverge, the owning core document prevails.
+
+The default v1 contract above (connection-bound sessions, no resumption) is unchanged and remains the mandatory interop baseline. This section defines an OPTIONAL, capability-gated reliable-session contract. No envelope change, no new `Frame` variant, no new field number, and no reuse of reserved numbers 16/17 or reserved names `event`/`resume`/`ack` (envelope.proto `reserved 16, 17; reserved "event", "resume", "ack"`). All reliable-session control travels as versioned binary payloads inside existing `RpcRequest`/`RpcResult`/`Notification` envelopes. App payloads stay opaque. The capability MUST be negotiated per `capabilities.md` SNTR-CAP-008 after ACTIVE; use without confirmation MUST fail per SNTR-CAP-011. Interop without the capability is mandatory-only (SNTR-CAP-003). Externally reachable production traffic MUST use TLS (SNTR-TSEC-007/009, SYN-ARCH-030). No custom cryptography is designed or required: session IDs and resume handles are OS-CSPRNG bytes used as lookup keys, never self-contained tokens.
+
+Canonical control methods for §1H (e.g. `/syntra.v1.ReliableSession/Attach` and peers) are TBD: no canonical method names or payload schemas are normatively defined by this section. Control payloads, when defined by a future RFC, will be versioned binary bytes carried in `RpcRequest` envelopes; the IDL (e.g. a future `session_control.proto`) is TBD. Until the RFC is accepted this section is proposal-only with no normative force.
+
+Shipping-authority blocker: no accepted reliable-session RFC or canonical
+negotiation/control/delivery payload contract is recorded in `rfcs/`.
+RFC 0002 defers resumption; RFC 0006 proposes a separate update/recovery
+profile and does not authorize reliable sessions. Existing local APIs and
+unit tests cannot establish wire interoperability or override that process.
+Maintainers need to resolve the implementation's shipping posture through
+the RFC process; this draft does not approve it. Draft test plans are in §7.1.
+
+**SNTR-SESS-030** — Session identity distinct from `connection_id`: when the capability is confirmed, the host issues one opaque 16-byte session identifier per reliable session (≥128-bit entropy, CSPRNG, non-zero, never all-zero). The session ID MUST be distinct from every `connection_id` (which stays per-connection diagnostic, SNTR-SESS-002), MUST NOT be accepted as an authentication credential, MUST NOT appear in URLs, MUST NOT be logged verbatim (redact/pseudonymize per SNTR-ASEC-004), and MUST be bound to exactly one principal + wire version + capability at issuance. Clients MUST treat it as opaque bytes and MUST NOT parse authority from it.
+
+**SNTR-SESS-031** — Attachment epoch and fencing: each reliable session carries a monotonic `u64` attachment epoch. The initial attachment uses epoch 1; each subsequent attachment (including resume) advances it (`current + 1`; `u64::MAX` is terminal — the session MUST be retired rather than wrap). At most one ACTIVE attachment per session exists; a new attachment with a higher epoch fences the old one. The fenced attachment's in-flight RPCs receive `UNAVAILABLE` (outcome unknown, SNTR-REL-009) and its connection closes; the fenced connection MUST NOT complete further work. Presenting a stale epoch (≤ current) MUST be rejected with `FAILED_PRECONDITION` and MUST NOT fence. Epoch 0 is never valid.
+
+**SNTR-SESS-032** — Resumption with resume credentials and revocation: resumption across connections is permitted ONLY under this capability with an opaque resume handle (32-byte v1 handle, CSPRNG lookup key; implementations MUST accept 16..256 bytes for forward compatibility and MUST reject empty/oversize/all-zero before lookup). Handles are single-purpose (resumption only, never auth, never `connection_id`), bound to exactly one session + principal + wire version + capability, with a bounded lifetime (default 24 h, deployment-documented) and single-use-or-rotated semantics (successful resume consumes the presented handle, issues a fresh one, and revokes the old; replay of a rotated handle is suspected replay, SNTR-RPL-011/031). Hosts MUST validate expiry, revocation, audience, principal, version, and capability bindings on every presentation; failure yields `UNAUTHENTICATED` or `FAILED_PRECONDITION` + close per §4. Issuers MUST be able to revoke promptly: revocation invalidates the handle immediately (and per policy the session), is bounded in memory, and propagates within the documented bound (security open-questions item 1; SNTR-ASEC-006). Rotation and revocation MUST NOT use custom cryptography.
+
+**SNTR-SESS-033** — Client-negotiated idle/keepalive lease: the initiator proposes `idle_timeout_ms` and `keepalive_interval_ms` (zero means host default) in the attach payload; the host confirms clamped values within 2 s..300 s idle and 1 s..60 s keepalive with `keepalive < idle` (at most half of idle), both bounded and documented. Over-maximum proposals are clamped per documented policy; under-minimum non-zero proposals are rejected with `OUT_OF_RANGE`. Keepalive is Syntra-owned control-plane progress (not app payload) and counts as activity; it MUST be bounded in rate and bytes and MUST NOT be used as a data channel. Idle expiry yields the `idle-timeout` signal (`UNAVAILABLE` to affected in-flight RPCs, SNTR-SESS-034) and clears the active attachment; the session survives for resume until credential expiry.
+
+**SNTR-SESS-034** — Typed lifecycle, drain, and overload feedback: hosts MUST surface session lifecycle with typed signals using existing `ErrorCode`s only (no new codes): `draining`/`going-away`/`idle-timeout` → `UNAVAILABLE`, `overloaded` → `RESOURCE_EXHAUSTED`, `fenced` → `FAILED_PRECONDITION`, `expired`/`revoked` → `UNAUTHENTICATED`. Signals travel as versioned control payloads (machine-readable names, exact match, case-sensitive) plus the mapped terminal RPC error where an RPC context exists. Drain is orderly: stop new work, observe the close grace, then teardown with `going-away`; in-flight RPCs receive terminal errors; shutdown retains outcomes/tombstones per retention for reconciliation and drains the control queue explicitly. Overload MUST apply backpressure (`RESOURCE_EXHAUSTED` with bounded jittered backoff, never unbounded queueing, never silent deadlock) and MUST isolate misbehaving principals (SNTR-REL-007/008, SNTR-ASEC-020).
+
+```mermaid
+sequenceDiagram
+  participant C as Initiator
+  participant H as Host
+  C->>H: handshake + ACTIVE (mandatory-only)
+  C->>H: attach{new session, lease proposal} (capability confirmed)
+  H-->>C: attached{session_id, epoch=1, resume handle, lease}
+  C->>H: invoke{delivery_id, method, payload} (stable ID)
+  H-->>C: result{delivery_id, outcome} (retained)
+  Note over C,H: transport loss; outcome unknown
+  C->>H: new transport + handshake + attach{resume handle}
+  H-->>C: attached{epoch=2, fresh handle} (old fenced)
+  C->>H: reconcile{delivery_id}
+  H-->>C: retained result (no re-execution)
+```
+
 ## 2. Client behavior
 
 - **SNTR-SESS-010** — The client MUST NOT send `connection_id` as a credential or resumption token, MUST NOT cache it beyond diagnostics for the connection lifetime, and MUST re-authenticate on every new connection.
@@ -174,6 +216,35 @@ Adding resumption is a minor-additive capability (new RPCs + tokens), never a si
 
 - **SNTR-SESS-900** — Fixtures: fresh `connection_id` per connection; `connection_id`-as-credential rejected; reconnect loses subscriptions/RPCs; resumption attempt without capability rejected; expiry signaled correctly.
 - **SNTR-SESS-901** — No-promise proof: an implementation claiming v1 MUST document that cross-transport resumption is unsupported unless an RFC-defined capability is negotiated and tested.
+- **SNTR-SESS-902** — Proposed reliable-session coverage (OPTIONAL, gated on `syntra.reliable-session/1` after acceptance): session ID distinct from `connection_id` (16-byte, non-zero, never auth); epoch fencing (stale rejected, old fenced with `UNAVAILABLE`); resume with rotation (replay of rotated handle rejected) and revocation (prompt invalidation); lease negotiation (clamp/reject rules, keepalive < idle); typed drain/overload signals with existing codes only; mandatory-only peer interoperates without the capability. `CONF-RS-001…005` are non-executable draft test plans (§7.1), not conformance evidence. This requirement has the same proposal-only status as §1H.
+
+### 7.1 Reliable-session draft test plans — not executable
+
+These IDs are retained for traceability and are not reused. Their former
+rows have been removed from `conformance/manifest/session.yaml` because no
+accepted canonical wire contract exists. `requirements.yaml` records
+`not_testable` with empty executable `test_ids` and these planned IDs in
+notes. A claimed capability alone cannot make these plans executable or
+turn implementation unit-test results into conformance passes.
+
+| Reserved test ID | Proposed coverage after acceptance | Draft requirement trace |
+|---|---|---|
+| `CONF-RS-001` | Explicit post-ACTIVE negotiation: confirmation, partial acceptance/fallback, unconfirmed-use rejection, connection isolation; initial attachment at epoch 1 with a nonzero 16-byte session ID distinct from `connection_id`; stale epoch rejection, fencing with unknown outcomes, pre-ACTIVE rejection, mandatory-only interop. Attach alone does not test negotiation. | SNTR-SESS-030/031/902, SNTR-CAP-008/902, SNTR-HS-015/902 |
+| `CONF-RS-002` | Deterministic setup with initial epoch 1, then resume expecting epoch **2**, fresh handle and rejection of rotated-handle replay; expiry/revocation/principal/version/capability binding; epoch 0 rejection and maximum-epoch retirement. Resume credentials are distinct from handshake authentication. | SNTR-SESS-032/902 |
+| `CONF-RS-003` | Lease defaults, clamp/reject bounds, keepalive activity and injected-clock idle expiry; idle-timeout maps to `UNAVAILABLE`, clears the attachment, and preserves reconciliation state. | SNTR-SESS-033/034/902 |
+| `CONF-RS-004` | Typed lifecycle/drain/overload feedback, bounded admission and jittered backoff, isolation, terminal errors for in-flight work, retained outcomes/tombstones, explicit control-queue drain. | SNTR-SESS-034/902, SNTR-REL-015 |
+| `CONF-RS-005` | Stable 16-byte delivery ID with fresh request IDs; same-content resend returns retained result without re-execution, mismatched content rejected; Retained/Forgotten/Unknown/Pending; Pending remains protected while execution is live even beyond the result-retention interval; deterministic `DEADLINE_EXCEEDED`/`CANCELLED` tombstones (never `UNAVAILABLE`), count/byte bounds and drain. | SNTR-REL-011/012/013/014/015/902, SNTR-RPC-011/012/013/902, SNTR-SESS-902 |
+
+Acceptance prerequisites include canonical `/package.Service/Method` paths,
+versioned binary payload schemas, explicit negotiation and confirmation,
+delivery-ID carriage within those payloads, and deterministic setup and
+expected outcomes. `Frame`, `RpcRequest`, and `RpcResult` have no
+`delivery_id` field; a manifest-only `delivery_id_b64` does not create one.
+The removed base64-encoded JSON examples are not a payload specification.
+The manifest schema defines `expected.retry` as a string; queue bounds and
+retry schedules need separate accepted fixture semantics rather than maps
+in that field. Meaningful implementation unit tests remain useful evidence
+about local behavior, independently of this blocked wire test plan.
 
 ```mermaid
 stateDiagram-v2

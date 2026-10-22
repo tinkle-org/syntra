@@ -184,3 +184,10 @@ cases:
       connection_state: ACTIVE
       session_state: active
     notes: "Resume accepted — OPTIONAL, gated on resume-v1. No resumption RFC exists in default v1, so conformant runners report SKIP with reason 'capability resume-v1 unclaimed'. When the RFC exists, this case asserts principal re-binding with fresh request_id space and no implicit restoration of RPCs/subscriptions/cursors."
+
+# CONF-RS-001..005 are reserved draft test plans, NOT executable cases.
+# See specifications/core/sessions.md §7.1 for coverage and review blockers.
+# Their former guessed JSON payloads, noncanonical method paths, out-of-schema
+# retry maps, and delivery_id_b64 pseudo-fields do not define a wire contract.
+# Restore executable cases only after an accepted RFC defines canonical
+# negotiation/control/delivery payloads and deterministic fixture setup.

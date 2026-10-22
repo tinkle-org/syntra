@@ -26,6 +26,15 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-CAP-007** — Deprecation: withdrawing an optional capability REQUIRES an RFC, a deprecation notice period, and a `versioning.md` entry. Peers MUST tolerate withdrawal gracefully (`UNIMPLEMENTED` + fallback, not connection failure where fallback exists).
 
+**SNTR-CAP-008** — Reliable-session capability `syntra.reliable-session/1` (OPTIONAL, minor-additive, no envelope change): negotiation is explicit post-`ACTIVE` generic-RPC control (no handshake binding, no new `Frame` variant, reserved values preserved). Initiators advertise the identifier; hosts confirm only the subset implemented for the bound principal and per connection (confirmation on one connection never enables another). Unconfirmed use MUST fail with `FAILED_PRECONDITION` (RPC context) per §4; required-but-unsupported MUST fail with `UNIMPLEMENTED`. Confirmation MUST cite this identifier and the bounds in `sessions.md` §1H / `reliability.md` §1C. Mandatory-only peers MUST interoperate without it (SNTR-CAP-003). Draft-proposal notice: this SNTR-CAP-008 is proposal-only and carries no normative force until its authorizing RFC is accepted. Until acceptance, implementations MUST NOT ship behavior from it, and no test, claim, or release MAY cite it as authority.
+
+No accepted reliable-session negotiation method or payload schema is
+recorded. The identifier above is proposed, not an allocation or shipping
+authorization. The `CONF-RS-*` plans in `sessions.md` §7.1 are not executable
+wire fixtures. Local implementation APIs/unit tests and runner aggregates
+do not establish negotiation conformance. RFC 0002 still defers resumption;
+the separate Draft recovery RFC 0006 does not resolve this blocker.
+
 ## 2. Client behavior
 
 - **SNTR-CAP-010** — The client MUST advertise only capabilities it implements, MUST handle partial acceptance (subset confirmed), and MUST fall back to mandatory-only operation when an option is unavailable.
@@ -52,6 +61,7 @@ Capabilities are the minor-evolution path (ADR-009). New mandatory behavior is n
 
 - **SNTR-CAP-900** — Fixtures: mandatory-only interop against full peer; unknown optional ignored; required-but-unsupported → `UNIMPLEMENTED`; unconfirmed-option use → `FAILED_PRECONDITION`; experimental marked and isolated.
 - **SNTR-CAP-901** — Negotiation trace: each optional feature exercised MUST cite its capability identifier and RFC.
+- **SNTR-CAP-902** — Proposed reliable-session negotiation coverage (OPTIONAL, gated after acceptance): advertise `syntra.reliable-session/1` post-`ACTIVE`; explicit confirmation; partial acceptance falls back to mandatory-only; unconfirmed session control → `FAILED_PRECONDITION`; confirmation remains connection-scoped. `CONF-RS-001` is a non-executable draft plan in `sessions.md` §7.1 pending an accepted canonical negotiation contract. Former attach/drain rows did not exercise negotiation and provide no evidence for this requirement. This requirement has the same proposal-only status as SNTR-CAP-008.
 
 ```mermaid
 sequenceDiagram

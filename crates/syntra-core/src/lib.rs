@@ -29,6 +29,7 @@ pub mod codec;
 pub mod error;
 pub mod frame;
 pub mod handshake;
+pub mod reliable;
 pub mod rpc;
 pub mod state;
 

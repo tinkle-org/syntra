@@ -180,6 +180,10 @@ sequenceDiagram
   Note over C,H: Reconnect means a new handshake; no resumption by default
 ```
 
+## 2B. Reliable-session attachment (OPTIONAL, no state-machine change)
+
+**SNTR-HS-015** — Reliable-session attachment is post-`ACTIVE` generic-RPC control under `syntra.reliable-session/1` and changes no state, transition, or timer in §1/§1B/§2A. The six-state machine, version negotiation, and handshake deadlines are untouched. Attachment (new or resumed with a resume handle, plus lease proposal/confirmation per SNTR-SESS-031/033) runs only in `ACTIVE` after the capability is confirmed; pre-`ACTIVE` session control MUST fail per §1B (handshake failure, no resumption). Fencing, revocation, idle expiry, and drain signals (SNTR-SESS-031/032/034) close or fence the attachment's connection but never add, remove, or reorder handshake states. Transport profiles MUST NOT bind session attachment to transport establishment; only a completed `hello`→`ready` establishes the principal binding that attachment then references.
+
 ## 3. Client behavior
 
 - **SNTR-HS-020** — The client MUST send exactly one `hello` with `min_version ≤ max_version`, both nonzero, and MUST NOT send application frames before receiving `ready`. On handshake error it MUST surface the typed code, MUST NOT retry with downgraded versions automatically unless the application explicitly re-negotiates, and MUST close the transport.
@@ -215,6 +219,7 @@ Version negotiation is the only wire-version mechanism. Adding handshake fields 
 ## 8. Conformance requirements
 
 - **SNTR-HS-900** — Fixtures: success; version mismatch (low/high/disjoint); unsupported required capability; auth reject; timeout; unexpected `request` during NEGOTIATING; second `hello`; pre-ACTIVE `notification`; graceful close; abrupt loss in each state. Each MUST yield the tabled code/transition.
+- **SNTR-HS-902** — Reliable-session attachment fixture (OPTIONAL, gated): pre-`ACTIVE` session control fails per §1B; post-`ACTIVE` attach/resume advances epoch without state-machine change. `CONF-RS-001`.
 - **SNTR-HS-901** — Sequence proof:
 
 ```mermaid

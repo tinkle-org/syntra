@@ -250,6 +250,14 @@ type clientCore interface {
 	takeOutcome(requestID uint64) (result *RpcResult, ok bool)
 	// pollNotification consumes one queued notification, or ok == false.
 	pollNotification() (*Notification, bool)
+	// lossTotals reports cumulative notification-loss totals for the core:
+	// (dropped_count, dropped_bytes) for notifications discarded when the
+	// bounded core queue was full. Bounds are unchanged; the queue stays
+	// non-blocking and drops the newest notification. Counters advance
+	// exactly once per drop (no double-counting), unifying the pure-Go
+	// core, the native FFI core, and the async Rust notification_loss
+	// signal.
+	lossTotals() (dropped uint64, droppedBytes uint64)
 	// reapExpired removes calls whose deadlines passed, stores a
 	// DEADLINE_EXCEEDED outcome for each, and returns their ids for
 	// delivery. Completion wins: ids with a stored outcome are skipped.
@@ -459,15 +467,33 @@ type Client struct {
 	cfg    resolvedClientConfig
 	nextID atomic.Uint64
 
-	mu          sync.Mutex
-	activated   chan struct{} // closed after successful handshake
-	closed      bool
-	pumpStarted bool // once true, Run alone closes notifyCh after the pump exits
-	done        chan struct{}
-	waiters     map[uint64]chan *RpcResult
-	notifyCh    chan *Notification
-	dropped     atomic.Uint64
-	transport   Transport
+	mu           sync.Mutex
+	activated    chan struct{} // closed after successful handshake
+	closed       bool
+	pumpStarted  bool // once true, Run alone closes notifyCh after the pump exits
+	done         chan struct{}
+	waiters      map[uint64]chan *RpcResult
+	notifyCh     chan *Notification
+	dropped      atomic.Uint64
+	droppedBytes atomic.Uint64
+	// lossCh is a broadcast channel: every drop closes the current channel
+	// and replaces it, so ALL WaitLossChange waiters wake (a single-token
+	// buffered channel would wake only one waiter). The counters are the
+	// signal; the channel is only the wakeup. Guarded by lossMu.
+	lossMu sync.Mutex
+	lossCh chan struct{}
+	// Core loss snapshots keep LossTotals monotonic across Close: the FFI
+	// core reports (0,0) once its handle is destroyed, so Close caches the
+	// last-known core totals and LossTotals returns the max of live and
+	// cached. Pure-Go cores keep reporting after close; max() is a no-op
+	// there.
+	coreCachedDropped atomic.Uint64
+	coreCachedBytes   atomic.Uint64
+	transport         Transport
+	// Serializes frame ingestion (the only core loss producer) with the
+	// final loss snapshot and destruction. Never held while waiting for Run
+	// or while publishing notifications; Close may interrupt delivery.
+	coreLifecycleMu sync.Mutex
 }
 
 // OpenClient creates an initiator session. It validates the config and
@@ -489,6 +515,7 @@ func OpenClient(cfg ClientConfig) (*Client, error) {
 		done:      make(chan struct{}),
 		waiters:   make(map[uint64]chan *RpcResult),
 		notifyCh:  make(chan *Notification, rcfg.notifyBuffer),
+		lossCh:    make(chan struct{}),
 	}
 	return c, nil
 }
@@ -507,6 +534,140 @@ func (c *Client) DroppedNotifications() uint64 {
 		return 0
 	}
 	return c.dropped.Load()
+}
+
+// DroppedBytes reports cumulative notification payload bytes discarded
+// under overflow. It pairs with DroppedNotifications: both advance exactly
+// once per drop (no double-counting).
+func (c *Client) DroppedBytes() uint64 {
+	if c == nil {
+		return 0
+	}
+	return c.droppedBytes.Load()
+}
+
+// LossTotals reports cumulative notification-loss totals for the session:
+// (dropped_count, dropped_bytes) summed over the public notifyCh queue and
+// the linked core queue. Bounds are unchanged on both queues; both stay
+// non-blocking and drop the newest notification. The two layers are
+// disjoint (a notification dropped in the core never reaches the public
+// queue), so the sum counts every drop exactly once. Totals are monotonic
+// across Close: the last-known core totals are cached at Close and the max
+// of live and cached is returned (the FFI core reports zero once its
+// handle is destroyed).
+func (c *Client) LossTotals() (dropped uint64, droppedBytes uint64) {
+	if c == nil {
+		return 0, 0
+	}
+	pubDropped := c.dropped.Load()
+	pubBytes := c.droppedBytes.Load()
+	var coreDropped, coreBytes uint64
+	if c.core != nil {
+		coreDropped, coreBytes = c.core.lossTotals()
+	}
+	if cached := c.coreCachedDropped.Load(); cached > coreDropped {
+		coreDropped = cached
+	}
+	if cached := c.coreCachedBytes.Load(); cached > coreBytes {
+		coreBytes = cached
+	}
+	return pubDropped + coreDropped, pubBytes + coreBytes
+}
+
+// snapshotCoreLoss caches the current core loss totals, keeping the max so
+// LossTotals stays monotonic across Close. Caller holds coreLifecycleMu.
+func (c *Client) snapshotCoreLoss() {
+	if c == nil || c.core == nil {
+		return
+	}
+	d, b := c.core.lossTotals()
+	for {
+		cur := c.coreCachedDropped.Load()
+		if d <= cur || c.coreCachedDropped.CompareAndSwap(cur, d) {
+			break
+		}
+	}
+	for {
+		cur := c.coreCachedBytes.Load()
+		if b <= cur || c.coreCachedBytes.CompareAndSwap(cur, b) {
+			break
+		}
+	}
+}
+
+// closeCore fences onFrame before taking the final snapshot. Waiting for
+// Run itself here would deadlock its deferred cleanup; only the in-flight
+// core operation must finish. Callers have already set closed under mu,
+// and must release mu before acquiring coreLifecycleMu.
+func (c *Client) closeCore() error {
+	c.coreLifecycleMu.Lock()
+	defer c.coreLifecycleMu.Unlock()
+	c.snapshotCoreLoss()
+	return c.core.close()
+}
+
+// broadcastLoss wakes ALL WaitLossChange waiters: the current channel is
+// closed and replaced atomically under lossMu. Bursts cannot block the pump
+// (close+replace never blocks) and waiters never double-count (counters
+// are the signal, the channel only the wakeup).
+func (c *Client) broadcastLoss() {
+	if c == nil {
+		return
+	}
+	c.lossMu.Lock()
+	old := c.lossCh
+	c.lossCh = make(chan struct{})
+	c.lossMu.Unlock()
+	if old != nil {
+		close(old)
+	}
+}
+
+// recordPublicLoss advances the public cumulative loss counters by one drop
+// plus its payload bytes and wakes all loss waiters. It is the single
+// place public drops are counted, so bursts cannot double-count.
+func (c *Client) recordPublicLoss(payloadLen int) {
+	c.dropped.Add(1)
+	c.droppedBytes.Add(uint64(payloadLen))
+	c.broadcastLoss()
+}
+
+// WaitLossChange blocks until the cumulative loss totals differ from
+// lastDropped/lastBytes, the session closes, or ctx ends. It returns the
+// current totals. Every waiter observes the same carried totals (broadcast
+// wakeup: all concurrent waiters fire, not just one); a waiter subscribed
+// after the drop reads them as current state instead of missing the signal.
+// A closed session returns current totals with no error; ctx expiry returns
+// ctx.Err.
+func (c *Client) WaitLossChange(ctx context.Context, lastDropped, lastBytes uint64) (uint64, uint64, error) {
+	if c == nil {
+		return 0, 0, NewRpcError(ErrorCodeInternal, "syntra: nil client")
+	}
+	if d, b := c.LossTotals(); d != lastDropped || b != lastBytes {
+		return d, b, nil
+	}
+	for {
+		c.lossMu.Lock()
+		ch := c.lossCh
+		c.lossMu.Unlock()
+		// Re-check after snapshotting the channel: a drop that landed
+		// between the first check and the snapshot must not be missed.
+		if d, b := c.LossTotals(); d != lastDropped || b != lastBytes {
+			return d, b, nil
+		}
+		select {
+		case <-ctx.Done():
+			d, b := c.LossTotals()
+			return d, b, ctx.Err()
+		case <-c.done:
+			d, b := c.LossTotals()
+			return d, b, nil
+		case <-ch:
+			if d, b := c.LossTotals(); d != lastDropped || b != lastBytes {
+				return d, b, nil
+			}
+		}
+	}
 }
 
 // failWaiters completes outstanding calls with err. Callers MUST hold c.mu.
@@ -601,7 +762,7 @@ func (c *Client) Run(ctx context.Context, t Transport) error {
 		}
 		c.mu.Unlock()
 		if closeCore {
-			_ = c.core.close()
+			_ = c.closeCore()
 		}
 	}()
 	if _, err := c.handshake(runCtx, t); err != nil {
@@ -698,7 +859,17 @@ func (c *Client) pump(ctx context.Context, t Transport) error {
 				c.failWaiters(ErrorCodeUnavailable, "syntra: transport recv failed")
 				return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: transport recv: %v", r.err))
 			}
+			prevDropped, prevBytes := c.LossTotals()
+			c.coreLifecycleMu.Lock()
+			c.mu.Lock()
+			closed := c.closed
+			c.mu.Unlock()
+			if closed {
+				c.coreLifecycleMu.Unlock()
+				return nil
+			}
 			terminal, n, fatal := c.core.onFrame(r.raw)
+			c.coreLifecycleMu.Unlock()
 			if fatal != nil {
 				c.failWaiters(fatal.Code, fatal.Message)
 				return fatal
@@ -708,9 +879,16 @@ func (c *Client) pump(ctx context.Context, t Transport) error {
 					select {
 					case c.notifyCh <- ntf:
 					default:
-						c.dropped.Add(1)
+						c.recordPublicLoss(len(ntf.GetPayload()))
 					}
 				}
+			}
+			// Core-level drops (bounded core queue overflow) also wake
+			// public loss waiters: the totals changed even though no new
+			// notification arrived, so idle peers still observe the loss.
+			// The counters are the signal; the broadcast wakes all waiters.
+			if d, b := c.LossTotals(); d != prevDropped || b != prevBytes {
+				c.broadcastLoss()
 			}
 			for _, id := range terminal {
 				if res, ok := c.core.takeOutcome(id); ok {
@@ -837,14 +1015,34 @@ func (c *Client) Call(ctx context.Context, method string, payload []byte, timeou
 		c.mu.Unlock()
 	}
 
-	if err := t.Send(ctx, reqFrame); err != nil {
+	callStart := time.Now()
+	sendCtx, sendStop := context.WithTimeout(ctx, budget)
+	sendErr := t.Send(sendCtx, reqFrame)
+	sendStop()
+	if sendErr != nil {
 		removeWaiter()
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(sendErr, context.Canceled) || errors.Is(sendErr, context.DeadlineExceeded) {
 			c.cancelBestEffort(id)
-			return nil, mapContextErr(ctx.Err())
+			if ctx.Err() != nil {
+				return nil, mapContextErr(ctx.Err())
+			}
+			return nil, NewRpcError(ErrorCodeDeadlineExceeded, "syntra: call budget exceeded during send")
 		}
-		return nil, NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: send request: %v", err))
+		return nil, NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: send request: %v", sendErr))
 	}
+	remaining := budget - time.Since(callStart)
+	if remaining <= 0 {
+		select {
+		case res := <-w:
+			return finishCall(res)
+		default:
+		}
+		removeWaiter()
+		c.cancelBestEffort(id)
+		return nil, NewRpcError(ErrorCodeDeadlineExceeded, "syntra: call budget exceeded")
+	}
+	budgetTimer := time.NewTimer(remaining)
+	defer budgetTimer.Stop()
 	select {
 	case res := <-w:
 		return finishCall(res)
@@ -858,6 +1056,15 @@ func (c *Client) Call(ctx context.Context, method string, payload []byte, timeou
 	case <-c.done:
 		removeWaiter()
 		return nil, NewRpcError(ErrorCodeUnavailable, "syntra: client closed")
+	case <-budgetTimer.C:
+		select {
+		case res := <-w:
+			return finishCall(res)
+		default:
+		}
+		removeWaiter()
+		c.cancelBestEffort(id)
+		return nil, NewRpcError(ErrorCodeDeadlineExceeded, "syntra: call budget exceeded")
 	}
 }
 
@@ -930,12 +1137,8 @@ func (c *Client) Close() error {
 	if !c.pumpStarted {
 		close(c.notifyCh)
 	}
-	core := c.core
 	c.mu.Unlock()
-	if err := core.close(); err != nil {
-		return err
-	}
-	return nil
+	return c.closeCore()
 }
 
 // resolvedHostConfig is a HostConfig with defaults applied.
@@ -1232,7 +1435,7 @@ func (h *Host) serveLoop(ctx context.Context, t Transport, hc *hostConn) error {
 	for {
 		select {
 		case <-ctx.Done():
-			h.cancelHandlers(hc, nil, true)
+			h.gracefulDrain(ctx, t, hc)
 			return nil
 		case cc := <-hc.completed:
 			hc.workers--
@@ -1436,6 +1639,20 @@ func (h *Host) finishReadyHandler(ctx context.Context, t Transport, hc *hostConn
 func (h *Host) answer(ctx context.Context, t Transport, hc *hostConn, id uint64, out *RpcResult) error {
 	frame, expired, err := hc.core.answer(id, out)
 	if err != nil {
+		var rerr *RpcError
+		if errors.As(err, &rerr) && rerr.Code == ErrorCodeResourceExhausted {
+			bounded := NewWireErrorResult(ErrorCodeResourceExhausted, "syntra: result exceeds bound")
+			frame2, expired2, err2 := hc.core.answer(id, bounded)
+			if err2 != nil {
+				return err2
+			}
+			if !expired2 && len(frame2) > 0 {
+				if serr := t.Send(ctx, frame2); serr != nil {
+					return hostSendError(ctx, serr)
+				}
+			}
+			return h.flush(ctx, t, hc)
+		}
 		return err
 	}
 	if !expired && len(frame) > 0 {
@@ -1542,6 +1759,42 @@ func (h *Host) cancelHandlers(hc *hostConn, ids []uint64, all bool) {
 	}
 }
 
+// NotifyDirected enqueues payload as a notification on exactly the served
+// connections bound to principal. Connections bound to other principals
+// never observe it (directed delivery isolation for recovery batches and
+// per-stream signals). With no matching connections it is a documented
+// no-op. Recovery drivers MUST use this (or a subscription-handle-routed
+// variant above it) instead of NotifyAll broadcast: broadcast leaks stream
+// state across principals and breaks per-stream termination scope.
+func (h *Host) NotifyDirected(principal string, payload []byte) error {
+	if h == nil {
+		return NewRpcError(ErrorCodeInternal, "syntra: nil host")
+	}
+	if err := ValidatePayloadSize(len(payload)); err != nil {
+		return err
+	}
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
+	}
+	var conns []*hostConn
+	for hc := range h.conns {
+		if hc.principal == principal {
+			conns = append(conns, hc)
+		}
+	}
+	h.mu.Unlock()
+	for _, hc := range conns {
+		_ = hc.core.notify(payload)
+		select {
+		case hc.wake <- struct{}{}:
+		default:
+		}
+	}
+	return nil
+}
+
 // NotifyAll enqueues payload as a notification on every served
 // connection. With no connections it is a documented no-op. Payloads
 // MUST be opaque application bytes; empty is a valid empty event.
@@ -1570,6 +1823,25 @@ func (h *Host) NotifyAll(payload []byte) error {
 		}
 	}
 	return nil
+}
+
+// gracefulDrain implements SNTR-HS-006/013 draining for graceful close:
+// flush already-queued outbound frames (terminal results, expiry results,
+// broadcasts) before teardown, then abandon in-flight via cancelHandlers.
+// Already-queued frames use a short bounded background context (the serve
+// ctx is already done, so direct Send would fail instantly). Handler
+// completion draining within the grace window stays in Serve's deferred
+// drainHandlers (bounded by handlerShutdownGrace); this path must not add a
+// second grace wait or Serve teardown would exceed its bound and existing
+// close-interrupt tests would time out.
+func (h *Host) gracefulDrain(ctx context.Context, t Transport, hc *hostConn) {
+	_ = ctx
+	drainCtx, drainStop := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer drainStop()
+	_ = h.flush(drainCtx, t, hc)
+	h.cancelHandlers(hc, nil, true)
+	// One more best-effort flush for frames queued by reap during cancel.
+	_ = h.flush(drainCtx, t, hc)
 }
 
 // Close releases the factory: new Serve calls fail fast and served
