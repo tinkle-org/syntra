@@ -43,6 +43,7 @@ type faultTransport struct {
 	Transport
 	faults *seededFaults
 	drops  int
+	dups   int
 }
 
 func (f *faultTransport) Send(ctx context.Context, frame []byte) error {
@@ -55,7 +56,20 @@ func (f *faultTransport) Send(ctx context.Context, frame []byte) error {
 			return nil
 		}
 	}
-	return f.Transport.Send(ctx, frame)
+	if err := f.Transport.Send(ctx, frame); err != nil {
+		return err
+	}
+	// Duplicate delivery: hand the same serialized frame to the transport a
+	// second time. Exactly-once holds because receivers dedup: the client
+	// ignores a second terminal result for one request id, and the host
+	// answers a duplicate request without a second dispatch storm.
+	if f.faults.duplicate() {
+		cp := append([]byte(nil), frame...)
+		if err := f.Transport.Send(ctx, cp); err == nil {
+			f.dups++
+		}
+	}
+	return nil
 }
 
 func runnerHostConfig(handler HandlerFunc) HostConfig {
@@ -109,10 +123,11 @@ func TestRunnerConcurrent16(t *testing.T) {
 }
 
 func TestRunnerEchoWithFaultInjection(t *testing.T) {
-	// RPCs stay exactly-once under notification-drop faults: the client
-	// transport is wrapped with faultTransport (requests pass through;
-	// only notifications drop), notifications are exercised, and terminal
-	// results remain exactly-once.
+	// RPCs stay exactly-once under notification-drop AND duplicate faults:
+	// the transports wrap both directions (requests pass through; only
+	// notifications drop; any frame may duplicate), notifications are
+	// exercised, and terminal results remain exactly-once (the receiver
+	// ignores/dedups the second copy).
 	a, b := LoopbackPair()
 	clientFault := &faultTransport{Transport: b, faults: newSeededFaults(0x5EED1234)}
 	hostFault := &faultTransport{Transport: a, faults: newSeededFaults(0x5EED1234)}
@@ -151,6 +166,68 @@ func TestRunnerEchoWithFaultInjection(t *testing.T) {
 	}
 	if hostFault.drops == 0 && clientFault.drops == 0 {
 		t.Fatalf("fault injection dropped no notifications (host=%d client=%d)", hostFault.drops, clientFault.drops)
+	}
+	if hostFault.dups == 0 && clientFault.dups == 0 {
+		t.Fatalf("fault injection duplicated no frames (host=%d client=%d)", hostFault.dups, clientFault.dups)
+	}
+	_ = runDone
+	_ = serveDone
+}
+
+func TestRunnerDuplicateResultDeduped(t *testing.T) {
+	// A duplicated terminal result frame is delivered exactly once: the
+	// client core ignores the second terminal for one request id and the
+	// waiter observes a single outcome.
+	cfg, err := resolveClientConfig(testClientConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	core, err := newClientCore(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer core.close()
+	hello, err := core.helloFrame()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ready, err := MarshalFrame(NewReadyFrame(1, &ServerReady{ConnectionId: "conn-1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = hello
+	if _, err := core.activate(ready); err != nil {
+		t.Fatal(err)
+	}
+	reqFrame, err := core.beginCall(77, "/example.Echo/Echo", []byte("dup-me"), 5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = reqFrame
+	resFrame, err := MarshalFrame(NewResultFrame(1, 77, NewSuccessResult([]byte("dup-me"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal, _, fatal := core.onFrame(resFrame)
+	if fatal != nil {
+		t.Fatal(fatal)
+	}
+	if len(terminal) != 1 || terminal[0] != 77 {
+		t.Fatalf("first result terminal = %v, want [77]", terminal)
+	}
+	dup, _, fatal := core.onFrame(append([]byte(nil), resFrame...))
+	if fatal != nil {
+		t.Fatal(fatal)
+	}
+	if len(dup) != 0 {
+		t.Fatalf("duplicate result must be ignored, terminal = %v", dup)
+	}
+	res, ok := core.takeOutcome(77)
+	if !ok || string(res.GetPayload()) != "dup-me" {
+		t.Fatalf("outcome = %v %v", res, ok)
+	}
+	if _, ok := core.takeOutcome(77); ok {
+		t.Fatal("duplicate result produced a second outcome")
 	}
 }
 

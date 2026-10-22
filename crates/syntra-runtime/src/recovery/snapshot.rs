@@ -13,8 +13,11 @@
 /// Snapshot staging failure. Never carries snapshot bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotError {
-    /// Page index outside `0..total_pages`, or conflicting bytes.
+    /// Page index outside `0..total_pages`, conflicting bytes, or
+    /// zero-length page bytes.
     InvalidPage,
+    /// Page handle differs from the staged snapshot handle.
+    HandleMismatch,
     /// Page boundary differs from the staged boundary.
     BoundaryMismatch,
     /// Not every page has arrived; installation is incomplete.
@@ -23,6 +26,8 @@ pub enum SnapshotError {
     OverLimit,
     /// Generation is not greater than the engine's current generation.
     StaleGeneration,
+    /// Coordinator did not offer the staged snapshot as committable.
+    CoordinatorRejected,
 }
 
 /// Bounded staged snapshot under one provider-proven boundary.
@@ -90,20 +95,28 @@ impl StagedSnapshot {
         self.pages.iter().all(|p| p.is_some())
     }
 
-    /// Stage one snapshot page. Out-of-range indexes, oversized pages, and
-    /// boundary mismatches fail. Re-staging identical bytes is idempotent;
-    /// different bytes for the same index fail.
+    /// Stage one snapshot page. Out-of-range indexes, handle mismatches,
+    /// oversized or zero-length pages, and boundary mismatches fail.
+    /// Re-staging identical bytes is idempotent; different bytes for the
+    /// same index fail.
     pub fn stage_page(
         &mut self,
+        snapshot_handle: &[u8],
         page_index: u32,
         bytes: Vec<u8>,
         boundary_checkpoint: &[u8],
     ) -> Result<(), SnapshotError> {
+        if snapshot_handle != self.snapshot_handle.as_slice() {
+            return Err(SnapshotError::HandleMismatch);
+        }
         if page_index >= self.total_pages {
             return Err(SnapshotError::InvalidPage);
         }
         if boundary_checkpoint != self.boundary_checkpoint.as_slice() {
             return Err(SnapshotError::BoundaryMismatch);
+        }
+        if bytes.is_empty() {
+            return Err(SnapshotError::InvalidPage);
         }
         if bytes.len() as u64 > self.page_bytes_max as u64 {
             return Err(SnapshotError::OverLimit);
@@ -144,9 +157,9 @@ mod tests {
     fn pages_assemble_in_order_only_when_complete() {
         let mut s = staged();
         assert!(!s.is_complete());
-        s.stage_page(1, b"world".to_vec(), b"b-100").unwrap();
+        s.stage_page(b"h1", 1, b"world".to_vec(), b"b-100").unwrap();
         assert!(s.install().is_err());
-        s.stage_page(0, b"hello-".to_vec(), b"b-100").unwrap();
+        s.stage_page(b"h1", 0, b"hello-".to_vec(), b"b-100").unwrap();
         assert!(s.is_complete());
         assert_eq!(s.install().unwrap(), b"hello-world");
     }
@@ -155,16 +168,24 @@ mod tests {
     fn snapshot_failure_modes_leave_staging_intact() {
         let mut s = staged();
         assert_eq!(
-            s.stage_page(7, b"x".to_vec(), b"b-100"),
+            s.stage_page(b"h1", 7, b"x".to_vec(), b"b-100"),
             Err(SnapshotError::InvalidPage)
         );
         assert_eq!(
-            s.stage_page(0, b"x".to_vec(), b"other"),
+            s.stage_page(b"h1", 0, b"x".to_vec(), b"other"),
             Err(SnapshotError::BoundaryMismatch)
         );
         assert_eq!(
-            s.stage_page(0, vec![0u8; 2048], b"b-100"),
+            s.stage_page(b"h1", 0, vec![0u8; 2048], b"b-100"),
             Err(SnapshotError::OverLimit)
+        );
+        assert_eq!(
+            s.stage_page(b"other-handle", 0, b"x".to_vec(), b"b-100"),
+            Err(SnapshotError::HandleMismatch)
+        );
+        assert_eq!(
+            s.stage_page(b"h1", 0, Vec::new(), b"b-100"),
+            Err(SnapshotError::InvalidPage)
         );
         assert_eq!(s.received_pages(), 0);
         assert_eq!(s.install(), Err(SnapshotError::Incomplete));
@@ -173,11 +194,11 @@ mod tests {
     #[test]
     fn identical_restage_is_idempotent_conflicting_is_rejected() {
         let mut s = staged();
-        s.stage_page(0, b"a".to_vec(), b"b-100").unwrap();
-        s.stage_page(0, b"a".to_vec(), b"b-100").unwrap();
+        s.stage_page(b"h1", 0, b"a".to_vec(), b"b-100").unwrap();
+        s.stage_page(b"h1", 0, b"a".to_vec(), b"b-100").unwrap();
         assert_eq!(s.received_pages(), 1);
         assert_eq!(
-            s.stage_page(0, b"b".to_vec(), b"b-100"),
+            s.stage_page(b"h1", 0, b"b".to_vec(), b"b-100"),
             Err(SnapshotError::InvalidPage)
         );
     }

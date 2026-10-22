@@ -47,6 +47,7 @@ pub struct CheckpointReconciler {
     config: ReconcilerConfig,
     last_tick: Option<Instant>,
     observed: HashMap<Vec<u8>, ProfileCheckpoint>,
+    next_cursor: Option<Vec<u8>>,
 }
 
 impl CheckpointReconciler {
@@ -56,6 +57,7 @@ impl CheckpointReconciler {
             config,
             last_tick: None,
             observed: HashMap::new(),
+            next_cursor: None,
         }
     }
 
@@ -87,11 +89,14 @@ impl CheckpointReconciler {
     /// Reconcile up to `max_streams_per_tick` streams.
     ///
     /// For each tracked stream whose last observed result differs from the
-    /// engine's committed cursor, emits `RecoveryNeeded` from the committed
-    /// cursor. Streams already converged emit nothing. The tick runs even
-    /// when no batch arrived since the last tick, so a missing final update
-    /// is discovered while peers are idle. Returns at most
-    /// `max_streams_per_tick` actions in selector order for determinism.
+    /// engine's committed position (generation and cursor), emits
+    /// `RecoveryNeeded` from the committed cursor. Streams already converged
+    /// emit nothing. The tick runs even when no batch arrived since the last
+    /// tick, so a missing final update is discovered while peers are idle.
+    /// Returns at most `max_streams_per_tick` actions in rotated selector
+    /// order for fairness: sorted selectors rotate to start after
+    /// `next_cursor` each tick, preventing starvation when the bound is
+    /// smaller than the tracked set.
     pub fn tick<S: DurableStore>(
         &mut self,
         now: Instant,
@@ -104,6 +109,14 @@ impl CheckpointReconciler {
         self.last_tick = Some(now);
         let mut selectors: Vec<Vec<u8>> = self.observed.keys().cloned().collect();
         selectors.sort();
+        // Rotate to start after next_cursor for round-robin fairness.
+        if let Some(cursor) = self.next_cursor.clone() {
+            if let Some(pos) = selectors.iter().position(|s| *s > cursor) {
+                let mut rotated = selectors.split_off(pos);
+                rotated.extend(selectors);
+                selectors = rotated;
+            }
+        }
         let mut out = Vec::new();
         for selector in selectors {
             if out.len() >= self.config.max_streams_per_tick {
@@ -113,17 +126,24 @@ impl CheckpointReconciler {
                 Some(o) => o.clone(),
                 None => continue,
             };
-            let committed = match engine.committed(&selector) {
-                Some(c) => c.to_vec(),
+            let pos = match engine.position(&selector) {
+                Some(p) => p,
                 None => continue,
             };
-            if observed.result_cursor == committed {
+            if observed.generation == pos.generation && observed.result_cursor == pos.committed {
                 continue;
             }
             out.push(ProfileAction::RecoveryNeeded {
                 stream_selector: selector.clone(),
-                committed,
+                committed: pos.committed.clone(),
             });
+        }
+        if let Some(last) = out.last() {
+            let last_selector = match last {
+                ProfileAction::RecoveryNeeded { stream_selector, .. } => stream_selector.clone(),
+                _ => return out,
+            };
+            self.next_cursor = Some(last_selector);
         }
         out
     }

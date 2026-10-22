@@ -32,8 +32,9 @@ transport layer (TCP segments, WS message flushes). No envelope batching.
 
 Normative: `SNTR-WS-090…092`, `SNTR-HTTP-120/121`, `SNTR-WSS-090` — default
 off; opt-in only with documented settings and decompressed-size bound
-(= max envelope) enforced during inflation; exceedance → 1009 /
-`RESOURCE_EXHAUSTED`.
+(= max envelope) enforced during inflation; exceedance → WS/WSS close 1009
+or HTTP 413, both with local `RESOURCE_EXHAUSTED` per
+`SNTR-WS-092`/`SNTR-HTTP-121`.
 
 Measurements / analysis:
 - Opaque payloads are often ciphertext or already-compressed bytes

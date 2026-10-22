@@ -476,11 +476,20 @@ type Client struct {
 	notifyCh     chan *Notification
 	dropped      atomic.Uint64
 	droppedBytes atomic.Uint64
-	// lossCh wakes WaitLossChange once per drop (buffered 1, non-blocking
-	// send so a burst cannot block the pump and waiters never double-count:
-	// the counters are the signal, the channel is only the wakeup).
-	lossCh    chan struct{}
-	transport Transport
+	// lossCh is a broadcast channel: every drop closes the current channel
+	// and replaces it, so ALL WaitLossChange waiters wake (a single-token
+	// buffered channel would wake only one waiter). The counters are the
+	// signal; the channel is only the wakeup. Guarded by lossMu.
+	lossMu sync.Mutex
+	lossCh chan struct{}
+	// Core loss snapshots keep LossTotals monotonic across Close: the FFI
+	// core reports (0,0) once its handle is destroyed, so Close caches the
+	// last-known core totals and LossTotals returns the max of live and
+	// cached. Pure-Go cores keep reporting after close; max() is a no-op
+	// there.
+	coreCachedDropped atomic.Uint64
+	coreCachedBytes   atomic.Uint64
+	transport         Transport
 }
 
 // OpenClient creates an initiator session. It validates the config and
@@ -502,7 +511,7 @@ func OpenClient(cfg ClientConfig) (*Client, error) {
 		done:      make(chan struct{}),
 		waiters:   make(map[uint64]chan *RpcResult),
 		notifyCh:  make(chan *Notification, rcfg.notifyBuffer),
-		lossCh:    make(chan struct{}, 1),
+		lossCh:    make(chan struct{}),
 	}
 	return c, nil
 }
@@ -538,7 +547,10 @@ func (c *Client) DroppedBytes() uint64 {
 // the linked core queue. Bounds are unchanged on both queues; both stay
 // non-blocking and drop the newest notification. The two layers are
 // disjoint (a notification dropped in the core never reaches the public
-// queue), so the sum counts every drop exactly once.
+// queue), so the sum counts every drop exactly once. Totals are monotonic
+// across Close: the last-known core totals are cached at Close and the max
+// of live and cached is returned (the FFI core reports zero once its
+// handle is destroyed).
 func (c *Client) LossTotals() (dropped uint64, droppedBytes uint64) {
 	if c == nil {
 		return 0, 0
@@ -549,27 +561,69 @@ func (c *Client) LossTotals() (dropped uint64, droppedBytes uint64) {
 	if c.core != nil {
 		coreDropped, coreBytes = c.core.lossTotals()
 	}
+	if cached := c.coreCachedDropped.Load(); cached > coreDropped {
+		coreDropped = cached
+	}
+	if cached := c.coreCachedBytes.Load(); cached > coreBytes {
+		coreBytes = cached
+	}
 	return pubDropped + coreDropped, pubBytes + coreBytes
 }
 
+// snapshotCoreLoss caches the current core loss totals, keeping the max so
+// LossTotals stays monotonic across Close.
+func (c *Client) snapshotCoreLoss() {
+	if c == nil || c.core == nil {
+		return
+	}
+	d, b := c.core.lossTotals()
+	for {
+		cur := c.coreCachedDropped.Load()
+		if d <= cur || c.coreCachedDropped.CompareAndSwap(cur, d) {
+			break
+		}
+	}
+	for {
+		cur := c.coreCachedBytes.Load()
+		if b <= cur || c.coreCachedBytes.CompareAndSwap(cur, b) {
+			break
+		}
+	}
+}
+
+// broadcastLoss wakes ALL WaitLossChange waiters: the current channel is
+// closed and replaced atomically under lossMu. Bursts cannot block the pump
+// (close+replace never blocks) and waiters never double-count (counters
+// are the signal, the channel only the wakeup).
+func (c *Client) broadcastLoss() {
+	if c == nil {
+		return
+	}
+	c.lossMu.Lock()
+	old := c.lossCh
+	c.lossCh = make(chan struct{})
+	c.lossMu.Unlock()
+	if old != nil {
+		close(old)
+	}
+}
+
 // recordPublicLoss advances the public cumulative loss counters by one drop
-// plus its payload bytes and wakes loss waiters once. It is the single
+// plus its payload bytes and wakes all loss waiters. It is the single
 // place public drops are counted, so bursts cannot double-count.
 func (c *Client) recordPublicLoss(payloadLen int) {
 	c.dropped.Add(1)
 	c.droppedBytes.Add(uint64(payloadLen))
-	select {
-	case c.lossCh <- struct{}{}:
-	default:
-	}
+	c.broadcastLoss()
 }
 
 // WaitLossChange blocks until the cumulative loss totals differ from
 // lastDropped/lastBytes, the session closes, or ctx ends. It returns the
-// current totals. Every waiter observes the same carried totals; a waiter
-// subscribed after the drop reads them as current state instead of missing
-// the signal. A closed session returns current totals with no error; ctx
-// expiry returns ctx.Err.
+// current totals. Every waiter observes the same carried totals (broadcast
+// wakeup: all concurrent waiters fire, not just one); a waiter subscribed
+// after the drop reads them as current state instead of missing the signal.
+// A closed session returns current totals with no error; ctx expiry returns
+// ctx.Err.
 func (c *Client) WaitLossChange(ctx context.Context, lastDropped, lastBytes uint64) (uint64, uint64, error) {
 	if c == nil {
 		return 0, 0, NewRpcError(ErrorCodeInternal, "syntra: nil client")
@@ -578,6 +632,14 @@ func (c *Client) WaitLossChange(ctx context.Context, lastDropped, lastBytes uint
 		return d, b, nil
 	}
 	for {
+		c.lossMu.Lock()
+		ch := c.lossCh
+		c.lossMu.Unlock()
+		// Re-check after snapshotting the channel: a drop that landed
+		// between the first check and the snapshot must not be missed.
+		if d, b := c.LossTotals(); d != lastDropped || b != lastBytes {
+			return d, b, nil
+		}
 		select {
 		case <-ctx.Done():
 			d, b := c.LossTotals()
@@ -585,7 +647,7 @@ func (c *Client) WaitLossChange(ctx context.Context, lastDropped, lastBytes uint
 		case <-c.done:
 			d, b := c.LossTotals()
 			return d, b, nil
-		case <-c.lossCh:
+		case <-ch:
 			if d, b := c.LossTotals(); d != lastDropped || b != lastBytes {
 				return d, b, nil
 			}
@@ -685,6 +747,7 @@ func (c *Client) Run(ctx context.Context, t Transport) error {
 		}
 		c.mu.Unlock()
 		if closeCore {
+			c.snapshotCoreLoss()
 			_ = c.core.close()
 		}
 	}()
@@ -800,13 +863,9 @@ func (c *Client) pump(ctx context.Context, t Transport) error {
 			// Core-level drops (bounded core queue overflow) also wake
 			// public loss waiters: the totals changed even though no new
 			// notification arrived, so idle peers still observe the loss.
-			// The counters are the signal; the buffered-1 send coalesces
-			// bursts.
+			// The counters are the signal; the broadcast wakes all waiters.
 			if d, b := c.LossTotals(); d != prevDropped || b != prevBytes {
-				select {
-				case c.lossCh <- struct{}{}:
-				default:
-				}
+				c.broadcastLoss()
 			}
 			for _, id := range terminal {
 				if res, ok := c.core.takeOutcome(id); ok {
@@ -1057,6 +1116,7 @@ func (c *Client) Close() error {
 	}
 	core := c.core
 	c.mu.Unlock()
+	c.snapshotCoreLoss()
 	if err := core.close(); err != nil {
 		return err
 	}

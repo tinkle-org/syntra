@@ -191,16 +191,19 @@ cases:
     roles: [client, server]
     capabilities: [syntra.reliable-session/1]
     mandatory: false
-    preconditions: [active_session]
+    preconditions: [transport_connected]
     input:
       frames:
+        - { request_id: 0, body: hello, min_version: 1, max_version: 1 }
+        - { request_id: 20, body: request, method: "/syntra.session.v1/Session/Attach", payload_b64: "eyJhdHRhY2giOiJuZXciLCJpZGxlX3RpbWVvdXRfbXMiOjAsImtlZXBhbGl2ZV9pbnRlcnZhbF9tcyI6MH0=", timeout_ms: 2000 }
         - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
     expected:
       connection_state: ACTIVE
       session_state: active
       frames:
+        - { request_id: 20, body: result, payload_b64: "eyJhdHRhY2hlZCI6Im9rIiwic2Vzc2lvbl9pZCI6ImZpeHR1cmUtc2Vzc2lvbi0wMDEiLCJlcG9jaCI6MX0=" }
         - { request_id: 21, body: result }
-    notes: "Reliable-session attach (OPTIONAL, gated): post-ACTIVE attach yields a 16-byte session_id distinct from connection_id with epoch 1; stale epoch rejected with FAILED_PRECONDITION and old attachment fenced with UNAVAILABLE; pre-ACTIVE session control fails per handshake §1B with no state-machine change. SKIP when unclaimed."
+    notes: "Reliable-session attach (OPTIONAL, gated): hello then post-ACTIVE attach (request_id 20, zero lease = host defaults) yields attached with a 16-byte session_id distinct from connection_id, epoch 1. Subcases: stale epoch (<= current) rejected with FAILED_PRECONDITION and MUST NOT fence (SNTR-SESS-031); old attachment fenced with UNAVAILABLE to in-flight RPCs per SNTR-REL-009; pre-ACTIVE session control fails per handshake SNTR-HS-015 with no state-machine change; rotation/revocation/expiry rows live in CONF-RS-002. SKIP when unclaimed."
 
   - id: CONF-RS-002
     requirement: [SNTR-SESS-032, SNTR-SESS-902]
@@ -208,15 +211,18 @@ cases:
     roles: [client, server]
     capabilities: [syntra.reliable-session/1]
     mandatory: false
-    preconditions: [active_session]
+    preconditions: [transport_connected]
     input:
       credentials: "fixture:reliable-resume-handle"
       frames:
         - { request_id: 0, body: hello, min_version: 1, max_version: 1 }
+        - { request_id: 20, body: request, method: "/syntra.session.v1/Session/Attach", payload_b64: "eyJhdHRhY2giOiJyZXN1bWUiLCJoYW5kbGUiOiJmaXh0dXJlLXJlbGlhYmxlLXJlc3VtZS1oYW5kbGUiLCJpZGxlX3RpbWVvdXRfbXMiOjAsImtlZXBhbGl2ZV9pbnRlcnZhbF9tcyI6MH0=", timeout_ms: 2000 }
     expected:
       connection_state: ACTIVE
       session_state: active
-    notes: "Resume with rotation + revocation (OPTIONAL, gated): valid handle advances epoch and rotates (replay of rotated handle rejected as suspected replay); revoked/expired/wrong-audience handles yield UNAUTHENTICATED or FAILED_PRECONDITION + close. SKIP when unclaimed."
+      frames:
+        - { request_id: 20, body: result, payload_b64: "eyJhdHRhY2hlZCI6Im9rIiwic2Vzc2lvbl9pZCI6ImZpeHR1cmUtc2Vzc2lvbi0wMDEiLCJlcG9jaCI6MX0=" }
+    notes: "Resume with rotation + revocation (OPTIONAL, gated): hello then attach with resume handle (request_id 20) advances epoch (current + 1), rotates the handle (replay of the rotated handle rejected as suspected replay per SNTR-RPL-011), and binds one session + principal + version + capability. Subcases: revoked/expired/wrong-audience handles yield UNAUTHENTICATED or FAILED_PRECONDITION + close per SNTR-SESS-032; epoch 0 never valid; u64 MAX retires the session rather than wraps. SKIP when unclaimed."
 
   - id: CONF-RS-003
     requirement: [SNTR-SESS-033, SNTR-SESS-902]
@@ -227,13 +233,15 @@ cases:
     preconditions: [active_session]
     input:
       frames:
-        - { request_id: 22, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+        - { request_id: 22, body: request, method: "/syntra.session.v1/Session/Attach", payload_b64: "eyJpZGxlX3RpbWVvdXRfbXMiOjEyMDAwMCwia2VlcGFsaXZlX2ludGVydmFsX21zIjoxMDAwMH0=", timeout_ms: 2000 }
+        - { request_id: 23, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
     expected:
       connection_state: ACTIVE
       session_state: active
       frames:
-        - { request_id: 22, body: result }
-    notes: "Lease negotiation (OPTIONAL, gated): zero selects host defaults; keepalive clamped below idle; under-minimum rejected with OUT_OF_RANGE; idle expiry yields idle-timeout UNAVAILABLE and clears the attachment without losing retained outcomes. SKIP when unclaimed."
+        - { request_id: 22, body: result, payload_b64: "eyJsZWFzZSI6ImNvbmZpcm1lZCIsImlkbGVfdGltZW91dF9tcyI6MTIwMDAwLCJrZWVwYWxpdmVfaW50ZXJ2YWxfbXMiOjEwMDAwfQ==" }
+        - { request_id: 23, body: result }
+    notes: "Lease negotiation (OPTIONAL, gated): attach (request_id 22) proposes idle 120000ms + keepalive 10000ms inside 2s..300s idle and 1s..60s keepalive with keepalive < idle; host confirms clamped values (payload_b64 carries the confirmed lease). Subcases, all deterministic with injected-clock steps (never wall-clock waits): zero proposal selects host defaults; over-maximum clamped per policy; under-minimum non-zero (e.g. idle 500ms/keepalive 100ms, payload eyJpZGxlX3RpbWVvdXRfbXMiOjUwMCwia2VlcGFsaXZlX2ludGVydmFsX21zIjoxMDB9) rejected with OUT_OF_RANGE; keepalive counts as activity; idle expiry yields idle-timeout UNAVAILABLE per SNTR-SESS-034 and clears the attachment while retained outcomes survive for resume. SKIP when unclaimed."
 
   - id: CONF-RS-004
     requirement: [SNTR-SESS-034, SNTR-REL-015, SNTR-CAP-902, SNTR-SESS-902]
@@ -243,12 +251,18 @@ cases:
     mandatory: false
     preconditions: [active_session]
     input:
-      faults: { abrupt_transport_loss: true, in_flight_request_ids: [23] }
+      frames:
+        - { request_id: 23, body: request, method: "/syntra.session.v1/Session/Drain", payload_b64: "eyJzaWduYWwiOiJkcmFpbiIsImdyYWNlX21zIjo1MDB9", timeout_ms: 2000 }
+        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
     expected:
       connection_state: CLOSED
-      session_state: terminated_abnormally
-      error: { code: UNAVAILABLE, message_pattern: "NEGATIVE:success" }
-    notes: "Lifecycle/drain/overload (OPTIONAL, gated): draining stops new work with going-away; overload yields RESOURCE_EXHAUSTED with backoff (never unbounded queueing); shutdown drains explicitly retaining outcomes per retention. Typed signals use existing codes only. SKIP when unclaimed."
+      session_state: terminated_normally
+      frames:
+        - { request_id: 23, body: result, payload_b64: "eyJzaWduYWwiOiJnb2luZy1hd2F5In0=" }
+      error: { code: UNAVAILABLE, message_pattern: "going-away" }
+      transport: { action: going-away-drain, stop_new_rpcs: true, drain_grace_ms: 500 }
+      retry: { policy: bounded_jittered_backoff, max_control_queue: 64 }
+    notes: "Lifecycle/drain/overload (OPTIONAL, gated): drain request (request_id 23) stops new work with going-away; request_id 24 issued into the drain receives terminal UNAVAILABLE (never reported as success per SNTR-REL-009); teardown retains outcomes/tombstones per retention and drains the control queue explicitly. Overload subcase (admission beyond caps: 1024 sessions, 128 retained/session, 1MiB retained bytes, 64 queued signals per SNTR-REL-015) yields RESOURCE_EXHAUSTED with bounded jittered backoff, never unbounded queueing nor silent deadlock; misbehaving principals isolated per SNTR-REL-007/008. Typed signals use existing codes only (SNTR-SESS-034). Abrupt-loss mapping (UNAVAILABLE, unknown outcome) is covered by CONF-SESS-007. SKIP when unclaimed."
 
   - id: CONF-RS-005
     requirement: [SNTR-REL-011, SNTR-REL-012, SNTR-REL-013, SNTR-REL-014, SNTR-REL-015, SNTR-RPC-011, SNTR-RPC-012, SNTR-RPC-013, SNTR-REL-902, SNTR-RPC-902, SNTR-SESS-902]
@@ -259,12 +273,13 @@ cases:
     preconditions: [active_session]
     input:
       frames:
-        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
-        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500, delivery_id_b64: "dGVzdC1kZWxpdmVyeS0wMQ==" }
+        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500, delivery_id_b64: "dGVzdC1kZWxpdmVyeS0wMQ==" }
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       frames:
-        - { request_id: 24, body: result }
-        - { request_id: 25, body: result }
-    notes: "Reliable delivery (OPTIONAL, gated): same delivery ID resends return the retained outcome without re-execution; mismatched content rejected with FAILED_PRECONDITION; forgotten/unknown treated as new decisions; deadline/cancel tombstones deterministic; control-plane bounds enforced with RESOURCE_EXHAUSTED. App payloads opaque; no exactly-once business effects claimed. SKIP when unclaimed."
+        - { request_id: 24, body: result, delivery_id_b64: "dGVzdC1kZWxpdmVyeS0wMQ==" }
+        - { request_id: 25, body: result, delivery_id_b64: "dGVzdC1kZWxpdmVyeS0wMQ==", retained: true }
+      retry: { resend_policy: same_delivery_id_fresh_request_id, backoff: bounded_jitter }
+    notes: "Reliable delivery (OPTIONAL, gated): request_ids 24 and 25 carry the same delivery ID (dGVzdC1kZWxpdmVyeS0wMQ==, 16 opaque bytes test-delivery-01, stable across resends per SNTR-RPC-011) with byte-identical (method, payload); the resend returns the retained outcome bit-identically without re-execution (Retained per SNTR-REL-013). Subcases: byte-mismatched reuse of one delivery ID rejected with FAILED_PRECONDITION before dispatch (SNTR-REL-012, connection usable); Forgotten (retention expired, default 128/session and 1MiB aggregate) and Unknown treated as new application decisions, never execution proof; Pending callers resend the same delivery ID; deadline/cancel tombstones (only DEADLINE_EXHAUSTED/CANCELLED, bounded 128/session) resolve late duplicates deterministically while UNAVAILABLE never tombstones (SNTR-REL-014); exhaustion yields RESOURCE_EXHAUSTED. Correlation uses request_id, reconciliation the delivery ID; same bytes in another session are distinct keys. App payloads opaque; no exactly-once business effects claimed. SKIP when unclaimed."

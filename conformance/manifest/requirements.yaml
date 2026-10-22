@@ -148,7 +148,12 @@ requirements:
   - { requirement_id: SNTR-SESS-031, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-001], automation_status: automated }
   - { requirement_id: SNTR-SESS-032, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-002], automation_status: automated }
   - { requirement_id: SNTR-SESS-033, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-003], automation_status: automated }
-  - { requirement_id: SNTR-SESS-034, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-004], automation_status: automated }
+  - requirement_id: SNTR-SESS-034
+    specification: specifications/core/sessions.md
+    section: "§1H"
+    test_ids: [CONF-RS-004]
+    automation_status: partially_automated
+    notes: "Drain/overload vectors are fixture-declared in CONF-RS-004 (going-away drain, RESOURCE_EXHAUSTED overload, retention); queue-bound/backoff/drain execution is exercised in unit tests, not end-to-end by every runner leg — human confirms leg coverage."
   - { requirement_id: SNTR-SESS-902, specification: specifications/core/sessions.md, section: "§7", test_ids: [CONF-RS-001, CONF-RS-002, CONF-RS-003, CONF-RS-004, CONF-RS-005], automation_status: automated }
 
   # ---- RPC: specifications/core/rpc.md ----
@@ -220,7 +225,12 @@ requirements:
   - { requirement_id: SNTR-REL-012, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
   - { requirement_id: SNTR-REL-013, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
   - { requirement_id: SNTR-REL-014, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-REL-015, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-004, CONF-RS-005], automation_status: automated }
+  - requirement_id: SNTR-REL-015
+    specification: specifications/core/reliability.md
+    section: "§1C"
+    test_ids: [CONF-RS-004, CONF-RS-005]
+    automation_status: partially_automated
+    notes: "CONF-RS-004/005 declare drain/retention/tombstone vectors but assert no numeric queue-bound, backoff-schedule, or drain-ordering execution; overload/queue-bound/backoff/drain need dedicated bound tests plus human review of the ControlBounds defaults."
   - { requirement_id: SNTR-REL-902, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RS-005], automation_status: automated }
 
   # ---- Capabilities: specifications/core/capabilities.md ----

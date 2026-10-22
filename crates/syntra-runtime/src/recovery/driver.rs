@@ -93,20 +93,24 @@ pub struct TargetedEnvelope {
 }
 
 /// Encode a checkpoint as a duplicate-cache key (opaque, equality only).
+/// Length-prefixes each variable field so embedded 0x00 bytes cannot cause
+/// collisions.
 fn cache_key(checkpoint: &ProfileCheckpoint) -> Vec<u8> {
     let mut k = Vec::with_capacity(
-        checkpoint.stream_selector.len()
+        8 + 8 * 3
+            + checkpoint.stream_selector.len()
             + checkpoint.base_cursor.len()
-            + checkpoint.result_cursor.len()
-            + 8,
+            + checkpoint.result_cursor.len(),
     );
     k.extend_from_slice(&checkpoint.generation.to_le_bytes());
-    k.push(0);
-    k.extend_from_slice(&checkpoint.stream_selector);
-    k.push(0);
-    k.extend_from_slice(&checkpoint.base_cursor);
-    k.push(0);
-    k.extend_from_slice(&checkpoint.result_cursor);
+    for field in [
+        &checkpoint.stream_selector,
+        &checkpoint.base_cursor,
+        &checkpoint.result_cursor,
+    ] {
+        k.extend_from_slice(&(field.len() as u64).to_le_bytes());
+        k.extend_from_slice(field);
+    }
     k
 }
 
@@ -172,8 +176,8 @@ impl InitiatorDriver {
         stream_selector: Vec<u8>,
         generation: u64,
         committed: Vec<u8>,
-    ) {
-        if let Some(saved) = self.store.load(&stream_selector) {
+    ) -> Result<(), StoreError> {
+        if let Some(saved) = self.store.load(&stream_selector)? {
             self.engine.insert_stream(
                 saved.stream_selector.clone(),
                 saved.generation,
@@ -182,6 +186,7 @@ impl InitiatorDriver {
         } else {
             self.engine.insert_stream(stream_selector, generation, committed);
         }
+        Ok(())
     }
 
     /// Observe a validated batch. Duplicates answered from the bounded
@@ -199,9 +204,12 @@ impl InitiatorDriver {
     ///
     /// Atomically stores the position plus `effects_digest` first; on store
     /// failure returns `Err` and never touches the engine, so committed
-    /// progress cannot advance on a failed write. On success delegates to
-    /// the engine and records the cache key so a re-delivery across the
-    /// recovered/live boundary is tolerated without re-applying effects.
+    /// progress cannot advance on a failed write. Rejected checkpoints are
+    /// validated read-only first and return the engine's rejection without
+    /// a store write, so rejected checkpoints never persist. On success
+    /// delegates to the engine and records the cache key so a re-delivery
+    /// across the recovered/live boundary is tolerated without re-applying
+    /// effects.
     pub fn confirm(
         &mut self,
         checkpoint: &ProfileCheckpoint,
@@ -211,6 +219,9 @@ impl InitiatorDriver {
             if let Err(e) = auth.authorize_confirm(checkpoint) {
                 return Err(InitiatorError::Unauthorized(e));
             }
+        }
+        if !self.engine.can_confirm(checkpoint) {
+            return Ok(self.engine.confirm_persisted(checkpoint));
         }
         let position = CommittedPosition {
             stream_selector: checkpoint.stream_selector.clone(),
@@ -284,22 +295,24 @@ impl InitiatorDriver {
     pub fn stage_snapshot_page(
         &mut self,
         stream_selector: &[u8],
+        snapshot_handle: &[u8],
         page_index: u32,
         bytes: Vec<u8>,
         boundary_checkpoint: &[u8],
     ) -> Result<(), SnapshotError> {
         match self.staged.get_mut(stream_selector) {
-            Some(staged) => staged.stage_page(page_index, bytes, boundary_checkpoint),
+            Some(staged) => staged.stage_page(snapshot_handle, page_index, bytes, boundary_checkpoint),
             None => Err(SnapshotError::InvalidPage),
         }
     }
 
     /// Install the staged snapshot and offer it to the coordinator as a
     /// new-generation checkpoint. Returns the checkpoint plus the assembled
-    /// bytes. The staged entry is removed only after a successful install.
-    /// Generations not greater than the engine's current generation are
-    /// rejected. The caller confirms the returned checkpoint via
-    /// [`Self::confirm`] to advance the generation.
+    /// bytes. The staged entry is removed only after the coordinator offers
+    /// it as committable; otherwise the entry is retained and
+    /// `CoordinatorRejected` is returned. Generations not greater than the
+    /// engine's current generation are rejected. The caller confirms the
+    /// returned checkpoint via [`Self::confirm`] to advance the generation.
     pub fn install_snapshot(
         &mut self,
         stream_selector: &[u8],
@@ -313,16 +326,25 @@ impl InitiatorDriver {
         let staged = self.staged.get(stream_selector).ok_or(SnapshotError::Incomplete)?;
         let bytes = staged.install()?;
         let boundary = staged.boundary_checkpoint().to_vec();
-        self.staged.remove(stream_selector);
-        Ok((
-            ProfileCheckpoint {
-                stream_selector: stream_selector.to_vec(),
-                generation,
-                base_cursor: boundary.clone(),
-                result_cursor: boundary,
-            },
-            bytes,
-        ))
+        let checkpoint = ProfileCheckpoint {
+            stream_selector: stream_selector.to_vec(),
+            generation,
+            base_cursor: boundary.clone(),
+            result_cursor: boundary,
+        };
+        let actions = self.engine.observe(ProfileInput::SnapshotInstalled {
+            checkpoint: checkpoint.clone(),
+        });
+        let offered = actions.iter().any(|a| match a {
+            ProfileAction::CommitCheckpoint { checkpoint: c } => c == &checkpoint,
+            _ => false,
+        });
+        if offered {
+            self.staged.remove(stream_selector);
+            Ok((checkpoint, bytes))
+        } else {
+            Err(SnapshotError::CoordinatorRejected)
+        }
     }
 }
 
@@ -336,11 +358,28 @@ pub struct HostDriver {
     authorizer: Option<Arc<dyn RecoveryAuthorizer>>,
     /// Batches per stream selector (opaque bytes keyed by result cursor).
     batches: HashMap<Vec<u8>, Vec<StoredBatch>>,
-    /// Subscription handle -> stream selector routing table.
-    routes: HashMap<Vec<u8>, Vec<u8>>,
+    /// Subscription handle -> route (selector, fixed boundary, generation,
+    /// and per-handle replay fencing state).
+    routes: HashMap<Vec<u8>, Route>,
     next_handle: u64,
     max_batches_per_page: u32,
     max_bytes_per_page: u32,
+}
+
+/// Per-subscription route: fixed catch-up boundary and generation captured
+/// at subscribe time, plus fencing state for verbatim retries.
+#[derive(Debug, Clone)]
+struct Route {
+    /// Stream selector routed to this handle.
+    selector: Vec<u8>,
+    /// Fixed catch-up boundary captured at subscribe time.
+    boundary: Vec<u8>,
+    /// Continuity generation captured at subscribe time.
+    generation: u64,
+    /// `from_checkpoint` of the last served page, if any.
+    last_from: Option<Vec<u8>>,
+    /// Last served page for verbatim duplicate retries.
+    last_page: Option<ReplayPage>,
 }
 
 /// One stored batch: predecessor/result cursors plus opaque payload.
@@ -352,6 +391,8 @@ pub struct StoredBatch {
     pub result: Vec<u8>,
     /// Opaque batch bytes.
     pub payload: Vec<u8>,
+    /// Continuity generation of this batch.
+    pub generation: u64,
 }
 
 impl HostDriver {
@@ -386,12 +427,14 @@ impl HostDriver {
 
     /// Subscribe a stream selector. Authorizes with the bound principal,
     /// assigns a fresh connection-scoped handle, and records the routing
-    /// entry. Returns the handle plus the fixed catch-up boundary (latest
-    /// result, or the start checkpoint when empty).
+    /// entry with its fixed catch-up boundary and generation. Returns the
+    /// handle plus the fixed catch-up boundary (latest result for the
+    /// generation, or the start checkpoint when empty).
     pub fn subscribe(
         &mut self,
         stream_selector: Vec<u8>,
         start_checkpoint: Vec<u8>,
+        generation: u64,
     ) -> Result<(Vec<u8>, Vec<u8>), ProviderError> {
         if let Some(auth) = &self.authorizer {
             auth.authorize_subscribe(&stream_selector)?;
@@ -399,37 +442,77 @@ impl HostDriver {
         let boundary = self
             .batches
             .get(&stream_selector)
-            .and_then(|v| v.last().map(|b| b.result.clone()))
+            .and_then(|v| {
+                v.iter()
+                    .rev()
+                    .find(|b| b.generation == generation)
+                    .map(|b| b.result.clone())
+            })
             .unwrap_or_else(|| start_checkpoint.clone());
         if boundary.is_empty() {
             return Err(ProviderError::StaleCheckpoint);
         }
         let handle = format!("sub-{}-{}", self.ctx.connection_id, self.next_handle).into_bytes();
         self.next_handle += 1;
-        self.routes.insert(handle.clone(), stream_selector);
+        self.routes.insert(
+            handle.clone(),
+            Route {
+                selector: stream_selector,
+                boundary: boundary.clone(),
+                generation,
+                last_from: None,
+                last_page: None,
+            },
+        );
         Ok((handle, boundary))
     }
 
     /// Serve one bounded replay page continuing from `from_checkpoint`.
     /// The caller transmits the page inside the terminal `RpcResult`.
+    /// Validates the generation against the subscription, enforces
+    /// per-handle fencing (exact duplicate `from` returns the verbatim
+    /// last page; any other `from` that does not continue from the last
+    /// page's result is rejected), and always returns the subscribe-time
+    /// boundary.
     pub fn replay_page(
-        &self,
+        &mut self,
         subscription_handle: &[u8],
         from_checkpoint: &[u8],
+        generation: u64,
         max_batches: u32,
         max_bytes: u32,
     ) -> Result<ReplayPage, ProviderError> {
-        let selector = self.routes.get(subscription_handle).ok_or(ProviderError::UnknownStream)?;
+        let (selector, boundary, route_generation, last_from, last_page) = {
+            let route = self.routes.get(subscription_handle).ok_or(ProviderError::UnknownStream)?;
+            (
+                route.selector.clone(),
+                route.boundary.clone(),
+                route.generation,
+                route.last_from.clone(),
+                route.last_page.clone(),
+            )
+        };
+        if generation != route_generation {
+            return Err(ProviderError::StaleCheckpoint);
+        }
+        if let (Some(lf), Some(lp)) = (last_from, last_page) {
+            if from_checkpoint == lf.as_slice() {
+                return Ok(lp);
+            }
+            if from_checkpoint != lp.result_checkpoint.as_slice() {
+                return Err(ProviderError::StaleCheckpoint);
+            }
+        }
         let probe = ProfileCheckpoint {
             stream_selector: selector.clone(),
-            generation: 0,
+            generation: route_generation,
             base_cursor: from_checkpoint.to_vec(),
             result_cursor: from_checkpoint.to_vec(),
         };
         if let Some(auth) = &self.authorizer {
             auth.authorize_replay(&probe)?;
         }
-        let batches = self.batches.get(selector).ok_or(ProviderError::OutsideRetention)?;
+        let batches = self.batches.get(&selector).ok_or(ProviderError::OutsideRetention)?;
         let start = batches
             .iter()
             .position(|b| b.predecessor == from_checkpoint)
@@ -459,9 +542,8 @@ impl HostDriver {
         if payloads.is_empty() {
             return Err(ProviderError::OutsideRetention);
         }
-        let boundary = batches.last().map(|b| b.result.clone()).unwrap_or_default();
         let more = end < batches.len();
-        Ok(ReplayPage {
+        let page = ReplayPage {
             predecessor_checkpoint: from_checkpoint.to_vec(),
             result_checkpoint: last_result,
             continuation_marker: if more {
@@ -471,7 +553,12 @@ impl HostDriver {
             },
             catchup_boundary: boundary,
             batch_payloads: payloads,
-        })
+        };
+        if let Some(route) = self.routes.get_mut(subscription_handle) {
+            route.last_from = Some(from_checkpoint.to_vec());
+            route.last_page = Some(page.clone());
+        }
+        Ok(page)
     }
 
     /// Route a batch to exactly one subscription handle. Returns the

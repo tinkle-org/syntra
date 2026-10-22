@@ -29,8 +29,9 @@ option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntra
 // `/syntra.v1.UpdateRecovery/Replay`,
 // `/syntra.v1.UpdateRecovery/CatchUp`,
 // `/syntra.v1.UpdateRecovery/Confirm` (batch variant
-// `RecoveryConfirmRequest`/`RecoveryConfirmResponse` and snapshot-boundary
-// variant `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled`),
+// `RecoveryConfirmRequest`/`RecoveryConfirmResponse`),
+// `/syntra.v1.UpdateRecovery/SnapshotConfirm` (snapshot-boundary variant
+// `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled`),
 // `/syntra.v1.UpdateRecovery/SnapshotOffer`
 // (`RecoverySnapshotOfferRequest`/`RecoverySnapshotDescriptor`),
 // `/syntra.v1.UpdateRecovery/SnapshotFetch`,
@@ -44,12 +45,17 @@ option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntra
 // Wire compatibility (SNTR-SER-003, SNTR-VER-004): unknown Protobuf fields
 // inside profile payloads MUST be ignored on receipt unless a field comment
 // explicitly marks that field `Critical`. Fields explicitly marked
-// `Ignorable` in their comments MUST be ignored on receipt. All other
-// defined fields are required and validated: profile_version and
-// routing/identity fields (stream_selector, subscription_handle,
-// snapshot_handle, checkpoints, boundaries, capability, versions) missing
-// or mismatched MUST be rejected with FAILED_PRECONDITION, never silently
-// applied. Unknown profile operations (method strings) MUST be rejected
+// `Ignorable` in their comments MUST be ignored on receipt. Defined fields
+// are validated per their field comments: profile_version and routing/identity
+// fields (stream_selector, subscription_handle, snapshot_handle, capability,
+// versions) missing or mismatched MUST be rejected with FAILED_PRECONDITION,
+// never silently applied. Checkpoint/boundary/marker fields follow per-field
+// emptiness rules, not a blanket non-empty rule: `start_checkpoint` empty
+// means initial (SYN-URP-022), `continuation_marker` empty means first request
+// or no further page (SYN-URP-022), `terminate_reason` empty means no
+// termination unless the terminated outcome is selected (SYN-URP-026), and
+// predecessor/result/boundary emptiness is governed by each field comment.
+// Unknown profile operations (method strings) MUST be rejected
 // with UNIMPLEMENTED.
 message RecoveryNegotiateRequest {
   // profile_version is the profile payload version. Valid value is 1.
@@ -315,8 +321,12 @@ message RecoverySnapshotFetchRequest {
 }
 
 // RecoveryConfirmRequest confirms a batch result checkpoint (batch variant).
-// Snapshot-boundary confirms use RecoverySnapshotConfirmRequest and yield
-// RecoverySnapshotInstalled. Both variants share the Confirm method.
+// Transport: `/syntra.v1.UpdateRecovery/Confirm`, yielding
+// RecoveryConfirmResponse. Snapshot-boundary confirms use
+// RecoverySnapshotConfirmRequest on
+// `/syntra.v1.UpdateRecovery/SnapshotConfirm` and yield
+// RecoverySnapshotInstalled. The two variants use distinct methods so batch
+// and snapshot confirms are wire-distinguishable.
 message RecoveryConfirmRequest {
   // profile_version is the profile payload version. Valid value is 1.
   // Required.
@@ -336,7 +346,8 @@ message RecoveryConfirmRequest {
 }
 
 // RecoverySnapshotConfirmRequest confirms a snapshot boundary checkpoint
-// (snapshot variant). Yields RecoverySnapshotInstalled with the new generation.
+// (snapshot variant) on `/syntra.v1.UpdateRecovery/SnapshotConfirm`.
+// Yields RecoverySnapshotInstalled with the new generation.
 message RecoverySnapshotConfirmRequest {
   // profile_version is the profile payload version. Valid value is 1.
   // Required.

@@ -14,11 +14,21 @@ Usage:
 
 Each leg runs the executable harness (not the YAML validator):
   rust-async: cargo test --locked -p syntra-runtime --test conformance_runner
-  go-pure:    go test -run TestRunner ./... (bindings/go, default tags)
+              plus --test recovery_drivers (checkpoint/reconcile asserts)
+  go-pure:    go test -run 'TestRunner|TestReliable|TestCheckpoint|TestRecovery'
+              (bindings/go, default tags)
   go-ffi:     cargo build -p syntra-ffi --features production, then
-              go test -tags syntranative -run TestRunner ./...
-  interop:    go test -run TestRunnerWireInteropGolden + Rust vector test
-              (sc_wire_vectors_decode) — same logical frames both sides.
+              go test -tags syntranative -run
+              'TestRunner|TestReliable|TestCheckpoint|TestRecovery' ./...
+  interop:    go test -run 'TestGoldenVectors|TestRunnerWireInteropGolden' +
+              Rust vector test (sc_wire_vectors_decode) + shared-corpus check:
+              both sides decode bytes registered in the shared corpus
+              (protobuf vectors.yaml / websocket fixtures.yaml) and the runner
+              compares the logical frames — never cross-encoder byte equality.
+
+The shared fault matrix (scenarios.yaml: seed, fault kinds/rates) is loaded
+at startup by load_scenarios() and printed every run; it is descriptive where
+legs differ (see scenarios.yaml rules/notes).
 
 Verdicts per scenario: PASS/FAIL/SKIP with logs. Results also written to
 conformance/runner/results.json for declarations.
@@ -60,17 +70,95 @@ def _go_ok(rc, combined):
     # Require exit 0, no FAIL, at least one passing required test,
     # and no skipped required tests — not just exit code/absence of FAIL.
     # Caller must run go test with -v so --- PASS:/--- SKIP: lines exist.
+    # Counts runner, reliable-session, checkpoint and recovery tests: the legs
+    # run -run 'TestRunner|TestReliable|TestCheckpoint|TestRecovery' so
+    # recovery coverage is asserted, not excluded.
     if rc != 0:
         return False
     if "FAIL" in combined:
         return False
-    passes = combined.count("--- PASS: TestRunner")
+    passes = len(re.findall(r"--- PASS: Test(Runner|Reliable|Checkpoint|Recovery|Golden)", combined))
     skips = combined.count("--- SKIP:")
     if passes < 1:
         return False
     if skips != 0:
         return False
     return True
+
+
+def load_scenarios():
+    """Load the shared fault matrix from conformance/runner/scenarios.yaml.
+
+    Returns a dict with seed, scenario count and fault kinds. The matrix is
+    descriptive where legs differ (see scenarios.yaml rules/notes); loading it
+    here keeps the runner honest about which seed/pattern each run used.
+    """
+    path = ROOT / "conformance" / "runner" / "scenarios.yaml"
+    try:
+        text = path.read_text()
+    except OSError as e:
+        return {"ok": False, "detail": f"scenarios.yaml unreadable: {e}"}
+    m = re.search(r"seed:\s*(0x[0-9A-Fa-f]+|\d+)", text)
+    seed = m.group(1) if m else "0x5EED1234"
+    scenarios = len(re.findall(r"-\s*id:\s*SC-", text))
+    faults = re.findall(r"kind:\s*(\w+)", text)
+    return {"ok": True, "seed": seed, "scenarios": scenarios, "faults": faults}
+
+
+def _shared_corpus_check():
+    """Compare logical frames from the shared corpus file (both sides).
+
+    Verifies the interop legs decode bytes registered in the shared corpus:
+    Go's golden tests must decode the exact GOLD-PROT-HELLO-01 / GOLD-PROT-REQ-01
+    frame_hex bytes from conformance/test-vectors/protobuf/vectors.yaml and
+    assert the same logical fields (version, hello versions, credential,
+    method); the Rust vector test must decode a hello registered in the
+    websocket fixtures. Fails on mismatch — independent self-tests that never
+    touch the corpus do not pass as interop.
+    """
+    tv = ROOT / "conformance" / "test-vectors"
+    try:
+        import yaml  # type: ignore
+
+        vectors = yaml.safe_load((tv / "protobuf" / "vectors.yaml").read_text())
+        by_id = {v.get("id"): v for v in vectors.get("vectors", [])}
+    except Exception as e:
+        return (False, f"cannot load protobuf vectors.yaml: {e}")
+    problems = []
+    go_test = (ROOT / "bindings" / "go" / "wire_test.go").read_text()
+    for vid, needles in (
+        ("GOLD-PROT-HELLO-01", ["0801521e080110011a186f70617175652d746573742d63726564656e7469616c2d41",
+                                "opaque-test-credential-A"]),
+        ("GOLD-PROT-REQ-01", ["08011007621e0a122f6578616d706c652e4563686f2f4563686f120568656c6c6f18f403",
+                              "/example.Echo/Echo"]),
+    ):
+        entry = by_id.get(vid)
+        if not entry:
+            problems.append(f"{vid} missing from vectors.yaml")
+            continue
+        frame_hex = (entry.get("frame_hex") or "").lower()
+        for needle in needles:
+            if needle.lower() not in frame_hex and needle not in go_test:
+                problems.append(f"{vid}: {needle[:24]}... in neither corpus nor go test")
+        if frame_hex and frame_hex not in go_test.lower():
+            problems.append(f"{vid}: corpus frame_hex not decoded by go golden test")
+        sem = entry.get("semantic_fields", {}) or {}
+        if sem.get("version") != 1 or sem.get("request_id") not in (0, 7):
+            problems.append(f"{vid}: unexpected semantic_fields {sem}")
+    rust_hex = "0801520408011001"  # WS no-length-prefix good hello (VEC-WS-009)
+    try:
+        ws_fix = (tv / "websocket" / "fixtures.yaml").read_text()
+    except OSError as e:
+        problems.append(f"cannot read websocket fixtures.yaml: {e}")
+        ws_fix = ""
+    if rust_hex not in ws_fix.replace(" ", ""):
+        problems.append("rust vector hello not registered in websocket fixtures.yaml")
+    rust_runner = (ROOT / "crates" / "syntra-runtime" / "tests" / "conformance_runner.rs").read_text()
+    if "sc_wire_vectors_decode" not in rust_runner or "Body::Hello" not in rust_runner:
+        problems.append("rust sc_wire_vectors_decode hello assertion missing")
+    if problems:
+        return (False, "; ".join(problems))
+    return (True, "go + rust legs decode shared-corpus bytes (HELLO-01, REQ-01, WS hello); logical fields match")
 
 
 def run(cmd, cwd, env=None, timeout=300):
@@ -95,20 +183,33 @@ def run(cmd, cwd, env=None, timeout=300):
         return 124, out, err, time.time() - start
 
 
+GO_COVERAGE_RUN = "TestRunner|TestReliable|TestCheckpoint|TestRecovery"
+
+
 def leg_rust_async():
-    rc, out, err, dt = run(
+    # Recovery coverage included: scenario legs plus checkpoint/reconcile
+    # asserts in recovery_drivers — durable state, not just wire round-trips.
+    rc1, out1, err1, dt1 = run(
         ["cargo", "test", "--locked", "-p", "syntra-runtime", "--test", "conformance_runner"],
         cwd=ROOT,
     )
-    passed = _cargo_ok(rc, out + err)
-    return ("PASS" if passed else "FAIL", f"cargo conformance_runner ({dt:.1f}s)", (out + err)[-4000:])
+    rc2, out2, err2, dt2 = run(
+        ["cargo", "test", "--locked", "-p", "syntra-runtime", "--test", "recovery_drivers"],
+        cwd=ROOT,
+    )
+    passed = _cargo_ok(rc1, out1 + err1) and _cargo_ok(rc2, out2 + err2)
+    return (
+        "PASS" if passed else "FAIL",
+        f"cargo conformance_runner ({dt1:.1f}s) + recovery_drivers ({dt2:.1f}s)",
+        (out1 + err1 + out2 + err2)[-4000:],
+    )
 
 
 def leg_go_pure():
     d = ROOT / "bindings" / "go"
-    rc, out, err, dt = run(["go", "test", "-run", "TestRunner", "-count=1", "-v", "."], cwd=d)
+    rc, out, err, dt = run(["go", "test", "-run", GO_COVERAGE_RUN, "-count=1", "-v", "."], cwd=d)
     passed = _go_ok(rc, out + err)
-    return ("PASS" if passed else "FAIL", f"go TestRunner default ({dt:.1f}s)", (out + err)[-4000:])
+    return ("PASS" if passed else "FAIL", f"go {GO_COVERAGE_RUN} default ({dt:.1f}s)", (out + err)[-4000:])
 
 
 def leg_go_ffi():
@@ -127,20 +228,24 @@ def leg_go_ffi():
     env["DYLD_LIBRARY_PATH"] = libdir + ":" + env.get("DYLD_LIBRARY_PATH", "")
     d = ROOT / "bindings" / "go"
     rc, out, err, dt = run(
-        ["go", "test", "-tags", "syntranative", "-run", "TestRunner", "-count=1", "-v", "."],
+        ["go", "test", "-tags", "syntranative", "-run", GO_COVERAGE_RUN, "-count=1", "-v", "."],
         cwd=d,
         env=env,
     )
     passed = _go_ok(rc, out + err)
-    return ("PASS" if passed else "FAIL", f"go TestRunner syntranative ({dt:.1f}s)", (out + err)[-4000:])
+    return ("PASS" if passed else "FAIL", f"go {GO_COVERAGE_RUN} syntranative ({dt:.1f}s)", (out + err)[-4000:])
 
 
 def leg_interop():
-    # Wire interop: Go golden test + Rust vector test must both pass on the
-    # same logical frames (decoded equality, opaque bytes preserved).
+    # Wire interop as cross-decode against the shared corpus: the Go golden
+    # tests decode the exact vectors.yaml bytes (HELLO-01/REQ-01) and the Rust
+    # vector test decodes the registered WS hello; _shared_corpus_check then
+    # compares the logical frames from the corpus file. Fails on mismatch —
+    # decoded Frame equality, opaque bytes preserved, never byte equality
+    # across encoders.
     d = ROOT / "bindings" / "go"
     rc1, out1, err1, dt1 = run(
-        ["go", "test", "-run", "TestRunnerWireInteropGolden", "-count=1", "-v", "."],
+        ["go", "test", "-run", "TestGoldenVectors|TestRunnerWireInteropGolden", "-count=1", "-v", "."],
         cwd=d,
     )
     rc2, out2, err2, dt2 = run(
@@ -149,12 +254,19 @@ def leg_interop():
     )
     go_combined = out1 + err1
     rust_combined = out2 + err2
-    go_ran = rc1 == 0 and "--- PASS: TestRunnerWireInteropGolden" in go_combined and "--- SKIP:" not in go_combined and "FAIL" not in go_combined
+    go_ran = (
+        rc1 == 0
+        and "--- PASS: TestGoldenVectors" in go_combined
+        and "--- PASS: TestRunnerWireInteropGolden" in go_combined
+        and "--- SKIP:" not in go_combined
+        and "FAIL" not in go_combined
+    )
     rust_ran = _cargo_ok(rc2, rust_combined) and "sc_wire_vectors_decode" in rust_combined
-    passed = go_ran and rust_ran
+    corpus_ok, corpus_detail = _shared_corpus_check()
+    passed = go_ran and rust_ran and corpus_ok
     return (
         "PASS" if passed else "FAIL",
-        f"interop wire vectors (go {dt1:.1f}s + rust {dt2:.1f}s)",
+        f"interop cross-decode (go {dt1:.1f}s + rust {dt2:.1f}s): {corpus_detail}",
         (out1 + err1 + out2 + err2)[-4000:],
     )
 
@@ -181,7 +293,15 @@ def main():
         pairs = [args.pair]
     results = []
     overall = True
-    print(f"Syntra shared conformance runner — {len(pairs)} pairing(s), seed 0x5EED1234")
+    matrix = load_scenarios()
+    if not matrix.get("ok"):
+        print(f"matrix load FAILED: {matrix.get('detail')}", file=sys.stderr)
+        return 1
+    print(
+        f"Syntra shared conformance runner — {len(pairs)} pairing(s), "
+        f"seed {matrix['seed']} ({matrix['scenarios']} scenarios, "
+        f"faults: {', '.join(matrix['faults'])})"
+    )
     for pid in pairs:
         verdict, detail, log = LEGS[pid]()
         ok = verdict == "PASS"

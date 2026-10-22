@@ -43,7 +43,8 @@ impl StoreError {
 /// an error is returned. `load` returns the last atomically stored position.
 pub trait DurableStore: Send + Sync {
     /// Last durably stored position for the selector, if any.
-    fn load(&self, stream_selector: &[u8]) -> Option<CommittedPosition>;
+    /// Returns `Err(Corrupt)` when stored bytes fail validation.
+    fn load(&self, stream_selector: &[u8]) -> Result<Option<CommittedPosition>, StoreError>;
     /// Atomically record `position` and its effects. On error nothing is
     /// recorded and the caller must not confirm.
     fn store_atomic(
@@ -90,8 +91,8 @@ impl MemoryStore {
 }
 
 impl DurableStore for MemoryStore {
-    fn load(&self, stream_selector: &[u8]) -> Option<CommittedPosition> {
-        self.positions.get(stream_selector).cloned()
+    fn load(&self, stream_selector: &[u8]) -> Result<Option<CommittedPosition>, StoreError> {
+        Ok(self.positions.get(stream_selector).cloned())
     }
 
     fn store_atomic(
@@ -126,9 +127,9 @@ mod tests {
     #[test]
     fn atomic_store_and_load_round_trip() {
         let mut s = MemoryStore::new();
-        assert_eq!(s.load(b"s"), None);
+        assert_eq!(s.load(b"s").unwrap(), None);
         s.store_atomic(pos(), b"digest-1").unwrap();
-        assert_eq!(s.load(b"s"), Some(pos()));
+        assert_eq!(s.load(b"s").unwrap(), Some(pos()));
         assert_eq!(s.digest(b"s"), Some(b"digest-1".as_slice()));
     }
 
@@ -148,7 +149,7 @@ mod tests {
             ),
             Err(StoreError::Unavailable)
         );
-        assert_eq!(s.load(b"s"), Some(pos()));
+        assert_eq!(s.load(b"s").unwrap(), Some(pos()));
         assert_eq!(s.digest(b"s"), Some(b"d0".as_slice()));
     }
 }

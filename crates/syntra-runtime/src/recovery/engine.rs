@@ -216,6 +216,18 @@ impl ProfileEngine {
         actions
     }
 
+    /// Read-only pre-validation for [`Self::confirm_persisted`].
+    ///
+    /// Returns true only when [`Self::confirm_persisted`] would advance
+    /// committed progress. False for untracked selectors, idempotent
+    /// duplicates, snapshot-gated or rejected checkpoints. No mutation.
+    pub fn can_confirm(&self, checkpoint: &ProfileCheckpoint) -> bool {
+        match self.streams.get(&checkpoint.stream_selector) {
+            Some(state) => state.recovery.can_confirm(checkpoint),
+            None => false,
+        }
+    }
+
     /// Alias for [`Self::confirm_persisted`].
     pub fn confirm(&mut self, checkpoint: &ProfileCheckpoint) -> Vec<ProfileAction> {
         self.confirm_persisted(checkpoint)

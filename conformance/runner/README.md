@@ -16,11 +16,15 @@ YAML; this runs the protocol).
 
 ## Scenarios
 
-Runner scenarios live in `scenarios.yaml` (seed `0x5EED1234`). Currently
-verified by the executable legs: echo, 16-concurrent,
-deadline-exactly-once, oversize-handler-result, graceful-close drain,
-fault-injection (drop/duplicate), wire interop golden. Cancel-wins and
-duplicate-id are verified in the `rust-async` leg only.
+Runner scenarios live in `scenarios.yaml` (seed `0x5EED1234`, loaded at
+startup by `runner.py:load_scenarios`). Currently verified by the
+executable legs: echo, 16-concurrent, deadline-exactly-once,
+oversize-handler-result, graceful-close drain, fault-injection
+(drop/duplicate), wire interop cross-decode against the shared corpus,
+plus reliable-session/checkpoint/recovery unit coverage (`TestReliable` /
+`TestCheckpoint` / `TestRecovery` on the Go legs, `recovery_drivers` on
+the Rust leg). Cancel-wins and duplicate-id are verified in the
+`rust-async` leg only.
 
 Defined in `scenarios.yaml` but not yet covered by all legs (do not claim):
 oversize-payload, unknown/malformed method, notifications, abrupt transport
@@ -29,8 +33,12 @@ loss (only graceful close is exercised), truncate/delay faults.
 Each scenario asserts:
 - wire payloads (decoded `Frame` equality, opaque bytes bit-identical),
 - durable state (recovery checkpoints only on validated complete batches),
-- bounds (1 MiB envelope, 16 concurrent, 30 s max budget, 5 s handshake),
+- bounds actually tested here (16 concurrent, bounded oversize handler
+  results with `RESOURCE_EXHAUSTED`),
 - terminal outcomes (exactly one result per `request_id`, correct codes).
+
+Not asserted by this runner (do not claim): 1 MiB envelope cap, 30 s max
+budget, 5 s handshake deadline — no boundary test exercises them here.
 
 ## Run
 

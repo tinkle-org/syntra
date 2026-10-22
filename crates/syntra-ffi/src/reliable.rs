@@ -7,7 +7,8 @@
 //!
 //! Status codes reuse the production ABI (`SYNTRA_FFI_OK`/`INVALID`); per-RPC
 //! failures never travel as status codes. All functions are pure validation
-//! (no handles, no allocation except where noted) and are additive: existing
+//! (no handles; inputs are copied into a bounded temporary buffer of at
+//! most 256 B before validation) and are additive: existing
 //! ABI signatures are untouched.
 
 use std::slice;
@@ -17,6 +18,13 @@ use super::{SYNTRA_FFI_INVALID, SYNTRA_FFI_OK};
 fn borrow_bytes(ptr: *const u8, len: usize) -> Result<Vec<u8>, i32> {
     if len == 0 {
         return Ok(Vec::new());
+    }
+    // Bound the copy BEFORE from_raw_parts/to_vec: a hostile caller must
+    // not be able to force an arbitrarily large allocation. 256 B is the
+    // largest bound any reliable-session validator accepts
+    // (MAX_RESUME_CREDENTIAL_LEN); session/delivery ids (16 B) are covered.
+    if len > syntra_core::reliable::MAX_RESUME_CREDENTIAL_LEN {
+        return Err(SYNTRA_FFI_INVALID);
     }
     if ptr.is_null() {
         return Err(SYNTRA_FFI_INVALID);

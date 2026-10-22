@@ -88,10 +88,10 @@ pub struct ConfirmedLease { pub idle_timeout_ms: u32, pub keepalive_interval_ms:
 pub fn negotiate_lease(p: LeaseProposal) -> Result<ConfirmedLease, SyntraError> {
     let mut idle = if p.idle_timeout_ms == 0 { DEFAULT_IDLE_TIMEOUT_MS } else { p.idle_timeout_ms };
     let mut keepalive = if p.keepalive_interval_ms == 0 { DEFAULT_KEEPALIVE_MS } else { p.keepalive_interval_ms };
-    if p.idle_timeout_ms != 0 && (p.idle_timeout_ms < MIN_IDLE_TIMEOUT_MS || p.idle_timeout_ms > MAX_IDLE_TIMEOUT_MS) {
+    if p.idle_timeout_ms != 0 && p.idle_timeout_ms < MIN_IDLE_TIMEOUT_MS {
         return Err(SyntraError::Protocol { code: ErrorCode::OutOfRange, message: "idle timeout out of range".to_string() });
     }
-    if p.keepalive_interval_ms != 0 && (p.keepalive_interval_ms < MIN_KEEPALIVE_MS || p.keepalive_interval_ms > MAX_KEEPALIVE_MS) {
+    if p.keepalive_interval_ms != 0 && p.keepalive_interval_ms < MIN_KEEPALIVE_MS {
         return Err(SyntraError::Protocol { code: ErrorCode::OutOfRange, message: "keepalive interval out of range".to_string() });
     }
     if idle > MAX_IDLE_TIMEOUT_MS { idle = MAX_IDLE_TIMEOUT_MS; }
@@ -132,7 +132,7 @@ impl SessionSignal {
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReconcileOutcome { Retained, Forgotten, Unknown }
+pub enum ReconcileOutcome { Retained, Forgotten, Unknown, Pending }
 pub fn check_duplicate_content(expected_method: &str, expected_payload: &[u8], actual_method: &str, actual_payload: &[u8]) -> Result<(), SyntraError> {
     if expected_method != actual_method || expected_payload != actual_payload {
         return Err(precondition("delivery id reused with different content; rejected"));
@@ -211,6 +211,14 @@ mod tests {
         let c = negotiate_lease(LeaseProposal { idle_timeout_ms: 0, keepalive_interval_ms: 0 }).unwrap();
         assert!(c.keepalive_interval_ms < c.idle_timeout_ms);
         assert!(negotiate_lease(LeaseProposal { idle_timeout_ms: 1, keepalive_interval_ms: 1000 }).is_err());
+        // Over-maximum proposals clamp to the documented maxima.
+        let c = negotiate_lease(LeaseProposal { idle_timeout_ms: 400_000, keepalive_interval_ms: 0 }).unwrap();
+        assert_eq!(c.idle_timeout_ms, MAX_IDLE_TIMEOUT_MS);
+        assert!(c.keepalive_interval_ms < c.idle_timeout_ms);
+        let c = negotiate_lease(LeaseProposal { idle_timeout_ms: 400_000, keepalive_interval_ms: 120_000 }).unwrap();
+        assert_eq!(c.idle_timeout_ms, MAX_IDLE_TIMEOUT_MS);
+        assert_eq!(c.keepalive_interval_ms, MAX_KEEPALIVE_MS);
+        assert!(c.keepalive_interval_ms < c.idle_timeout_ms);
     }
     #[test]
     fn signals_map() {

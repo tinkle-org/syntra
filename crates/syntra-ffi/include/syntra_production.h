@@ -118,7 +118,8 @@ int32_t syntra_ffi_host_reap_expired(syntra_ffi_host_t *h,
 int32_t syntra_ffi_host_close(syntra_ffi_host_t *h);
 
 /* Reliable-session validation parity (syntra.reliable-session/1, no wire change).
- * Pure shape checks over opaque bytes; no handles, no allocation. */
+ * Pure shape checks over opaque bytes; no handles. Inputs are copied into a
+ * bounded temporary allocation (at most 256 B per call) before validation. */
 int32_t syntra_ffi_reliable_session_id_valid(const uint8_t *id, uintptr_t len);
 int32_t syntra_ffi_reliable_delivery_id_valid(const uint8_t *id, uintptr_t len);
 int32_t syntra_ffi_reliable_resume_credential_valid(const uint8_t *cred, uintptr_t len);

@@ -80,7 +80,9 @@ func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{positions: make(map[string]CommittedPosition), digests: make(map[string][]byte)}
 }
 
-// Load returns the last durably stored position for stream, or nil.
+// Load returns the last durably stored position for stream, or nil. The
+// returned position deep-copies committed bytes so callers can never alias
+// (or mutate) store state.
 func (s *MemoryStore) Load(stream string) *CommittedPosition {
 	if s == nil {
 		return nil
@@ -92,11 +94,14 @@ func (s *MemoryStore) Load(stream string) *CommittedPosition {
 		return nil
 	}
 	cp := pos
+	cp.Committed = append([]byte(nil), pos.Committed...)
 	return &cp
 }
 
 // StoreAtomic records pos and effectsDigest atomically, or records nothing
-// on injected failure. The caller must not confirm on error.
+// on injected failure. The caller must not confirm on error. Both the
+// position's committed bytes and the digest are deep-copied so later caller
+// mutation cannot alias durable state.
 func (s *MemoryStore) StoreAtomic(pos CommittedPosition, effectsDigest []byte) error {
 	if s == nil {
 		return &StoreError{Code: ErrorCodeInternal, Message: "syntra: nil store"}
@@ -107,10 +112,11 @@ func (s *MemoryStore) StoreAtomic(pos CommittedPosition, effectsDigest []byte) e
 		s.FailNext = false
 		return &StoreError{Code: ErrorCodeUnavailable, Message: "syntra: persistence unavailable"}
 	}
-	digest := make([]byte, len(effectsDigest))
-	copy(digest, effectsDigest)
+	digest := append([]byte(nil), effectsDigest...)
+	cp := pos
+	cp.Committed = append([]byte(nil), pos.Committed...)
 	s.digests[pos.Stream] = digest
-	s.positions[pos.Stream] = pos
+	s.positions[pos.Stream] = cp
 	return nil
 }
 
@@ -298,13 +304,16 @@ func NewCheckpointReconciler(cfg ReconcilerConfig) *CheckpointReconciler {
 
 // NoteObserved records the last observed (validated or completed)
 // checkpoint for the stream, including the final batch of a stream that
-// then goes idle.
+// then goes idle. Base and Result bytes are deep-copied so later caller
+// mutation cannot alias reconciler state.
 func (r *CheckpointReconciler) NoteObserved(cp Checkpoint) {
 	if r == nil {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	cp.Base = append([]byte(nil), cp.Base...)
+	cp.Result = append([]byte(nil), cp.Result...)
 	r.observed[cp.Stream] = cp
 }
 
@@ -319,40 +328,56 @@ func (r *CheckpointReconciler) Forget(stream string) {
 }
 
 // Tick reconciles up to MaxStreamsPerTick streams. For each tracked stream
-// whose last observed result differs from committed, it returns a
-// needs-recovery entry keyed by stream. Streams already converged return
-// nothing. The tick runs even when no batch arrived since the last tick.
-// At most MaxStreamsPerTick entries are returned in stream order for
-// determinism. Ticks closer than TickInterval are no-ops.
-func (r *CheckpointReconciler) Tick(now time.Time, committed func(stream string) (result []byte, ok bool)) []string {
+// whose last observed generation or result differs from committed, it
+// returns a needs-recovery entry keyed by stream. Streams already converged
+// (same generation and byte-identical result) return nothing. The tick runs
+// even when no batch arrived since the last tick. At most MaxStreamsPerTick
+// entries are returned in stream order for determinism. Ticks closer than
+// TickInterval are no-ops.
+//
+// The committed callback runs WITHOUT the reconciler lock held: it may
+// safely call back into NoteObserved/Forget without deadlocking. The
+// observed set is snapshotted under lock first; lastTick advances before
+// callbacks run so concurrent ticks stay gated.
+func (r *CheckpointReconciler) Tick(now time.Time, committed func(stream string) (result []byte, generation uint64, ok bool)) []string {
 	if r == nil {
 		return nil
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if !r.lastTick.IsZero() && now.Sub(r.lastTick) < r.config.TickInterval {
+		r.mu.Unlock()
 		return nil
 	}
 	r.lastTick = now
+	snap := make(map[string]Checkpoint, len(r.observed))
+	for s, cp := range r.observed {
+		snap[s] = Checkpoint{
+			Stream:     cp.Stream,
+			Generation: cp.Generation,
+			Base:       append([]byte(nil), cp.Base...),
+			Result:     append([]byte(nil), cp.Result...),
+		}
+	}
+	max := r.config.MaxStreamsPerTick
+	r.mu.Unlock()
 	var streams []string
-	for s := range r.observed {
+	for s := range snap {
 		streams = append(streams, s)
 	}
 	sort.Strings(streams)
 	var out []string
 	for _, s := range streams {
-		if len(out) >= r.config.MaxStreamsPerTick {
+		if max > 0 && len(out) >= max {
 			break
 		}
-		obs := r.observed[s]
-		result, ok := committed(s)
+		obs := snap[s]
+		result, gen, ok := committed(s)
 		if !ok {
 			continue
 		}
-		if string(obs.Result) == string(result) {
-			continue
+		if obs.Generation != gen || string(obs.Result) != string(result) {
+			out = append(out, s)
 		}
-		out = append(out, s)
 	}
 	return out
 }

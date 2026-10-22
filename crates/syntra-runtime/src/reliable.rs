@@ -31,7 +31,7 @@ impl StoredOutcome {
 #[derive(Debug, Clone)]
 struct RetainedEntry { method: String, payload: Vec<u8>, outcome: StoredOutcome, retained_at_ms: u64 }
 #[derive(Debug, Default)]
-struct OutcomeStore { entries: HashMap<DeliveryId, RetainedEntry>, bytes: usize, forgotten: HashMap<DeliveryId, u64> }
+struct OutcomeStore { entries: HashMap<DeliveryId, RetainedEntry>, bytes: usize, forgotten: HashMap<DeliveryId, u64>, pending: HashMap<DeliveryId, u64> }
 impl OutcomeStore {
     fn insert(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, method: String, payload: Vec<u8>, outcome: StoredOutcome) -> Result<ReconcileOutcome, SyntraError> {
         if let Some(existing) = self.entries.get(&did) {
@@ -56,7 +56,21 @@ impl OutcomeStore {
         if self.bytes.saturating_add(n) > bounds.max_retained_bytes { return Err(resource("retained result bytes exhausted")); }
         self.bytes = self.bytes.saturating_add(n);
         self.entries.insert(did, RetainedEntry { method, payload, outcome, retained_at_ms: now_ms });
+        self.pending.remove(&did);
         Ok(ReconcileOutcome::Retained)
+    }
+    fn note_dispatch(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId) -> Result<(), SyntraError> {
+        if self.entries.contains_key(&did) || self.forgotten.contains_key(&did) {
+            return Ok(());
+        }
+        if self.pending.contains_key(&did) {
+            return Ok(());
+        }
+        if self.pending.len() >= bounds.max_retained_results {
+            return Err(resource("pending dispatch budget exhausted"));
+        }
+        self.pending.insert(did, now_ms);
+        Ok(())
     }
     fn get(&self, now_ms: u64, retention_ms: u64, did: &DeliveryId) -> ReconcileOutcome {
         match self.entries.get(did) {
@@ -65,7 +79,11 @@ impl OutcomeStore {
             None => match self.forgotten.get(did) {
                 Some(&forgot_at) if now_ms.saturating_sub(forgot_at) > retention_ms => ReconcileOutcome::Unknown,
                 Some(_) => ReconcileOutcome::Forgotten,
-                None => ReconcileOutcome::Unknown,
+                None => match self.pending.get(did) {
+                    Some(&dispatched_at) if now_ms.saturating_sub(dispatched_at) > retention_ms => ReconcileOutcome::Forgotten,
+                    Some(_) => ReconcileOutcome::Pending,
+                    None => ReconcileOutcome::Unknown,
+                },
             },
         }
     }
@@ -73,10 +91,19 @@ impl OutcomeStore {
         self.entries.get(did).map(|e| e.outcome.clone())
     }
     fn forget(&mut self, bounds: &ControlBounds, now_ms: u64, did: &DeliveryId) -> bool {
+        self.pending.remove(did);
         if let Some(e) = self.entries.remove(did) {
             let f = e.method.len() + e.payload.len() + e.outcome.byte_len();
             self.bytes = self.bytes.saturating_sub(f);
             if !self.forgotten.contains_key(did) && self.forgotten.len() >= bounds.max_retained_results {
+                if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(k, _)| *k) {
+                    self.forgotten.remove(&oldest);
+                }
+            }
+            self.forgotten.insert(*did, now_ms);
+            true
+        } else if !self.forgotten.contains_key(did) {
+            if self.forgotten.len() >= bounds.max_retained_results {
                 if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(k, _)| *k) {
                     self.forgotten.remove(&oldest);
                 }
@@ -91,6 +118,20 @@ impl OutcomeStore {
             .map(|(k, _)| *k).collect();
         let n = expired.len();
         for k in expired { self.forget(bounds, now_ms, &k); }
+        let expired_pending: Vec<DeliveryId> = self.pending.iter()
+            .filter(|(_, &t)| now_ms.saturating_sub(t) > retention_ms)
+            .map(|(k, _)| *k).collect();
+        for k in expired_pending {
+            self.pending.remove(&k);
+            if !self.forgotten.contains_key(&k) {
+                if self.forgotten.len() >= bounds.max_retained_results {
+                    if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(kk, _)| *kk) {
+                        self.forgotten.remove(&oldest);
+                    }
+                }
+                self.forgotten.insert(k, now_ms);
+            }
+        }
         let expired_forgotten: Vec<DeliveryId> = self.forgotten.iter()
             .filter(|(_, &t)| now_ms.saturating_sub(t) > retention_ms)
             .map(|(k, _)| *k).collect();
@@ -104,10 +145,20 @@ struct TombstoneEntry { code: ErrorCode, retained_at_ms: u64 }
 struct TombstoneStore { entries: HashMap<DeliveryId, TombstoneEntry> }
 impl TombstoneStore {
     fn record(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, code: ErrorCode) -> Result<(), SyntraError> {
-        if !matches!(code, ErrorCode::DeadlineExceeded | ErrorCode::Cancelled | ErrorCode::Unavailable) {
-            return Err(SyntraError::Protocol { code: ErrorCode::InvalidArgument, message: "tombstones only for deadline/cancel/unavailable".to_string() });
+        // Spec (reliability): tombstones exist only for terminal
+        // DEADLINE_EXCEEDED and CANCELLED. UNAVAILABLE means unknown
+        // outcome and must stay reconcilable-as-Unknown, never tombstoned.
+        if !matches!(code, ErrorCode::DeadlineExceeded | ErrorCode::Cancelled) {
+            return Err(SyntraError::Protocol { code: ErrorCode::InvalidArgument, message: "tombstones only for deadline/cancel".to_string() });
         }
-        if !self.entries.contains_key(&did) && self.entries.len() >= bounds.max_tombstones {
+        // First-write-wins: racing deadline/cancel reports are deterministic.
+        if let Some(existing) = self.entries.get(&did) {
+            if existing.code != code {
+                return Err(failed_precondition("tombstone already recorded with different terminal code"));
+            }
+            return Ok(());
+        }
+        if self.entries.len() >= bounds.max_tombstones {
             return Err(resource("tombstone budget exhausted"));
         }
         self.entries.insert(did, TombstoneEntry { code, retained_at_ms: now_ms });
@@ -241,6 +292,21 @@ impl ReliableSessionManager {
             if total.saturating_add(1) > self.bounds.max_resume_credentials.saturating_mul(2) {
                 return Err(resource("too many resume credentials"));
             }
+            let st = inner.sessions.get(&sid).ok_or_else(|| SyntraError::Handshake {
+                code: ErrorCode::Unauthenticated, message: "unknown session".to_string() })?;
+            if st.epoch != cur { return Err(failed_precondition("concurrent attach raced epoch")); }
+            // Pre-reserve Fenced-signal capacity BEFORE committing the
+            // epoch/connection rotation: ControlQueue::push is fallible
+            // (bounded), and a post-mutation push failure must not leave a
+            // committed rotation without its fence signal (or swallow the
+            // error). Under the manager lock no concurrent mutation can
+            // invalidate this check, so the push below must succeed.
+            if st.active_connection.is_some()
+                && (inner.signals.len() >= self.bounds.max_control_queue
+                    || inner.signals.bytes.saturating_add(32) > self.bounds.max_control_bytes)
+            {
+                return Err(resource("control queue full; back off"));
+            }
             let st = inner.sessions.get_mut(&sid).ok_or_else(|| SyntraError::Handshake {
                 code: ErrorCode::Unauthenticated, message: "unknown session".to_string() })?;
             if st.epoch != cur { return Err(failed_precondition("concurrent attach raced epoch")); }
@@ -256,7 +322,9 @@ impl ReliableSessionManager {
             inner.resume_index.insert(fresh.clone(), ResumeEntry {
                 session_id: sid, principal: bp, version: bv, issued_at_ms: now_ms, expires_at_ms: exp });
             if fenced.is_some() {
-                let _ = inner.signals.push(&self.bounds, sid, SessionSignal::Fenced);
+                // Pre-reserved above: this push must succeed; propagate
+                // instead of swallowing so a bound change is never silent.
+                inner.signals.push(&self.bounds, sid, SessionSignal::Fenced)?;
             }
             Ok((proposed, lease, fenced, Some(fresh)))
         } else {
@@ -281,12 +349,18 @@ impl ReliableSessionManager {
         }
         Ok(())
     }
-    pub fn record_result(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8], method: String, payload: Vec<u8>, outcome: StoredOutcome) -> Result<ReconcileOutcome, SyntraError> {
+    pub fn record_result(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], method: String, payload: Vec<u8>, outcome: StoredOutcome) -> Result<ReconcileOutcome, SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
         if payload.len() > syntra_core::MAX_FRAME_BYTES { return Err(resource("payload exceeds envelope bound")); }
         let mut inner = self.lock()?;
         let st = inner.sessions.get_mut(&sid).ok_or_else(|| failed_precondition("unknown session for result"))?;
+        // Fencing: a connection fenced by a newer attach (epoch advanced)
+        // must not complete work. Callers pass the epoch they attached at;
+        // anything stale is rejected before any outcome mutation.
+        if st.epoch != expected_epoch {
+            return Err(failed_precondition("stale attachment epoch; fenced connection cannot complete"));
+        }
         st.last_activity_ms = now_ms;
         st.outcomes.insert(&self.bounds, now_ms, did, method, payload, outcome)
     }
@@ -296,21 +370,50 @@ impl ReliableSessionManager {
         let inner = self.lock()?;
         let st = inner.sessions.get(&sid).ok_or_else(|| failed_precondition("unknown session for reconcile"))?;
         let o = st.outcomes.get(now_ms, self.bounds.result_retention_ms, &did);
-        let stored = match o { ReconcileOutcome::Retained => st.outcomes.outcome_of(&did), _ => None };
+        // Tombstones are terminal too: an outcome with no retained result
+        // but a live tombstone reconciles to the tombstoned error instead
+        // of Unknown, so a retry after deadline/cancel observes the
+        // terminal code rather than re-dispatching forever.
+        let (o, stored) = match o {
+            ReconcileOutcome::Retained => (o, st.outcomes.outcome_of(&did)),
+            ReconcileOutcome::Unknown => match st.tombstones.get(now_ms, self.bounds.tombstone_retention_ms, &did) {
+                Some(code) => (ReconcileOutcome::Retained, Some(StoredOutcome::Error {
+                    code, message: "terminal outcome retained as tombstone".to_string(),
+                })),
+                None => (ReconcileOutcome::Unknown, None),
+            },
+            ReconcileOutcome::Forgotten => (o, None),
+            ReconcileOutcome::Pending => (o, None),
+        };
         Ok((o, stored))
     }
-    pub fn forget(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8]) -> Result<bool, SyntraError> {
+    pub fn forget(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8]) -> Result<bool, SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
         let mut inner = self.lock()?;
         let st = inner.sessions.get_mut(&sid).ok_or_else(|| failed_precondition("unknown session for forget"))?;
+        if st.epoch != expected_epoch {
+            return Err(failed_precondition("stale attachment epoch; fenced connection cannot forget"));
+        }
         Ok(st.outcomes.forget(&self.bounds, now_ms, &did))
     }
-    pub fn record_tombstone(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8], code: ErrorCode) -> Result<(), SyntraError> {
+    pub fn note_dispatch(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8]) -> Result<(), SyntraError> {
+        let sid = validate_session_id(session_id)?;
+        let did = validate_delivery_id(delivery_id)?;
+        let mut inner = self.lock()?;
+        let st = inner.sessions.get_mut(&sid).ok_or_else(|| failed_precondition("unknown session for dispatch"))?;
+        st.last_activity_ms = now_ms;
+        st.outcomes.note_dispatch(&self.bounds, now_ms, did)
+    }
+    pub fn record_tombstone(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], code: ErrorCode) -> Result<(), SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
         let mut inner = self.lock()?;
         let st = inner.sessions.get_mut(&sid).ok_or_else(|| failed_precondition("unknown session for tombstone"))?;
+        if st.epoch != expected_epoch {
+            return Err(failed_precondition("stale attachment epoch; fenced connection cannot tombstone"));
+        }
+        st.outcomes.pending.remove(&did);
         st.tombstones.record(&self.bounds, now_ms, did, code)
     }
     pub fn tombstone_of(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8]) -> Result<Option<ErrorCode>, SyntraError> {
@@ -464,10 +567,10 @@ mod tests {
         let did = [7u8; 16];
         let (o, _) = m.reconcile(1_002, &sid.0, &did).expect("r");
         assert_eq!(o, ReconcileOutcome::Unknown);
-        m.record_result(1_003, &sid.0, &did, "/example.Echo/Echo".to_string(), b"h".to_vec(), StoredOutcome::Payload(b"h".to_vec())).expect("rec");
+        m.record_result(1_003, &sid.0, 1, &did, "/example.Echo/Echo".to_string(), b"h".to_vec(), StoredOutcome::Payload(b"h".to_vec())).expect("rec");
         let (o2, _) = m.reconcile(1_004, &sid.0, &did).expect("r2");
         assert_eq!(o2, ReconcileOutcome::Retained);
-        assert!(m.record_result(1_005, &sid.0, &did, "/example.Echo/Echo".to_string(), b"x".to_vec(), StoredOutcome::Payload(b"x".to_vec())).is_err());
+        assert!(m.record_result(1_005, &sid.0, 1, &did, "/example.Echo/Echo".to_string(), b"x".to_vec(), StoredOutcome::Payload(b"x".to_vec())).is_err());
         let (o3, _) = m.reconcile(61_003 + 1_003, &sid.0, &did).expect("r3");
         assert_eq!(o3, ReconcileOutcome::Forgotten);
     }
@@ -476,8 +579,35 @@ mod tests {
         let m = manager();
         let (sid, _, _, _) = m.create_session(1_000, "svc-a".to_string(), 1, proposal()).expect("create");
         m.attach(1_001, &sid.0, &[], "conn-1".to_string(), "svc-a", 1, proposal()).expect("attach");
-        m.record_tombstone(1_002, &sid.0, &[11u8; 16], ErrorCode::DeadlineExceeded).expect("t");
+        m.record_tombstone(1_002, &sid.0, 1, &[11u8; 16], ErrorCode::DeadlineExceeded).expect("t");
         assert_eq!(m.tombstone_of(1_003, &sid.0, &[11u8; 16]).expect("l"), Some(ErrorCode::DeadlineExceeded));
+        // UNAVAILABLE is unknown-outcome, never tombstoned.
+        assert!(m.record_tombstone(1_004, &sid.0, 1, &[12u8; 16], ErrorCode::Unavailable).is_err());
+        // A live tombstone reconciles to the terminal error, not Unknown.
+        let (o, stored) = m.reconcile(1_005, &sid.0, &[11u8; 16]).expect("reconcile tombstone");
+        assert_eq!(o, ReconcileOutcome::Retained);
+        match stored {
+            Some(StoredOutcome::Error { code, .. }) => assert_eq!(code, ErrorCode::DeadlineExceeded),
+            other => panic!("expected tombstoned error, got {other:?}"),
+        }
+    }
+    #[test]
+    fn fenced_connection_cannot_complete() {
+        let m = manager();
+        let (sid, _, cred, _) = m.create_session(1_000, "svc-a".to_string(), 1, proposal()).expect("create");
+        m.attach(1_001, &sid.0, &[], "conn-1".to_string(), "svc-a", 1, proposal()).expect("first");
+        // Advance the epoch: conn-1 is now fenced.
+        let (e2, _, _, rotated) = m.attach(1_002, &sid.0, &cred, "conn-2".to_string(), "svc-a", 1, proposal()).expect("resume");
+        assert_eq!(e2, 2);
+        let _ = rotated;
+        let did = [9u8; 16];
+        // Stale epoch (conn-1) cannot record, forget, or tombstone.
+        assert!(m.record_result(1_003, &sid.0, 1, &did, "/a/B/C".to_string(), b"p".to_vec(), StoredOutcome::Payload(b"p".to_vec())).is_err());
+        assert!(m.forget(1_003, &sid.0, 1, &did).is_err());
+        assert!(m.record_tombstone(1_003, &sid.0, 1, &did, ErrorCode::Cancelled).is_err());
+        // Current epoch (conn-2) works.
+        m.record_result(1_004, &sid.0, 2, &did, "/a/B/C".to_string(), b"p".to_vec(), StoredOutcome::Payload(b"p".to_vec())).expect("current epoch records");
+        assert!(m.forget(1_005, &sid.0, 2, &did).expect("current epoch forgets"));
     }
     #[test]
     fn idle_and_drain_bounded() {

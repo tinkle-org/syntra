@@ -5,6 +5,7 @@
 # every run reproduces byte-identically.
 format_version: "1.0"
 runner: "syntra-conformance-runner v1"
+validated_by: "conformance/runner/runner.py:load_scenarios (seed + fault matrix loaded at startup; matrix descriptive where legs differ — see fault_injection rules and notes)"
 pairings:
   - id: rust-async
     description: "async Rust tokio runtime via syntra-runtime::loopback_pair"
@@ -23,7 +24,7 @@ scenarios:
     steps: ["handshake", "16 concurrent echo with distinct ids", "assert all correlate by id", "assert out-of-order completion legal"]
   - id: SC-CANCEL-WINS
     name: "cancel before completion yields CANCELLED; completion wins race"
-    steps: ["handshake", "slow handler", "cancel id 1", "assert terminal CANCELLED exactly once", "assert no second result after handler returns", "assert connection usable"]
+    steps: ["handshake", "slow handler", "cancel id 1", "assert terminal CANCELLED exactly once", "assert no second result after handler returns", "assert connection usable", "fast handler id 2 completes before cancel arrives", "assert exactly one success for id 2", "assert late cancel after terminal tolerated with no second outcome"]
   - id: SC-DEADLINE
     name: "budget expiry yields exactly one DEADLINE_EXCEEDED"
     steps: ["handshake", "slow handler 300ms, budget 50ms", "assert client DEADLINE_EXCEEDED", "assert host auto-enqueues exactly one DEADLINE_EXCEEDED", "assert no duplicate after late handler", "assert unknown-outcome semantics"]
@@ -47,7 +48,7 @@ scenarios:
     steps: ["handshake", "start slow RPC", "emit events", "assert RPC completes with payload", "assert events in order", "assert overflow drops newest with cumulative loss"]
   - id: SC-GRACEFUL-CLOSE
     name: "graceful close draining per SNTR-HS-006/013"
-    steps: ["handshake", "complete echo", "initiate graceful close", "assert CLOSING then CLOSED", "assert queued results delivered before loss mapping", "assert new RPCs rejected FailedPrecondition", "assert per-connection state discarded"]
+    steps: ["handshake", "blocking handler id 9", "initiate graceful close while result queued", "release handler", "assert queued result drained before CLOSED", "assert CLOSING then CLOSED", "assert new RPCs rejected FailedPrecondition", "assert per-connection state discarded"]
   - id: SC-TRANSPORT-LOSS
     name: "abrupt loss maps in-flight to UNAVAILABLE unknown-outcome"
     steps: ["handshake", "blocking RPC outstanding", "transport lost", "assert UNAVAILABLE", "assert unknown-outcome", "assert reconnect needs fresh handshake"]
@@ -63,9 +64,11 @@ fault_injection:
     - "exactly-once terminal preserved under all faults (no zero, no two results)"
     - "wire bytes validated before and after faults (ValidateFrame, size bounds)"
     - "durable state (StreamRecovery checkpoints) advances only on validated batches"
+    - "matrix is descriptive until legs converge: go leg drops notifications only (1/64) and duplicates any frame (1/128) with no truncate/delay; rust leg drops/duplicates/truncates any transport unit (1/64, 1/128, 1/96); delay 5ms send unimplemented — legs must converge on the target matrix"
 verdicts: ["PASS", "FAIL", "SKIP"]
 notes:
   - "Wire payloads: decoded Frame equality, opaque bytes bit-identical, no byte-equality across encoders (SNTR-SER-002)."
   - "Durable state: recovery coordinator checkpoints only on validated complete batches; gaps map to GapDetected."
   - "Bounds: 1MiB envelope, 16 concurrent, 30s max budget, 5s handshake — all enforced, all documented."
   - "Terminal outcomes: exactly one result per id; codes CANCELLED/DEADLINE_EXCEEDED/UNAVAILABLE/RESOURCE_EXHAUSTED per scenario."
+  - "Fault matrix target (drop 1/64 notifications, duplicate 1/128 results, truncate 1/256 inbound-bytes, delay 5ms send) is descriptive: implemented legs differ per the rules above; runner.py:load_scenarios prints the matrix every run so drift is visible."

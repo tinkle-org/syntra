@@ -57,7 +57,7 @@ impl RecoveryAuthorizer for AllowAll {
 #[test]
 fn persistence_failure_retries_from_last_committed() {
     let mut d = InitiatorDriver::new(ctx("c1"), 16);
-    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec());
+    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec()).unwrap();
     let batch = cp(b"s", 7, b"c-40", b"c-43");
     let offered = d.on_batch_validated(batch.clone());
     assert!(matches!(offered[0], ProfileAction::CommitCheckpoint { .. }));
@@ -73,7 +73,7 @@ fn persistence_failure_retries_from_last_committed() {
 #[test]
 fn lost_confirm_discovered_by_reconciliation_without_new_update() {
     let mut d = InitiatorDriver::new(ctx("c1"), 16);
-    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec());
+    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec()).unwrap();
     let batch = cp(b"s", 7, b"c-40", b"c-43");
     let offered = d.on_batch_validated(batch.clone());
     assert!(matches!(offered[0], ProfileAction::CommitCheckpoint { .. }));
@@ -93,7 +93,7 @@ fn lost_confirm_discovered_by_reconciliation_without_new_update() {
 #[test]
 fn snapshot_failure_never_advances_generation() {
     let mut d = InitiatorDriver::new(ctx("c1"), 16);
-    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec());
+    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec()).unwrap();
     d.stage_snapshot(
         b"s".to_vec(),
         b"h1".to_vec(),
@@ -102,11 +102,11 @@ fn snapshot_failure_never_advances_generation() {
         1024,
     )
     .unwrap();
-    d.stage_snapshot_page(b"s", 0, b"half".to_vec(), b"b-100").unwrap();
+    d.stage_snapshot_page(b"s", b"h1", 0, b"half".to_vec(), b"b-100").unwrap();
     assert!(d.install_snapshot(b"s", 8).is_err());
     assert_eq!(d.engine().generation(b"s"), Some(7));
     assert_eq!(d.engine().committed(b"s"), Some(b"c-40".as_slice()));
-    d.stage_snapshot_page(b"s", 1, b"rest".to_vec(), b"b-100").unwrap();
+    d.stage_snapshot_page(b"s", b"h1", 1, b"rest".to_vec(), b"b-100").unwrap();
     let (snap_cp, snap_bytes) = d.install_snapshot(b"s", 8).unwrap();
     assert_eq!(snap_cp.result_cursor, b"b-100");
     assert_eq!(snap_bytes, b"halfrest");
@@ -130,14 +130,16 @@ fn directed_delivery_isolates_subscription_handles() {
         predecessor: b"c-40".to_vec(),
         result: b"c-43".to_vec(),
         payload: b"batch-a".to_vec(),
+        generation: 7,
     });
     h.append_batch(b"stream-b".to_vec(), StoredBatch {
         predecessor: b"d-40".to_vec(),
         result: b"d-43".to_vec(),
         payload: b"batch-b".to_vec(),
+        generation: 7,
     });
-    let (ha, _) = h.subscribe(b"stream-a".to_vec(), b"c-40".to_vec()).unwrap();
-    let (hb, _) = h.subscribe(b"stream-b".to_vec(), b"d-40".to_vec()).unwrap();
+    let (ha, _) = h.subscribe(b"stream-a".to_vec(), b"c-40".to_vec(), 7).unwrap();
+    let (hb, _) = h.subscribe(b"stream-b".to_vec(), b"d-40".to_vec(), 7).unwrap();
     assert_ne!(ha, hb);
     let env_a = h.directed_delivery(&ha, b"batch-a".to_vec()).unwrap();
     assert_eq!(env_a.subscription_handle, ha);
@@ -154,7 +156,7 @@ fn directed_delivery_isolates_subscription_handles() {
 #[test]
 fn final_batch_loss_with_idle_peers_recovers_via_loss_and_reconcile() {
     let mut d = InitiatorDriver::new(ctx("c1"), 16);
-    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec());
+    d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec()).unwrap();
     assert!(d.poll_loss(b"s", 0).is_empty());
     let gap = d.poll_loss(b"s", 1);
     assert!(matches!(gap[0], ProfileAction::RecoveryNeeded { .. }));
