@@ -1,4 +1,4 @@
-# Portable recovery cases. Prose companion: recovery.md (CONF-URP-001…008).
+# Portable recovery cases. Prose companion: recovery.md (CONF-URP-001…009).
 # Optionality rule: any case whose capabilities are unadvertised MUST yield
 # UNSUPPORTED (correct UNIMPLEMENTED refusal) or SKIP — never FAIL.
 format_version: "1.0"
@@ -29,7 +29,8 @@ cases:
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Duplicate tolerance: initiator tolerates the duplicate across the recovered and live boundary with no violation and no error storm. SKIP when unclaimed."
+      hygiene: {absent_from: [violation, error_storm]}
+    notes: "Duplicate tolerance across the recovered and live boundary: initiator tolerates the duplicate with no violation and no error storm. SKIP when unclaimed."
 
   - id: CONF-URP-003
     requirement: [SNTR-EVENT-006, SNTR-EVENT-021]
@@ -42,7 +43,9 @@ cases:
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Gap detection: initiator detects the gap by predecessor chaining without arithmetic on checkpoint bytes and without structural parsing. SKIP when unclaimed."
+      hygiene: {absent_from: [increment, decrement, parse_checkpoint]}
+      retry: "initiator issues replay for the missing batch"
+    notes: "Gap detection by predecessor chaining without arithmetic on checkpoint bytes and without structural parsing; initiator requests recovery for the missing batch. SKIP when unclaimed."
 
   - id: CONF-URP-004
     requirement: [SNTR-EVENT-008, SNTR-EVENT-009]
@@ -68,8 +71,9 @@ cases:
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-      error: {code: FAILED_PRECONDITION}
-    notes: "Expired continuation: replay from the expired checkpoint yields FAILED_PRECONDITION with snapshot-required signal. Recovery follows the snapshot path, never silent restart. SKIP when unclaimed."
+      error: {code: FAILED_PRECONDITION, message_pattern: snapshot}
+      hygiene: {absent_from: [silent_restart]}
+    notes: "Expired continuation with snapshot-required signal: replay from the expired checkpoint yields FAILED_PRECONDITION carrying the snapshot-required signal; the signal marker is required in the error detail so the case fails when the signal is absent. Recovery follows the snapshot path, never silent restart. SKIP when unclaimed."
 
   - id: CONF-URP-006
     requirement: [SNTR-EVENT-008]
@@ -106,9 +110,25 @@ cases:
     capabilities: [update-recovery-v1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed, flood_ready]
-    input: {faults: {flood_events: true}}
+    input: {faults: {flood_events: true, overflow_policy: reject_new_work}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       error: {code: RESOURCE_EXHAUSTED}
-    notes: "Overflow explicit loss: saturation yields RESOURCE_EXHAUSTED and/or explicit continuity loss with a new generation. Never unbounded queueing and never silent truncation. SKIP when unclaimed."
+      hygiene: {absent_from: [unbounded_queue, silent_truncation]}
+    notes: "Overflow reject-new-work outcome, selected when the host documents the reject-new-work policy. Saturation yields RESOURCE_EXHAUSTED with documented backoff. Conditional alternative is CONF-URP-009 explicit continuity loss with a new generation; satisfying either satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."
+
+  - id: CONF-URP-009
+    requirement: [SNTR-EVENT-030, SNTR-REL-007]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed, flood_ready]
+    input: {faults: {flood_events: true, overflow_policy: continuity_loss}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames: [{request_id: 0, body: notification}]
+      hygiene: {absent_from: [unbounded_queue, silent_truncation]}
+    notes: "Overflow continuity-loss outcome, selected when the host documents the continuity-loss policy. Saturation ends only the affected stream with an observable notification carrying the explicit continuity-loss signal and a new generation. Conditional alternative is CONF-URP-008 RESOURCE_EXHAUSTED; satisfying either satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."

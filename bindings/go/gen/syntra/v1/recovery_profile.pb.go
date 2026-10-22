@@ -261,8 +261,11 @@ type RecoveryReplayPage struct {
 	// catchup_boundary is the live boundary being approached. Opaque bytes, at
 	// most 4096 bytes.
 	CatchupBoundary []byte `protobuf:"bytes,6,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
-	// batch_payloads holds opaque batch bytes. At most 64 entries, each at most
-	// 262144 bytes, total at most 262144 bytes.
+	// batch_payloads holds one serialized RecoveryBatch per entry. At most 64
+	// entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
+	// MUST validate each entry as a RecoveryBatch with matching generation and
+	// predecessor/result checkpoint continuity through the same pipeline as live
+	// batches.
 	BatchPayloads [][]byte `protobuf:"bytes,7,rep,name=batch_payloads,json=batchPayloads,proto3" json:"batch_payloads,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -873,8 +876,16 @@ type RecoveryBatchTrailer struct {
 	// snapshot_required is true when the requested checkpoint is outside retention
 	// and replay cannot complete.
 	SnapshotRequired bool `protobuf:"varint,7,opt,name=snapshot_required,json=snapshotRequired,proto3" json:"snapshot_required,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// terminated is true when the host ends the targeted subscription. The trailer
+	// carries the typed terminal signal so the host can terminate one stream even
+	// when there is no outstanding invocation.
+	Terminated bool `protobuf:"varint,8,opt,name=terminated,proto3" json:"terminated,omitempty"`
+	// terminate_reason carries the required machine-readable reason when terminated
+	// is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
+	// means no termination.
+	TerminateReason []byte `protobuf:"bytes,9,opt,name=terminate_reason,json=terminateReason,proto3" json:"terminate_reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RecoveryBatchTrailer) Reset() {
@@ -956,6 +967,20 @@ func (x *RecoveryBatchTrailer) GetSnapshotRequired() bool {
 	return false
 }
 
+func (x *RecoveryBatchTrailer) GetTerminated() bool {
+	if x != nil {
+		return x.Terminated
+	}
+	return false
+}
+
+func (x *RecoveryBatchTrailer) GetTerminateReason() []byte {
+	if x != nil {
+		return x.TerminateReason
+	}
+	return nil
+}
+
 var File_syntra_v1_recovery_profile_proto protoreflect.FileDescriptor
 
 const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
@@ -1029,7 +1054,7 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"generation\x125\n" +
 	"\x16predecessor_checkpoint\x18\x04 \x01(\fR\x15predecessorCheckpoint\x12+\n" +
 	"\x11result_checkpoint\x18\x05 \x01(\fR\x10resultCheckpoint\x12#\n" +
-	"\rbatch_payload\x18\x06 \x01(\fR\fbatchPayload\"\xc2\x02\n" +
+	"\rbatch_payload\x18\x06 \x01(\fR\fbatchPayload\"\x8d\x03\n" +
 	"\x14RecoveryBatchTrailer\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
@@ -1039,7 +1064,11 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\x13boundary_checkpoint\x18\x04 \x01(\fR\x12boundaryCheckpoint\x12'\n" +
 	"\x0fnext_generation\x18\x05 \x01(\x04R\x0enextGeneration\x12)\n" +
 	"\x10catchup_complete\x18\x06 \x01(\bR\x0fcatchupComplete\x12+\n" +
-	"\x11snapshot_required\x18\a \x01(\bR\x10snapshotRequiredB?Z=github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1b\x06proto3"
+	"\x11snapshot_required\x18\a \x01(\bR\x10snapshotRequired\x12\x1e\n" +
+	"\n" +
+	"terminated\x18\b \x01(\bR\n" +
+	"terminated\x12)\n" +
+	"\x10terminate_reason\x18\t \x01(\fR\x0fterminateReasonB?Z=github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1b\x06proto3"
 
 var (
 	file_syntra_v1_recovery_profile_proto_rawDescOnce sync.Once

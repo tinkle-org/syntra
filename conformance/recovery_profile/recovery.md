@@ -1,4 +1,4 @@
-# Conformance — update and recovery (`CONF-URP-001…008`)
+# Conformance — update and recovery (`CONF-URP-001…009`)
 
 Related normative requirements are cited per case; test IDs are not normative.
 Neutral fixtures only: generic subscription, generic key and value read,
@@ -89,7 +89,17 @@ Related event coverage is in [event conformance](../events/events.md).
 - Related normative requirement: SNTR-EVENT-030, SNTR-REL-007.
 - Preconditions: ACTIVE; subscription confirmed; bounded buffer ready for flood.
 - Input: Host produces batches faster than the Initiator consumes.
-- Expected output: `RESOURCE_EXHAUSTED` on new work and/or explicit continuity loss with a new generation; never unbounded queueing; never silent truncation without the documented signal.
+- Expected output: `RESOURCE_EXHAUSTED` on new work with documented backoff (this case covers the reject-new-work outcome; `CONF-URP-009` covers the permitted continuity-loss alternative); never unbounded queueing; never silent truncation without the documented signal.
+- Expected connection state: ACTIVE.
+- Expected session state: unchanged.
+- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+
+## CONF-URP-009 overflow with continuity loss
+
+- Related normative requirement: SNTR-EVENT-030, SNTR-REL-007.
+- Preconditions: ACTIVE; subscription confirmed; bounded buffer ready for flood.
+- Input: Host produces batches faster than the Initiator consumes.
+- Expected output: explicit continuity loss with a new generation ending only the affected stream (this case covers the continuity-loss alternative; `CONF-URP-008` covers the permitted `RESOURCE_EXHAUSTED` alternative); never unbounded queueing; never silent truncation without the documented signal.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
@@ -129,6 +139,7 @@ Initiator                              Host
 | CONF-URP-005 | EVENT-009 (expired continuation) |
 | CONF-URP-006 | EVENT-008 (snapshot install gate) |
 | CONF-URP-007 | SESS-008, EVENT-020 (reconnect) |
-| CONF-URP-008 | EVENT-030, REL-007 (overflow) |
+| CONF-URP-008 | EVENT-030, REL-007 (overflow reject-new-work) |
+| CONF-URP-009 | EVENT-030, REL-007 (overflow continuity loss) |
 
 Further detail is in [profile readme](README.md).

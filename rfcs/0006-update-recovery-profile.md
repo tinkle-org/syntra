@@ -67,13 +67,15 @@ changes.
 - New/changed requirements with IDs (prefix `SYN-URP`):
 
   - Initiator obligations:
-    - `SYN-URP-001` — The initiator MUST NOT use any profile operation
+    - `SYN-URP-001` — The initiator MUST NOT use any profile operation,
+      except the standardized profile negotiation invocation after ACTIVE,
       before the profile capability is confirmed for the connection. The
       initiator MUST negotiate the profile after ACTIVE through the
       standardized generic RPC defined by this profile, MUST handle
       partial acceptance by falling back to mandatory-only operation
       (plus any previously confirmed options), and MUST NOT send profile
-      payloads for an unconfirmed capability.
+      payloads for an unconfirmed capability. The negotiation invocation
+      itself is the only permitted profile operation before confirmation.
     - `SYN-URP-002` — The initiator MUST treat every profile payload as
       versioned bytes carried inside existing `RpcRequest.payload`,
       `RpcResult.payload`, or `Notification.payload`. The initiator MUST
@@ -106,9 +108,10 @@ changes.
       keep connection state separate from per-stream state, MUST tear
       down only the targeted subscription on a per-stream terminal
       signal, and MUST re-establish subscriptions explicitly after the
-      connection ends (no implicit continuity), carrying forward only
-      the last confirmed checkpoint bytes where the stream specification
-      permits.
+      connection ends with a fresh connection-scoped handle and no
+      implicit continuity, carrying forward only the last confirmed
+      checkpoint bytes bound to the same stable stream identity where
+      the stream specification permits.
     - `SYN-URP-007` — The initiator MUST enforce its bounds (pending
       calls, subscriptions, queued bytes, page sizes), MUST back off on
       `RESOURCE_EXHAUSTED`, MUST accept an explicit continuity-loss
@@ -136,8 +139,13 @@ changes.
       per confirmed subscription, MUST assign one continuity generation
       per stream, MUST increment the generation on every continuity loss
       (overflow, retention expiry, revocation-driven reset, or snapshot
-      rebase), and MUST bind every checkpoint to exactly one
-      (stream, generation) pair. Checkpoints from a prior generation
+      rebase), and MUST bind every checkpoint to exactly one stable
+      stream identity and generation pair. The stable stream identity
+      is the stream selected by the stream selector and persists across
+      reconnects, separate from the connection-scoped subscription
+      handle which is fresh per subscription. A checkpoint from a prior
+      subscription for the same stable identity MAY resume when the
+      generation is still valid; checkpoints from a prior generation
       MUST be rejected with `FAILED_PRECONDITION`, never reinterpreted
       under the new generation.
     - `SYN-URP-013` — The host MUST emit opaque checkpoints with explicit

@@ -10,7 +10,7 @@ coverage that is evaluated when the capability is claimed.
 
 ## Files
 
-- [recovery prose](recovery.md) — human-readable cases `CONF-URP-001…008`.
+- [recovery prose](recovery.md) — human-readable cases `CONF-URP-001…009`.
 - [recovery machine snippet](recovery.yaml) — machine-readable cases for runners.
 - Related event material: [event conformance](../events/events.md).
 - Manifest guidance: [manifest format](../manifest/README.md).
@@ -58,7 +58,8 @@ Expected states use only the closed vocabularies for connection and session:
 | `CONF-URP-005` | Expired continuation with snapshot-required |
 | `CONF-URP-006` | Snapshot install gate |
 | `CONF-URP-007` | Reconnect re-subscribe |
-| `CONF-URP-008` | Overflow with explicit loss |
+| `CONF-URP-008` | Overflow with explicit loss (reject-new-work) |
+| `CONF-URP-009` | Overflow with explicit loss (continuity loss) |
 
 Details are in [recovery prose](recovery.md). Neutral fixtures only:
 generic subscription, generic key and value read, and echo round trip.

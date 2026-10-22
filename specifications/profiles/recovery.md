@@ -35,7 +35,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 ### 2.1 Initiator obligations
 
-**SYN-URP-001** — The initiator MUST NOT use any profile operation before the profile capability is confirmed for the connection. The initiator MUST negotiate the profile after ACTIVE through the standardized generic invocation defined by the profile, MUST handle partial acceptance by falling back to mandatory-only operation plus any previously confirmed options, and MUST NOT send profile payloads for an unconfirmed capability.
+**SYN-URP-001** — The initiator MUST NOT use any profile operation, except the standardized profile negotiation invocation after ACTIVE, before the profile capability is confirmed for the connection. The initiator MUST negotiate the profile after ACTIVE through the standardized generic invocation defined by the profile, MUST handle partial acceptance by falling back to mandatory-only operation plus any previously confirmed options, and MUST NOT send profile payloads for an unconfirmed capability. The negotiation invocation itself is the only permitted profile operation before confirmation.
 
 **SYN-URP-002** — The initiator MUST treat every profile payload as versioned bytes carried inside existing `RpcRequest` payload, `RpcResult` payload, or `Notification` payload. The initiator MUST NOT require any new `Frame` body variant, field number, or field name, and MUST preserve and respect reserved numbers 16, 17 and reserved names `event`, `resume`, `ack`.
 
@@ -45,7 +45,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 **SYN-URP-005** — The initiator MUST follow the commit sequence receive → validate → offer → persist → confirm: receive the batch, validate it through the same pipeline as live batches, offer it to the application above Syntra, persist the resulting checkpoint through the application persistence point, and only then confirm the checkpoint through the defined generic invocation. Transport receipt or envelope decode MUST NOT be reported as committed progress or as application success.
 
-**SYN-URP-006** — The initiator MUST route each received batch to exactly the subscription whose opaque handle it accompanies, MUST keep connection state separate from per-stream state, MUST tear down only the targeted subscription on a per-stream terminal signal, and MUST re-establish subscriptions explicitly after the connection ends with no implicit continuity, carrying forward only the last confirmed checkpoint bytes where the stream specification permits.
+**SYN-URP-006** — The initiator MUST route each received batch to exactly the subscription whose opaque handle it accompanies, MUST keep connection state separate from per-stream state, MUST tear down only the targeted subscription on a per-stream terminal signal, and MUST re-establish subscriptions explicitly after the connection ends with a fresh connection-scoped handle and no implicit continuity, carrying forward only the last confirmed checkpoint bytes bound to the same stable stream identity where the stream specification permits.
 
 **SYN-URP-007** — The initiator MUST enforce its bounds for pending invocations, subscriptions, queued bytes, and page sizes, MUST back off on `RESOURCE_EXHAUSTED`, MUST accept an explicit continuity-loss signal with a new generation as the only overflow path, and MUST NOT silently accept truncated history as complete.
 
@@ -55,7 +55,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 **SYN-URP-011** — The host MUST implement negotiation, subscribe, replay, catch-up, snapshot, continuation, confirm, and terminate operations as standardized generic invocations with versioned payloads inside existing envelopes. The host MUST NOT add envelope fields, MUST NOT reuse reserved numbers 16, 17 or reserved names `event`, `resume`, `ack`, and MUST keep unknown profile fields ignored on receipt where explicitly marked ignorable, rejecting unknown profile operations with `UNIMPLEMENTED`.
 
-**SYN-URP-012** — The host MUST maintain independent logical streams per confirmed subscription, MUST assign one continuity generation per stream, MUST increment the generation on every continuity loss from overflow, retention expiry, revocation-driven reset, or snapshot rebase, and MUST bind every checkpoint to exactly one stream and generation pair. Checkpoints from a prior generation MUST be rejected with `FAILED_PRECONDITION`, never reinterpreted under the new generation.
+**SYN-URP-012** — The host MUST maintain independent logical streams per confirmed subscription, MUST assign one continuity generation per stream, MUST increment the generation on every continuity loss from overflow, retention expiry, revocation-driven reset, or snapshot rebase, and MUST bind every checkpoint to exactly one stable stream identity and generation pair. The stable stream identity is the stream selected by the stream selector and persists across reconnects, separate from the connection-scoped subscription handle which is fresh per subscription. A checkpoint from a prior subscription for the same stable identity MAY resume when the generation is still valid. Checkpoints from a prior generation MUST be rejected with `FAILED_PRECONDITION`, never reinterpreted under the new generation.
 
 **SYN-URP-013** — The host MUST emit opaque checkpoints with explicit predecessor/result semantics on every batch: each batch states the predecessor checkpoint it continues from and the result checkpoint it advances to. The host MUST NOT require the initiator to compute a successor, and MUST reject forged, malformed, cross-stream, cross-generation, or cross-principal checkpoint bytes with `FAILED_PRECONDITION`, or `UNAUTHENTICATED` where token-like, without leaking other principals' stream state.
 
@@ -75,13 +75,13 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 A subscription is established only by generic invocation after ACTIVE. The stream is the delivery sequence of exactly one subscription. One subscription maps to exactly one independent logical stream. Multiplexing of multiple subscriptions over one connection is multiplexing of independent streams, each with its own handle, generation, checkpoint, catch-up phase, and routing entry.
 
-The opaque handle is returned inside `RpcResult` payload and is carried inside each profile batch payload so the initiator can route to exactly one subscription. The core does not interpret the handle. Handles are connection-scoped by default. A new subscription yields a new handle. Handles are not reused across connections unless a future accepted specification explicitly binds them. The handle authorizes nothing by itself. Delivery begins only after host confirmation.
+The opaque handle is returned inside `RpcResult` payload and is carried inside each profile batch payload so the initiator can route to exactly one subscription. The core does not interpret the handle. Handles are connection-scoped by default. A new subscription yields a new handle. Handles are not reused across connections. The stable stream identity selected by the stream selector persists across reconnects and is separate from the handle; a prior confirmed checkpoint bound to the same stable identity may resume under a new handle when the generation is still valid. The handle authorizes nothing by itself. Delivery begins only after host confirmation.
 
 Per-stream termination affects only the targeted subscription. Connection end discards all per-stream state. Re-establishment after connection end is explicit re-subscription. No stream survives its connection by default, consistent with [events](../core/events.md) session-loss behavior. Pending batches may still arrive after termination by race. Initiators tolerate post-termination batches.
 
 ## 4. Opaque checkpoint predecessor and result rules
 
-Checkpoints are opaque bytes to Syntra. Initiators present exact bytes. Hosts bind bytes to exactly one stream and generation pair.
+Checkpoints are opaque bytes to Syntra. Initiators present exact bytes. Hosts bind bytes to exactly one stable stream identity and generation pair.
 
 Each batch carries both a predecessor checkpoint and a result checkpoint. The predecessor states what the batch continues from. The result states what the batch advances to. Gaps are detectable by predecessor chaining without arithmetic. No peer computes a successor by increment or ordering inference. No peer parses checkpoint structure.
 

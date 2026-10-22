@@ -333,8 +333,11 @@ pub struct RecoveryReplayPage {
     /// most 4096 bytes.
     #[prost(bytes="vec", tag="6")]
     pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
-    /// batch_payloads holds opaque batch bytes. At most 64 entries, each at most
-    /// 262144 bytes, total at most 262144 bytes.
+    /// batch_payloads holds one serialized RecoveryBatch per entry. At most 64
+    /// entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
+    /// MUST validate each entry as a RecoveryBatch with matching generation and
+    /// predecessor/result checkpoint continuity through the same pipeline as live
+    /// batches.
     #[prost(bytes="vec", repeated, tag="7")]
     pub batch_payloads: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
 }
@@ -500,5 +503,15 @@ pub struct RecoveryBatchTrailer {
     /// and replay cannot complete.
     #[prost(bool, tag="7")]
     pub snapshot_required: bool,
+    /// terminated is true when the host ends the targeted subscription. The trailer
+    /// carries the typed terminal signal so the host can terminate one stream even
+    /// when there is no outstanding invocation.
+    #[prost(bool, tag="8")]
+    pub terminated: bool,
+    /// terminate_reason carries the required machine-readable reason when terminated
+    /// is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
+    /// means no termination.
+    #[prost(bytes="vec", tag="9")]
+    pub terminate_reason: ::prost::alloc::vec::Vec<u8>,
 }
 // @@protoc_insertion_point(module)

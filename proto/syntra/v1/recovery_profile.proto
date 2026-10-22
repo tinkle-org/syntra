@@ -74,8 +74,11 @@ message RecoveryReplayPage {
   // catchup_boundary is the live boundary being approached. Opaque bytes, at
   // most 4096 bytes.
   bytes catchup_boundary = 6;
-  // batch_payloads holds opaque batch bytes. At most 64 entries, each at most
-  // 262144 bytes, total at most 262144 bytes.
+  // batch_payloads holds one serialized RecoveryBatch per entry. At most 64
+  // entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
+  // MUST validate each entry as a RecoveryBatch with matching generation and
+  // predecessor/result checkpoint continuity through the same pipeline as live
+  // batches.
   repeated bytes batch_payloads = 7;
 }
 
@@ -196,4 +199,12 @@ message RecoveryBatchTrailer {
   // snapshot_required is true when the requested checkpoint is outside retention
   // and replay cannot complete.
   bool snapshot_required = 7;
+  // terminated is true when the host ends the targeted subscription. The trailer
+  // carries the typed terminal signal so the host can terminate one stream even
+  // when there is no outstanding invocation.
+  bool terminated = 8;
+  // terminate_reason carries the required machine-readable reason when terminated
+  // is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
+  // means no termination.
+  bytes terminate_reason = 9;
 }
