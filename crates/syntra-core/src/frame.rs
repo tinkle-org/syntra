@@ -76,12 +76,6 @@ pub fn encode_frame(frame: &Frame) -> Vec<u8> {
     frame.encode_to_vec()
 }
 
-/// Decode + validate a received `Frame`.
-///
-/// Steps in order (SNTR-WIRE-005): (1) well-formedness + size/depth,
-/// (2) version, (3) `request_id` discipline, (4) variant-state legality,
-/// (5) per-variant semantics. First failure determines the error;
-/// validation completes before dispatch.
 /// Shared raw-wire prelude: emptiness, envelope size, then the bounded
 /// top-level pre-scan. Used by both [`decode_frame`] and
 /// [`validate_wire_structure`] so the two entry points cannot drift.
@@ -101,6 +95,12 @@ fn pre_scan(bytes: &[u8]) -> Result<ScanStats, SyntraError> {
     scan_top_level(bytes)
 }
 
+/// Decode + validate a received `Frame`.
+///
+/// Steps in order (SNTR-WIRE-005): (1) well-formedness + size/depth,
+/// (2) version, (3) `request_id` discipline, (4) variant-state legality,
+/// (5) per-variant semantics. First failure determines the error;
+/// validation completes before dispatch.
 pub fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, SyntraError> {
     // Raw pre-scan (SNTR-SER-006/008, SNTR-WIRE-002/004): reserved
     // numbers, duplicate bodies, unknown-only bodies, and depth/alloc
