@@ -1,0 +1,77 @@
+specifications/profiles/recovery.md
+  s_2be668f66f4a4b::t_533871a7ecc195 1-208
+conformance/recovery_profile/recovery.md
+  s_98c22b50bdb77a::t_ced09a5844c108 1-134
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_32d5244b970968::t_4cc40b8b859b5d 245-503
+crates/syntra-runtime/src/recovery.rs
+  s_c2031b1e82017e::t_335fa720f75247 12-19
+proto/syntra/v1/recovery_profile.proto
+  s_304e8b9459f8a5::t_d3ef29e95c9e80 1-199
+conformance/recovery_profile/README.md
+  s_98c22b50bdb77a::t_41a6981301e02c 1-64
+conformance/recovery_profile/recovery.yaml
+  s_98c22b50bdb77a::t_64a35ee8f6436c 1-114
+crates/syntra-runtime/src/recovery/profile.rs
+  s_c2031b1e82017e::t_0b36bd3f95139c 1-674
+rfcs/0006-update-recovery-profile.md
+  s_9026756c8baab0::t_f5030ca0415036 1-579
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_32d5244b970968::t_0399b1f8989372 1-1100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "72eecfc55adfedf474459b8feebbe2c3b2b9a9c0",
+  "prompts": {},
+  "sessions": {
+    "s_2be668f66f4a4b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ee1e05effeWvJ4PUulRmKjwb",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_304e8b9459f8a5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ee1e04cffeZLVjYL83gDdLIp",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_32d5244b970968": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9edc3e6affeEC3NSbDhFGvMv8",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_9026756c8baab0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ee39e5cffeeA2NlIXpK1y5te",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_98c22b50bdb77a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9edfec61ffe22wMVHY8isFe75",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_c2031b1e82017e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9edfec76ffe2MDFI3SuJrvDHm",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
