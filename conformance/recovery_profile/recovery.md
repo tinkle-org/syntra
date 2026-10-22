@@ -14,7 +14,7 @@ Machine-readable equivalents are in [recovery machine snippet](../manifest/recov
 Guidance on fields is in [manifest format](../manifest/README.md).
 Related event coverage is in [event conformance](../events/events.md).
 
-Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`, `overflow_local_queue`, `emit_live_during_replay`) are harness-side instrumentation that drives the host to emit, duplicate, overflow, or flood batches; they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
+Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`, `overflow_local_queue`, `emit_live_during_replay`) are harness-side instrumentation that drives the host to emit, duplicate, or flood batches, except `overflow_local_queue` which overflows the initiator's local notification queue (fault injected on the initiator side); they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
 
 ## CONF-URP-001 mandatory-only fallback
 
@@ -108,7 +108,7 @@ Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_dupl
 
 ## CONF-URP-010 dropped-final-update silence
 
-- Related normative requirement: SNTR-EVENT-006, SNTR-EVENT-021.
+- Related normative requirement: SNTR-EVENT-030, SNTR-REL-007.
 - Preconditions: ACTIVE; subscription confirmed.
 - Input: harness overflows the local notification queue so the loss counter changes and the stream goes idle with no catch-up boundary.
 - Expected output: initiator maps the loss counter to recovery and never treats idle as caught-up; no silent stall.
@@ -163,7 +163,7 @@ Initiator                              Host
 | CONF-URP-007 | SESS-008, EVENT-020 (reconnect) |
 | CONF-URP-008 | EVENT-030, REL-007 (overflow reject-new-work) |
 | CONF-URP-009 | EVENT-030, REL-007 (overflow continuity loss) |
-| CONF-URP-010 | EVENT-006/021 (dropped-final-update silence) |
+| CONF-URP-010 | EVENT-030, REL-007 (dropped-final-update silence) |
 | CONF-URP-011 | EVENT-008/009 (fixed-boundary replay) |
 
 Further detail is in [profile readme](README.md).

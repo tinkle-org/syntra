@@ -47,7 +47,7 @@ profiles:
     manifests: [manifest/events.yaml, manifest/recovery.yaml]
     capabilities: [events-v1, events-replay-v1, syntra.update-recovery/1]
     claimable_alone: false
-    notes: "Capability identifiers are placeholders pending the events RFC and RFC 0006; they MUST NOT be advertised until the respective RFC is accepted. Mandatory-only hosts pass absence rows as UNSUPPORTED. Recovery cases CONF-URP-001…009 are discovered through the manifests selection above; runners load manifest/recovery.yaml subject to the syntra.update-recovery/1 capability gate (placeholder pending RFC 0006 acceptance)."
+    notes: "Capability identifiers are placeholders pending the events RFC and RFC 0006; they MUST NOT be advertised until the respective RFC is accepted. Mandatory-only hosts pass absence rows as UNSUPPORTED. Recovery cases CONF-URP-001…011 are discovered through the manifests selection above; runners load manifest/recovery.yaml subject to the syntra.update-recovery/1 capability gate (placeholder pending RFC 0006 acceptance)."
 
   - id: SNTR-TCP-V1
     kind: TRANSPORT_PROFILE

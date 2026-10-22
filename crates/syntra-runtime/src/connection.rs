@@ -497,9 +497,10 @@ pub(crate) struct Shared {
     /// bounded and drops remain non-blocking.
     pub notification_dropped: AtomicU64,
     pub notification_dropped_bytes: AtomicU64,
-    /// Fired when the notification loss counters change so loss-aware
-    /// consumers wake without requiring another notification.
-    pub notification_loss_notify: Notify,
+    /// Carries the latest loss totals so every loss waiter observes a
+    /// drop. Published on every drop alongside the counters; late
+    /// subscribers read the current totals instead of missing a signal.
+    pub notification_loss_tx: watch::Sender<(u64, u64)>,
     /// Close broadcast: fired on every path to CLOSED so transport pumps
     /// (which only hold byte channels) learn remote teardown promptly.
     /// Pumps `select!` on this alongside reads; firing is idempotent.
@@ -516,6 +517,7 @@ impl Shared {
     ) -> (Arc<Self>, mpsc::Receiver<Bytes>) {
         let (notif_tx, notif_rx) = mpsc::channel(config.notification_capacity);
         let (closed_tx, _) = watch::channel(false);
+        let (notification_loss_tx, _) = watch::channel((0, 0));
         let shared = Arc::new(Self {
             role,
             state: RwLock::new(ConnectionState::Connected),
@@ -532,10 +534,27 @@ impl Shared {
             misbehavior: AtomicU32::new(0),
             notification_dropped: AtomicU64::new(0),
             notification_dropped_bytes: AtomicU64::new(0),
-            notification_loss_notify: Notify::new(),
+            notification_loss_tx,
             closed_tx,
         });
         (shared, notif_rx)
+    }
+}
+
+impl Shared {
+    /// Record one dropped Syntra notification: advance the cumulative
+    /// loss counters and publish the latest totals. Non-blocking; every
+    /// loss waiter observes the new totals and late subscribers read
+    /// them as current state.
+    pub(crate) fn record_notification_loss(&self, payload_bytes: u64) -> (u64, u64) {
+        let dropped = self.notification_dropped.fetch_add(1, Ordering::Relaxed) + 1;
+        let dropped_bytes = self
+            .notification_dropped_bytes
+            .fetch_add(payload_bytes, Ordering::Relaxed)
+            + payload_bytes;
+        self.notification_loss_tx
+            .send_replace((dropped, dropped_bytes));
+        (dropped, dropped_bytes)
     }
 }
 
@@ -729,6 +748,15 @@ impl Connection {
     fn fire_closed(&self) {
         // Retain the terminal value even when no subscribers exist yet.
         self.shared.closed_tx.send_replace(true);
+    }
+
+    /// Test hook: hold the notification receiver lock so loss-wake tests
+    /// can park waiters without them consuming the queued notification.
+    #[cfg(test)]
+    pub(crate) async fn hold_notification_receiver_for_test(
+        &self,
+    ) -> tokio::sync::MutexGuard<'_, mpsc::Receiver<Bytes>> {
+        self.notif_rx.lock().await
     }
 
     /// Take the next notification payload (opaque application bytes).

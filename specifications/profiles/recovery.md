@@ -125,11 +125,11 @@ This subsection is a Draft proposal under [RFC 0006](../../rfcs/0006-update-reco
 Proposed steps, using only the terminology above and neutral mechanics only (generic subscription establishment, generic key/value read, echo round trip):
 
 - Subscribe from committed Checkpoint: the Initiator establishes one Subscription with the last confirmed Checkpoint bytes, presenting exact Checkpoint bytes with explicit predecessor/result pairing. The Host binds the Subscription to exactly one Stream with one opaque Handle and one Generation.
-- Capture fixed catch-up boundary B at subscribe-accept or first replay/catch-up accept: the Host captures one fixed catch-up boundary B when it accepts the subscribe invocation, or at the latest when it accepts the first replay or catch-up invocation for the Stream. B does not advance while catch-up Pages are emitted.
-- Replay bounded Pages through B: the Host returns bounded Pages through B, each Page stating its Continuation marker and B. The Initiator follows the Continuation marker Page by Page and stops at B. Oversized history is paged, never burst beyond the documented per-Connection and per-Subscription queue bounds. Invocation-triggered catch-up streams over the existing Connection as Notification Batches through the same validation and authorization path as live Batches.
+- Capture fixed catch-up boundary B at subscribe accept and hold live Batches: the Host captures one fixed catch-up boundary B when it accepts the subscribe invocation. The Host holds live Batches for the Stream until the catch-up completion signal, so Batches emitted after subscribe accept arrive only after B in ordered delivery. Holding is bounded subject to the documented overflow policy: reject with `RESOURCE_EXHAUSTED` and/or end the Stream with an explicit continuity-loss signal carrying a new Generation, never silent drop. B does not advance while catch-up Pages are emitted.
+- Replay bounded Pages through B: the Host returns bounded Pages through B, each Page stating its Continuation marker and B. The Initiator follows the Continuation marker Page by Page and stops at B. Oversized history is paged, never burst beyond the documented per-Connection and per-Subscription queue bounds. Invocation-triggered catch-up streams over the existing Connection as Notification Batches through the same validation and authorization path as live Batches. Held live Batches are not emitted before the catch-up completion signal.
 - Persist in order receive-validate-offer-persist-confirm: for each Batch through B, the Initiator follows the commit sequence receive, validate, offer, persist, confirm. The Initiator receives the Batch, validates it through the same pipeline as live Batches, offers it to the application above Syntra, persists the resulting Checkpoint through the application persistence point, and only then confirms the Checkpoint through the defined generic invocation. Transport receipt or envelope decode is not reported as committed progress.
-- Explicit catch-up completion at B: when the Stream reaches B, the Host emits an explicit catch-up completion signal. The Initiator treats B as the point where recovered history meets live delivery only on that signal.
-- Continue after B: after completion, the Host emits live Batches chaining from exactly B, and the Initiator validates them through the same pipeline as recovered Batches. Duplicates across the recovered/live boundary are expected and tolerated by result Checkpoint equality with an already applied Checkpoint, skipped before predecessor chaining validation, never treated as a violation.
+- Explicit catch-up completion at B: when the Stream reaches B, the Host emits an explicit catch-up completion signal. The Initiator treats B as the point where recovered history meets live delivery only on that signal. Completion releases held live Batches in order after B.
+- Continue after B: after completion, the Host emits held then new live Batches chaining from exactly B, and the Initiator validates them through the same pipeline as recovered Batches. Duplicates across the recovered/live boundary are expected and tolerated by result Checkpoint equality with an already applied Checkpoint, skipped before predecessor chaining validation, never treated as a violation.
 - Snapshot fallback on outside-retention: when the requested Checkpoint is outside retention or otherwise unrecoverable by replay, the Host fails the replay/catch-up invocation with `FAILED_PRECONDITION` in `RpcResult` while emitting an explicit snapshot-required signal as `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload. Recovery then follows the snapshot path with a provider-proven boundary Checkpoint. Silent restart from an unrelated point is forbidden.
 - Generation scope separating shared continuity changes from subscriber-local failures: a Generation increment signals a shared continuity change for the Stream (overflow, retention expiry, revocation-driven reset, or snapshot rebase) and invalidates prior Checkpoints for that stable stream identity across Subscriptions. Subscriber-local failures affect only the targeted Subscription and do not increment the Generation: Batch validation failure, offer or persist failure, confirm retry, per-stream terminal signal, and Connection end with explicit re-subscription under a fresh Handle.
 - Confirmation retry idempotency: re-presenting the same confirmed Checkpoint bytes through the confirm operation is idempotent. The Host returns confirmed without new side effects and without incrementing the Generation. The Initiator may retry confirm after `UNAVAILABLE`, `DEADLINE_EXCEEDED`, or a lost `RpcResult` by presenting the exact Checkpoint bytes again.
@@ -140,12 +140,18 @@ Initiator                              Host
     |--- invocation{subscribe generic,    |
     |         last confirmed Checkpoint} >|
     |<-- result{handle, gen 7, fixed B} --|
+    |         (Host holds live Batches    |
+    |          for Stream until catch-up   |
+    |          done at B; bounded holding  |
+    |          per documented overflow     |
+    |          policy)                     |
     |<-- notification{bounded Page        |
     |         through B, cont marker} ----|
     |--- invocation{confirm Checkpoint} ->|
     |<-- result{confirmed, same bytes} ---|
     |<-- notification{catch-up done at B}-|
-    |<-- notification{live Batch from B} -|
+    |<-- notification{held then new live  |
+    |         Batch from B} --------------|
 ```
 
 ## 6. Snapshot transfer and installation contract
