@@ -14,7 +14,7 @@ Machine-readable equivalents are in [recovery machine snippet](../manifest/recov
 Guidance on fields is in [manifest format](../manifest/README.md).
 Related event coverage is in [event conformance](../events/events.md).
 
-Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`, `overflow_local_queue`, `emit_live_during_replay`) are harness-side instrumentation that drives the host to emit, duplicate, or flood batches, except `overflow_local_queue` which overflows the initiator's local notification queue (fault injected on the initiator side); they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
+Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`, `overflow_local_queue`, `emit_live_during_replay`) are harness-side instrumentation that drives the host to emit, drop, duplicate, or flood batches (`skip_batch` drops a batch to form a gap), except `overflow_local_queue` which overflows the initiator's local notification queue (fault injected on the initiator side); they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
 
 ## CONF-URP-001 mandatory-only fallback
 

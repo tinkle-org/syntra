@@ -285,7 +285,8 @@ func (x *RecoverySubscribeRequest) GetStartCheckpoint() []byte {
 	return nil
 }
 
-// RecoverySubscribeResponse confirms one subscription with its handle and generation.
+// RecoverySubscribeResponse confirms one subscription with its handle, generation,
+// and fixed catch-up boundary.
 type RecoverySubscribeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// profile_version is the profile payload version. Valid value is 1.
@@ -295,9 +296,13 @@ type RecoverySubscribeResponse struct {
 	// at most 256 bytes. Required.
 	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
 	// generation is the continuity generation of the stream. Required.
-	Generation    uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Generation uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	// catchup_boundary is the fixed boundary captured at subscribe accept where
+	// recovered history meets live delivery. Opaque bytes, at most 4096 bytes.
+	// Required.
+	CatchupBoundary []byte `protobuf:"bytes,4,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RecoverySubscribeResponse) Reset() {
@@ -349,6 +354,13 @@ func (x *RecoverySubscribeResponse) GetGeneration() uint64 {
 		return x.Generation
 	}
 	return 0
+}
+
+func (x *RecoverySubscribeResponse) GetCatchupBoundary() []byte {
+	if x != nil {
+		return x.CatchupBoundary
+	}
+	return nil
 }
 
 // RecoveryUnsubscribeRequest ends one targeted subscription.
@@ -1660,13 +1672,14 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\x18RecoverySubscribeRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12'\n" +
 	"\x0fstream_selector\x18\x02 \x01(\fR\x0estreamSelector\x12)\n" +
-	"\x10start_checkpoint\x18\x03 \x01(\fR\x0fstartCheckpoint\"\x95\x01\n" +
+	"\x10start_checkpoint\x18\x03 \x01(\fR\x0fstartCheckpoint\"\xc0\x01\n" +
 	"\x19RecoverySubscribeResponse\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
 	"\n" +
 	"generation\x18\x03 \x01(\x04R\n" +
-	"generation\"v\n" +
+	"generation\x12)\n" +
+	"\x10catchup_boundary\x18\x04 \x01(\fR\x0fcatchupBoundary\"v\n" +
 	"\x1aRecoveryUnsubscribeRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\xd8\x01\n" +

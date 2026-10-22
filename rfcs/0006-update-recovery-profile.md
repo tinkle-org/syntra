@@ -249,9 +249,9 @@ changes.
   | Operation | Method string | Request payload | Result / stream payloads |
   |---|---|---|---|
   | Negotiate | `/syntra.update-recovery/1/Negotiate` | `RecoveryNegotiateRequest` (`profile_version`, `min_version`, `max_version`, `capability` `syntra.update-recovery/1`) | `RecoveryNegotiateResponse` (`selected_version` plus confirmed bounds) |
-  | Subscribe | `/syntra.update-recovery/1/Subscribe` | `RecoverySubscribeRequest` (`profile_version`, `stream_selector` for a generic subscription, `start_checkpoint`) | `RecoverySubscribeResponse` (`subscription_handle`, `generation`) |
-  | Replay | `/syntra.update-recovery/1/Replay` | `RecoveryReplayRequest` (`subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
-  | CatchUp | `/syntra.update-recovery/1/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` plus `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
+  | Subscribe | `/syntra.update-recovery/1/Subscribe` | `RecoverySubscribeRequest` (`profile_version`, `stream_selector` for a generic subscription, `start_checkpoint`) | `RecoverySubscribeResponse` (`profile_version`, `subscription_handle`, `generation`, `catchup_boundary`) |
+  | Replay | `/syntra.update-recovery/1/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
+  | CatchUp | `/syntra.update-recovery/1/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` in the terminal `RpcResult`; `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
   | Confirm | `/syntra.update-recovery/1/Confirm` | `RecoveryConfirmRequest` (`profile_version`, `subscription_handle`, `generation`, `checkpoint` result or boundary) | `RecoveryConfirmResponse` (`confirmed_checkpoint`); snapshot boundary confirm yields `RecoverySnapshotInstalled` |
   | SnapshotOffer | `/syntra.update-recovery/1/SnapshotOffer` | versioned bytes: `subscription_handle` accept (`profile_version=1`) | `RecoverySnapshotDescriptor` (`snapshot_handle`, provider-proven `boundary_checkpoint`, `total_pages` 1..256, `page_bytes_max` 1..262144) |
   | SnapshotFetch | `/syntra.update-recovery/1/SnapshotFetch` | `RecoverySnapshotFetchRequest` (`profile_version`, `snapshot_handle`, `page_index` 0..255) | exactly one `RecoverySnapshotChunk` per `RpcResult` with `page_index` correlation plus `boundary_checkpoint` equality; completion as `RecoverySnapshotComplete` (`total_pages`, `total_bytes` 1..67108864) |
@@ -309,11 +309,21 @@ changes.
   unchanged. This profile adds one per-stream machine per confirmed
   subscription; connection end discards all per-stream state:
   - `SUBSCRIBED → CATCHING_UP` on subscribe confirm with fixed
-    catch-up boundary B captured at subscribe accept; live `Notification`
+    catch-up boundary B captured at subscribe accept and carried in
+    `RecoverySubscribeResponse.catchup_boundary`; the initiator replays
+    from its last confirmed checkpoint via
+    `RecoveryReplayRequest.from_checkpoint` (non-empty unless initial)
+    and validates each `RecoveryReplayPage.catchup_boundary` against B;
+    live `Notification`
     batches for the stream held until the catch-up completion signal
     under bounded holding per the documented overflow policy
-    (`RESOURCE_EXHAUSTED` and/or explicit continuity loss with a new
-    generation, never silent drop); `CATCHING_UP → LIVE` on catch-up
+    (while held during CATCHING_UP, saturation MUST end the stream
+    with explicit continuity loss carrying a new generation and a
+    CATCHING_UP -> CONTINUITY_LOST transition clearing the held queue,
+    never a bare `RESOURCE_EXHAUSTED` that stalls waiting for an
+    unreachable completion signal; outside holding, reject with
+    `RESOURCE_EXHAUSTED` and/or continuity loss, never silent drop);
+    `CATCHING_UP → LIVE` on catch-up
     completion signal with held then new live batches chaining from B;
     `CATCHING_UP → SNAPSHOT_REQUIRED` on
      snapshot-required signal; `SNAPSHOT_REQUIRED → INSTALLING` on
@@ -368,7 +378,8 @@ Initiator                              Host
     |          catch-up done; bounded      |
     |          holding per documented      |
     |          overflow policy)            |
-    |--- request{replay from B} --------->|
+    |--- request{replay from last confirmed}|
+    |                                   -->|
     |<-- notification{page 1, cont C} -----|
     |<-- notification{page 2, cont end} ---|
     |<-- notification{catch-up done} ------|
@@ -377,6 +388,7 @@ Initiator                              Host
     |--- request{confirm checkpoint D} --->|
     |<-- result{confirmed D} --------------|
     |--- request{catch-up trigger} ------->|
+    |<-- result{accepted with B} ----------|
     |<-- notification{recovered batch} -----|
     |<-- notification{catch-up done} ------|
     |<-- notification{live batch from B} --|
@@ -701,9 +713,12 @@ as authority.
    `/syntra.update-recovery/1/Unsubscribe` under identifier
    `syntra.update-recovery/1`. Canonical payloads are
    `RecoveryNegotiateRequest`/`RecoveryNegotiateResponse`,
-   `RecoverySubscribeRequest`/`RecoverySubscribeResponse`,
-   `RecoveryReplayRequest` with exactly one `RecoveryReplayPage` per
-   `RpcResult`, `RecoveryCatchUpRequest`/`RecoveryCatchUpAccepted`,
+    `RecoverySubscribeRequest`/`RecoverySubscribeResponse`
+    (response carries `catchup_boundary` fixed at subscribe accept),
+    `RecoveryReplayRequest` (with `profile_version`) with exactly one `RecoveryReplayPage` per
+    `RpcResult`, `RecoveryCatchUpRequest` with `RecoveryCatchUpAccepted`
+    in the terminal `RpcResult` (batches and completion trailer via
+    `Notification`),
    `RecoveryConfirmRequest`/`RecoveryConfirmResponse`, and
    `RecoverySnapshotFetchRequest` with exactly one
    `RecoverySnapshotChunk` per `RpcResult`, all defined in

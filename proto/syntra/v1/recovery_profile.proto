@@ -77,7 +77,8 @@ message RecoverySubscribeRequest {
   bytes start_checkpoint = 3;
 }
 
-// RecoverySubscribeResponse confirms one subscription with its handle and generation.
+// RecoverySubscribeResponse confirms one subscription with its handle, generation,
+// and fixed catch-up boundary.
 message RecoverySubscribeResponse {
   // profile_version is the profile payload version. Valid value is 1.
   // Required.
@@ -87,6 +88,10 @@ message RecoverySubscribeResponse {
   bytes subscription_handle = 2;
   // generation is the continuity generation of the stream. Required.
   uint64 generation = 3;
+  // catchup_boundary is the fixed boundary captured at subscribe accept where
+  // recovered history meets live delivery. Opaque bytes, at most 4096 bytes.
+  // Required.
+  bytes catchup_boundary = 4;
 }
 
 // RecoveryUnsubscribeRequest ends one targeted subscription.

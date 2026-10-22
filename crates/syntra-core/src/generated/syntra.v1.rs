@@ -332,7 +332,8 @@ pub struct RecoverySubscribeRequest {
     #[prost(bytes="vec", tag="3")]
     pub start_checkpoint: ::prost::alloc::vec::Vec<u8>,
 }
-/// RecoverySubscribeResponse confirms one subscription with its handle and generation.
+/// RecoverySubscribeResponse confirms one subscription with its handle, generation,
+/// and fixed catch-up boundary.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoverySubscribeResponse {
@@ -347,6 +348,11 @@ pub struct RecoverySubscribeResponse {
     /// generation is the continuity generation of the stream. Required.
     #[prost(uint64, tag="3")]
     pub generation: u64,
+    /// catchup_boundary is the fixed boundary captured at subscribe accept where
+    /// recovered history meets live delivery. Opaque bytes, at most 4096 bytes.
+    /// Required.
+    #[prost(bytes="vec", tag="4")]
+    pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
 }
 /// RecoveryUnsubscribeRequest ends one targeted subscription.
 #[allow(clippy::derive_partial_eq_without_eq)]
