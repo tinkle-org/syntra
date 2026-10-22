@@ -9,11 +9,10 @@
 // LoopbackPair provides an in-memory Transport for tests and embedding.
 //
 // Both Client and Host delegate state (handshake machine, correlation,
-// timers) to the supported pure-Go core (native_purego.go) in default
-// builds. The syntranative adapter (native.go) is unsupported: its
-// proposed syntra_ffi_* ABI is incompatible with the current
-// crates/syntra-ffi exports, so Release-built libraries cannot enable it.
-// NativeAvailable reports which core is linked (false in supported builds).
+// timers) to the pure-Go core (native_purego.go) in default builds and to
+// the production Rust core via the syntranative adapter (native.go) under
+// -tags syntranative. NativeAvailable reports which core is linked (false
+// in default builds, true with syntranative).
 //
 // Context deadlines and cancellation: every blocking call honors ctx.
 // Call derives the wire timeout_ms budget as the minimum of the
@@ -220,9 +219,9 @@ func AllowAllAuthorize(ctx context.Context, principal string, method string) err
 }
 
 // clientCore owns initiator-side session state: handshake progress,
-// correlation, timers, and notification queue. The supported
-// implementation is the pure-Go core (native_purego.go); the syntranative
-// adapter (native.go) is unsupported. All methods except close are invalid
+// correlation, timers, and notification queue. Implementations are the
+// pure-Go core (native_purego.go, default builds) and the production
+// native adapter (native.go, -tags syntranative). All methods except close are invalid
 // after close reports, and report FailedPrecondition once closed.
 type clientCore interface {
 	// helloFrame returns the hello frame to transmit. It fails closed on
@@ -310,8 +309,7 @@ type activatedReady struct {
 
 // activateFrame validates one inbound ServerReady frame against the
 // proposed range and returns the selected version. Shared handshake
-// acceptance for the supported pure-Go core (the syntranative adapter is
-// unsupported).
+// acceptance for both cores (pure-Go default and syntranative native).
 func activateFrame(frame []byte, minVersion, maxVersion uint32) (*activatedReady, error) {
 	f, err := UnmarshalFrame(frame)
 	if err != nil {
@@ -389,6 +387,8 @@ type ClientConfig struct {
 	Credential []byte
 	// DefaultTimeout applies when a call passes timeoutMs zero. Zero
 	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
+	// The value is rounded up to whole milliseconds at resolution so the
+	// pure-Go and native backends enforce the identical deadline.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls. Zero selects
 	// MaxConcurrentRPCs; larger values are rejected. Excess calls fail fast
@@ -430,6 +430,9 @@ func resolveClientConfig(cfg ClientConfig) (resolvedClientConfig, error) {
 	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
 		return resolvedClientConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: client default timeout exceeds max")
 	}
+	// Normalize once so both backends share the identical deadline: whole
+	// milliseconds, rounded up, never shorter than configured.
+	out.timeout = time.Duration(roundUpToMs(out.timeout)) * time.Millisecond
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
 	}
@@ -968,6 +971,8 @@ type HostConfig struct {
 	Authorize AuthorizeFunc
 	// DefaultTimeout applies when a request passes timeoutMs zero. Zero
 	// selects DefaultRPCTimeout. Negative or above MaxRPCTimeoutMs fails fast.
+	// The value is rounded up to whole milliseconds at resolution so the
+	// pure-Go and native backends enforce the identical deadline.
 	DefaultTimeout time.Duration
 	// MaxConcurrent caps outstanding calls per connection. Zero selects
 	// MaxConcurrentRPCs. Excess calls fail with ResourceExhausted while
@@ -1003,6 +1008,9 @@ func resolveHostConfig(cfg HostConfig) (resolvedHostConfig, error) {
 	if out.timeout > time.Duration(MaxRPCTimeoutMs)*time.Millisecond {
 		return resolvedHostConfig{}, NewRpcError(ErrorCodeOutOfRange, "syntra: host default timeout exceeds max")
 	}
+	// Normalize once so both backends share the identical deadline: whole
+	// milliseconds, rounded up, never shorter than configured.
+	out.timeout = time.Duration(roundUpToMs(out.timeout)) * time.Millisecond
 	if out.maxPending == 0 {
 		out.maxPending = MaxConcurrentRPCs
 	}

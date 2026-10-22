@@ -2,9 +2,9 @@
 // context cancellation, notifications, concurrency, and deterministic
 // close over a loopback transport. All method fixtures are neutral
 // (/example.Echo/Echo, /example.KV/Get, /example.Slow/Wait); no
-// messenger semantics appear here. Tests run on the supported pure-Go
-// core in default builds (no -tags). The syntranative adapter is
-// unsupported and is not exercised here; TestCoreBackend logs the
+// messenger semantics appear here. Tests run on the pure-Go core in
+// default builds (no -tags). The syntranative adapter is exercised by
+// native_test.go under -tags syntranative; TestCoreBackend logs the
 // linked selection.
 package syntra
 
@@ -48,6 +48,37 @@ func testClientConfig() ClientConfig {
 		MaxVersion:     1,
 		Credential:     []byte("test-credential"),
 		DefaultTimeout: 5 * time.Second,
+	}
+}
+
+// TestDefaultTimeoutRoundsUpToWholeMs pins the shared rounding policy:
+// sub-millisecond defaults round up at resolution so the pure-Go and
+// native backends enforce the identical deadline, never a shorter one.
+func TestDefaultTimeoutRoundsUpToWholeMs(t *testing.T) {
+	if got := roundUpToMs(1500 * time.Microsecond); got != 2 {
+		t.Fatalf("roundUpToMs(1.5ms) = %d, want 2", got)
+	}
+	if got := roundUpToMs(time.Millisecond); got != 1 {
+		t.Fatalf("roundUpToMs(1ms) = %d, want 1", got)
+	}
+	cfg, err := resolveClientConfig(ClientConfig{
+		MinVersion: 1, MaxVersion: 1, DefaultTimeout: 1500 * time.Microsecond,
+	})
+	if err != nil {
+		t.Fatalf("resolveClientConfig: %v", err)
+	}
+	if cfg.timeout != 2*time.Millisecond {
+		t.Fatalf("client timeout = %v, want 2ms", cfg.timeout)
+	}
+	host, err := resolveHostConfig(HostConfig{
+		MinVersion: 1, MaxVersion: 1, DefaultTimeout: 1500 * time.Microsecond,
+		Policy: StaticPolicy("test-principal", true), Handler: echoHandler,
+	})
+	if err != nil {
+		t.Fatalf("resolveHostConfig: %v", err)
+	}
+	if host.timeout != 2*time.Millisecond {
+		t.Fatalf("host timeout = %v, want 2ms", host.timeout)
 	}
 }
 

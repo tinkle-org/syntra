@@ -57,6 +57,13 @@ independent implementation becomes impossible.
 
 ## Status
 
-Accepted. The reference implementation is forthcoming and will live
-outside the normative paths defined in `specifications/architecture.md`
-Sec. 8.
+Accepted. The reference implementation is present in `crates/` (including
+the production native ABI) and lives outside the normative paths defined
+in `specifications/architecture.md` Sec. 8.
+
+Note: `specifications/architecture.md` Sec. 8 still lists the Rust
+reference and the conformance suite as forthcoming; that row needs a
+factual status alignment in the same change (present, non-normative).
+This status-only alignment does not amend the decision and needs no RFC
+beyond maintainer review; decision changes still REQUIRE an RFC per
+`specifications/decisions/README.md`.

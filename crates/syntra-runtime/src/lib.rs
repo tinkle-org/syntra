@@ -21,11 +21,18 @@
 pub mod connection;
 pub mod host;
 pub mod initiator;
+pub mod policy;
+pub mod recovery;
 pub mod session;
 
 pub use connection::{CancelToken, Connection, ConnectionConfig};
 pub use host::{AllowAll, FnHandler, Handler, HandlerFut, HandlerOutcome, Host};
 pub use initiator::Initiator;
+pub use policy::{
+    AdmittedRequest, AuthDecision, AuthzDecision, CompletionDisposition, CompletionToken,
+    HostResult, PolicyDeadlines,
+};
+pub use recovery::{RecoveryAction, RecoveryInput, StreamCheckpoint, StreamRecovery};
 pub use session::{
     AllowAnonymous, AuthError, Authenticator, Principal, RejectAll, Session, SessionManager,
     StaticToken,

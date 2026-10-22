@@ -3,11 +3,14 @@
 // Distribution note: `go get github.com/tinklehq/syntra/bindings/go`
 // installs the Go sources in this module only (generated Protobuf types
 // plus the pure-Go validation, codec, handshake, and session logic).
-// Sessions use the supported pure-Go core; no native library is required
-// and this module never downloads binaries. The syntranative adapter is
-// unsupported: its proposed syntra_ffi_* ABI is incompatible with the
-// current crates/syntra-ffi exports. Release-built Rust libraries cannot
-// enable it. See README.md for the ABI reconciliation blockers.
+// Sessions use the supported pure-Go core by default; no native library
+// is required and this module never downloads binaries. The syntranative
+// adapter is supported via the production Rust core: build
+// crates/syntra-ffi with --features production, link it with
+// CGO_LDFLAGS="-L<dir> -lsyntra_ffi", and select the adapter with
+// -tags syntranative (native.go matches
+// crates/syntra-ffi/include/syntra_production.h). See README.md for the
+// exact build, link, and test commands.
 //
 // The binding implements the transport-independent core only
 // (specifications/core/{framing,rpc,serialization,errors,handshake}.md and
@@ -143,6 +146,19 @@ var DefaultRPCTimeout = 3 * time.Second
 // MaxRPCTimeoutMs caps a caller-requested timeout budget. Larger values
 // fail fast as OutOfRange so a peer cannot pin a session slot for minutes.
 const MaxRPCTimeoutMs uint32 = 30_000
+
+// roundUpToMs converts a validated positive timeout to whole milliseconds,
+// rounding up. The native ABI expresses budgets as uint32 milliseconds, so
+// config resolution normalizes once: both backends then enforce the
+// identical effective deadline instead of the native side silently
+// truncating sub-millisecond durations.
+func roundUpToMs(d time.Duration) uint32 {
+	ms := uint32((d + time.Millisecond - 1) / time.Millisecond)
+	if ms == 0 {
+		ms = 1
+	}
+	return ms
+}
 
 // ReservedFrameFieldNames are the reserved envelope oneof names
 // (envelope.proto `reserved "event", "resume", "ack"`). Decoders that

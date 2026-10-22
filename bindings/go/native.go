@@ -8,18 +8,16 @@ package syntra
 #include <stdlib.h>
 #include <string.h>
 
-// ---- UNSUPPORTED: proposed Go adapter ABI, not the Rust C ABI ----
+// Production native ABI: transport-agnostic initiator/responder cores.
 //
-// These declarations are retained as an unimplemented adapter proposal.
-// crates/syntra-ffi default builds export no C ABI; the explicit
-// test-fixture feature exports syntra_* loopback operations with u64
-// handles (native tests only), not this syntra_ffi_* frame-pump API with
-// pointer handles. Version packing, statuses, strings and buffer ownership
-// also differ. Installing a Release library cannot make this build link;
-// CheckABI cannot run before those missing symbols are resolved. See
-// README.md. CI runs default tags only and never enables this adapter.
+// Build the Rust library with:
+//   cargo build -p syntra-ffi --features production
+// The authoritative header is crates/syntra-ffi/include/syntra_production.h.
+// Default Rust builds export no C ABI; the test-fixture feature exports a
+// separate syntra_* loopback ABI for native tests only.
+// CI runs the default tags and this adapter (see repo-validation.yml).
 //
-// Proposed buffer ownership (NOT the current Rust contract):
+// Buffer ownership:
 //   - `const uint8_t*` inputs are BORROWED: the library copies what it
 //     retains before returning. The caller keeps ownership and frees
 //     with the usual Go/C rules (C.CBytes/C.CString results are freed
@@ -27,15 +25,14 @@ package syntra
 //   - `uint8_t**` outputs are OWNED: on success the library writes a
 //     heap buffer the caller MUST release with syntra_ffi_free exactly
 //     once. (NULL, 0) means "empty / absent" and needs no free.
-//   - syntra_ffi_free is free()-compatible. The Rust side MUST allocate
-//     output buffers with malloc-compatible allocation.
+//   - Output buffers are allocated by Rust and released only through
+//     syntra_ffi_free with the returned length.
 //   - Strings cross as explicit (ptr, len) pairs, never NUL-terminated.
 //   - Handles (syntra_ffi_client_t / syntra_ffi_host_t) are owned: open
 //     exactly once, close exactly once with the matching close call.
-//     Closing twice returns SYNTRA_FFI_ERR_CLOSED; the Go wrapper also
-//     guards with an atomic flag so double Close is deterministic and
-//     never reaches a use-after-free. Rust MUST contain all panics at
-//     the FFI boundary and map them to SYNTRA_FFI_ERR_INTERNAL.
+//     The Go wrapper guards with an atomic flag so double Close is
+//     deterministic and never reaches a use-after-free. Rust contains
+//     all panics at the FFI boundary and maps them to internal status.
 //
 // Status codes (int32_t return): 0 is SYNTRA_FFI_OK. Negative values are
 // FFI-layer failures and map to Go control errors as documented on
@@ -117,16 +114,11 @@ import (
 	"unsafe"
 )
 
-// NativeABIVersion is the proposed Go adapter ABI version. The current Rust
-// FFI instead returns a packed major/minor/patch from syntra_abi_version;
-// its version 1.0.0 is 0x10000, not this value. Native integration is unsupported.
+// NativeABIVersion is the production native ABI version. It matches
+// SYNTRA_FFI_ABI_VERSION in crates/syntra-ffi/include/syntra_production.h.
 const NativeABIVersion = 1
 
-// Proposed Go adapter statuses, NOT crates/syntra-ffi's SYNTRA_E_* table.
-// Deferred until ABI reconciliation: Rust -1 is PANIC, -2 ARG, -3 HANDSHAKE,
-// -4 RPC, -5 TIMEOUT, -6 CANCELLED, -7 UNAVAILABLE, -8 RESOURCE, -9 VERSION,
-// -10 UTF8; +1 is AGAIN. Relabeling these alone would leave incompatible
-// symbols, handles, ownership and per-RPC error semantics in place.
+// Production native statuses, matching the Rust production ABI.
 const (
 	ffiOK       = 0
 	ffiInvalid  = -1
@@ -160,15 +152,12 @@ func ffiStatus(st C.int32_t, op string) error {
 }
 
 // NativeAvailable reports whether the process links the native
-// adapter. It is true if this unsupported syntranative build links against
-// a custom implementation of the proposed ABI; it is not a support guarantee.
+// production core built with `cargo build -p syntra-ffi --features production`.
 func NativeAvailable() bool { return true }
 
 // CheckABI queries syntra_ffi_abi_version and fails closed unless it
 // equals NativeABIVersion. Call it after process start (or lazily on
 // first Open) before trusting any other native call.
-// The current Rust library does not export this symbol, so linking fails
-// before this check can run.
 func CheckABI() error {
 	v := uint32(C.syntra_ffi_abi_version())
 	if v != NativeABIVersion {
@@ -213,12 +202,11 @@ func newClientCore(cfg resolvedClientConfig) (clientCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
+	// cfg.timeout is already whole milliseconds (rounded up at config
+	// resolution); the helper keeps the conversion exact and floors at 1.
 	c := &ffiClientCore{
 		minVersion: cfg.minVersion, maxVersion: cfg.maxVersion,
-		timeoutMs: uint32(cfg.timeout / time.Millisecond), maxPending: uint32(cfg.maxPending),
-	}
-	if c.timeoutMs == 0 {
-		c.timeoutMs = 1
+		timeoutMs: roundUpToMs(cfg.timeout), maxPending: uint32(cfg.maxPending),
 	}
 	var handle *C.syntra_ffi_client_t
 	var st C.int32_t
@@ -254,6 +242,11 @@ type ffiClientCore struct {
 	stateMu    sync.Mutex
 	negotiated uint32
 	active     atomic.Bool
+	// Synthesized terminal outcomes for calls the native core reaped.
+	// Rust drops expired correlation entries without an outcome frame;
+	// the binding stashes DEADLINE_EXCEEDED here so reap() can deliver
+	// them exactly like the pure-Go core does.
+	expired map[uint64]*RpcResult
 }
 
 func (c *ffiClientCore) locked() (*C.syntra_ffi_client_t, error) {
@@ -410,6 +403,13 @@ func (c *ffiClientCore) cancelCall(requestID uint64) []byte {
 }
 
 func (c *ffiClientCore) takeOutcome(requestID uint64) (*RpcResult, bool) {
+	c.stateMu.Lock()
+	if res, ok := c.expired[requestID]; ok {
+		delete(c.expired, requestID)
+		c.stateMu.Unlock()
+		return res, true
+	}
+	c.stateMu.Unlock()
 	h, err := c.locked()
 	if err != nil {
 		return nil, false
@@ -472,6 +472,16 @@ func (c *ffiClientCore) reapExpired(now time.Time) []uint64 {
 	for i := 0; i < int(n); i++ {
 		out = append(out, uint64(ids[i]))
 	}
+	if len(out) > 0 {
+		c.stateMu.Lock()
+		if c.expired == nil {
+			c.expired = make(map[uint64]*RpcResult, len(out))
+		}
+		for _, id := range out {
+			c.expired[id] = NewWireErrorResult(ErrorCodeDeadlineExceeded, "syntra: deadline exceeded")
+		}
+		c.stateMu.Unlock()
+	}
 	return out
 }
 
@@ -497,6 +507,12 @@ func (c *ffiClientCore) destroy() {
 }
 
 // newHostCore opens a Rust-backed responder core for one connection.
+// host_open takes no default-timeout param in ABI v1, so the Go wrapper
+// threads cfg.timeout at request time: onFrame rewrites a zero wire
+// timeout_ms to the configured default before crossing FFI, matching the
+// pure-Go core. An ABI change adding default_timeout_ms to host_open
+// would require header + Rust + Go + smoke test updates and an ABI bump;
+// request-time threading is the minimal compatible fix.
 func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	if cfg.minVersion == 0 || cfg.maxVersion == 0 || cfg.minVersion > cfg.maxVersion {
 		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: host version range invalid")
@@ -504,12 +520,15 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 	if err := CheckABI(); err != nil {
 		return nil, err
 	}
-	c := &ffiHostCore{}
+	// cfg.timeout is already whole milliseconds (rounded up at config
+	// resolution); the helper keeps the conversion exact and floors at 1.
+	timeoutMs := roundUpToMs(cfg.timeout)
+	c := &ffiHostCore{timeoutMs: timeoutMs}
 	var handle *C.syntra_ffi_host_t
-	// Deferred with ABI reconciliation: cfg.timeout is lost here because
-	// this proposed host_open has no default-timeout argument. Rust's actual
-	// syntra_open uses ConnectionConfig::default() (30 s) and exposes no host
-	// config API. Adding an argument locally cannot change the Rust contract.
+	// host_open takes the version range and concurrency bound. Per-RPC
+	// budgets travel with each request; a zero wire timeout is rewritten
+	// to the configured default in onFrame before crossing FFI (host_open
+	// has no timeout param in ABI v1).
 	st := C.syntra_ffi_host_open(C.uint32_t(cfg.minVersion), C.uint32_t(cfg.maxVersion),
 		C.uint32_t(cfg.maxPending), &handle)
 	if err := ffiStatus(st, "host_open"); err != nil {
@@ -524,12 +543,15 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 }
 
 // ffiHostCore is the CGO responder core with the same exactly-once
-// destruction discipline as the client core.
+// destruction discipline as the client core. timeoutMs is the resolved
+// HostConfig.DefaultTimeout in milliseconds, threaded at request time
+// because host_open takes no timeout param in ABI v1.
 type ffiHostCore struct {
-	mu     sync.RWMutex
-	handle *C.syntra_ffi_host_t
-	once   sync.Once
-	closed atomic.Bool
+	mu        sync.RWMutex
+	handle    *C.syntra_ffi_host_t
+	once      sync.Once
+	closed    atomic.Bool
+	timeoutMs uint32
 }
 
 func (c *ffiHostCore) locked() (*C.syntra_ffi_host_t, error) {
@@ -603,6 +625,22 @@ func (c *ffiHostCore) onFrame(frame []byte) ([][]byte, []uint64, *RpcError) {
 		return nil, nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: host closed")
 	}
 	defer c.unlockHandle()
+	// Thread the configured default: host_open has no timeout param, so a
+	// zero wire timeout would otherwise fall back to the Rust hard-coded
+	// 3s instead of cfg.timeout. Rewrite zero to the configured default
+	// (validated <= MaxRPCTimeoutMs) to match the pure-Go core.
+	wire := frame
+	if f, uerr := UnmarshalFrame(frame); uerr == nil && BodyKindOf(f) == BodyKindRequest && f.GetRequest().GetTimeoutMs() == 0 {
+		f.GetRequest().TimeoutMs = c.timeoutMs
+		raw, merr := MarshalFrame(NewRequestFrame(f.GetVersion(), f.GetRequestId(), f.GetRequest()))
+		if merr != nil {
+			// Leave the original bytes for the native core: it reports
+			// malformed requests as per-RPC errors, never fatal.
+			wire = frame
+		} else {
+			wire = raw
+		}
+	}
 	const maxCancels = 64
 	cancels := make([]C.uint64_t, maxCancels)
 	var out *C.uint8_t
@@ -610,7 +648,7 @@ func (c *ffiHostCore) onFrame(frame []byte) ([][]byte, []uint64, *RpcError) {
 	var hasResp C.int32_t
 	var nCancel C.uintptr_t
 	var st C.int32_t
-	withBorrowed(frame, func(ptr *C.uint8_t, fln C.uintptr_t) {
+	withBorrowed(wire, func(ptr *C.uint8_t, fln C.uintptr_t) {
 		st = C.syntra_ffi_host_on_frame(h, ptr, fln, &out, &ln, &hasResp,
 			&cancels[0], C.uintptr_t(len(cancels)), &nCancel)
 	})

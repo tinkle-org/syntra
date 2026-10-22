@@ -76,6 +76,20 @@ the crates.io model governs.
 
 ### Added
 
+- Production native ABI in `crates/syntra-ffi` (`production` feature) with
+  `crates/syntra-ffi/include/syntra_production.h`: transport-agnostic
+  initiator/responder cores, stable handles, version checks, buffer
+  ownership, lifecycle, frame ingest, and outbound actions.
+- Host policy bridge in `crates/syntra-runtime::policy`: asynchronous
+  authentication and authorization completion with tokens distinct from
+  wire `request_id` values.
+- Generic recovery boundary in `crates/syntra-runtime::recovery`:
+  application-supplied stream checkpoints with local recovery actions; the
+  core never invokes recovery RPCs.
+- Go production adapter under `-tags syntranative` linked against the
+  production library, with lifecycle and concurrency coverage.
+- `docs/production-runtime.md` describing engine ownership, the native ABI,
+  recovery rules, and distribution.
 - Apache-2.0 `LICENSE`; all Rust packages are Apache-2.0 and publish
   to crates.io via release-plz Trusted Publishing (OIDC, with scoped
   `CARGO_REGISTRY_TOKEN` bootstrap fallback).
@@ -84,17 +98,19 @@ the crates.io model governs.
   `.github/workflows/release.yml` (schema/source/crate/Go archives,
   descriptor/manifests/vectors, SHA256SUMS attached to the syntra-core
   GitHub Release; nested `bindings/go/vX.Y.Z` tag created-or-verified at
-  the same revision by the release workflow; no native/header/browser-WASM
-  assets).
-- `crates/syntra-ffi` is default-empty (no C ABI exports) with an explicit
-  native `test-fixture` feature only for tests; all WASM targets are
-  rejected at compile time. CI runs default workspace tests plus
-  `--features test-fixture` tests and `build_contract.py`, and asserts the
-  expected WASM failure alongside non-FFI WASM checks.
+  the same revision by the release workflow; no browser-WASM assets —
+  native production ABI ships as source plus header, built from the tagged
+  source).
+- `crates/syntra-ffi` is default-empty (no C ABI exports by default) with
+  `test-fixture` for tests and `production` for the native ABI; all WASM
+  targets are rejected at compile time. CI runs default workspace tests
+  plus `--features test-fixture` and `--features production` tests and
+  `build_contract.py`, and asserts the expected WASM failure alongside
+  non-FFI WASM checks.
 - Committed generated types under `crates/` (Rust) and `bindings/go/` (Go,
   incl. `*.pb.go`), drift-checked by `scripts/validate-schema.py
-  --drift-only` and CI jobs (default + fixture `cargo test`, default-tag
-  `go test`, expected-failure WASM check).
+  --drift-only` and CI jobs (default + fixture + production `cargo test`,
+  default-tag and `syntranative` `go test`, expected-failure WASM check).
 - Seven-file public IDL in `proto/syntra/v1`, preserving the
   existing message names, field numbers, oneofs, enum registry and reservations.
   Session control/capability messages and requested extensions remain deferred
@@ -202,9 +218,9 @@ the crates.io model governs.
   `<crate>-vX.Y.Z` (+ nested `bindings/go/vX.Y.Z` at the syntra-core
   revision) with crates.io publication plus GitHub Release assets (source,
   crate, Go-bindings archives, descriptor, manifests, vectors, SHA256SUMS);
-  no native/header/browser-WASM assets, no GHCR, no `buf push`. Go servers
-  use the default pure-Go module; `syntranative` is unsupported and
-  withheld.
+  no browser-WASM assets, no GHCR, no `buf push`. Go servers use the
+  default pure-Go module or link the production library with
+  `-tags syntranative` (native ABI via `syntra-ffi` `production` feature).
 - `.tmp/`-only generation model: committed generated types now live under
   `crates/` (Rust) and `bindings/go/` (Go, incl. `*.pb.go`), drift-checked
   by `scripts/validate-schema.py --drift-only` (CI-enforced). No wire or

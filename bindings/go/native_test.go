@@ -1,9 +1,9 @@
 //go:build syntranative
 
-// Unsupported adapter tests: require a custom implementation of the
-// proposed syntra_ffi_* ABI that the current crates/syntra-ffi does not
-// export, so linking fails. Skipped by default (no -tags); CI runs
-// default tags only. Do not enable in CI or releases.
+// Production native adapter tests: require the production Rust library
+// (cargo build -p syntra-ffi --features production) linked with
+// -tags syntranative. Skipped by default (no -tags); CI runs this suite
+// in the go-tests native step (see repo-validation.yml).
 package syntra
 
 import (

@@ -76,13 +76,10 @@ pub fn encode_frame(frame: &Frame) -> Vec<u8> {
     frame.encode_to_vec()
 }
 
-/// Decode + validate a received `Frame`.
-///
-/// Steps in order (SNTR-WIRE-005): (1) well-formedness + size/depth,
-/// (2) version, (3) `request_id` discipline, (4) variant-state legality,
-/// (5) per-variant semantics. First failure determines the error;
-/// validation completes before dispatch.
-pub fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, SyntraError> {
+/// Shared raw-wire prelude: emptiness, envelope size, then the bounded
+/// top-level pre-scan. Used by both [`decode_frame`] and
+/// [`validate_wire_structure`] so the two entry points cannot drift.
+fn pre_scan(bytes: &[u8]) -> Result<ScanStats, SyntraError> {
     if bytes.is_empty() {
         return Err(SyntraError::Protocol {
             code: ErrorCode::InvalidArgument,
@@ -95,10 +92,20 @@ pub fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, Syntr
             message: "frame exceeds maximum envelope size".to_string(),
         });
     }
+    scan_top_level(bytes)
+}
+
+/// Decode + validate a received `Frame`.
+///
+/// Steps in order (SNTR-WIRE-005): (1) well-formedness + size/depth,
+/// (2) version, (3) `request_id` discipline, (4) variant-state legality,
+/// (5) per-variant semantics. First failure determines the error;
+/// validation completes before dispatch.
+pub fn decode_frame(bytes: &[u8], ctx: ValidationContext) -> Result<Frame, SyntraError> {
     // Raw pre-scan (SNTR-SER-006/008, SNTR-WIRE-002/004): reserved
     // numbers, duplicate bodies, unknown-only bodies, and depth/alloc
     // limits are decided here, before prost allocates anything.
-    let scan = scan_top_level(bytes)?;
+    let scan = pre_scan(bytes)?;
     let frame = Frame::decode(bytes).map_err(|_| SyntraError::Protocol {
         code: ErrorCode::InvalidArgument,
         message: "malformed protobuf frame".to_string(),
@@ -287,6 +294,41 @@ pub fn validate_frame(frame: &Frame, ctx: ValidationContext) -> Result<FrameKind
 /// Outcome of the raw wire pre-scan.
 struct ScanStats {
     unknown_present: bool,
+    body_present: bool,
+}
+
+/// Raw-wire structural validation without semantic checks.
+///
+/// Runs the same bounded pre-scan as [`decode_frame`] (reserved
+/// top-level fields, duplicate body alternatives, truncation,
+/// allocation and depth bounds) followed by a full prost decode, but
+/// classifies no method, version, or state semantics. The decode matters:
+/// the pre-scan skips most body contents (only `RpcResult` -> `RpcError`
+/// is descended into), so malformed nested protobuf would otherwise read
+/// as structurally sound. Used by embedding boundaries that map some
+/// decode failures to per-RPC errors: structural violations stay fatal
+/// even when the envelope also carries a malformed method.
+pub fn validate_wire_structure(bytes: &[u8]) -> Result<(), SyntraError> {
+    let scan = pre_scan(bytes)?;
+    Frame::decode(bytes).map_err(|_| SyntraError::Protocol {
+        code: ErrorCode::InvalidArgument,
+        message: "malformed protobuf frame".to_string(),
+    })?;
+    if !scan.body_present {
+        if scan.unknown_present {
+            // Unknown-only envelope: same SNTR-WIRE-004 classification as
+            // `decode_frame`, never silently dropped, never success.
+            return Err(SyntraError::Protocol {
+                code: ErrorCode::Unimplemented,
+                message: "unknown frame variant".to_string(),
+            });
+        }
+        return Err(SyntraError::Protocol {
+            code: ErrorCode::InvalidArgument,
+            message: "frame body must be set".to_string(),
+        });
+    }
+    Ok(())
 }
 
 /// Scan top-level protobuf wire bytes before prost decodes.
@@ -342,7 +384,7 @@ fn scan_top_level(bytes: &[u8]) -> Result<ScanStats, SyntraError> {
         }
         i = skip_top_value(bytes, i, wire, field)?;
     }
-    Ok(ScanStats { unknown_present })
+    Ok(ScanStats { unknown_present, body_present: body_count == 1 })
 }
 
 fn reject_reserved(field: u32) -> Result<(), SyntraError> {
@@ -535,6 +577,42 @@ mod tests {
             body: None,
         };
         assert!(validate_frame(&f, ctx_active()).is_err());
+    }
+
+    #[test]
+    fn wire_structure_rejects_bodyless_input_like_decode() {
+        // version=1 with no body: structurally incomplete.
+        let raw = [0x08u8, 0x01];
+        assert!(validate_wire_structure(&raw).is_err());
+        assert!(decode_frame(&raw, ctx_active()).is_err());
+    }
+
+    #[test]
+    fn wire_structure_rejects_malformed_nested_body_like_decode() {
+        // version=1 plus a request body (field 12) whose nested bytes are
+        // protobuf garbage: the pre-scan skips body contents by length, so
+        // only the full decode rejects it.
+        let mut raw = vec![0x08u8, 0x01, 0x62, 0x0A];
+        raw.extend([0xFFu8; 10]);
+        assert!(validate_wire_structure(&raw).is_err());
+        assert!(decode_frame(&raw, ctx_active()).is_err());
+    }
+
+    #[test]
+    fn wire_structure_matches_decode_on_unknown_only_envelope() {
+        // version=1 plus unknown top-level field 90: SNTR-WIRE-004
+        // classifies this UNIMPLEMENTED, never INVALID_ARGUMENT.
+        let raw = [0x08u8, 0x01, 0xD0, 0x05, 0x01];
+        let wire_err = validate_wire_structure(&raw).expect_err("unknown-only must fail");
+        assert!(matches!(
+            wire_err,
+            SyntraError::Protocol { code: crate::error::ErrorCode::Unimplemented, .. }
+        ));
+        let decode_err = decode_frame(&raw, ctx_active()).expect_err("unknown-only must fail");
+        assert!(matches!(
+            decode_err,
+            SyntraError::Protocol { code: crate::error::ErrorCode::Unimplemented, .. }
+        ));
     }
 
     #[test]

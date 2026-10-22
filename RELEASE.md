@@ -38,8 +38,8 @@ An unchecked box blocks tagging.
 - [ ] Proto lint passes
 - [ ] Proto breaking checks pass
 - [ ] Committed generated types fresh (`validate-schema.py --drift-only`)
-- [ ] Rust tests pass (default `cargo test --locked --workspace` plus `cargo test -p syntra-ffi --features test-fixture` and `build_contract.py`)
-- [ ] Go tests pass (`go test ./...` in `bindings/go`, default tags only; no `-tags syntranative`)
+- [ ] Rust tests pass (default `cargo test --locked --workspace` plus `cargo test -p syntra-ffi --features test-fixture`, `cargo test -p syntra-ffi --features production`, and `build_contract.py`)
+- [ ] Go tests pass (`go test ./...` in `bindings/go` with default tags; `go test -tags syntranative ./...` against the production library)
 - [ ] WASM checks pass (non-FFI `cargo check --locked -p syntra-core -p syntra-runtime -p syntra-ws -p syntra-web --target wasm32-unknown-unknown` succeeds; `syntra-ffi` WASM check fails with `syntra-ffi does not support WASM`)
 - [ ] Conformance requirements complete
 - [ ] Test vectors validated
@@ -226,22 +226,24 @@ validated tagged commit (crates.io publishing is a separate preceding step):
   `git archive`, including build scripts and schemas.
 - `*.crate` — workspace package archives. `cargo package --workspace
   --locked --no-verify` must succeed; missing archives fail the job. The
-  `syntra-ffi` archive is expected noise: default builds export no C ABI
-  (empty fixture crate by design), and its presence does not imply native
-  support. The registry publishing step performs build verification.
-  Source archives do not vendor dependencies and do not promise offline builds.
-- `syntra-go-bindings-<tag>.tar.gz` — the committed Go module source.
+  `syntra-ffi` default build exports no C ABI; `test-fixture` and
+  `production` features export their respective ABIs. The registry
+  publishing step performs build verification. Source archives do not
+  vendor dependencies and do not promise offline builds.
+- `syntra-go-bindings-<tag>.tar.gz` — the committed Go module source
+  (`bindings/go` only; it documents the header location but does not carry
+  the header). Native builds use the authoritative header from the source
+  snapshot (`syntra-source-<tag>.tar.gz`:
+  `crates/syntra-ffi/include/syntra_production.h`).
 - `CHANGELOG.md`, `RELEASE.md`, `GOVERNANCE.md`, `LICENSE` (as tagged).
 - `SHA256SUMS` — checksums for exactly the uploaded assets other than itself.
 
-**Go native mode (`syntranative`) is unsupported.** Its session-oriented C
-declarations do not match the Rust FFI exports, signatures, and ownership
-contract. An ABI-version integer alone cannot establish compatibility.
-Native libraries/headers and browser WASM binaries are withheld from this
-release payload until the FFI/Go owners align the contract and add linked
-runtime tests. The default pure-Go module is the documented Go path. Rust
-and WASM compile checks are useful gates, not native-Go integration proof
-or a browser SDK support claim.
+**Go native mode (`-tags syntranative`) builds against the production
+library** (`cargo build -p syntra-ffi --features production`) and the
+authoritative `crates/syntra-ffi/include/syntra_production.h`. Native
+libraries are built from the tagged source; the Go module documents the
+required header and linking setup. Browser WASM binaries remain withheld;
+WASM checks are gates, not SDK claims. See `docs/production-runtime.md`.
 
 `sh scripts/collect-release-artifacts.sh syntra-core-vX.Y.Z` (or
 `sh scripts/collect-release-artifacts.sh vX.Y.Z syntra-core-vX.Y.Z` for a

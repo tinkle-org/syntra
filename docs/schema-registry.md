@@ -146,8 +146,8 @@ pull request
   ↓  buf build
   ↓  buf breaking --against <Git baseline>
   ↓  committed-generation drift check (--drift-only)
-  ↓  cargo test (default workspace + syntra-ffi test-fixture + build_contract.py)
-  ↓  go test (default tags only, no syntranative)
+  ↓  cargo test (default workspace + syntra-ffi test-fixture + syntra-ffi production + build_contract.py)
+  ↓  go test (default tags plus `syntranative` against the production library)
   ↓  WASM check (non-FFI success + expected syntra-ffi failure)
   ↓  merge allowed (only on green + required reviews)
 ```
@@ -184,15 +184,15 @@ closed. `.tmp/` holds disposable reproducibility output and must not be tracked.
 Per-ecosystem guide (versions below are the versions pinned for this repository's validation in `specifications/schema/generation.md`, not floating `latest`):
 
 - **Rust (primary):** pin released crates.io versions, for example `cargo add syntra-core@X.Y.Z`, or an exact crate tag/commit for Git consumers. Generated schema types provide message/enum types using the pinned `prost` runtime; they provide no networking or transport. Runtime/FFI crates are separate non-normative code. Branch on `ErrorCode`, never message text; map unknown numeric codes to `UNKNOWN` per SNTR-ERR-005. Generated getters alone do not implement that policy. The syntra-core GitHub Release also carries source and `.crate` archives; third-party dependencies are not vendored.
-- **Go:** fetch `github.com/tinklehq/syntra/bindings/go@vX.Y.Z` through the paired nested tag. Default pure-Go mode is the documented path. Import generated types from `.../bindings/go/gen/syntra/v1`; generator `buf.build/protocolbuffers/go:v1.36.6`, revision 1, with `paths=source_relative`; runtime `google.golang.org/protobuf` at the pinned version. Proxy warmup verifies the leading-`v` version; pkg.go.dev indexing is asynchronous and best-effort.
+- **Go:** fetch `github.com/tinklehq/syntra/bindings/go@vX.Y.Z` through the paired nested tag. The default pure-Go build needs no native library. For the Rust-backed path, build the production library and use `-tags syntranative` (see `docs/production-runtime.md` and `bindings/go/README.md`). Import generated types from `.../bindings/go/gen/syntra/v1`; generator `buf.build/protocolbuffers/go:v1.36.6`, revision 1, with `paths=source_relative`; runtime `google.golang.org/protobuf` at the pinned version. Proxy warmup verifies the leading-`v` version; pkg.go.dev indexing is asynchronous and best-effort.
 - **Other languages:** generate from `buf export` output of the tagged revision with a pinned local compiler and record the toolchain version in the consumer's lockfile.
 
-**Native Go mode (`syntranative`) is unsupported.** Its client/host session
-declarations differ from Rust's C ABI exports, signatures, and ownership
-contract. Do not link the wrapper to Rust binaries based only on an ABI
-version number. Native libraries/headers and browser WASM binaries are not
-published by this release workflow. FFI/Go owners must align the contract and
-add linked runtime tests before those support claims or assets return.
+**Native Go mode (`-tags syntranative`) links the production library**
+built with `cargo build -p syntra-ffi --features production` against
+`crates/syntra-ffi/include/syntra_production.h`. Verify the ABI version and
+run the linked runtime tests; a version integer alone is not compatibility
+proof. Native libraries are built from tagged source; browser WASM binaries
+remain unpublished.
 
 Pin exact package versions or Git revisions, generator plugin versions and
 revisions, and the Protobuf runtime. Rebuild bindings deliberately; never float.
@@ -240,7 +240,8 @@ Authoritative relationships at a glance (see §7 for rules):
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |
 | Transport conformance | Transport profile ID | `SNTR-WSS-H1-V1` (see `conformance/profiles.yaml`) |
-| Native Go / browser WASM binaries | Unsupported distribution; no release assets | Requires ABI alignment and linked runtime tests |
+| Native Go library | Supported via source build: `cargo build -p syntra-ffi --features production` plus `-tags syntranative` with `CGO_LDFLAGS`/`LD_LIBRARY_PATH` and linked runtime tests; no prebuilt release assets | Requires ABI version check (`CheckABI`) and linked runtime tests |
+| Browser WASM binaries | Unsupported distribution; no release assets | No browser ABI defined; `syntra-ffi` rejects WASM targets |
 
 Per-crate tags such as `syntra-core-v1.0.0` are explicit. Neither global
 `v1.0.0` nor `proto-v1.0.0` tags drive this workflow. Implementation versions

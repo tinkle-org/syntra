@@ -34,7 +34,9 @@ pub mod state;
 
 pub use codec::{decode_frame, encode_frame, MAX_FRAME_BYTES};
 pub use error::{ErrorCode, RpcError, SyntraError};
-pub use frame::{validate_frame, FrameKind, ValidationContext, MAX_DECODE_DEPTH};
+pub use frame::{
+    validate_frame, validate_wire_structure, FrameKind, ValidationContext, MAX_DECODE_DEPTH,
+};
 pub use handshake::{
     build_hello, negotiate_version, validate_connection_id, validate_hello_range,
     HANDSHAKE_TIMEOUT_DEFAULT, MAX_CREDENTIAL_BYTES, MAX_VERSION, MIN_VERSION,

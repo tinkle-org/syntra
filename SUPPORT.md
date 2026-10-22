@@ -8,9 +8,9 @@
 - **Questions and ideas:** open a GitHub Discussion or Issue in
   `tinklehq/syntra` with a clear title, what you tried, and a minimal
   neutral reproduction (echo / generic key-value / generic subscription).
-- **Bugs in specs, schemas, or (forthcoming) code:** open a GitHub Issue
-  with the requirement ID or field number, expected vs. actual behavior,
-  and environment (Buf/protoc version, OS, toolchain).
+- **Bugs in specs, schemas, or code:** open a GitHub Issue with the
+  requirement ID or field number, expected vs. actual behavior, and
+  environment (Buf/protoc version, OS, toolchain).
 - **Vulnerabilities or conduct issues:** do **not** use public issues.
   See [`SECURITY.md`](SECURITY.md) and
   [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for private reporting via
@@ -29,9 +29,9 @@ reporting for this repository are the authoritative channels.
   only as historical provenance and an archived descriptor in
   [`compatibility/v1-initial`](compatibility/v1-initial/README.md); the
   FILE/source migration is a known breaking difference.
-- Forthcoming normative specifications, transport profiles, conformance
-  suite, and Rust reference implementation — support scope for each will
-  be stated in its README and `CHANGELOG.md` when published.
+- Draft specifications, transport profiles, conformance suite, and Rust
+  reference implementation — support scope for each is stated in its
+  README and `CHANGELOG.md`.
 
 ## What is not supported
 

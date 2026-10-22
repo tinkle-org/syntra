@@ -239,7 +239,7 @@ informative for that concern.
 | Network mappings (framing, TLS profile, HTTP/WS binding, limits on the wire) | `specifications/transports/*.md` — transport specifications (forthcoming) | Core specs, code |
 | Security requirements (threat model, auth interfaces, transport policy, limits) | `specifications/security/*.md` — security specifications (forthcoming) | Architecture overview, code |
 | Executable verification (what "conformant" means) | Conformance and interoperability suite (forthcoming) | Manual test notes |
-| Implementation (one way to satisfy the above) | Rust reference implementation (forthcoming, non-normative) | Any other language implementation |
+| Implementation (one way to satisfy the above) | Rust reference implementation (present, non-normative) | Any other language implementation |
 
 **SYN-ARCH-040** — Protobuf schemas are the sole authority for data
 representation. Specification prose MUST NOT redefine field numbers or

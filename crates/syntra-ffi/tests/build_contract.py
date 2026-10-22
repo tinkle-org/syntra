@@ -41,14 +41,16 @@ class BuildContract(unittest.TestCase):
             self.skipTest("symbol check requires Darwin or Linux nm")
         return subprocess.run(command, text=True, capture_output=True, check=True).stdout
 
-    def test_default_artifact_has_no_fixture_abi(self):
-        result = self.cargo("build", "--locked", "-p", "syntra-ffi", "--no-default-features")
+    def test_default_artifact_has_no_abi(self):
+        result = self.cargo("build", "-p", "syntra-ffi", "--no-default-features")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("syntra_open", self.symbols())
         self.assertNotIn("syntra_abi_compatible", self.symbols())
+        self.assertNotIn("syntra_ffi_client_open", self.symbols())
+        self.assertNotIn("syntra_ffi_host_open", self.symbols())
 
     def test_blocking_wasm_builds_fail_with_actionable_diagnostic(self):
-        for features in [[], ["--features", "test-fixture"]]:
+        for features in [[], ["--features", "test-fixture"], ["--features", "production"]]:
             with self.subTest(features=features):
                 result = self.cargo(
                     "build", "--locked", "-p", "syntra-ffi", "--no-default-features",
@@ -57,9 +59,44 @@ class BuildContract(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stderr)
                 self.assertIn("syntra-ffi does not support WASM", result.stderr)
 
+    def test_explicit_production_exports_abi(self):
+        result = self.cargo(
+            "build", "-p", "syntra-ffi", "--no-default-features",
+            "--features", "production",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for symbol in [
+            "syntra_ffi_abi_version",
+            "syntra_ffi_free",
+            "syntra_ffi_client_open",
+            "syntra_ffi_client_hello_frame",
+            "syntra_ffi_client_activate",
+            "syntra_ffi_client_on_frame",
+            "syntra_ffi_client_begin_call",
+            "syntra_ffi_host_open",
+            "syntra_ffi_host_accept_hello",
+            "syntra_ffi_host_auth_complete",
+            "syntra_ffi_host_on_frame",
+            "syntra_ffi_host_take_pending",
+            "syntra_ffi_host_answer",
+            "syntra_ffi_host_notify",
+            "syntra_ffi_host_next_outbound",
+        ]:
+            self.assertIn(symbol, self.symbols())
+        executable = self.target / "production-smoke"
+        subprocess.run(
+            ["cc", "-std=c11", "-Wall", "-Wextra", "-Werror",
+             "-I", str(ROOT / "crates/syntra-ffi/include"),
+             str(ROOT / "crates/syntra-ffi/tests/production_smoke.c"),
+             "-L", str(self.target / "debug"), "-lsyntra_ffi",
+             f"-Wl,-rpath,{self.target / 'debug'}", "-o", str(executable)],
+            check=True, capture_output=True, text=True,
+        )
+        subprocess.run([str(executable)], check=True, timeout=30)
+
     def test_explicit_native_fixture_exports_abi(self):
         result = self.cargo(
-            "build", "--locked", "-p", "syntra-ffi", "--no-default-features",
+            "build", "-p", "syntra-ffi", "--no-default-features",
             "--features", "test-fixture",
         )
         self.assertEqual(result.returncode, 0, result.stderr)

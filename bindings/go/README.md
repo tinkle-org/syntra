@@ -16,10 +16,28 @@ default build is pure Go and requires neither CGO nor a native library.
 This module never downloads binaries. In this build, `NativeAvailable()`
 returns false and `CheckABI()` returns nil because no native library is linked.
 
-**Native Go integration (`-tags syntranative`) is unsupported.** Installing
-a Release-built `libsyntra_ffi` does not enable it. The adapter in `native.go`
-declares a proposed ABI that the current Rust crate does not export; linking
-fails before its ABI version check can run. See [Native ABI blockers](#native-abi-blockers).
+**Native Go integration (`-tags syntranative`) uses the production Rust core.**
+Build the native library from the repository root, then run Go from this
+directory with the linker and runtime paths set (per
+`.github/workflows/repo-validation.yml`):
+
+```sh
+cargo build -p syntra-ffi --features production
+```
+
+```sh
+CGO_LDFLAGS="-L../../target/debug -lsyntra_ffi" LD_LIBRARY_PATH="../../target/debug" go test -tags syntranative ./...
+```
+
+CI runs the same step with `cargo build --locked -p syntra-ffi
+--features production` and `LIBDIR="$GITHUB_WORKSPACE/target/debug"`
+(`CGO_LDFLAGS="-L$LIBDIR -lsyntra_ffi"`,
+`LD_LIBRARY_PATH="$LIBDIR:$LD_LIBRARY_PATH"`,
+`go test -tags syntranative -count=1 ./...`) with `working-directory:
+bindings/go`. `-tags syntranative` alone does not link the library.
+The adapter in `native.go` matches
+`crates/syntra-ffi/include/syntra_production.h`.
+See [Native ABI](#native-abi).
 
 ## Layout
 
@@ -28,7 +46,7 @@ fails before its ABI version check can run. See [Native ABI blockers](#native-ab
 | `gen/syntra/v1/*.pb.go` | Generated types. Committed, drift-checked (see `.gitignore`). Regenerate, never hand-edit. |
 | `syntra.go` | Package doc, type aliases, bounds, `RpcError` + normalization/branch helpers, frame/handshake/RPC validators, protowire codec pre-scan, handshake machine, correlation tracker. No messenger semantics. |
 | `session.go` | `Transport` + `LoopbackPair`, `Client` (handshake pump, `Call` with context deadlines/cancellation, notifications, deterministic close), `Host` (`Serve` dispatch, `NotifyAll`), `HandlerFunc`, `StaticPolicy`. |
-| `native.go` (`-tags syntranative`) | Unsupported CGO adapter proposal; incompatible with the current Rust FFI. |
+| `native.go` (`-tags syntranative`) | Production CGO adapter matching `crates/syntra-ffi/include/syntra_production.h`. |
 | `native_purego.go` (default) | Supported pure-Go client/host cores. |
 | `wire_test.go` | Golden vectors from `conformance/test-vectors/protobuf/vectors.yaml` plus duplicate-body, reserved-field, truncation, and enum-normalization cases. |
 | `session_test.go` | Lifecycle tests over loopback with neutral echo fixtures (`/example.Echo/Echo`, `/example.KV/Get`, `/example.Slow/Wait`). |
@@ -99,36 +117,23 @@ go test -race ./...
   body from metadata remains blocked by
   [RFC B5](../../rfcs/0001-public-idl-layout.md#b5-unknown-body-versus-metadata-discriminator).
 
-## Native ABI blockers
+## Native ABI
 
-`native.go` and [`crates/syntra-ffi/src/lib.rs`](../../crates/syntra-ffi/src/lib.rs)
-describe different interfaces:
+`native.go` matches [`crates/syntra-ffi/include/syntra_production.h`](../../crates/syntra-ffi/include/syntra_production.h)
+and the `production` feature in [`crates/syntra-ffi`](../../crates/syntra-ffi/src/lib.rs):
 
-- Go expects `syntra_ffi_*` client/host frame operations with pointer handles.
-  Rust exports `syntra_*` runtime/loopback operations with integer `u64`
-  handles, including `syntra_open` and `syntra_handshake`.
-- Go expects ABI integer `1`; Rust returns packed `1.0.0` (`0x10000`) from
-  `syntra_abi_version` and provides `syntra_abi_compatible`. Rust buffers
-  come from boxed slices and must use `syntra_free`; they do not implement
-  the adapter's proposed malloc-compatible ownership contract. Rust method
-  strings use NUL termination rather than Go's proposed explicit lengths.
-- **Status mapping deferred:** Go's proposed table assigns -1 to invalid
-  argument, -2 closed, -3 ABI mismatch, -4 memory, -5 expired, -6 internal.
-  Rust actually defines -1 panic, -2 argument, -3 handshake, -4 RPC,
-  -5 timeout, -6 cancelled, -7 unavailable, -8 resource, -9 version,
-  -10 UTF-8, and +1 poll-again. Copying this table alone cannot repair the
-  ABI or its different per-RPC error model. Restore a shared authoritative
-  ABI/header first, then map and test every real status against that library.
-- **Host default timeout deferred:** the proposed `syntra_ffi_host_open`
-  drops resolved `HostConfig.DefaultTimeout` because it has no timeout
-  parameter. The actual Rust `syntra_open` creates a loopback pair using
-  `ConnectionConfig::default()` (30 seconds) and exposes no host-config
-  entry point. A local extra C argument or Go-only timer would not configure
-  the Rust deadline owner. ABI restoration must provide configuration to
-  that owner and verify `timeout_ms=0` with a nondefault host budget. The
-  supported pure-Go host already applies its resolved timeout (3 seconds
-  by default; maximum configured/requested budget 30 seconds).
+- Pointer handles for initiator/responder cores, opened and closed exactly once.
+- ABI version `1` on both sides via `syntra_ffi_abi_version` / `CheckABI`.
+- Status table `0, -1..-6` for FFI-layer failures; per-RPC failures travel
+  inside `RpcResult` frames.
+- Owned outputs released with `syntra_ffi_free`; strings as `(ptr, len)`.
+- Host authentication completes in the application: `host_accept_hello`
+  validates and selects a version, then `host_auth_complete` binds the
+  resolved principal and returns `ServerReady`.
 
-CGO typechecking/vetting of local declarations is not native integration
-coverage. Native support requires real-library linking and lifecycle,
-status, ownership, and deadline tests after these contracts are reconciled.
+The separate `syntra_*` loopback ABI remains test-only behind
+`test-fixture` and `include/syntra.h`.
+
+CGO typechecking alone is not integration coverage. Native verification
+requires real-library linking plus lifecycle, status, ownership, deadline,
+and concurrency tests.
