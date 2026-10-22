@@ -1,0 +1,44 @@
+rfcs/0006-update-recovery-profile.md
+  s_95afc7dd312d61::t_04c822c2dd87d1 218-225
+conformance/manifest/recovery.yaml
+  s_e674ef395fde23::t_4d5c44a5e16eba 80-81,83
+conformance/profiles.yaml
+  s_e674ef395fde23::t_78bd7fdd088861 45
+crates/syntra-runtime/src/recovery/profile.rs
+  s_e1b4893de64fa2::t_e17c6517bb75b7 288-291
+  s_95afc7dd312d61::t_4a48c0521b58da 292
+conformance/recovery_profile/recovery.md
+  s_e674ef395fde23::t_2f523018d86b3f 97,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "484fb40ab90e5472d19ca25bae95822c9e0059eb",
+  "prompts": {},
+  "sessions": {
+    "s_95afc7dd312d61": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9eab6cbaffeXk73l1OhhG6yaF",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_e1b4893de64fa2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9eab6cceffeW1EkJA9rQM767s",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_e674ef395fde23": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9eab6cadffe1JlHsp50e6wXBd",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
