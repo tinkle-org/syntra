@@ -1,0 +1,52 @@
+conformance/recovery_profile/README.md
+  s_af1b238feae6f8::t_22b80af124a404 13
+  s_af1b238feae6f8::t_9d992bd32a5d30 61-62
+rfcs/0006-update-recovery-profile.md
+  s_af1b238feae6f8::t_6197ebc98afefa 111-114
+  s_af1b238feae6f8::t_ed0257659a434f 142-148
+  s_af1b238feae6f8::t_225bd40e67a57c 70-71,77-78
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_af1b238feae6f8::t_426938ee0f8274 336-340,506-515
+conformance/recovery_profile/recovery.md
+  s_af1b238feae6f8::t_a5d26c2553db40 1
+  s_af1b238feae6f8::t_50c938fa26bd89 92-102
+  s_af1b238feae6f8::t_5e12ad4df0cd71 142-143
+proto/syntra/v1/recovery_profile.proto
+  s_af1b238feae6f8::t_757bed4429231e 202-209
+  s_af1b238feae6f8::t_87ae8d15166cac 77-81
+conformance/recovery_profile/recovery.yaml
+  s_af1b238feae6f8::t_227ade141e617b 74,76
+  s_af1b238feae6f8::t_31d9f995a9ae9c 32-33
+  s_af1b238feae6f8::t_11f0afa02cc8ae 113,119,128,132,134
+  s_af1b238feae6f8::t_ffd226a74f290c 1
+  s_af1b238feae6f8::t_abc69ef79fa0b1 46,48
+  s_af1b238feae6f8::t_e7b9454e081b67 47
+  s_af1b238feae6f8::t_7713bab77df40c 118,120-127,129-131,133
+  s_af1b238feae6f8::t_6d07ac91e4442d 75
+conformance/profiles.yaml
+  s_af1b238feae6f8::t_9b19cde089bf77 47-48,50
+specifications/profiles/recovery.md
+  s_af1b238feae6f8::t_72777dd2e67f19 58
+  s_af1b238feae6f8::t_fdc27bfad688fe 38
+  s_af1b238feae6f8::t_1f7ccb1a2ba8bb 48
+  s_af1b238feae6f8::t_28c4a3d5b25389 84
+  s_af1b238feae6f8::t_d34585b0ebd865 78
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_af1b238feae6f8::t_8f07aeaa9a2781 264-268,879-888,970-983,1057,1067-1071
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "536b8d73aab3a87e480ada4f0d27377ef049557c",
+  "prompts": {},
+  "sessions": {
+    "s_af1b238feae6f8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9efb0a2dffeeZgdMYugHEntYl",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
