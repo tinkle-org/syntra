@@ -31,7 +31,7 @@ All examples in this document are neutral only: echo round trip, generic key/val
 
 ## 2. Requirement IDs
 
-IDs in this section use prefix `SYN-URP`. They are proposed only and carry no normative force until acceptance. The defining proposal is [RFC 0006](../../rfcs/0006-update-recovery-profile.md). Core `SNTR-*` IDs remain owned by their defining core documents listed in [core index](../core/README.md) and indexed in [requirement registry](../core/requirements.md).
+IDs in this section use prefix `SYN-URP`. They are proposed only and carry no normative force until acceptance. The defining proposal is [RFC 0006](../../rfcs/0006-update-recovery-profile.md). Core `SNTR-*` IDs remain owned by their defining core documents listed in [core index](../core/README.md) and indexed in [requirement registry](../core/requirements.md). `SYN-URP-008` and `SYN-URP-009` are reserved and not assigned.
 
 ### 2.1 Initiator obligations
 
@@ -41,7 +41,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 **SYN-URP-003** — The initiator MUST treat each subscription as one independent logical stream. The initiator MUST track one continuity generation per stream, MUST treat checkpoints as opaque bytes, MUST present exact checkpoint bytes with explicit predecessor/result pairing, and MUST NOT perform arithmetic on checkpoint bytes by increment, decrement, ordering inference, or structural parsing.
 
-**SYN-URP-004** — The initiator MUST consume bounded replay pages, MUST follow the page continuation marker, MUST stop at the catch-up boundary, MUST apply the same validation pipeline to recovered batches and live batches, and MUST tolerate duplicates across the recovered/live boundary without treating a duplicate as a violation.
+**SYN-URP-004** — The initiator MUST consume bounded replay pages, MUST follow the page continuation marker, MUST stop at the catch-up boundary, MUST apply the same validation pipeline to recovered batches and live batches, and MUST tolerate duplicates across the recovered/live boundary without treating a duplicate as a violation. The initiator detects a duplicate by result checkpoint equality with an already applied checkpoint and skips it before predecessor chaining validation.
 
 **SYN-URP-005** — The initiator MUST follow the commit sequence receive → validate → offer → persist → confirm: receive the batch, validate it through the same pipeline as live batches, offer it to the application above Syntra, persist the resulting checkpoint through the application persistence point, and only then confirm the checkpoint through the defined generic invocation. Transport receipt or envelope decode MUST NOT be reported as committed progress or as application success.
 
@@ -51,7 +51,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 ### 2.2 Host obligations
 
-**SYN-URP-010** — The host MUST confirm the profile only where it implements it for the bound principal, MUST confirm per connection so that confirmation on one connection does not enable the profile on another, MUST document the confirmed profile version and bounds per deployment, and MUST reject unnegotiated profile use with `UNIMPLEMENTED` for an unknown or unconfirmed operation or `FAILED_PRECONDITION` for use of an unconfirmed option on a confirmed connection.
+**SYN-URP-010** — The host MUST confirm the profile only where it implements it for the bound principal, MUST confirm per connection so that confirmation on one connection does not enable the profile on another, MUST document the confirmed profile version and bounds per deployment, MUST accept the standardized profile negotiation invocation after ACTIVE before confirmation where the host implements the profile, and MUST reject other unnegotiated profile use with `UNIMPLEMENTED` for an unknown operation or `FAILED_PRECONDITION` for use of an unconfirmed operation or for use of an unconfirmed option on a confirmed connection. The negotiation invocation itself is the only permitted profile operation before confirmation.
 
 **SYN-URP-011** — The host MUST implement negotiation, subscribe, replay, catch-up, snapshot, continuation, confirm, and terminate operations as standardized generic invocations with versioned payloads inside existing envelopes. The host MUST NOT add envelope fields, MUST NOT reuse reserved numbers 16, 17 or reserved names `event`, `resume`, `ack`, and MUST keep unknown profile fields ignored on receipt where explicitly marked ignorable, rejecting unknown profile operations with `UNIMPLEMENTED`.
 
@@ -61,7 +61,7 @@ IDs in this section use prefix `SYN-URP`. They are proposed only and carry no no
 
 **SYN-URP-014** — The host MUST return bounded replay pages, each page stating its continuation marker and the catch-up boundary. Oversized history MUST be paged, never burst beyond the documented per-connection and per-subscription queue bounds. The host MUST stream invocation-triggered catch-up over the existing connection as `Notification` batches through the same validation and authorization path as live batches.
 
-**SYN-URP-015** — The host MUST emit an explicit catch-up completion signal when the stream reaches live, and MUST emit an explicit snapshot-required signal with `FAILED_PRECONDITION` when the requested checkpoint is outside retention or otherwise unrecoverable by replay. Silent restart from an unrelated point is forbidden. Silent truncation without the documented signal is forbidden.
+**SYN-URP-015** — The host MUST emit an explicit catch-up completion signal when the stream reaches live, and MUST fail the replay/catch-up invocation with `FAILED_PRECONDITION` in `RpcResult` while emitting an explicit snapshot-required signal as `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload when the requested checkpoint is outside retention or otherwise unrecoverable by replay. Silent restart from an unrelated point is forbidden. Silent truncation without the documented signal is forbidden.
 
 **SYN-URP-016** — The host MUST implement the snapshot transfer and installation contract through generic invocations in bounded pages: offer a snapshot under a provider-proven boundary checkpoint, transfer pages the initiator can store without interpreting, and mark installation complete only when the initiator confirms the boundary checkpoint through the defined confirm operation. The boundary MUST be proven by the provider, meaning the host application supplying the snapshot, so that subsequent batches MUST chain from exactly that boundary checkpoint and MUST be rejected otherwise. Snapshot formats remain provider-defined. Syntra defines only the transfer, boundary, and confirmation mechanics.
 
@@ -97,7 +97,7 @@ Each replay page states its continuation marker and the catch-up boundary. The c
 
 Replay responses are subject to the same queue bounds as live batches per [reliability](../core/reliability.md). Oversized history is paged across multiple bounded pages. Invocation-triggered catch-up streams over the existing connection as `Notification` batches through the same validation and authorization path as live batches.
 
-Recovered batches and live batches pass through the same validation pipeline: envelope validity, generation match, predecessor chaining, authorization context freshness, and size bounds. Duplicates across the recovered/live boundary are expected and tolerated. A duplicate is never a violation.
+Recovered batches and live batches pass through the same validation pipeline: envelope validity, generation match, predecessor chaining, authorization context freshness, and size bounds. Duplicates across the recovered/live boundary are expected and tolerated. The initiator detects a duplicate by result checkpoint equality with an already applied checkpoint and skips it before predecessor chaining validation. A duplicate is never a violation.
 
 Completion is explicit. When the stream reaches live, the host emits an explicit catch-up completion signal. When the requested checkpoint is outside retention or otherwise unrecoverable by replay, the host emits an explicit snapshot-required signal. Silent truncation without the documented signal is forbidden.
 
@@ -179,11 +179,12 @@ Profile errors use the existing typed codes. No code semantics change. Mappings:
 | Condition | Code | Scope |
 |---|---|---|
 | Unknown profile operation | `UNIMPLEMENTED` | Affected invocation only |
+| Use of an unconfirmed profile operation | `FAILED_PRECONDITION` | Affected invocation only |
 | Unknown stream handle | `UNIMPLEMENTED` | Affected invocation only |
 | Use of an unconfirmed option on a confirmed connection | `FAILED_PRECONDITION` | Affected invocation only |
 | Unauthorized or unknown principal at any hook | `PERMISSION_DENIED` or `UNAUTHENTICATED` | Affected invocation and targeted stream termination where possible |
 | Stale, forged, malformed, cross-stream, cross-generation, or cross-principal checkpoint | `FAILED_PRECONDITION`, or `UNAUTHENTICATED` where token-like | Affected invocation only, without leaking other principals' state |
-| Requested checkpoint outside retention or unrecoverable by replay | `FAILED_PRECONDITION` with explicit snapshot-required signal | Affected stream, recovery by snapshot path |
+| Requested checkpoint outside retention or unrecoverable by replay | `FAILED_PRECONDITION` in the failed replay/catch-up `RpcResult` plus explicit snapshot-required signal as `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload | Affected stream, recovery by snapshot path |
 | Overload or bound saturation | `RESOURCE_EXHAUSTED` with documented backoff, and/or explicit continuity loss with a new generation | Affected invocation or stream, never silent drop |
 | Transport loss with invocations outstanding | `UNAVAILABLE` with unknown outcome | All in-flight invocations on that connection |
 | Deadline expiry | `DEADLINE_EXCEEDED` | Affected invocation only |

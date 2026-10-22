@@ -16,7 +16,8 @@ option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntra
 // defaults: at most 64 subscriptions per connection, at most 256 per
 // principal, at most 16 pending profile calls per connection, at most
 // 262144 queued notification bytes per stream, at most 1048576 per
-// connection, at most 64 batches and 262144 bytes per replay page, at most
+// connection, at most 64 serialized batches and 262144 total bytes per
+// replay page with each serialized batch at most 262144 bytes, at most
 // 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
 // effective deadline 5 s where the request carries no explicit bounded
 // deadline.
@@ -75,10 +76,10 @@ message RecoveryReplayPage {
   // most 4096 bytes.
   bytes catchup_boundary = 6;
   // batch_payloads holds one serialized RecoveryBatch per entry. At most 64
-  // entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
-  // MUST validate each entry as a RecoveryBatch with matching generation and
-  // predecessor/result checkpoint continuity through the same pipeline as live
-  // batches.
+  // entries, each serialized entry at most 262144 bytes, total at most
+  // 262144 bytes. Consumers MUST validate each entry as a RecoveryBatch with
+  // matching generation and predecessor/result checkpoint continuity through
+  // the same pipeline as live batches.
   repeated bytes batch_payloads = 7;
 }
 
@@ -174,12 +175,15 @@ message RecoveryBatch {
   // result_checkpoint is the checkpoint this batch advances to. Opaque bytes,
   // at most 4096 bytes.
   bytes result_checkpoint = 5;
-  // batch_payload holds opaque application batch bytes. At most 262144 bytes.
+  // batch_payload holds opaque application batch bytes. The serialized
+  // RecoveryBatch entry is at most 262144 bytes, so batch_payload must leave
+  // room for subscription handle, generation, checkpoints, tags, and lengths.
   bytes batch_payload = 6;
 }
 
 // RecoveryBatchTrailer marks catch-up completion, snapshot need, continuity loss,
-// or targeted termination for one stream.
+// or targeted termination for one stream. Outcomes are mutually exclusive;
+// exactly one outcome is selected per trailer.
 message RecoveryBatchTrailer {
   // profile_version is the profile payload version. Valid value is 1.
   uint32 profile_version = 1;
@@ -191,20 +195,25 @@ message RecoveryBatchTrailer {
   // boundary_checkpoint is the catch-up or snapshot boundary. Opaque bytes, at
   // most 4096 bytes.
   bytes boundary_checkpoint = 4;
-  // next_generation carries the new generation on continuity loss. Zero means no
-  // continuity loss, nonzero is the new generation.
-  uint64 next_generation = 5;
-  // catchup_complete is true when the stream has reached live.
-  bool catchup_complete = 6;
-  // snapshot_required is true when the requested checkpoint is outside retention
-  // and replay cannot complete.
-  bool snapshot_required = 7;
-  // terminated is true when the host ends the targeted subscription. The trailer
-  // carries the typed terminal signal so the host can terminate one stream even
-  // when there is no outstanding invocation.
-  bool terminated = 8;
-  // terminate_reason carries the required machine-readable reason when terminated
-  // is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
-  // means no termination.
+  // outcome selects the terminal outcome for the stream. Outcomes are mutually
+  // exclusive; exactly one is selected per trailer. An unset outcome is
+  // representable by codecs but is not a valid trailer.
+  oneof outcome {
+    // next_generation carries the new generation on continuity loss. Selected
+    // only on continuity loss with a nonzero new generation.
+    uint64 next_generation = 5;
+    // catchup_complete is selected with true when the stream has reached live.
+    bool catchup_complete = 6;
+    // snapshot_required is selected with true when the requested checkpoint is
+    // outside retention and replay cannot complete.
+    bool snapshot_required = 7;
+    // terminated is selected with true when the host ends the targeted
+    // subscription. The trailer carries the typed terminal signal so the host
+    // can terminate one stream even when there is no outstanding invocation.
+    bool terminated = 8;
+  }
+  // terminate_reason carries the required machine-readable reason when the
+  // terminated outcome is selected. Opaque bytes, non-empty when terminated,
+  // at most 256 bytes. Empty means no termination.
   bytes terminate_reason = 9;
 }

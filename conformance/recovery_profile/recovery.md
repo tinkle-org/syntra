@@ -10,9 +10,11 @@ never `FAIL`.
 
 Contract terms follow [Update/Recovery Profile](../../specifications/profiles/recovery.md)
 and the proposal in [RFC 0006](../../rfcs/0006-update-recovery-profile.md).
-Machine-readable equivalents are in [recovery machine snippet](recovery.yaml).
+Machine-readable equivalents are in [recovery machine snippet](../manifest/recovery.yaml).
 Guidance on fields is in [manifest format](../manifest/README.md).
 Related event coverage is in [event conformance](../events/events.md).
+
+Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`) are harness-side instrumentation that drives the host to emit, duplicate, drop, or flood batches; they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
 
 ## CONF-URP-001 mandatory-only fallback
 
@@ -22,7 +24,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: `UNIMPLEMENTED`; no batches emitted; mandatory invocation interop unaffected.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional; runs against mandatory-only Hosts, where a correct `UNIMPLEMENTED` refusal reports `UNSUPPORTED` (not `SKIP`).
 
 ## CONF-URP-002 duplicate tolerance
 
@@ -32,7 +34,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: Initiator tolerates the duplicate with no violation and no error storm.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
 ## CONF-URP-003 gap detection
 
@@ -42,7 +44,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: Initiator detects the gap by predecessor chaining; no arithmetic on checkpoint bytes; no structural parsing.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
 ## CONF-URP-004 replay paging
 
@@ -52,7 +54,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: bounded pages each stating the continuation marker and the catch-up boundary; never burst beyond documented bounds; Initiator follows the marker page by page and stops at the boundary.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
 ## CONF-URP-005 expired continuation with snapshot-required
 
@@ -62,7 +64,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: `FAILED_PRECONDITION` with explicit snapshot-required signal; recovery follows the snapshot path; never silent restart from an unrelated point.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
 ## CONF-URP-006 snapshot install gate
 
@@ -72,7 +74,7 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: installation completes only when the Initiator confirms the boundary checkpoint; later batches chain from exactly that boundary; no partial install without boundary confirm.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
 ## CONF-URP-007 reconnect re-subscribe
 
@@ -82,27 +84,27 @@ Related event coverage is in [event conformance](../events/events.md).
 - Expected output: no batches arrive; Initiator re-subscribes explicitly with a fresh handle; old handle and checkpoint carry no continuity without negotiated recovery.
 - Expected connection state: ACTIVE.
 - Expected session state: active.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
 
-## CONF-URP-008 overflow with explicit loss
+## CONF-URP-008 overflow with reject-new-work
 
 - Related normative requirement: SNTR-EVENT-030, SNTR-REL-007.
 - Preconditions: ACTIVE; subscription confirmed; bounded buffer ready for flood.
 - Input: Host produces batches faster than the Initiator consumes.
-- Expected output: `RESOURCE_EXHAUSTED` on new work with documented backoff (this case covers the reject-new-work outcome; `CONF-URP-009` covers the permitted continuity-loss alternative); never unbounded queueing; never silent truncation without the documented signal.
+- Expected output: `RESOURCE_EXHAUSTED` on new work with documented backoff (this case covers the reject-new-work outcome and runs only when the host documents that policy; `CONF-URP-009` covers the permitted continuity-loss alternative and runs only under that policy; satisfying either satisfies the overflow requirement); never unbounded queueing; never silent truncation without the documented signal.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host documents the alternative continuity-loss policy).
 
 ## CONF-URP-009 overflow with continuity loss
 
 - Related normative requirement: SNTR-EVENT-030, SNTR-REL-007.
 - Preconditions: ACTIVE; subscription confirmed; bounded buffer ready for flood.
 - Input: Host produces batches faster than the Initiator consumes.
-- Expected output: explicit continuity loss with a new generation ending only the affected stream (this case covers the continuity-loss alternative; `CONF-URP-008` covers the permitted `RESOURCE_EXHAUSTED` alternative); never unbounded queueing; never silent truncation without the documented signal.
+- Expected output: explicit continuity loss with a new generation ending only the affected stream (this case covers the continuity-loss alternative and runs only when the host documents that policy; `CONF-URP-008` covers the permitted `RESOURCE_EXHAUSTED` alternative and runs only under that policy; satisfying either satisfies the overflow requirement); never unbounded queueing; never silent truncation without the documented signal.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `update-recovery-v1` (SKIP when unclaimed).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host documents the alternative reject-new-work policy).
 
 ## Sequence view
 

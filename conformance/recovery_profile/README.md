@@ -11,7 +11,7 @@ coverage that is evaluated when the capability is claimed.
 ## Files
 
 - [recovery prose](recovery.md) — human-readable cases `CONF-URP-001…009`.
-- [recovery machine snippet](recovery.yaml) — machine-readable cases for runners.
+- [recovery machine snippet](../manifest/recovery.yaml) — machine-readable cases for runners.
 - Related event material: [event conformance](../events/events.md).
 - Manifest guidance: [manifest format](../manifest/README.md).
 - Claimed profile definition: [profiles](../profiles.yaml).
@@ -19,10 +19,10 @@ coverage that is evaluated when the capability is claimed.
 ## Profile and capability
 
 - Profile: `SNTR-EVENTS-V1`.
-- Capability: `update-recovery-v1`.
-- Every case in [recovery machine snippet](recovery.yaml) sets `mandatory: false`.
-- Every case in [recovery machine snippet](recovery.yaml) sets `capabilities: [update-recovery-v1]`.
-- Every case in [recovery machine snippet](recovery.yaml) sets `profile: SNTR-EVENTS-V1`.
+- Capability: `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; MUST NOT be advertised until accepted).
+- Every case in [recovery machine snippet](../manifest/recovery.yaml) sets `mandatory: false`.
+- Every case in [recovery machine snippet](../manifest/recovery.yaml) sets `capabilities: [syntra.update-recovery/1]`.
+- Every case in [recovery machine snippet](../manifest/recovery.yaml) sets `profile: SNTR-EVENTS-V1`.
 
 ## Optionality rule
 
@@ -58,8 +58,8 @@ Expected states use only the closed vocabularies for connection and session:
 | `CONF-URP-005` | Expired continuation with snapshot-required |
 | `CONF-URP-006` | Snapshot install gate |
 | `CONF-URP-007` | Reconnect re-subscribe |
-| `CONF-URP-008` | Overflow with explicit loss (reject-new-work) |
-| `CONF-URP-009` | Overflow with explicit loss (continuity loss) |
+| `CONF-URP-008` | Overflow with reject-new-work |
+| `CONF-URP-009` | Overflow with continuity loss |
 
 Details are in [recovery prose](recovery.md). Neutral fixtures only:
 generic subscription, generic key and value read, and echo round trip.

@@ -33,7 +33,8 @@ const (
 // defaults: at most 64 subscriptions per connection, at most 256 per
 // principal, at most 16 pending profile calls per connection, at most
 // 262144 queued notification bytes per stream, at most 1048576 per
-// connection, at most 64 batches and 262144 bytes per replay page, at most
+// connection, at most 64 serialized batches and 262144 total bytes per
+// replay page with each serialized batch at most 262144 bytes, at most
 // 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
 // effective deadline 5 s where the request carries no explicit bounded
 // deadline.
@@ -262,10 +263,10 @@ type RecoveryReplayPage struct {
 	// most 4096 bytes.
 	CatchupBoundary []byte `protobuf:"bytes,6,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
 	// batch_payloads holds one serialized RecoveryBatch per entry. At most 64
-	// entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
-	// MUST validate each entry as a RecoveryBatch with matching generation and
-	// predecessor/result checkpoint continuity through the same pipeline as live
-	// batches.
+	// entries, each serialized entry at most 262144 bytes, total at most
+	// 262144 bytes. Consumers MUST validate each entry as a RecoveryBatch with
+	// matching generation and predecessor/result checkpoint continuity through
+	// the same pipeline as live batches.
 	BatchPayloads [][]byte `protobuf:"bytes,7,rep,name=batch_payloads,json=batchPayloads,proto3" json:"batch_payloads,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -776,7 +777,9 @@ type RecoveryBatch struct {
 	// result_checkpoint is the checkpoint this batch advances to. Opaque bytes,
 	// at most 4096 bytes.
 	ResultCheckpoint []byte `protobuf:"bytes,5,opt,name=result_checkpoint,json=resultCheckpoint,proto3" json:"result_checkpoint,omitempty"`
-	// batch_payload holds opaque application batch bytes. At most 262144 bytes.
+	// batch_payload holds opaque application batch bytes. The serialized
+	// RecoveryBatch entry is at most 262144 bytes, so batch_payload must leave
+	// room for subscription handle, generation, checkpoints, tags, and lengths.
 	BatchPayload  []byte `protobuf:"bytes,6,opt,name=batch_payload,json=batchPayload,proto3" json:"batch_payload,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -855,7 +858,8 @@ func (x *RecoveryBatch) GetBatchPayload() []byte {
 }
 
 // RecoveryBatchTrailer marks catch-up completion, snapshot need, continuity loss,
-// or targeted termination for one stream.
+// or targeted termination for one stream. Outcomes are mutually exclusive;
+// exactly one outcome is selected per trailer.
 type RecoveryBatchTrailer struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// profile_version is the profile payload version. Valid value is 1.
@@ -868,21 +872,20 @@ type RecoveryBatchTrailer struct {
 	// boundary_checkpoint is the catch-up or snapshot boundary. Opaque bytes, at
 	// most 4096 bytes.
 	BoundaryCheckpoint []byte `protobuf:"bytes,4,opt,name=boundary_checkpoint,json=boundaryCheckpoint,proto3" json:"boundary_checkpoint,omitempty"`
-	// next_generation carries the new generation on continuity loss. Zero means no
-	// continuity loss, nonzero is the new generation.
-	NextGeneration uint64 `protobuf:"varint,5,opt,name=next_generation,json=nextGeneration,proto3" json:"next_generation,omitempty"`
-	// catchup_complete is true when the stream has reached live.
-	CatchupComplete bool `protobuf:"varint,6,opt,name=catchup_complete,json=catchupComplete,proto3" json:"catchup_complete,omitempty"`
-	// snapshot_required is true when the requested checkpoint is outside retention
-	// and replay cannot complete.
-	SnapshotRequired bool `protobuf:"varint,7,opt,name=snapshot_required,json=snapshotRequired,proto3" json:"snapshot_required,omitempty"`
-	// terminated is true when the host ends the targeted subscription. The trailer
-	// carries the typed terminal signal so the host can terminate one stream even
-	// when there is no outstanding invocation.
-	Terminated bool `protobuf:"varint,8,opt,name=terminated,proto3" json:"terminated,omitempty"`
-	// terminate_reason carries the required machine-readable reason when terminated
-	// is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
-	// means no termination.
+	// outcome selects the terminal outcome for the stream. Outcomes are mutually
+	// exclusive; exactly one is selected per trailer. An unset outcome is
+	// representable by codecs but is not a valid trailer.
+	//
+	// Types that are valid to be assigned to Outcome:
+	//
+	//	*RecoveryBatchTrailer_NextGeneration
+	//	*RecoveryBatchTrailer_CatchupComplete
+	//	*RecoveryBatchTrailer_SnapshotRequired
+	//	*RecoveryBatchTrailer_Terminated
+	Outcome isRecoveryBatchTrailer_Outcome `protobuf_oneof:"outcome"`
+	// terminate_reason carries the required machine-readable reason when the
+	// terminated outcome is selected. Opaque bytes, non-empty when terminated,
+	// at most 256 bytes. Empty means no termination.
 	TerminateReason []byte `protobuf:"bytes,9,opt,name=terminate_reason,json=terminateReason,proto3" json:"terminate_reason,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -946,30 +949,45 @@ func (x *RecoveryBatchTrailer) GetBoundaryCheckpoint() []byte {
 	return nil
 }
 
+func (x *RecoveryBatchTrailer) GetOutcome() isRecoveryBatchTrailer_Outcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return nil
+}
+
 func (x *RecoveryBatchTrailer) GetNextGeneration() uint64 {
 	if x != nil {
-		return x.NextGeneration
+		if x, ok := x.Outcome.(*RecoveryBatchTrailer_NextGeneration); ok {
+			return x.NextGeneration
+		}
 	}
 	return 0
 }
 
 func (x *RecoveryBatchTrailer) GetCatchupComplete() bool {
 	if x != nil {
-		return x.CatchupComplete
+		if x, ok := x.Outcome.(*RecoveryBatchTrailer_CatchupComplete); ok {
+			return x.CatchupComplete
+		}
 	}
 	return false
 }
 
 func (x *RecoveryBatchTrailer) GetSnapshotRequired() bool {
 	if x != nil {
-		return x.SnapshotRequired
+		if x, ok := x.Outcome.(*RecoveryBatchTrailer_SnapshotRequired); ok {
+			return x.SnapshotRequired
+		}
 	}
 	return false
 }
 
 func (x *RecoveryBatchTrailer) GetTerminated() bool {
 	if x != nil {
-		return x.Terminated
+		if x, ok := x.Outcome.(*RecoveryBatchTrailer_Terminated); ok {
+			return x.Terminated
+		}
 	}
 	return false
 }
@@ -980,6 +998,42 @@ func (x *RecoveryBatchTrailer) GetTerminateReason() []byte {
 	}
 	return nil
 }
+
+type isRecoveryBatchTrailer_Outcome interface {
+	isRecoveryBatchTrailer_Outcome()
+}
+
+type RecoveryBatchTrailer_NextGeneration struct {
+	// next_generation carries the new generation on continuity loss. Selected
+	// only on continuity loss with a nonzero new generation.
+	NextGeneration uint64 `protobuf:"varint,5,opt,name=next_generation,json=nextGeneration,proto3,oneof"`
+}
+
+type RecoveryBatchTrailer_CatchupComplete struct {
+	// catchup_complete is selected with true when the stream has reached live.
+	CatchupComplete bool `protobuf:"varint,6,opt,name=catchup_complete,json=catchupComplete,proto3,oneof"`
+}
+
+type RecoveryBatchTrailer_SnapshotRequired struct {
+	// snapshot_required is selected with true when the requested checkpoint is
+	// outside retention and replay cannot complete.
+	SnapshotRequired bool `protobuf:"varint,7,opt,name=snapshot_required,json=snapshotRequired,proto3,oneof"`
+}
+
+type RecoveryBatchTrailer_Terminated struct {
+	// terminated is selected with true when the host ends the targeted
+	// subscription. The trailer carries the typed terminal signal so the host
+	// can terminate one stream even when there is no outstanding invocation.
+	Terminated bool `protobuf:"varint,8,opt,name=terminated,proto3,oneof"`
+}
+
+func (*RecoveryBatchTrailer_NextGeneration) isRecoveryBatchTrailer_Outcome() {}
+
+func (*RecoveryBatchTrailer_CatchupComplete) isRecoveryBatchTrailer_Outcome() {}
+
+func (*RecoveryBatchTrailer_SnapshotRequired) isRecoveryBatchTrailer_Outcome() {}
+
+func (*RecoveryBatchTrailer_Terminated) isRecoveryBatchTrailer_Outcome() {}
 
 var File_syntra_v1_recovery_profile_proto protoreflect.FileDescriptor
 
@@ -1054,21 +1108,22 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"generation\x125\n" +
 	"\x16predecessor_checkpoint\x18\x04 \x01(\fR\x15predecessorCheckpoint\x12+\n" +
 	"\x11result_checkpoint\x18\x05 \x01(\fR\x10resultCheckpoint\x12#\n" +
-	"\rbatch_payload\x18\x06 \x01(\fR\fbatchPayload\"\x8d\x03\n" +
+	"\rbatch_payload\x18\x06 \x01(\fR\fbatchPayload\"\xa0\x03\n" +
 	"\x14RecoveryBatchTrailer\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
 	"\n" +
 	"generation\x18\x03 \x01(\x04R\n" +
 	"generation\x12/\n" +
-	"\x13boundary_checkpoint\x18\x04 \x01(\fR\x12boundaryCheckpoint\x12'\n" +
-	"\x0fnext_generation\x18\x05 \x01(\x04R\x0enextGeneration\x12)\n" +
-	"\x10catchup_complete\x18\x06 \x01(\bR\x0fcatchupComplete\x12+\n" +
-	"\x11snapshot_required\x18\a \x01(\bR\x10snapshotRequired\x12\x1e\n" +
+	"\x13boundary_checkpoint\x18\x04 \x01(\fR\x12boundaryCheckpoint\x12)\n" +
+	"\x0fnext_generation\x18\x05 \x01(\x04H\x00R\x0enextGeneration\x12+\n" +
+	"\x10catchup_complete\x18\x06 \x01(\bH\x00R\x0fcatchupComplete\x12-\n" +
+	"\x11snapshot_required\x18\a \x01(\bH\x00R\x10snapshotRequired\x12 \n" +
 	"\n" +
-	"terminated\x18\b \x01(\bR\n" +
+	"terminated\x18\b \x01(\bH\x00R\n" +
 	"terminated\x12)\n" +
-	"\x10terminate_reason\x18\t \x01(\fR\x0fterminateReasonB?Z=github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1b\x06proto3"
+	"\x10terminate_reason\x18\t \x01(\fR\x0fterminateReasonB\t\n" +
+	"\aoutcomeB?Z=github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1b\x06proto3"
 
 var (
 	file_syntra_v1_recovery_profile_proto_rawDescOnce sync.Once
@@ -1108,6 +1163,12 @@ func init() { file_syntra_v1_recovery_profile_proto_init() }
 func file_syntra_v1_recovery_profile_proto_init() {
 	if File_syntra_v1_recovery_profile_proto != nil {
 		return
+	}
+	file_syntra_v1_recovery_profile_proto_msgTypes[10].OneofWrappers = []any{
+		(*RecoveryBatchTrailer_NextGeneration)(nil),
+		(*RecoveryBatchTrailer_CatchupComplete)(nil),
+		(*RecoveryBatchTrailer_SnapshotRequired)(nil),
+		(*RecoveryBatchTrailer_Terminated)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

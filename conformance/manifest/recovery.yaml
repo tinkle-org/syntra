@@ -1,4 +1,4 @@
-# Portable recovery cases. Prose companion: recovery.md (CONF-URP-001…009).
+# Portable recovery cases. Prose companion: ../recovery_profile/recovery.md (CONF-URP-001…009).
 # Optionality rule: any case whose capabilities are unadvertised MUST yield
 # UNSUPPORTED (correct UNIMPLEMENTED refusal) or SKIP — never FAIL.
 format_version: "1.0"
@@ -8,7 +8,7 @@ cases:
     requirement: [SNTR-CAP-003, SNTR-EVENT-001, SNTR-EVENT-011]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session]
     input: {subscriptions: [{method: "/example.Events/Subscribe", filter_b64: "ZmlsdGVyLWE="}]}
@@ -22,7 +22,7 @@ cases:
     requirement: [SNTR-EVENT-007, SNTR-REL-005]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed]
     input: {faults: {emit_duplicate_event: true}}
@@ -36,35 +36,40 @@ cases:
     requirement: [SNTR-EVENT-006, SNTR-EVENT-021]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed]
     input: {faults: {emit_batches: 3, skip_batch: true}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-      hygiene: {absent_from: [increment, decrement, parse_checkpoint]}
-      retry: "initiator issues replay for the missing batch"
-    notes: "Gap detection by predecessor chaining without arithmetic on checkpoint bytes and without structural parsing; initiator requests recovery for the missing batch. SKIP when unclaimed."
+      frames:
+        - {request_id: 0, body: notification}
+    notes: "Gap detection by predecessor chaining without arithmetic on checkpoint bytes and without structural parsing; initiator requests recovery and host re-delivers the missing batch as a notification. Harness fault injection provides the gap. SKIP when unclaimed."
 
   - id: CONF-URP-004
     requirement: [SNTR-EVENT-008, SNTR-EVENT-009]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed]
     input: {replay: {cursor_b64: "Y3Vyc29yLUs=", strategy: subscribe_with_cursor}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Replay paging: oversized history returns bounded pages with continuation marker and catch-up boundary, never burst beyond bounds. Initiator follows the marker and stops at the boundary. SKIP when unclaimed."
+      frames:
+        - {request_id: 0, body: notification}
+        - {request_id: 0, body: notification}
+        - {request_id: 0, body: notification}
+      hygiene: {absent_from: [unbounded_burst]}
+    notes: "Replay paging: oversized history returns bounded pages with continuation marker and catch-up boundary, never burst beyond bounds. Expected frames are the bounded pages plus the catch-up boundary; hygiene forbids burst beyond bounds. Initiator follows the marker and stops at the boundary. SKIP when unclaimed."
 
   - id: CONF-URP-005
     requirement: [SNTR-EVENT-009]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, cursor_expired]
     input: {replay: {cursor_b64: "ZXhwaXJlZC1jdXJzb3I=", strategy: subscribe_with_cursor}}
@@ -79,56 +84,63 @@ cases:
     requirement: [SNTR-EVENT-008]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed]
     input: {replay: {cursor_b64: "Y3Vyc29yLUs=", strategy: snapshot_from_boundary}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Snapshot install gate: offer under provider-proven boundary transfers bounded pages the initiator stores without interpreting. Install completes only on boundary confirm with no partial install. SKIP when unclaimed."
+      frames:
+        - {request_id: 1, body: result}
+      hygiene: {absent_from: [partial_install]}
+    notes: "Snapshot install gate: offer under provider-proven boundary transfers bounded pages the initiator stores without interpreting. Expected result confirms the boundary checkpoint; install completes only on boundary confirm with no partial install. SKIP when unclaimed."
 
   - id: CONF-URP-007
     requirement: [SNTR-SESS-008, SNTR-EVENT-020]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [transport_connected]
     input:
       frames:
         - {request_id: 0, body: hello, min_version: 1, max_version: 1}
+      subscriptions:
+        - {method: "/example.Events/Subscribe", filter_b64: "ZmlsdGVyLWE=", handle_b64: "c3RhbGUtaGFuZGxl"}
     expected:
       connection_state: ACTIVE
       session_state: active
-    notes: "Reconnect re-subscribe: new connection carries no batches without explicit re-subscribe. Old handle and checkpoint carry no continuity without negotiated recovery. SKIP when unclaimed."
+      hygiene: {absent_from: [notification]}
+    notes: "Reconnect re-subscribe: new connection carries no batches without explicit re-subscribe; stale-handle subscribe attempt carries no continuity without negotiated recovery. Expected hygiene forbids notification batches. SKIP when unclaimed."
 
   - id: CONF-URP-008
     requirement: [SNTR-EVENT-030, SNTR-REL-007]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed, flood_ready]
-    input: {faults: {flood_events: true, overflow_policy: reject_new_work}}
+    input: {faults: {flood_events: true}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       error: {code: RESOURCE_EXHAUSTED}
       hygiene: {absent_from: [unbounded_queue, silent_truncation]}
-    notes: "Overflow reject-new-work outcome, selected when the host documents the reject-new-work policy. Saturation yields RESOURCE_EXHAUSTED with documented backoff. Conditional alternative is CONF-URP-009 explicit continuity loss with a new generation; satisfying either satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."
+    notes: "Overflow reject-new-work outcome, runnable only when the host documents the reject-new-work policy (SKIP CONF-URP-008 otherwise; SKIP CONF-URP-009 when this policy holds). Saturation yields RESOURCE_EXHAUSTED with documented backoff. Conditional alternative is CONF-URP-009 explicit continuity loss with a new generation; satisfying either CONF-URP-008 or CONF-URP-009 satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."
 
   - id: CONF-URP-009
     requirement: [SNTR-EVENT-030, SNTR-REL-007]
     profile: SNTR-EVENTS-V1
     roles: [client, server]
-    capabilities: [update-recovery-v1]
+    capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session, subscription_confirmed, flood_ready]
-    input: {faults: {flood_events: true, overflow_policy: continuity_loss}}
+    input: {faults: {flood_events: true}}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-      frames: [{request_id: 0, body: notification}]
+      frames:
+        - {request_id: 0, body: notification, payload_b64: "Y29udGludWl0eS1sb3NzIGdlbi04"}
       hygiene: {absent_from: [unbounded_queue, silent_truncation]}
-    notes: "Overflow continuity-loss outcome, selected when the host documents the continuity-loss policy. Saturation ends only the affected stream with an observable notification carrying the explicit continuity-loss signal and a new generation. Conditional alternative is CONF-URP-008 RESOURCE_EXHAUSTED; satisfying either satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."
+    notes: "Overflow continuity-loss outcome, runnable only when the host documents the continuity-loss policy (SKIP CONF-URP-009 otherwise; SKIP CONF-URP-008 when this policy holds). Saturation ends only the affected stream with an observable notification carrying the explicit continuity-loss signal and a new generation; the expected payload carries that signal so a normal batch does not pass. Conditional alternative is CONF-URP-008 RESOURCE_EXHAUSTED; satisfying either CONF-URP-008 or CONF-URP-009 satisfies the overflow requirement. Never unbounded queueing and never silent truncation without the documented signal. SKIP when unclaimed."

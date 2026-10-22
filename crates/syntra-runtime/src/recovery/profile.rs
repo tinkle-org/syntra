@@ -32,8 +32,8 @@
 //! pending gate is set. While set, otherwise-valid validated batches return
 //! a snapshot-required action instead of a committable action, so committed
 //! progress cannot advance via the batch path until a snapshot with a new
-//! generation confirms. Snapshot installation remains admissible while
-//! pending as the snapshot path.
+//! generation confirms. New-generation snapshot installation remains
+//! admissible while pending as the snapshot path.
 
 use syntra_core::ErrorCode;
 
@@ -270,25 +270,43 @@ pub trait RecoveryAuthorizer {
 /// [`ProfileAction::SnapshotRequired`] instead of `CommitCheckpoint`, so
 /// committed progress cannot advance via the batch path until a snapshot
 /// with a new generation confirms via [`Self::confirm_persisted`].
-/// [`ProfileInput::SnapshotInstalled`] remains admissible while pending
-/// as the snapshot path.
+/// New-generation [`ProfileInput::SnapshotInstalled`] remains admissible
+/// while pending as the snapshot path.
 ///
 /// Duplicate tolerance: a validated batch or snapshot whose result cursor
 /// already equals the committed cursor is tolerated with no actions and
 /// no mutation. A duplicate is never a violation. Duplicate confirmation
 /// is idempotent and leaves progress unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingOffer {
+    checkpoint: ProfileCheckpoint,
+    is_snapshot: bool,
+}
 #[derive(Debug, Clone)]
 pub struct ProfileRecovery {
     stream_selector: Vec<u8>,
     generation: u64,
     committed: Vec<u8>,
     snapshot_pending: bool,
+    pending: Option<PendingOffer>,
 }
+
+/// Committable checkpoint returned by observe with its snapshot source.
+///
+/// Tracks whether the pending checkpoint was offered through the batch
+/// path or the snapshot path. New-generation progress advances only
+/// through the snapshot path.
 
 impl ProfileRecovery {
     /// Starts tracking from the last confirmed position.
     pub fn new(stream_selector: Vec<u8>, generation: u64, committed: Vec<u8>) -> Self {
-        Self { stream_selector, generation, committed, snapshot_pending: false }
+        Self {
+            stream_selector,
+            generation,
+            committed,
+            snapshot_pending: false,
+            pending: None,
+        }
     }
 
     /// Last confirmed cursor bytes.
@@ -364,6 +382,10 @@ impl ProfileRecovery {
                 if checkpoint.base_cursor != self.committed {
                     return self.recovery_needed();
                 }
+                self.pending = Some(PendingOffer {
+                    checkpoint: checkpoint.clone(),
+                    is_snapshot: false,
+                });
                 vec![ProfileAction::CommitCheckpoint { checkpoint }]
             },
             ProfileInput::GapDetected { stream_selector, expected_base: _, observed_base: _ } => {
@@ -378,8 +400,14 @@ impl ProfileRecovery {
                 }
                 self.recovery_needed()
             },
-            ProfileInput::ContinuationExpired { stream_selector, committed: _ } => {
+            ProfileInput::ContinuationExpired { stream_selector, committed } => {
                 if stream_selector != self.stream_selector {
+                    return vec![];
+                }
+                // Only continuation expiry matching committed progress sets
+                // the pending gate. Expiry carrying another committed cursor
+                // is ignored with no actions and no mutation.
+                if committed != self.committed {
                     return vec![];
                 }
                 self.snapshot_pending = true;
@@ -402,8 +430,16 @@ impl ProfileRecovery {
                     if checkpoint.base_cursor != self.committed {
                         return self.recovery_needed();
                     }
+                    self.pending = Some(PendingOffer {
+                        checkpoint: checkpoint.clone(),
+                        is_snapshot: true,
+                    });
                     return vec![ProfileAction::CommitCheckpoint { checkpoint }];
                 }
+                self.pending = Some(PendingOffer {
+                    checkpoint: checkpoint.clone(),
+                    is_snapshot: true,
+                });
                 vec![ProfileAction::CommitCheckpoint { checkpoint }]
             },
         }
@@ -414,7 +450,9 @@ impl ProfileRecovery {
     /// checkpoint is not adopted and a recovery-needed action retries from
     /// the last persisted position. Call only with the checkpoint
     /// previously returned as a committable action; a persistence failure
-    /// is reported by simply not calling this method.
+    /// is reported by simply not calling this method. A checkpoint never
+    /// returned as committable is rejected without advancing committed
+    /// progress.
     ///
     /// Selectors for other streams are ignored with no actions and no
     /// mutation. Duplicate confirmation of the committed cursor is
@@ -425,7 +463,8 @@ impl ProfileRecovery {
     /// snapshot whose base differs from the pre-snapshot committed cursor
     /// is accepted as its proven synchronization cut. Same-generation
     /// checkpoints must continue exactly from the committed cursor.
-    /// Generations move forward only.
+    /// Generations move forward only. New-generation progress advances
+    /// only through the snapshot path.
     ///
     /// While the pending gate is set, same-generation confirmations are
     /// blocked with a snapshot-required action instead of advancing, so
@@ -444,15 +483,29 @@ impl ProfileRecovery {
             if self.snapshot_pending {
                 return self.snapshot_required();
             }
+            // Only a checkpoint previously returned as committable advances
+            // committed progress.
+            match &self.pending {
+                Some(offer) if offer.checkpoint == *checkpoint => {},
+                _ => return self.recovery_needed(),
+            }
             if checkpoint.base_cursor != self.committed {
                 return self.recovery_needed();
             }
             self.committed = checkpoint.result_cursor.clone();
+            self.pending = None;
             return vec![];
+        }
+        // New-generation progress advances only through a snapshot
+        // previously returned as committable through the snapshot path.
+        match &self.pending {
+            Some(offer) if offer.checkpoint == *checkpoint && offer.is_snapshot => {},
+            _ => return self.recovery_needed(),
         }
         self.generation = checkpoint.generation;
         self.committed = checkpoint.result_cursor.clone();
         self.snapshot_pending = false;
+        self.pending = None;
         vec![]
     }
 
@@ -651,6 +704,92 @@ mod tests {
         assert!(reconfirm.is_empty());
         assert_eq!(r.committed(), b"cursor-43");
         assert_eq!(r.generation(), 7);
+    }
+
+    #[test]
+    fn profile_stale_continuation_expiry_ignored() {
+        let mut r = coordinator(b"cursor-40");
+        let cp = checkpoint(b"cursor-40", b"cursor-43");
+        let actions = r.observe(ProfileInput::BatchValidated { checkpoint: cp.clone() });
+        assert!(matches!(actions[0], ProfileAction::CommitCheckpoint { .. }));
+        assert!(r.confirm_persisted(&cp).is_empty());
+        assert_eq!(r.committed(), b"cursor-43");
+        // Continuation expiry carrying the previous committed cursor is
+        // ignored with no actions and no mutation of the pending gate.
+        let stale = r.observe(ProfileInput::ContinuationExpired {
+            stream_selector: selector(),
+            committed: b"cursor-40".to_vec(),
+        });
+        assert!(stale.is_empty());
+        assert!(!r.snapshot_pending());
+        assert_eq!(r.committed(), b"cursor-43");
+        assert_eq!(r.generation(), 7);
+        // Batch path remains committable from the committed cursor.
+        let next = checkpoint(b"cursor-43", b"cursor-46");
+        let offered = r.observe(ProfileInput::BatchValidated { checkpoint: next });
+        assert!(matches!(offered[0], ProfileAction::CommitCheckpoint { .. }));
+        assert!(!r.snapshot_pending());
+    }
+
+    #[test]
+    fn profile_unoffered_snapshot_confirm_rejected() {
+        let mut r = coordinator(b"cursor-40");
+        let snap = ProfileCheckpoint {
+            stream_selector: selector(),
+            generation: 8,
+            base_cursor: b"boundary-00".to_vec(),
+            result_cursor: b"boundary-100".to_vec(),
+        };
+        // Snapshot never returned as committable through the snapshot path
+        // is rejected without advancing generation or committed progress.
+        let rejected = r.confirm_persisted(&snap);
+        assert!(matches!(rejected[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(r.generation(), 7);
+        assert_eq!(r.committed(), b"cursor-40");
+        assert!(!r.snapshot_pending());
+        // Matching continuation expiry sets the pending gate.
+        let expired = r.observe(ProfileInput::ContinuationExpired {
+            stream_selector: selector(),
+            committed: b"cursor-40".to_vec(),
+        });
+        assert!(matches!(expired[0], ProfileAction::SnapshotRequired { .. }));
+        assert!(r.snapshot_pending());
+        // Un-offered snapshot confirm does not clear the pending gate.
+        let rejected_while_pending = r.confirm_persisted(&snap);
+        assert!(matches!(
+            rejected_while_pending[0],
+            ProfileAction::RecoveryNeeded { .. }
+        ));
+        assert_eq!(r.generation(), 7);
+        assert_eq!(r.committed(), b"cursor-40");
+        assert!(r.snapshot_pending());
+    }
+
+    #[test]
+    fn profile_offered_snapshot_confirm_advances_and_clears_gate() {
+        let mut r = coordinator(b"cursor-40");
+        let expired = r.observe(ProfileInput::ContinuationExpired {
+            stream_selector: selector(),
+            committed: b"cursor-40".to_vec(),
+        });
+        assert!(matches!(expired[0], ProfileAction::SnapshotRequired { .. }));
+        assert!(r.snapshot_pending());
+        let snap = ProfileCheckpoint {
+            stream_selector: selector(),
+            generation: 8,
+            base_cursor: b"boundary-00".to_vec(),
+            result_cursor: b"boundary-100".to_vec(),
+        };
+        // Snapshot returned as committable through the snapshot path.
+        let offered = r.observe(ProfileInput::SnapshotInstalled { checkpoint: snap.clone() });
+        assert!(matches!(offered[0], ProfileAction::CommitCheckpoint { .. }));
+        assert!(r.snapshot_pending());
+        // Confirm advances generation and committed progress and clears
+        // the pending gate.
+        assert!(r.confirm_persisted(&snap).is_empty());
+        assert!(!r.snapshot_pending());
+        assert_eq!(r.generation(), 8);
+        assert_eq!(r.committed(), b"boundary-100");
     }
 
     #[test]

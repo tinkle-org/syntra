@@ -123,10 +123,13 @@ changes.
       implements it for the bound principal, MUST confirm per
       connection (confirmation on one connection MUST NOT enable the
       profile on another), MUST document the confirmed profile version
-      and bounds per deployment, and MUST reject unnegotiated profile
-      use with `UNIMPLEMENTED` (unknown or unconfirmed operation) or
+      and bounds per deployment, MUST accept the standardized profile
+      negotiation invocation after ACTIVE before confirmation where the
+      host implements the profile, and MUST reject other unnegotiated
+      profile use with `UNIMPLEMENTED` (unknown or unconfirmed operation) or
       `FAILED_PRECONDITION` (use of an unconfirmed option on a confirmed
-      connection).
+      connection). The negotiation invocation itself is the only permitted
+      profile operation before confirmation.
     - `SYN-URP-011` — The host MUST implement negotiation, subscribe,
       replay, catch-up, snapshot, continuation, confirm, and terminate
       operations as standardized generic RPCs with versioned payloads
@@ -164,12 +167,13 @@ changes.
       `Notification` batches through the same validation and
       authorization path as live batches.
     - `SYN-URP-015` — The host MUST emit an explicit catch-up completion
-      signal when the stream reaches live, and MUST emit an explicit
-      snapshot-required signal (with `FAILED_PRECONDITION`) when the
-      requested checkpoint is outside retention or otherwise
-      unrecoverable by replay. Silent restart from an unrelated point is
-      forbidden; silent truncation without the documented signal is
-      forbidden.
+      signal when the stream reaches live, and MUST fail the replay/catch-up
+      invocation with `FAILED_PRECONDITION` in `RpcResult` while emitting an
+      explicit snapshot-required signal as `RecoveryBatchTrailer{snapshot_required=true}`
+      in a `Notification` payload when the requested checkpoint is outside
+      retention or otherwise unrecoverable by replay. Silent restart from an
+      unrelated point is forbidden; silent truncation without the documented
+      signal is forbidden.
     - `SYN-URP-016` — The host MUST implement the snapshot
       transfer/installation contract through generic RPCs in bounded
       pages: offer a snapshot under a provider-proven boundary
@@ -211,10 +215,11 @@ changes.
       error detail.
 
 - Schema diff (`.proto` snippet, field numbers, reserved handling):
-  No schema diff. No field is added, deprecated, or renumbered. The
-  profile uses the existing `request` (field 12), `result` (field 13),
-  and `notification` (field 15) variants exactly as defined in
-  `proto/syntra/v1/envelope.proto`. Reserved numbers 16, 17 and
+  Additive and envelope-neutral: `proto/syntra/v1/recovery_profile.proto`
+  adds profile payload messages carried inside the existing `request`
+  (field 12), `result` (field 13), and `notification` (field 15) variants
+  exactly as defined in `proto/syntra/v1/envelope.proto`. No `Frame`
+  field is added, deprecated, or renumbered. Reserved numbers 16, 17 and
   reserved names `event`, `resume`, `ack` are preserved unchanged and
   MUST NOT be reused by this profile. Profile versioning lives inside
   the opaque payload bytes (a profile payload version field defined by
@@ -227,10 +232,12 @@ changes.
   - `SUBSCRIBED → LIVE` on subscribe confirm; `LIVE → CATCHING_UP` on
     accepted catch-up/replay RPC; `CATCHING_UP → LIVE` on catch-up
     completion signal; `CATCHING_UP → SNAPSHOT_REQUIRED` on
-    snapshot-required signal; `SNAPSHOT_REQUIRED → INSTALLING` on
+     snapshot-required signal; `SNAPSHOT_REQUIRED → INSTALLING` on
     accepted snapshot offer; `INSTALLING → LIVE` on boundary confirm;
     any streamed state → `TERMINATED(targeted)` on per-stream terminal
-    signal or cancel; any streamed state → `CONTINUITY_LOST(new
+     signal or terminate operation; `cancel` applies to the invoking RPC
+     only and does not by itself terminate the stream unless the confirmed
+     stream binding states so; any streamed state → `CONTINUITY_LOST(new
     generation)` on overflow/expiry/revocation reset, then re-entry via
     fresh subscribe or replay-from-confirmed-checkpoint where offered.
   - Failure transitions are terminal for the affected RPC or stream,
@@ -328,10 +335,12 @@ capability negotiation, unknown-field/profile handling, resource bounds.
 - Error mapping: unknown profile operation → `UNIMPLEMENTED`;
   unconfirmed-option use → `FAILED_PRECONDITION`; unknown stream →
   `UNIMPLEMENTED`; unauthorized at any hook → `PERMISSION_DENIED` or
-  `UNAUTHENTICATED`; stale, forged, cross-stream, cross-generation, or
+   `UNAUTHENTICATED`; stale, forged, cross-stream, cross-generation, or
   cross-principal checkpoint → `FAILED_PRECONDITION` (or
   `UNAUTHENTICATED` where token-like); outside-retention replay →
-  snapshot-required signal with `FAILED_PRECONDITION`; overload →
+   failed replay/catch-up `RpcResult` with `FAILED_PRECONDITION` plus
+   `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification`
+   payload; overload →
   `RESOURCE_EXHAUSTED`; loss → `UNAVAILABLE` (outcome unknown);
   deadline expiry → `DEADLINE_EXCEEDED`. Error detail MUST NOT contain
   credentials or private diagnostics.
@@ -548,10 +557,11 @@ What gets harder, what could go wrong, and mitigations.
    snapshot page/total limits, profile RPC deadline). Proposed values
    are in §3; maintainers must confirm or replace with rationale.
 2. TBD — blocker: exact standardized generic RPC method strings and
-   profile payload version field layout (field order, version
-   negotiation rule, ignorable-field marking). This draft proposes the
-   `/syntra.update-recovery/1/*` shape and versioned opaque bytes;
-   byte-level layout needs maintainer decision.
+   profile payload version negotiation rule (version negotiation rule,
+   ignorable-field marking). Payload message layout is decided by
+   `proto/syntra/v1/recovery_profile.proto`; method strings and version
+   negotiation need maintainer decision. This draft proposes the
+   `/syntra.update-recovery/1/*` shape and versioned opaque bytes.
 3. TBD — blocker: retention-minimum commitment for hosts that offer
    replay (whether any minimum is required or retention stays purely
    deployment-documented).

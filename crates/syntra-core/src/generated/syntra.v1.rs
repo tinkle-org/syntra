@@ -254,7 +254,8 @@ pub mod frame {
 /// defaults: at most 64 subscriptions per connection, at most 256 per
 /// principal, at most 16 pending profile calls per connection, at most
 /// 262144 queued notification bytes per stream, at most 1048576 per
-/// connection, at most 64 batches and 262144 bytes per replay page, at most
+/// connection, at most 64 serialized batches and 262144 total bytes per
+/// replay page with each serialized batch at most 262144 bytes, at most
 /// 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
 /// effective deadline 5 s where the request carries no explicit bounded
 /// deadline.
@@ -334,10 +335,10 @@ pub struct RecoveryReplayPage {
     #[prost(bytes="vec", tag="6")]
     pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
     /// batch_payloads holds one serialized RecoveryBatch per entry. At most 64
-    /// entries, each at most 262144 bytes, total at most 262144 bytes. Consumers
-    /// MUST validate each entry as a RecoveryBatch with matching generation and
-    /// predecessor/result checkpoint continuity through the same pipeline as live
-    /// batches.
+    /// entries, each serialized entry at most 262144 bytes, total at most
+    /// 262144 bytes. Consumers MUST validate each entry as a RecoveryBatch with
+    /// matching generation and predecessor/result checkpoint continuity through
+    /// the same pipeline as live batches.
     #[prost(bytes="vec", repeated, tag="7")]
     pub batch_payloads: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
 }
@@ -469,12 +470,15 @@ pub struct RecoveryBatch {
     /// at most 4096 bytes.
     #[prost(bytes="vec", tag="5")]
     pub result_checkpoint: ::prost::alloc::vec::Vec<u8>,
-    /// batch_payload holds opaque application batch bytes. At most 262144 bytes.
+    /// batch_payload holds opaque application batch bytes. The serialized
+    /// RecoveryBatch entry is at most 262144 bytes, so batch_payload must leave
+    /// room for subscription handle, generation, checkpoints, tags, and lengths.
     #[prost(bytes="vec", tag="6")]
     pub batch_payload: ::prost::alloc::vec::Vec<u8>,
 }
 /// RecoveryBatchTrailer marks catch-up completion, snapshot need, continuity loss,
-/// or targeted termination for one stream.
+/// or targeted termination for one stream. Outcomes are mutually exclusive;
+/// exactly one outcome is selected per trailer.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoveryBatchTrailer {
@@ -492,26 +496,41 @@ pub struct RecoveryBatchTrailer {
     /// most 4096 bytes.
     #[prost(bytes="vec", tag="4")]
     pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
-    /// next_generation carries the new generation on continuity loss. Zero means no
-    /// continuity loss, nonzero is the new generation.
-    #[prost(uint64, tag="5")]
-    pub next_generation: u64,
-    /// catchup_complete is true when the stream has reached live.
-    #[prost(bool, tag="6")]
-    pub catchup_complete: bool,
-    /// snapshot_required is true when the requested checkpoint is outside retention
-    /// and replay cannot complete.
-    #[prost(bool, tag="7")]
-    pub snapshot_required: bool,
-    /// terminated is true when the host ends the targeted subscription. The trailer
-    /// carries the typed terminal signal so the host can terminate one stream even
-    /// when there is no outstanding invocation.
-    #[prost(bool, tag="8")]
-    pub terminated: bool,
-    /// terminate_reason carries the required machine-readable reason when terminated
-    /// is true. Opaque bytes, non-empty when terminated, at most 256 bytes. Empty
-    /// means no termination.
+    /// terminate_reason carries the required machine-readable reason when the
+    /// terminated outcome is selected. Opaque bytes, non-empty when terminated,
+    /// at most 256 bytes. Empty means no termination.
     #[prost(bytes="vec", tag="9")]
     pub terminate_reason: ::prost::alloc::vec::Vec<u8>,
+    /// outcome selects the terminal outcome for the stream. Outcomes are mutually
+    /// exclusive; exactly one is selected per trailer. An unset outcome is
+    /// representable by codecs but is not a valid trailer.
+    #[prost(oneof="recovery_batch_trailer::Outcome", tags="5, 6, 7, 8")]
+    pub outcome: ::core::option::Option<recovery_batch_trailer::Outcome>,
+}
+/// Nested message and enum types in `RecoveryBatchTrailer`.
+pub mod recovery_batch_trailer {
+    /// outcome selects the terminal outcome for the stream. Outcomes are mutually
+    /// exclusive; exactly one is selected per trailer. An unset outcome is
+    /// representable by codecs but is not a valid trailer.
+    #[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, Copy, PartialEq, ::prost::Oneof)]
+    pub enum Outcome {
+        /// next_generation carries the new generation on continuity loss. Selected
+        /// only on continuity loss with a nonzero new generation.
+        #[prost(uint64, tag="5")]
+        NextGeneration(u64),
+        /// catchup_complete is selected with true when the stream has reached live.
+        #[prost(bool, tag="6")]
+        CatchupComplete(bool),
+        /// snapshot_required is selected with true when the requested checkpoint is
+        /// outside retention and replay cannot complete.
+        #[prost(bool, tag="7")]
+        SnapshotRequired(bool),
+        /// terminated is selected with true when the host ends the targeted
+        /// subscription. The trailer carries the typed terminal signal so the host
+        /// can terminate one stream even when there is no outstanding invocation.
+        #[prost(bool, tag="8")]
+        Terminated(bool),
+    }
 }
 // @@protoc_insertion_point(module)
