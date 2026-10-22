@@ -1,0 +1,351 @@
+specifications/core/requirements.md
+  s_15bd70399fd962::t_f456a719ebd251 18,20-21,23-24
+specifications/profiles/recovery.md
+  s_a33e48a7414367::t_5e9ab70dcb06f9 28-40
+  s_a33e48a7414367::t_ed9e1f9b13bc64 87-90,95-99
+  s_a33e48a7414367::t_4d773d97607ae3 184-189,192,194,196,198-202
+  s_a33e48a7414367::t_910eea39444f44 244-246
+  s_a33e48a7414367::t_49cea50537f818 100
+crates/syntra-runtime/src/recovery/store.rs
+  s_366cfea08df04c::t_66ee28ea60f73f 1-154
+crates/syntra-runtime/src/recovery/cache.rs
+  s_366cfea08df04c::t_6b50684dd61478 1-119
+crates/syntra-runtime/src/recovery.rs
+  s_366cfea08df04c::t_f6bf6554d7876a 12-13,16-18,20,28-30
+  s_39b45aa115a0a6::t_428ec061c01c9a 21
+bindings/go/recovery.go
+  s_366cfea08df04c::t_7de013fe449b8e 1-358
+crates/syntra-runtime/src/host.rs
+  s_0f8ec978880385::t_d0a70b3978fe35 815-821,823-825
+  s_0f8ec978880385::t_1fafeb9503258c 826
+  s_0f8ec978880385::t_9bb6e9d7762847 717,724-737
+bindings/go/session.go
+  s_0f8ec978880385::t_d1485d220cb633 581,953-956,958-960,977-985,1712,1714
+  s_0f8ec978880385::t_8c70764493c5e0 1750-1758,1760-1761,1764-1766
+  s_0f8ec978880385::t_3e63d72be57af6 534,553,565,594,1759,1762-1763,1767-1768
+  s_f0b3f346a91680::t_e47a5c91a3ec56 785
+  s_366cfea08df04c::t_6150068ebf9334 483
+  s_0f8ec978880385::t_a8c611b77e0e7b 1360
+  s_0f8ec978880385::t_5ba6b1d4fcc168 591,809-810,946,1564-1577
+  s_366cfea08df04c::t_1399d4d26cd858 532,545,551,564,576,579,592-593,957,1694,1697,1702,1707-1708,1715-1716,1718-1719
+  s_366cfea08df04c::t_b6d0eed6a10424 950
+  s_366cfea08df04c::t_bbf05a8f0a0305 480-482
+  s_366cfea08df04c::t_0dc56166902185 529-531
+  s_366cfea08df04c::t_471aecb4f17b35 546-550
+  s_366cfea08df04c::t_af8eca9a161260 577-578
+  s_0f8ec978880385::t_10430f005c110f 582-584,588-590
+  s_0f8ec978880385::t_24f492d106ad71 595
+  s_0f8ec978880385::t_eae1e1ce5ae235 806-808
+  s_0f8ec978880385::t_e892665cf77889 944-945
+  s_0f8ec978880385::t_f5b215807507ff 947
+  s_366cfea08df04c::t_804227a5db2722 949
+  s_366cfea08df04c::t_0cb9ac0a30d0d9 1691-1693
+  s_366cfea08df04c::t_0cbd1d70e73f8d 1695-1696
+  s_366cfea08df04c::t_7bcdcdc3f26a88 1698-1701
+  s_366cfea08df04c::t_cf89815b0445f9 1703-1706
+  s_0f8ec978880385::t_008f17f432197d 1713
+  s_366cfea08df04c::t_9e2dd44d7e3c1a 1717
+  s_f0b3f346a91680::t_d0777b2e14db94 253-260,470-479,505,526-528,533,535-544,552,554-563,566-575,580,585-587,796,800-805,936-940,942,951-952,962-963,1684-1690,1709-1711
+crates/syntra-core/src/reliable.rs
+  s_15bd70399fd962::t_702b2f76879b19 1-26,28-226
+  s_39b45aa115a0a6::t_80d1b18c72675b 27
+specifications/core/versioning.md
+  s_15bd70399fd962::t_f2ac795dd4930d 58-59
+bindings/go/reliable.go
+  s_e2d6f188780d76::t_1441922c549f14 325
+  s_d8ad84485eac90::t_d51e1e335fd53c 723-730,742-743
+  s_e2d6f188780d76::t_9bfc738a9d1732 375-397
+  s_e2d6f188780d76::t_e38ca15640f472 848-853
+  s_d8ad84485eac90::t_a531c442459076 632-634,657-673
+  s_e2d6f188780d76::t_2bc82751c3a29a 505,510
+  s_d8ad84485eac90::t_2ac178add29350 788-790,810-826,828-832
+  s_15bd70399fd962::t_e6d3d5c02336a0 1-42,44-294,301,317-324,327-335,339-341,343-374,398-417,419-437,439,441-446,451,453-455,457-460,462-464,466-467,469-470,472-475,477-478,480-482,484-485,487-488,490-491,493-495,497-498,500-502,504,509,511-512,515-521,526-527,529-530,532-536,538-584,596-603
+  s_f0b3f346a91680::t_09bbb51506935d 438
+  s_d8ad84485eac90::t_a2b29b61869c1a 312-316
+  s_e2d6f188780d76::t_264e084f331be9 716,731,749
+  s_98638f8a4bd987::t_d1d9b77ecd38f3 43
+  s_e2d6f188780d76::t_d7ea64dad72502 418
+  s_d8ad84485eac90::t_47f7dcc5701c34 440
+  s_e2d6f188780d76::t_0bbe2f4dcee3ee 506-508
+  s_e2d6f188780d76::t_06a2241b4e8919 342
+  s_f0b3f346a91680::t_c45d5966d47a59 295-300,302-311,326,336-338
+  s_d8ad84485eac90::t_d0b96116bb63be 585-595
+  s_f0b3f346a91680::t_92631419984dc0 604-631,635-656,674-715,717-722,744-748,750-787,793-809,827,833-847,854-881
+  s_d8ad84485eac90::t_82ad3d2abeb775 513-514,522-524
+  s_e2d6f188780d76::t_692f5a27b2ed48 732-736
+  s_e2d6f188780d76::t_17ba75906b7c89 737-738,740-741
+  s_e2d6f188780d76::t_2678b407bec1e9 739
+  s_e2d6f188780d76::t_c36b2bdc50850b 791-792
+  s_f0b3f346a91680::t_cd8e666349dbc6 447-450,452,456,461,465,468,471,476,479,483,486,489,492,496,499,503,525,528,531,537
+crates/syntra-runtime/tests/conformance_runner.rs
+  s_87109a341c301d::t_df261ac452f779 476-477
+  s_0f8ec978880385::t_84c29ac9d00844 1-38,41-63,85-130,140-296,304,323,459,473-475,478-494
+  s_39b45aa115a0a6::t_1ab39d82153c32 373,376
+  s_39b45aa115a0a6::t_cd720ca10f99ad 297-303,305-307,309-322,324-372,374,377,380-413,415-458,460-472
+  s_39b45aa115a0a6::t_cfecad93e1fdf0 375,378-379
+  s_39b45aa115a0a6::t_5df16cb5aa055c 414
+  s_39b45aa115a0a6::t_d433eb2ab1db3b 39-40,64-84
+  s_0f8ec978880385::t_b512fd6e44ecf9 131-139
+  s_87109a341c301d::t_d194567045290d 308
+rfcs/0006-update-recovery-profile.md
+  s_a33e48a7414367::t_c8e16ba54c1f52 275-326
+  s_a33e48a7414367::t_6cf868b3929a20 340-343,347,353,535-542,858-861,864-866,929
+  s_a33e48a7414367::t_d409383a6fa0c1 751-754,758-762,771-779
+  s_a33e48a7414367::t_43c2f2ebf7de91 374-388
+  s_a33e48a7414367::t_606d4153938757 855-856,862-863,867-871,878-882,884-888,893-896
+  s_a33e48a7414367::t_9f6e0db083acf7 543-551
+  s_a33e48a7414367::t_d6e4ce966ac97f 344-346,348
+conformance/manifest/session.yaml
+  s_15bd70399fd962::t_0d3be66d29f0a3 187-253,255-270
+  s_79866e221b5430::t_fc3c0a86bb44d4 254
+bindings/go/conformance_runner_test.go
+  s_f0b3f346a91680::t_911bec077b9f6d 198,203
+  s_0f8ec978880385::t_a5b6bf39aae628 157-174,176,186-187,193-194,200-202,204-217,221-222
+  s_98638f8a4bd987::t_1c56a79ccd8b8d 298
+  s_0f8ec978880385::t_bcf480c3b15a85 309-312,316
+  s_0f8ec978880385::t_80da5f92edab4a 1,3-110,175,177-185,188-192,195-197,199,218-220,223-280,284-287,294,297,300,303-308,313-315,317-335,356-402
+  s_98638f8a4bd987::t_d1d9b77ecd38f3 2
+  s_f0b3f346a91680::t_863fa47eb7da7b 111-156
+  s_98638f8a4bd987::t_02080a33650444 289-293
+  s_f0b3f346a91680::t_8028490633fed3 336-355
+  s_98638f8a4bd987::t_9a204a62cc145d 281-283,288,295-296,299,301-302
+conformance/runner/README.md
+  s_79866e221b5430::t_1cffc1f9cbaa10 19-27
+  s_79866e221b5430::t_205b91101addb1 42-46
+  s_0f8ec978880385::t_265f9c14612218 1-18,28-41
+docs/perf-tradeoffs.md
+  s_0f8ec978880385::t_64a6b0035ca68b 1-3,6-57,66-72,74,78,82-87
+  s_79866e221b5430::t_9d1f57739a02d9 4-5
+  s_98638f8a4bd987::t_c884e2b5c3cdf3 58-65,73,75-77,79-81
+conformance/runner/scenarios.yaml
+  s_0f8ec978880385::t_d3151dea1ef13d 1-14,16-71
+  s_79866e221b5430::t_43ee1d3751dfb2 15
+crates/syntra-runtime/src/initiator.rs
+  s_0f8ec978880385::t_063e324c81a1ef 726-727
+  s_0f8ec978880385::t_7cf8c2d9d0858d 729-730
+scripts/validate-repo.py
+  s_15bd70399fd962::t_45027de37610e6 72
+crates/syntra-runtime/src/recovery/reconcile.rs
+  s_366cfea08df04c::t_09c8bb8a8c091c 1-185
+bindings/go/reliable_test.go
+  s_15bd70399fd962::t_67bf0d1515d076 1-64,66-67,69-74,79,90-105,107-138
+  s_f0b3f346a91680::t_3771a594893d80 65,68,75-78,80-89
+  s_f0b3f346a91680::t_2bfa20b05a2d18 106
+proto/syntra/v1/recovery_profile.proto
+  s_a33e48a7414367::t_8e664030274b6a 431-452
+  s_a33e48a7414367::t_5325090eed13ec 317-319,328-329,331-334,338-357,366-367,370
+  s_a33e48a7414367::t_5a8145319da44f 228-240
+  s_a33e48a7414367::t_d6f5d5325a0dfe 9,21,26-42
+  s_a33e48a7414367::t_03905be468016d 119,122-132,134-136
+  s_a33e48a7414367::t_40e7182519cdf3 43
+specifications/core/handshake.md
+  s_15bd70399fd962::t_f30deb5e8d30e8 183-186
+  s_15bd70399fd962::t_68b2f344cb6d6b 222
+crates/syntra-runtime/src/lib.rs
+  s_0f8ec978880385::t_d213c234414e08 88-90,115-117
+  s_15bd70399fd962::t_22196af2e3c3aa 26,37
+crates/syntra-ffi/src/lib.rs
+  s_15bd70399fd962::t_5be33b7c73e6b0 46-48,51-53
+conformance/manifest/requirements.yaml
+  s_15bd70399fd962::t_6aa5a9ff1a8f97 99-100
+  s_15bd70399fd962::t_b249ac877d254f 172-175
+  s_15bd70399fd962::t_75792ed6fb74b5 147-151
+  s_15bd70399fd962::t_4b922532c1cf2d 219-224
+  s_79866e221b5430::t_3b0e04dd04e3d1 152
+  s_15bd70399fd962::t_df7f99c8ea3588 255-256
+crates/syntra-runtime/src/recovery/snapshot.rs
+  s_366cfea08df04c::t_f527c59974d799 1-23,26-184
+  s_39b45aa115a0a6::t_fce33d57b77555 24-25
+conformance/manifest/recovery.yaml
+  s_a33e48a7414367::t_3b20357912c0c1 162,165
+  s_a33e48a7414367::t_8c3498b524a4b0 179-181,183
+  s_a33e48a7414367::t_539e975516f0be 146,148
+conformance/runner/results.json
+  s_87109a341c301d::t_580f372b0a0e44 17,22
+  s_0f8ec978880385::t_1c8369c64673d8 1-6,8-11,13-15,18-21,23-25
+  s_98638f8a4bd987::t_ca99f7e6d2dc24 7,12,16
+bindings/go/native_purego.go
+  s_0f8ec978880385::t_d6181de75ded7e 178,186,188,493-501
+  s_366cfea08df04c::t_f92a00ee9e37b9 271-272
+  s_0f8ec978880385::t_a35f22ce86fbb9 6
+  s_0f8ec978880385::t_5876e51c17b01f 175-177
+  s_0f8ec978880385::t_f7fd3587450b95 179-181,183-185
+  s_0f8ec978880385::t_db1cf84d9fc0ac 187
+  s_366cfea08df04c::t_f24211721458c7 268-270
+  s_15bd70399fd962::t_44cecb6e96c487 37,61-67,77-79,182,261-267
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_a33e48a7414367::t_4a21a1d2c06043 247,259,264-281,381,385,389-405,523-539,644-646,659-660,663-666,670-694,707-708,712,801-834,836
+  s_a33e48a7414367::t_8e7295eb6886c2 835
+conformance/runner/runner.py
+  s_79866e221b5430::t_2b62745c21a00e 9,12
+  s_79866e221b5430::t_6ff7aec7f76d7d 172-173,176-181,190-191
+  s_79866e221b5430::t_e712c1a9969069 103
+  s_87109a341c301d::t_09e3382bcc5ce3 82-85,87-94
+  s_0f8ec978880385::t_00be643ed44466 1-8,10-11,13-27,29-39,76-81,86,95-102,105-108,112-119,121-129,131-133,136-149,155-171,174-175,182-189,192-199
+  s_79866e221b5430::t_a67e38b89de552 40-75
+  s_87109a341c301d::t_8930da091f8c14 120,135
+  s_79866e221b5430::t_b84b410f1792a2 109-110
+  s_79866e221b5430::t_a503ed8a6fc5d5 130,134
+  s_87109a341c301d::t_95b4b05a59da26 104,111
+  s_79866e221b5430::t_b51f25b26245e3 150-154
+  s_79866e221b5430::t_066f9354b70889 28
+crates/syntra-runtime/tests/recovery_drivers.rs
+  s_39b45aa115a0a6::t_7f8f9f84dca9db 19-21
+  s_39b45aa115a0a6::t_2efa9d90065c50 170-185
+  s_366cfea08df04c::t_0b130e3e714ab9 1-18,22-109,111,115-169,186
+  s_39b45aa115a0a6::t_697e159226b853 110,112-114
+crates/syntra-ffi/include/syntra_production.h
+  s_366cfea08df04c::t_fcd85213b28835 75-81
+  s_15bd70399fd962::t_cf6fb4c04e5727 120-127
+specifications/core/reliability.md
+  s_15bd70399fd962::t_f096aea23575cf 45-58
+  s_79866e221b5430::t_0891e2675089ec 85
+specifications/core/sessions.md
+  s_15bd70399fd962::t_9556d00c19ad02 151-180
+  s_15bd70399fd962::t_15fbd37dedb47d 207
+specifications/core/rpc.md
+  s_79866e221b5430::t_50a87b36729df3 184
+  s_15bd70399fd962::t_f738d0b059c2c4 145-156
+specifications/core/capabilities.md
+  s_15bd70399fd962::t_8928e1ea7f5eef 29-30
+  s_15bd70399fd962::t_2cf2c60a0ca799 57
+crates/syntra-ffi/src/production.rs
+  s_0f8ec978880385::t_711913678d97ea 1446-1464
+  s_366cfea08df04c::t_22cdcf444d8a52 1710-1711
+  s_366cfea08df04c::t_a1d2c7be597feb 695,702,706,708-711,1639,1658
+  s_0f8ec978880385::t_c3be5d7c35b540 1293-1313
+  s_366cfea08df04c::t_ba3d92b773ec4e 692-694
+  s_366cfea08df04c::t_4661203fbe4ec3 696-701
+  s_366cfea08df04c::t_0c9d30cc8d0d45 703-705
+  s_366cfea08df04c::t_a6e497d41a62a0 707
+  s_366cfea08df04c::t_b4ec075bbe7a73 1636-1638
+  s_366cfea08df04c::t_bf68a4f6bc8511 1640-1642,1655-1657
+  s_366cfea08df04c::t_9626199b1f79b2 1659-1661,1707-1709
+  s_15bd70399fd962::t_ada0361ebb4a92 98-102,304-305,466,470-475,477-480,681-691,1605-1635,1643-1654,1662-1706
+bindings/go/native.go
+  s_366cfea08df04c::t_9d6f30554f271a 475-476
+  s_366cfea08df04c::t_23bd45108ae38c 73-74,460-474
+crates/syntra-runtime/src/reliable.rs
+  s_39b45aa115a0a6::t_d4cfaae86344e4 371-372,375,380-384
+  s_39b45aa115a0a6::t_9d2fd2b2778243 3
+  s_15bd70399fd962::t_c9a37c2ea63c73 1-2,4-33,35-37,46,54-64,70-74,76-78,85-87,89-92,98-165,167-203,205-209,218-219,221-223,225,227-236,262-271,274-301,303-306,308-322,324-325,332,336-339,347,356-370,373-374,376-379,385-386,396-440,442-443,445-450,452-453,457-493
+  s_39b45aa115a0a6::t_854ccd2cce6124 441,444,451,454-456
+  s_39b45aa115a0a6::t_29197e6210f24e 340-346,348-355
+  s_39b45aa115a0a6::t_06b6deffad65bc 387-395
+  s_39b45aa115a0a6::t_480ea8629c3613 323,326-331,333-335
+  s_39b45aa115a0a6::t_ea6b281e6c3d9e 204,210-217,220,224,226,237-242,244-259,261,272-273
+  s_39b45aa115a0a6::t_9897af632273e3 34,38-45,47-53,65-69,75,79-84,88,93-97
+  s_15bd70399fd962::t_18f1a30803b998 243,260
+  s_39b45aa115a0a6::t_32ca271f9ce83e 302,307
+  s_39b45aa115a0a6::t_2181a9b0995292 166
+crates/syntra-runtime/src/recovery/driver.rs
+  s_39b45aa115a0a6::t_b235779916848f 448-451
+  s_39b45aa115a0a6::t_1ad1c3f50df57f 38-55
+  s_366cfea08df04c::t_79e11ebe56b06e 1-37,56-208,210,213-297,303-306,313,315,326-447,452-503
+  s_39b45aa115a0a6::t_81b64ad32c3861 298-302,307-312,314,316-325
+  s_39b45aa115a0a6::t_2cb4e5d63c116e 209,211-212
+crates/syntra-ffi/src/reliable.rs
+  s_15bd70399fd962::t_4b2b433c58a345 1-175
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_a33e48a7414367::t_eeaa3cceff3a70 26,38,43-60,389,392,442-508,537,549,562,639,651,664,735,747,760,806,818,831,868,880,893,924-990,1015,1027,1040,1106,1118,1131,1189,1201,1214,1270,1282,1295,1344,1356,1369,1393-1395,1405-1406,1408-1411,1419,1431,1444,1475-1555,1565-1566,1569,1577,1589,1602,1659,1671,1684,1765,1777,1790,1907-2026,2061-2067,2100-2106,2151-2158,2189-2195,2209,2211-2233,2236-2243,2251,2257-2261,2268
+bindings/go/recovery_test.go
+  s_366cfea08df04c::t_60e5f8e528dfa9 1-213
+crates/syntra-core/src/lib.rs
+  s_15bd70399fd962::t_19407943ef7808 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "56236e0f18cc22df927b1908be61ebcc7e41593b",
+  "prompts": {},
+  "sessions": {
+    "s_0f8ec978880385": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9dd6afc4ffea8okUKqdd9ZXxH",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_15bd70399fd962": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9dd6aff3ffe4C7gi8XSVSkHDM",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_366cfea08df04c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9dd6afd1ffePJKdgaQbXBBoYA",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_39b45aa115a0a6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9db6f015ffe1Ph9jf5FWcVXlS",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_79866e221b5430": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9db6f000ffesjEJQrQcBy7ovu",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_87109a341c301d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9bdf44e3ffexG9Da9QucoKeDs",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_98638f8a4bd987": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9e07e576ffel1DDXANV2dRUrM",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_a33e48a7414367": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9dd6afddffekpkSIN4qgn7p7p",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_d8ad84485eac90": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9bdf4504ffe7uNRZow1O8Csx5",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_e2d6f188780d76": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9bbd7f8dffeaiMWgvMKIe1QwL",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_f0b3f346a91680": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9db6f039ffeqqaEB7fjPnmGar",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
