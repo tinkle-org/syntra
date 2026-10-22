@@ -34,6 +34,19 @@
 //! progress cannot advance via the batch path until a snapshot with a new
 //! generation confirms. New-generation snapshot installation remains
 //! admissible while pending as the snapshot path.
+//!
+//! Commit sequencing is stop-and-wait with a single pending offer. While a
+//! committable checkpoint awaits confirmation, a different committable
+//! checkpoint returns a recovery-needed action without replacing the pending
+//! offer, so confirming the first offer still succeeds. Gap, continuity-loss,
+//! and continuation-expiry reports invalidate the pending offer.
+//!
+//! The coordinator compares selector and cursor bytes by equality only. An
+//! older duplicate whose result cursor no longer equals the committed cursor
+//! is indistinguishable from a gap and returns a recovery-needed action. The
+//! application holds a bounded recent-result cache keyed by checkpoint bytes
+//! to answer older duplicates without re-applying effects; the coordinator
+//! never orders or parses cursor bytes.
 
 use syntra_core::ErrorCode;
 
@@ -276,7 +289,16 @@ pub trait RecoveryAuthorizer {
 /// Duplicate tolerance: a validated batch or snapshot whose result cursor
 /// already equals the committed cursor is tolerated with no actions and
 /// no mutation. A duplicate is never a violation. Duplicate confirmation
-/// is idempotent and leaves progress unchanged.
+/// is idempotent and leaves progress unchanged. An older duplicate whose
+/// result cursor no longer equals the committed cursor returns a
+/// recovery-needed action; the application holds a bounded recent-result
+/// cache keyed by checkpoint bytes to answer such duplicates without
+/// re-applying effects. The coordinator compares bytes by equality only
+/// and never orders or parses cursor bytes.
+///
+/// Stop-and-wait: at most one committable checkpoint is pending
+/// confirmation. A different committable checkpoint while pending returns a
+/// recovery-needed action without replacing the pending offer.
 #[derive(Debug, Clone)]
 pub struct ProfileRecovery {
     stream_selector: Vec<u8>,
@@ -364,6 +386,14 @@ impl ProfileRecovery {
     /// their proven synchronization cut. Stale generations and
     /// non-contiguous same-generation checkpoints return a recovery-needed
     /// action instead of a committable action.
+    ///
+    /// Stop-and-wait: while one committable checkpoint is pending, a
+    /// different committable checkpoint returns a recovery-needed action
+    /// without replacing the pending offer. Gap, continuity-loss, and
+    /// continuation-expiry reports invalidate the pending offer. An older
+    /// duplicate whose result cursor no longer equals the committed cursor
+    /// returns a recovery-needed action; the application answers it from a
+    /// bounded recent-result cache keyed by checkpoint bytes.
     pub fn observe(&mut self, input: ProfileInput) -> Vec<ProfileAction> {
         match input {
             ProfileInput::BatchValidated { checkpoint } => {
@@ -382,6 +412,11 @@ impl ProfileRecovery {
                 if checkpoint.base_cursor != self.committed {
                     return self.recovery_needed();
                 }
+                if let Some(offer) = &self.pending {
+                    if offer.checkpoint != checkpoint {
+                        return self.recovery_needed();
+                    }
+                }
                 self.pending = Some(PendingOffer {
                     checkpoint: checkpoint.clone(),
                     is_snapshot: false,
@@ -392,12 +427,14 @@ impl ProfileRecovery {
                 if stream_selector != self.stream_selector {
                     return vec![];
                 }
+                self.pending = None;
                 self.recovery_needed()
             },
             ProfileInput::ContinuityLost { stream_selector, committed: _ } => {
                 if stream_selector != self.stream_selector {
                     return vec![];
                 }
+                self.pending = None;
                 self.recovery_needed()
             },
             ProfileInput::ContinuationExpired { stream_selector, committed } => {
@@ -410,6 +447,7 @@ impl ProfileRecovery {
                 if committed != self.committed {
                     return vec![];
                 }
+                self.pending = None;
                 self.snapshot_pending = true;
                 self.snapshot_required()
             },
@@ -430,11 +468,21 @@ impl ProfileRecovery {
                     if checkpoint.base_cursor != self.committed {
                         return self.recovery_needed();
                     }
+                    if let Some(offer) = &self.pending {
+                        if offer.checkpoint != checkpoint {
+                            return self.recovery_needed();
+                        }
+                    }
                     self.pending = Some(PendingOffer {
                         checkpoint: checkpoint.clone(),
                         is_snapshot: true,
                     });
                     return vec![ProfileAction::CommitCheckpoint { checkpoint }];
+                }
+                if let Some(offer) = &self.pending {
+                    if offer.checkpoint != checkpoint {
+                        return self.recovery_needed();
+                    }
                 }
                 self.pending = Some(PendingOffer {
                     checkpoint: checkpoint.clone(),
@@ -469,6 +517,10 @@ impl ProfileRecovery {
     /// While the pending gate is set, same-generation confirmations are
     /// blocked with a snapshot-required action instead of advancing, so
     /// only a new-generation snapshot confirm clears the gate.
+    ///
+    /// Stop-and-wait: only the pending committable checkpoint confirms.
+    /// A different checkpoint returns a recovery-needed action without
+    /// advancing committed progress.
     pub fn confirm_persisted(&mut self, checkpoint: &ProfileCheckpoint) -> Vec<ProfileAction> {
         if checkpoint.stream_selector != self.stream_selector {
             return vec![];
@@ -790,6 +842,58 @@ mod tests {
         assert!(!r.snapshot_pending());
         assert_eq!(r.generation(), 8);
         assert_eq!(r.committed(), b"boundary-100");
+    }
+
+    #[test]
+    fn profile_stop_and_wait_pipelined_second_rejected_first_confirm_succeeds() {
+        let mut r = coordinator(b"cursor-40");
+        let first = checkpoint(b"cursor-40", b"cursor-43");
+        let second = checkpoint(b"cursor-40", b"cursor-44");
+        let first_actions =
+            r.observe(ProfileInput::BatchValidated { checkpoint: first.clone() });
+        assert!(matches!(first_actions[0], ProfileAction::CommitCheckpoint { .. }));
+        // Competing offer from the same base with a different result reaches
+        // the pending-offer check, so it returns recovery-needed without
+        // replacing the pending offer.
+        let second_actions =
+            r.observe(ProfileInput::BatchValidated { checkpoint: second.clone() });
+        assert!(matches!(
+            second_actions[0],
+            ProfileAction::RecoveryNeeded { .. }
+        ));
+        // First confirm still succeeds under stop-and-wait.
+        assert!(r.confirm_persisted(&first).is_empty());
+        assert_eq!(r.committed(), b"cursor-43");
+    }
+
+    #[test]
+    fn profile_gap_invalidates_pending_offer() {
+        let mut r = coordinator(b"cursor-40");
+        let cp = checkpoint(b"cursor-40", b"cursor-43");
+        let actions = r.observe(ProfileInput::BatchValidated { checkpoint: cp.clone() });
+        assert!(matches!(actions[0], ProfileAction::CommitCheckpoint { .. }));
+        let gap = r.observe(ProfileInput::GapDetected {
+            stream_selector: selector(),
+            expected_base: b"cursor-40".to_vec(),
+            observed_base: b"cursor-45".to_vec(),
+        });
+        assert!(matches!(gap[0], ProfileAction::RecoveryNeeded { .. }));
+        // Pending offer was invalidated, so confirming it no longer advances.
+        let after_gap = r.confirm_persisted(&cp);
+        assert!(matches!(after_gap[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(r.committed(), b"cursor-40");
+        // Continuity loss invalidates a pending offer the same way.
+        let mut r = coordinator(b"cursor-40");
+        let actions = r.observe(ProfileInput::BatchValidated { checkpoint: cp.clone() });
+        assert!(matches!(actions[0], ProfileAction::CommitCheckpoint { .. }));
+        let lost = r.observe(ProfileInput::ContinuityLost {
+            stream_selector: selector(),
+            committed: b"cursor-40".to_vec(),
+        });
+        assert!(matches!(lost[0], ProfileAction::RecoveryNeeded { .. }));
+        let after_lost = r.confirm_persisted(&cp);
+        assert!(matches!(after_lost[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(r.committed(), b"cursor-40");
     }
 
     #[test]

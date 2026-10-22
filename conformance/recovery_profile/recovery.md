@@ -1,4 +1,4 @@
-# Conformance — update and recovery (`CONF-URP-001…009`)
+# Conformance — update and recovery (`CONF-URP-001…011`)
 
 Related normative requirements are cited per case; test IDs are not normative.
 Neutral fixtures only: generic subscription, generic key and value read,
@@ -14,7 +14,7 @@ Machine-readable equivalents are in [recovery machine snippet](../manifest/recov
 Guidance on fields is in [manifest format](../manifest/README.md).
 Related event coverage is in [event conformance](../events/events.md).
 
-Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`) are harness-side instrumentation that drives the host to emit, duplicate, drop, or flood batches; they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
+Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_duplicate_event`, `flood_events`, `overflow_local_queue`, `emit_live_during_replay`) are harness-side instrumentation that drives the host to emit, duplicate, overflow, or flood batches; they are not wire fields, consistent with `emit_events`, `emit_duplicate_event`, `flood_events` precedent in [event manifest](../manifest/events.yaml).
 
 ## CONF-URP-001 mandatory-only fallback
 
@@ -106,6 +106,26 @@ Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_dupl
 - Expected session state: unchanged.
 - Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host does not document continuity-loss).
 
+## CONF-URP-010 dropped-final-update silence
+
+- Related normative requirement: SNTR-EVENT-006, SNTR-EVENT-021.
+- Preconditions: ACTIVE; subscription confirmed.
+- Input: harness overflows the local notification queue so the loss counter changes and the stream goes idle with no catch-up boundary.
+- Expected output: initiator maps the loss counter to recovery and never treats idle as caught-up; no silent stall.
+- Expected connection state: ACTIVE.
+- Expected session state: unchanged.
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
+
+## CONF-URP-011 fixed-boundary replay
+
+- Related normative requirement: SNTR-EVENT-008, SNTR-EVENT-009.
+- Preconditions: ACTIVE; subscription confirmed.
+- Input: replay from the last confirmed checkpoint while new live arrivals occur during paging.
+- Expected output: bounded pages each stating the continuation marker and the fixed catch-up boundary plus explicit completion; initiator follows the marker page by page and stops at the boundary; the boundary never moves and history is never silently truncated.
+- Expected connection state: ACTIVE.
+- Expected session state: unchanged.
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed).
+
 ## Sequence view
 
 ```text
@@ -143,5 +163,7 @@ Initiator                              Host
 | CONF-URP-007 | SESS-008, EVENT-020 (reconnect) |
 | CONF-URP-008 | EVENT-030, REL-007 (overflow reject-new-work) |
 | CONF-URP-009 | EVENT-030, REL-007 (overflow continuity loss) |
+| CONF-URP-010 | EVENT-006/021 (dropped-final-update silence) |
+| CONF-URP-011 | EVENT-008/009 (fixed-boundary replay) |
 
 Further detail is in [profile readme](README.md).

@@ -19,7 +19,7 @@
 //!   (`PendingGuard`).
 
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Arc,
 };
 use std::time::Duration;
@@ -492,6 +492,14 @@ pub(crate) struct Shared {
     pub closed: AtomicBool,
     /// ACTIVE-phase decode failures (misbehavior counter, SNTR-ASEC-020).
     pub misbehavior: AtomicU32,
+    /// Notification queue overflow observability for the Initiator path.
+    /// Counts dropped notifications and their bytes; the queue stays
+    /// bounded and drops remain non-blocking.
+    pub notification_dropped: AtomicU64,
+    pub notification_dropped_bytes: AtomicU64,
+    /// Fired when the notification loss counters change so loss-aware
+    /// consumers wake without requiring another notification.
+    pub notification_loss_notify: Notify,
     /// Close broadcast: fired on every path to CLOSED so transport pumps
     /// (which only hold byte channels) learn remote teardown promptly.
     /// Pumps `select!` on this alongside reads; firing is idempotent.
@@ -522,6 +530,9 @@ impl Shared {
             config,
             closed: AtomicBool::new(false),
             misbehavior: AtomicU32::new(0),
+            notification_dropped: AtomicU64::new(0),
+            notification_dropped_bytes: AtomicU64::new(0),
+            notification_loss_notify: Notify::new(),
             closed_tx,
         });
         (shared, notif_rx)
@@ -742,5 +753,20 @@ impl Connection {
     /// Number of outstanding RPCs (for backpressure observability).
     pub fn pending_len(&self) -> usize {
         self.shared.pending.len()
+    }
+
+    /// Notification queue overflow observability.
+    /// Returns `(dropped_count, dropped_bytes)` for notifications
+    /// discarded when the bounded notification queue was full.
+    /// Bounds are unchanged; the queue stays non-blocking and drops.
+    pub fn notification_loss(&self) -> (u64, u64) {
+        (
+            self.shared
+                .notification_dropped
+                .load(Ordering::Relaxed),
+            self.shared
+                .notification_dropped_bytes
+                .load(Ordering::Relaxed),
+        )
     }
 }

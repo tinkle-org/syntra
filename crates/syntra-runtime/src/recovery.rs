@@ -9,8 +9,10 @@
 //! recovery RPCs, constructs payloads, performs requests, persists
 //! checkpoints, and installs snapshots.
 
+pub mod engine;
 pub mod profile;
 
+pub use engine::ProfileEngine;
 pub use profile::{
     CommittedPosition, ProfileAction, ProfileCheckpoint, ProfileInput, ProfileRecovery,
     ProfileRecoveryAction, ProfileRecoveryInput, ProviderError, RecoveryAuthorizer, ReplayPage,

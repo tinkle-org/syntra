@@ -29,6 +29,7 @@
 //!   result branch first; a timer that fires first still re-checks for
 //!   an arrived result before reporting expiry).
 
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use prost::Message;
@@ -388,8 +389,10 @@ impl Initiator {
                 .await;
             return;
         }
-        // Notifications never complete an RPC. Bounded channel:
-        // drop-with-diagnostic on overflow, never unbounded queueing.
+        // Notifications never complete an RPC. Bounded notification
+        // queue stays non-blocking: overflow drops with loss accounting,
+        // never unbounded queueing.
+        let dropped_len = notif.payload.len() as u64;
         if self
             .conn
             .shared
@@ -397,7 +400,24 @@ impl Initiator {
             .try_send(notif.payload.into())
             .is_err()
         {
-            tracing::debug!("notification queue full; dropping");
+            let dropped = self
+                .conn
+                .shared
+                .notification_dropped
+                .fetch_add(1, Ordering::Relaxed)
+                + 1;
+            let dropped_bytes = self
+                .conn
+                .shared
+                .notification_dropped_bytes
+                .fetch_add(dropped_len, Ordering::Relaxed)
+                + dropped_len;
+            tracing::warn!(
+                dropped,
+                dropped_bytes,
+                "notification queue full; dropping notification"
+            );
+            self.conn.shared.notification_loss_notify.notify_one();
         }
     }
 
@@ -647,6 +667,45 @@ impl Initiator {
     /// Returns None when the connection is closed and drained.
     pub async fn next_notification(&self) -> Option<Vec<u8>> {
         self.conn.next_notification().await
+    }
+
+    /// Notification queue overflow observability for this Initiator.
+    /// Returns `(dropped_count, dropped_bytes)` for notifications
+    /// discarded when the bounded notification queue was full.
+    /// Bounds are unchanged; the queue stays non-blocking and drops.
+    pub fn notification_loss(&self) -> (u64, u64) {
+        self.conn.notification_loss()
+    }
+
+    /// Take the next notification plus current loss totals
+    /// `(payload, (dropped_count, dropped_bytes))`.
+    ///
+    /// Recovery embedding must map a loss increment to
+    /// `GapDetected`/`RecoveryNeeded` through the Syntra recovery
+    /// coordinator and must not treat idle `None` as caught-up:
+    /// `None` without a loss increment reports an idle or closed
+    /// Connection drain, never committed progress through the
+    /// recovery coordinator.
+    ///
+    /// Wakes on either a queued notification or a loss-counter change,
+    /// so a loss without further notifications still returns promptly
+    /// with the updated totals.
+    pub async fn next_notification_with_loss(&self) -> (Option<Vec<u8>>, (u64, u64)) {
+        loop {
+            let before = self.notification_loss();
+            tokio::select! {
+                biased;
+                next = self.conn.next_notification() => {
+                    return (next, self.notification_loss());
+                }
+                _ = self.conn.shared.notification_loss_notify.notified() => {
+                    let after = self.notification_loss();
+                    if after != before {
+                        return (None, after);
+                    }
+                }
+            }
+        }
     }
 
     /// Graceful close from ACTIVE: stop new RPCs, allow the transport's
@@ -1024,5 +1083,31 @@ mod tests {
         let err = h.await.unwrap().unwrap_err();
         assert!(matches!(err, SyntraError::Handshake { .. }));
         assert!(c.is_closed());
+    }
+
+    #[tokio::test]
+    async fn notification_overflow_reports_loss() {
+        // Bounded notification queue of capacity 1 admits one
+        // Initiator notification and drops the next with loss accounting.
+        let (c, _wrx) = Initiator::new(ConnectionConfig {
+            notification_capacity: 1,
+            ..ConnectionConfig::default()
+        });
+        *c.conn.shared.state.write().await = ConnectionState::Active;
+        *c.conn.shared.version.write().await = Some(1);
+        for payload in [b"one".to_vec(), b"two".to_vec()] {
+            let frame = Frame {
+                version: 1,
+                request_id: 0,
+                body: Some(Body::Notification(syntra_core::proto::Notification {
+                    payload,
+                })),
+            };
+            c.ingest(&frame.encode_to_vec()).await;
+        }
+        let (dropped, dropped_bytes) = c.notification_loss();
+        assert_eq!(dropped, 1);
+        assert_eq!(dropped_bytes, 3);
+        assert_eq!(c.conn.notification_loss(), (1, 3));
     }
 }
