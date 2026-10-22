@@ -242,4 +242,263 @@ pub mod frame {
         Notification(super::Notification),
     }
 }
+/// Update/recovery profile payloads for ordered delivery, bounded replay,
+/// snapshot recovery, and committed progress (SYN-URP-001..019).
+///
+/// All payloads are versioned bytes carried inside the existing request,
+/// result, and notification envelopes with no envelope changes. Each
+/// subscription is one independent logical stream with one continuity
+/// generation. Checkpoints, handles, selectors, markers, and boundaries are
+/// opaque bytes. Confirmation proves only persistence through the
+/// application persistence point. Bounds below are deployment-documented
+/// defaults: at most 64 subscriptions per connection, at most 256 per
+/// principal, at most 16 pending profile calls per connection, at most
+/// 262144 queued notification bytes per stream, at most 1048576 per
+/// connection, at most 64 batches and 262144 bytes per replay page, at most
+/// 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
+/// effective deadline 5 s where the request carries no explicit bounded
+/// deadline.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySubscribeRequest {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// stream_selector selects the stream. Opaque bytes, non-empty, at most 1024 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub stream_selector: ::prost::alloc::vec::Vec<u8>,
+    /// start_checkpoint is the confirmed checkpoint to continue from. Opaque bytes,
+    /// empty means initial, otherwise at most 4096 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub start_checkpoint: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoveryUnsubscribeRequest ends one targeted subscription.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryUnsubscribeRequest {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoveryReplayRequest asks for bounded replay from a confirmed checkpoint.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryReplayRequest {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// from_checkpoint is the confirmed checkpoint to replay from. Opaque bytes,
+    /// non-empty, at most 4096 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub from_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// max_batches bounds batches in one page. Valid range is 1 to 64.
+    #[prost(uint32, tag="4")]
+    pub max_batches: u32,
+    /// max_bytes bounds page bytes. Valid range is 1 to 262144.
+    #[prost(uint32, tag="5")]
+    pub max_bytes: u32,
+}
+/// RecoveryReplayPage carries one bounded replay page toward the catch-up boundary.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryReplayPage {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// predecessor_checkpoint is the checkpoint this page continues from. Opaque
+    /// bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub predecessor_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// result_checkpoint is the checkpoint this page advances to. Opaque bytes,
+    /// at most 4096 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub result_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// continuation_marker orders the next page. Opaque bytes, empty means no
+    /// further page, otherwise at most 4096 bytes.
+    #[prost(bytes="vec", tag="5")]
+    pub continuation_marker: ::prost::alloc::vec::Vec<u8>,
+    /// catchup_boundary is the live boundary being approached. Opaque bytes, at
+    /// most 4096 bytes.
+    #[prost(bytes="vec", tag="6")]
+    pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
+    /// batch_payloads holds opaque batch bytes. At most 64 entries, each at most
+    /// 262144 bytes, total at most 262144 bytes.
+    #[prost(bytes="vec", repeated, tag="7")]
+    pub batch_payloads: ::prost::alloc::vec::Vec<::prost::alloc::vec::Vec<u8>>,
+}
+/// RecoveryReplayComplete signals the stream has reached live.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryReplayComplete {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation of the stream.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
+    /// live_boundary_checkpoint is the checkpoint where replay met live. Opaque
+    /// bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub live_boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoverySnapshotDescriptor offers a snapshot under a provider-proven boundary.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotDescriptor {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// snapshot_handle identifies the offered snapshot. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub snapshot_handle: ::prost::alloc::vec::Vec<u8>,
+    /// boundary_checkpoint is the provider-proven boundary subsequent batches chain
+    /// from. Opaque bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// total_pages bounds pages in this offer. Valid range is 1 to 256.
+    #[prost(uint32, tag="5")]
+    pub total_pages: u32,
+    /// page_bytes_max bounds each page. Valid range is 1 to 262144.
+    #[prost(uint32, tag="6")]
+    pub page_bytes_max: u32,
+}
+/// RecoverySnapshotChunk carries one bounded snapshot page for storage without interpretation.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotChunk {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// snapshot_handle identifies the offered snapshot. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub snapshot_handle: ::prost::alloc::vec::Vec<u8>,
+    /// page_index orders the page within the offer. Valid range is 0 to 255.
+    #[prost(uint32, tag="3")]
+    pub page_index: u32,
+    /// page_bytes holds opaque snapshot bytes. Non-empty, at most 262144 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub page_bytes: ::prost::alloc::vec::Vec<u8>,
+    /// boundary_checkpoint binds the chunk to the offered boundary. Opaque bytes,
+    /// at most 4096 bytes.
+    #[prost(bytes="vec", tag="5")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoverySnapshotComplete marks transfer of all pages in the offer.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotComplete {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// snapshot_handle identifies the offered snapshot. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub snapshot_handle: ::prost::alloc::vec::Vec<u8>,
+    /// boundary_checkpoint is the offered boundary. Opaque bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// total_pages is the transferred page count. Valid range is 1 to 256.
+    #[prost(uint32, tag="4")]
+    pub total_pages: u32,
+    /// total_bytes is the transferred byte count. Valid range is 1 to 67108864.
+    #[prost(uint64, tag="5")]
+    pub total_bytes: u64,
+}
+/// RecoverySnapshotInstalled confirms installation only on boundary confirm.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoverySnapshotInstalled {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// boundary_checkpoint is the confirmed boundary. Opaque bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="3")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation after installation.
+    #[prost(uint64, tag="4")]
+    pub generation: u64,
+}
+/// RecoveryBatch carries one ordered batch with predecessor/result pairing.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryBatch {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation of the stream.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
+    /// predecessor_checkpoint is the checkpoint this batch continues from. Opaque
+    /// bytes, at most 4096 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub predecessor_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// result_checkpoint is the checkpoint this batch advances to. Opaque bytes,
+    /// at most 4096 bytes.
+    #[prost(bytes="vec", tag="5")]
+    pub result_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// batch_payload holds opaque application batch bytes. At most 262144 bytes.
+    #[prost(bytes="vec", tag="6")]
+    pub batch_payload: ::prost::alloc::vec::Vec<u8>,
+}
+/// RecoveryBatchTrailer marks catch-up completion, snapshot need, continuity loss,
+/// or targeted termination for one stream.
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RecoveryBatchTrailer {
+    /// profile_version is the profile payload version. Valid value is 1.
+    #[prost(uint32, tag="1")]
+    pub profile_version: u32,
+    /// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+    /// at most 256 bytes.
+    #[prost(bytes="vec", tag="2")]
+    pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
+    /// generation is the continuity generation of the stream.
+    #[prost(uint64, tag="3")]
+    pub generation: u64,
+    /// boundary_checkpoint is the catch-up or snapshot boundary. Opaque bytes, at
+    /// most 4096 bytes.
+    #[prost(bytes="vec", tag="4")]
+    pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
+    /// next_generation carries the new generation on continuity loss. Zero means no
+    /// continuity loss, nonzero is the new generation.
+    #[prost(uint64, tag="5")]
+    pub next_generation: u64,
+    /// catchup_complete is true when the stream has reached live.
+    #[prost(bool, tag="6")]
+    pub catchup_complete: bool,
+    /// snapshot_required is true when the requested checkpoint is outside retention
+    /// and replay cannot complete.
+    #[prost(bool, tag="7")]
+    pub snapshot_required: bool,
+}
 // @@protoc_insertion_point(module)

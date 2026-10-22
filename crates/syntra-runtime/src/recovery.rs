@@ -9,6 +9,14 @@
 //! recovery RPCs, constructs payloads, performs requests, persists
 //! checkpoints, and installs snapshots.
 
+pub mod profile;
+
+pub use profile::{
+    CommittedPosition, ProfileAction, ProfileCheckpoint, ProfileInput, ProfileRecovery,
+    ProfileRecoveryAction, ProfileRecoveryInput, ProviderError, RecoveryAuthorizer, ReplayPage,
+    ReplayProvider, SnapshotOffer, SnapshotProvider,
+};
+
 /// Position within one independently ordered stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StreamCheckpoint {

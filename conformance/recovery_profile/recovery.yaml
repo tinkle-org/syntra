@@ -1,0 +1,114 @@
+# Portable recovery cases. Prose companion: recovery.md (CONF-URP-001…008).
+# Optionality rule: any case whose capabilities are unadvertised MUST yield
+# UNSUPPORTED (correct UNIMPLEMENTED refusal) or SKIP — never FAIL.
+format_version: "1.0"
+profile: SNTR-EVENTS-V1
+cases:
+  - id: CONF-URP-001
+    requirement: [SNTR-CAP-003, SNTR-EVENT-001, SNTR-EVENT-011]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session]
+    input: {subscriptions: [{method: "/example.Events/Subscribe", filter_b64: "ZmlsdGVyLWE="}]}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: {code: UNIMPLEMENTED}
+    notes: "Mandatory-only fallback: attempt without confirmed capability yields UNIMPLEMENTED with no batches and intact mandatory interop. Correct refusal reports UNSUPPORTED. SKIP when unclaimed."
+
+  - id: CONF-URP-002
+    requirement: [SNTR-EVENT-007, SNTR-REL-005]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed]
+    input: {faults: {emit_duplicate_event: true}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+    notes: "Duplicate tolerance: initiator tolerates the duplicate across the recovered and live boundary with no violation and no error storm. SKIP when unclaimed."
+
+  - id: CONF-URP-003
+    requirement: [SNTR-EVENT-006, SNTR-EVENT-021]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed]
+    input: {faults: {emit_batches: 3, skip_batch: true}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+    notes: "Gap detection: initiator detects the gap by predecessor chaining without arithmetic on checkpoint bytes and without structural parsing. SKIP when unclaimed."
+
+  - id: CONF-URP-004
+    requirement: [SNTR-EVENT-008, SNTR-EVENT-009]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed]
+    input: {replay: {cursor_b64: "Y3Vyc29yLUs=", strategy: subscribe_with_cursor}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+    notes: "Replay paging: oversized history returns bounded pages with continuation marker and catch-up boundary, never burst beyond bounds. Initiator follows the marker and stops at the boundary. SKIP when unclaimed."
+
+  - id: CONF-URP-005
+    requirement: [SNTR-EVENT-009]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, cursor_expired]
+    input: {replay: {cursor_b64: "ZXhwaXJlZC1jdXJzb3I=", strategy: subscribe_with_cursor}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: {code: FAILED_PRECONDITION}
+    notes: "Expired continuation: replay from the expired checkpoint yields FAILED_PRECONDITION with snapshot-required signal. Recovery follows the snapshot path, never silent restart. SKIP when unclaimed."
+
+  - id: CONF-URP-006
+    requirement: [SNTR-EVENT-008]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed]
+    input: {replay: {cursor_b64: "Y3Vyc29yLUs=", strategy: snapshot_from_boundary}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+    notes: "Snapshot install gate: offer under provider-proven boundary transfers bounded pages the initiator stores without interpreting. Install completes only on boundary confirm with no partial install. SKIP when unclaimed."
+
+  - id: CONF-URP-007
+    requirement: [SNTR-SESS-008, SNTR-EVENT-020]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [transport_connected]
+    input:
+      frames:
+        - {request_id: 0, body: hello, min_version: 1, max_version: 1}
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+    notes: "Reconnect re-subscribe: new connection carries no batches without explicit re-subscribe. Old handle and checkpoint carry no continuity without negotiated recovery. SKIP when unclaimed."
+
+  - id: CONF-URP-008
+    requirement: [SNTR-EVENT-030, SNTR-REL-007]
+    profile: SNTR-EVENTS-V1
+    roles: [client, server]
+    capabilities: [update-recovery-v1]
+    mandatory: false
+    preconditions: [active_session, subscription_confirmed, flood_ready]
+    input: {faults: {flood_events: true}}
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: {code: RESOURCE_EXHAUSTED}
+    notes: "Overflow explicit loss: saturation yields RESOURCE_EXHAUSTED and/or explicit continuity loss with a new generation. Never unbounded queueing and never silent truncation. SKIP when unclaimed."
