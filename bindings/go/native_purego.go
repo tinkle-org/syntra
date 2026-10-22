@@ -3,6 +3,7 @@
 package syntra
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -33,6 +34,7 @@ func newClientCore(cfg resolvedClientConfig) (clientCore, error) {
 		cfg:      cfg,
 		tracker:  NewTracker(),
 		outcomes: make(map[uint64]*RpcResult),
+		lossCh:   make(chan struct{}, 1),
 	}, nil
 }
 
@@ -56,6 +58,13 @@ func newHostCore(cfg resolvedHostConfig) (hostCore, error) {
 }
 
 // goClientCore is the pure-Go initiator core.
+//
+// Notification queue is bounded by cfg.notifyBuffer with cumulative loss
+// accounting (unified with the async Rust and FFI cores): when full, the
+// incoming (newest) notification drops and (dropped, droppedBytes) advance
+// by exactly one drop plus its payload bytes. The queued prefix is
+// preserved; there is no silent oldest-eviction. lossCh wakes loss
+// waiters once per drop (non-blocking, no double-counting).
 type goClientCore struct {
 	mu            sync.Mutex
 	cfg           resolvedClientConfig
@@ -65,6 +74,9 @@ type goClientCore struct {
 	tracker       *Tracker
 	outcomes      map[uint64]*RpcResult
 	notifications []*Notification
+	dropped       uint64
+	droppedBytes  uint64
+	lossCh        chan struct{}
 }
 
 func (g *goClientCore) helloFrame() ([]byte, error) {
@@ -160,6 +172,20 @@ func (g *goClientCore) onFrame(frame []byte) (terminal []uint64, notifications i
 		g.outcomes[id] = f.GetResult()
 		return []uint64{id}, 0, nil
 	case BodyKindNotification:
+		cap := g.cfg.notifyBuffer
+		if cap <= 0 {
+			cap = 16
+		}
+		if len(g.notifications) >= cap {
+			payloadLen := len(f.GetNotification().GetPayload())
+			g.dropped++
+			g.droppedBytes += uint64(payloadLen)
+			select {
+			case g.lossCh <- struct{}{}:
+			default:
+			}
+			return nil, 0, nil
+		}
 		g.notifications = append(g.notifications, f.GetNotification())
 		return nil, 1, nil
 	default:
@@ -230,6 +256,18 @@ func (g *goClientCore) pollNotification() (*Notification, bool) {
 	ntf := g.notifications[0]
 	g.notifications = g.notifications[1:]
 	return ntf, true
+}
+
+// lossTotals reports cumulative notification-loss totals for the pure-Go
+// core: (dropped_count, dropped_bytes) for notifications discarded when the
+// bounded queue was full. Bounds are unchanged; the queue stays
+// non-blocking and drops the newest notification. Counters advance exactly
+// once per drop (no double-counting), unifying with the async Rust
+// notification_loss and the FFI client_notification_loss signals.
+func (g *goClientCore) lossTotals() (uint64, uint64) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.dropped, g.droppedBytes
 }
 
 func (g *goClientCore) reapExpired(now time.Time) []uint64 {
@@ -452,6 +490,15 @@ func (g *goHostCore) answer(requestID uint64, result *RpcResult) ([]byte, bool, 
 	delete(g.outstanding, requestID)
 	raw, err := MarshalFrame(NewResultFrame(g.negotiated, requestID, result))
 	if err != nil {
+		var rerr *RpcError
+		if errors.As(err, &rerr) && rerr.Code == ErrorCodeResourceExhausted {
+			bounded := NewWireErrorResult(ErrorCodeResourceExhausted, "syntra: result exceeds bound")
+			raw2, err2 := MarshalFrame(NewResultFrame(g.negotiated, requestID, bounded))
+			if err2 != nil {
+				return nil, false, err2
+			}
+			return raw2, false, nil
+		}
 		return nil, false, err
 	}
 	return raw, false, nil

@@ -72,6 +72,13 @@ int32_t syntra_ffi_client_take_outcome(syntra_ffi_client_t *c, uint64_t request_
     uint8_t **out, uintptr_t *out_len, int32_t *present);
 int32_t syntra_ffi_client_poll_notification(syntra_ffi_client_t *c,
     uint8_t **out, uintptr_t *out_len, int32_t *present);
+/* Cumulative notification-loss totals: (dropped_count, dropped_bytes) for
+ * notifications discarded when the bounded queue was full. The queue stays
+ * non-blocking and drops the newest notification; counters advance exactly
+ * once per drop (no double-counting), unifying with the async Rust
+ * notification_loss and the Go LossTotals signals. */
+int32_t syntra_ffi_client_notification_loss(syntra_ffi_client_t *c,
+    uint64_t *dropped_out, uint64_t *dropped_bytes_out);
 int32_t syntra_ffi_client_reap_expired(syntra_ffi_client_t *c,
     uint64_t *ids, uintptr_t cap, uintptr_t *n);
 int32_t syntra_ffi_client_close(syntra_ffi_client_t *c);
@@ -109,6 +116,14 @@ int32_t syntra_ffi_host_next_outbound(syntra_ffi_host_t *h,
 int32_t syntra_ffi_host_reap_expired(syntra_ffi_host_t *h,
     uint64_t *ids, uintptr_t cap, uintptr_t *n);
 int32_t syntra_ffi_host_close(syntra_ffi_host_t *h);
+
+/* Reliable-session validation parity (syntra.reliable-session/1, no wire change).
+ * Pure shape checks over opaque bytes; no handles, no allocation. */
+int32_t syntra_ffi_reliable_session_id_valid(const uint8_t *id, uintptr_t len);
+int32_t syntra_ffi_reliable_delivery_id_valid(const uint8_t *id, uintptr_t len);
+int32_t syntra_ffi_reliable_resume_credential_valid(const uint8_t *cred, uintptr_t len);
+int32_t syntra_ffi_reliable_epoch_advance_valid(uint64_t current, uint64_t proposed);
+int32_t syntra_ffi_reliable_negotiate_lease(uint32_t idle_ms, uint32_t keepalive_ms, uint32_t *idle_out, uint32_t *keepalive_out);
 
 #ifdef __cplusplus
 }

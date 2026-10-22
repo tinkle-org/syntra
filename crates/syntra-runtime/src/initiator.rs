@@ -723,9 +723,11 @@ impl Initiator {
         }
     }
 
-    /// Graceful close from ACTIVE: stop new RPCs, allow the transport's
-    /// grace period, then teardown (SNTR-HS-006/013).
+    /// Graceful close from ACTIVE: stop new RPCs, drain already-queued
+    /// inbound results via the pump, then teardown (SNTR-HS-006/013).
     pub async fn close(&self) {
+        use syntra_core::StateEvent;
+        let _ = self.conn.transition(StateEvent::GracefulClose).await;
         self.conn.close().await;
     }
 

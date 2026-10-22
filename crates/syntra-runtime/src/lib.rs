@@ -23,6 +23,7 @@ pub mod host;
 pub mod initiator;
 pub mod policy;
 pub mod recovery;
+pub mod reliable;
 pub mod session;
 
 pub use connection::{CancelToken, Connection, ConnectionConfig};
@@ -33,6 +34,7 @@ pub use policy::{
     HostResult, PolicyDeadlines,
 };
 pub use recovery::{RecoveryAction, RecoveryInput, StreamCheckpoint, StreamRecovery};
+pub use reliable::{now_ms, ReliableSessionManager, StoredOutcome};
 pub use session::{
     AllowAnonymous, AuthError, Authenticator, Principal, RejectAll, Session, SessionManager,
     StaticToken,
@@ -68,9 +70,6 @@ pub fn loopback_pair(
     let mut host_closed_a = pump_host.subscribe_close();
     crate::connection::spawn_task(async move {
         loop {
-            // Check first: a close that fired before subscribe (or while
-            // busy) must still end the pump — `changed()` only sees new
-            // versions.
             if pump_host.is_closed() || pump_init.is_closed() {
                 break;
             }
@@ -86,8 +85,9 @@ pub fn loopback_pair(
                 }
             }
         }
-        // Remote-teardown semantics: whoever is still open learns the
-        // loss. Idempotent when both sides already closed gracefully.
+        while let Ok(bytes) = init_rx.try_recv() {
+            pump_host.ingest(&bytes).await;
+        }
         pump_init.on_transport_lost().await;
         pump_host.on_transport_lost().await;
     });
@@ -111,6 +111,9 @@ pub fn loopback_pair(
                     }
                 }
             }
+        }
+        while let Ok(bytes) = host_rx.try_recv() {
+            pump_init.ingest(&bytes).await;
         }
         pump_init.on_transport_lost().await;
         pump_host.on_transport_lost().await;

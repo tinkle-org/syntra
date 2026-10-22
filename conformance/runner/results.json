@@ -1,0 +1,25 @@
+{
+  "runner": "syntra-conformance-runner v1",
+  "results": [
+    {
+      "pairing": "rust-async",
+      "verdict": "PASS",
+      "detail": "cargo conformance_runner (0.2s)"
+    },
+    {
+      "pairing": "go-pure",
+      "verdict": "PASS",
+      "detail": "go TestRunner default (1.0s)"
+    },
+    {
+      "pairing": "go-ffi",
+      "verdict": "PASS",
+      "detail": "go TestRunner syntranative (1.3s)"
+    },
+    {
+      "pairing": "interop",
+      "verdict": "PASS",
+      "detail": "interop wire vectors (go 0.4s + rust 0.1s)"
+    }
+  ]
+}

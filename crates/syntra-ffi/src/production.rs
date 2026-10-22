@@ -95,6 +95,11 @@ struct ClientInner {
     pending: HashMap<u64, PendingCall>,
     outcomes: HashMap<u64, Vec<u8>>,
     notifications: VecDeque<Vec<u8>>,
+    /// Cumulative notifications dropped under overflow (bounded queue,
+    /// non-blocking drop-newest). Paired with `notification_dropped_bytes`;
+    /// both advance exactly once per drop (no double-counting).
+    notification_dropped: u64,
+    notification_dropped_bytes: u64,
     closed: bool,
 }
 
@@ -296,6 +301,8 @@ pub extern "C" fn syntra_ffi_client_open(
                 pending: HashMap::new(),
                 outcomes: HashMap::new(),
                 notifications: VecDeque::new(),
+                notification_dropped: 0,
+                notification_dropped_bytes: 0,
                 closed: false,
             }),
         });
@@ -456,12 +463,21 @@ pub extern "C" fn syntra_ffi_client_on_frame(
                 }
                 SYNTRA_FFI_OK
             },
-            Some(syntra_core::proto::frame::Body::Notification(_)) => {
+            Some(syntra_core::proto::frame::Body::Notification(n)) => {
                 if decoded.request_id != 0 {
                     return SYNTRA_FFI_INVALID;
                 }
+                // Bounded non-blocking queue with cumulative loss accounting
+                // (unified with async Rust `record_notification_loss` and the
+                // Go cores): when full, the incoming (newest) notification
+                // drops and the cumulative counters advance by exactly one
+                // drop plus its payload bytes. Previously queued items are
+                // preserved; no silent oldest-eviction.
                 if inner.notifications.len() >= 256 {
-                    inner.notifications.pop_front();
+                    let payload_bytes = n.payload.len() as u64;
+                    inner.notification_dropped += 1;
+                    inner.notification_dropped_bytes += payload_bytes;
+                    return SYNTRA_FFI_OK;
                 }
                 inner.notifications.push_back(bytes);
                 unsafe { *notifications = 1 };
@@ -658,6 +674,37 @@ pub extern "C" fn syntra_ffi_client_poll_notification(
             },
             None => SYNTRA_FFI_OK,
         }
+    }));
+    r.unwrap_or(SYNTRA_FFI_INTERNAL)
+}
+
+/// Reports cumulative notification-loss totals for the initiator core:
+/// `(dropped_count, dropped_bytes)` for notifications discarded when the
+/// bounded queue was full. The queue stays non-blocking and drops the newest
+/// notification. Counters advance exactly once per drop (no double-counting)
+/// and unify with the async Rust `notification_loss` and Go `LossTotals`.
+#[no_mangle]
+pub extern "C" fn syntra_ffi_client_notification_loss(
+    c: *mut syntra_ffi_client_t,
+    dropped_out: *mut u64,
+    dropped_bytes_out: *mut u64,
+) -> i32 {
+    let r = catch_unwind(AssertUnwindSafe(|| {
+        if dropped_out.is_null() || dropped_bytes_out.is_null() {
+            return SYNTRA_FFI_INVALID;
+        }
+        let inner = match client_lock(c) {
+            Ok(g) => g,
+            Err(code) => return code,
+        };
+        if inner.closed {
+            return SYNTRA_FFI_CLOSED;
+        }
+        unsafe {
+            *dropped_out = inner.notification_dropped;
+            *dropped_bytes_out = inner.notification_dropped_bytes;
+        }
+        SYNTRA_FFI_OK
     }));
     r.unwrap_or(SYNTRA_FFI_INTERNAL)
 }
@@ -1243,6 +1290,27 @@ pub extern "C" fn syntra_ffi_host_answer(
             Some(call) => {
                 inner.cancelled.remove(&id);
                 if call.deadline <= Instant::now() {
+                    let version = inner.negotiated;
+                    let frame = Frame {
+                        version,
+                        request_id: id,
+                        body: Some(syntra_core::proto::frame::Body::Result(
+                            syntra_core::proto::RpcResult {
+                                outcome: Some(
+                                    syntra_core::proto::rpc_result::Outcome::Error(
+                                        syntra_core::proto::RpcError {
+                                            code: syntra_core::ErrorCode::DeadlineExceeded.as_i32(),
+                                            message: "deadline exceeded".to_string(),
+                                        },
+                                    ),
+                                ),
+                            },
+                        )),
+                    };
+                    let encoded = frame.encode_to_vec();
+                    if encoded.len() <= MAX_FRAME_BYTES {
+                        inner.outbound.push_back(encoded);
+                    }
                     unsafe { *expired = 1 };
                 }
                 SYNTRA_FFI_OK
@@ -1375,6 +1443,25 @@ pub extern "C" fn syntra_ffi_host_reap_expired(
         for id in to_reap {
             inner.pending_map.remove(&id);
             inner.cancelled.remove(&id);
+            let version = inner.negotiated;
+            let frame = Frame {
+                version,
+                request_id: id,
+                body: Some(syntra_core::proto::frame::Body::Result(
+                    syntra_core::proto::RpcResult {
+                        outcome: Some(syntra_core::proto::rpc_result::Outcome::Error(
+                            syntra_core::proto::RpcError {
+                                code: syntra_core::ErrorCode::DeadlineExceeded.as_i32(),
+                                message: "deadline exceeded".to_string(),
+                            },
+                        )),
+                    },
+                )),
+            };
+            let encoded = frame.encode_to_vec();
+            if encoded.len() <= MAX_FRAME_BYTES {
+                inner.outbound.push_back(encoded);
+            }
             unsafe { *ids.add(written) = id };
             written += 1;
         }
@@ -1513,6 +1600,113 @@ mod tests {
             syntra_ffi_free(out, out_len);
         }
         (rc, has_response)
+    }
+
+    #[test]
+    fn notification_overflow_drops_newest_with_cumulative_loss() {
+        let c = open_client();
+        let mut h: *mut syntra_ffi_host_t = ptr::null_mut();
+        assert_eq!(syntra_ffi_host_open(1, 1, 16, &mut h), SYNTRA_FFI_OK);
+        let mut hello_ptr: *mut u8 = ptr::null_mut();
+        let mut hello_len = 0usize;
+        assert_eq!(
+            syntra_ffi_client_hello_frame(c, &mut hello_ptr, &mut hello_len),
+            SYNTRA_FFI_OK
+        );
+        let hello = unsafe { slice::from_raw_parts(hello_ptr, hello_len).to_vec() };
+        syntra_ffi_free(hello_ptr, hello_len);
+        let mut ver = 0u32;
+        assert_eq!(
+            syntra_ffi_host_accept_hello(h, hello.as_ptr(), hello.len(), &mut ver),
+            SYNTRA_FFI_OK
+        );
+        let princ = b"svc-test";
+        let mut rptr: *mut u8 = ptr::null_mut();
+        let mut rlen = 0usize;
+        assert_eq!(
+            syntra_ffi_host_auth_complete(h, princ.as_ptr() as *const _, princ.len(), &mut rptr, &mut rlen),
+            SYNTRA_FFI_OK
+        );
+        let ready = unsafe { slice::from_raw_parts(rptr, rlen).to_vec() };
+        syntra_ffi_free(rptr, rlen);
+        assert_eq!(syntra_ffi_client_activate(c, ready.as_ptr(), ready.len()), SYNTRA_FFI_OK);
+        let notif = |payload: &[u8]| Frame {
+            version: 1,
+            request_id: 0,
+            body: Some(syntra_core::proto::frame::Body::Notification(
+                syntra_core::proto::Notification { payload: payload.to_vec().into() },
+            )),
+        }
+        .encode_to_vec();
+        let mut terminal_n = 0usize;
+        let mut was_queued = 0i32;
+        for i in 0..256u32 {
+            let bytes = notif(format!("n-{i}").as_bytes());
+            assert_eq!(
+                syntra_ffi_client_on_frame(
+                    c,
+                    bytes.as_ptr(),
+                    bytes.len(),
+                    ptr::null_mut(),
+                    0,
+                    &mut terminal_n,
+                    &mut was_queued
+                ),
+                SYNTRA_FFI_OK
+            );
+            assert_eq!(was_queued, 1);
+        }
+        let dropped_bytes = notif(b"0123456789");
+        assert_eq!(
+            syntra_ffi_client_on_frame(
+                c,
+                dropped_bytes.as_ptr(),
+                dropped_bytes.len(),
+                ptr::null_mut(),
+                0,
+                &mut terminal_n,
+                &mut was_queued
+            ),
+            SYNTRA_FFI_OK
+        );
+        assert_eq!(was_queued, 0, "overflow must not report a queued notification");
+        let mut dropped = 0u64;
+        let mut dropped_bytes_out = 0u64;
+        assert_eq!(
+            syntra_ffi_client_notification_loss(c, &mut dropped, &mut dropped_bytes_out),
+            SYNTRA_FFI_OK
+        );
+        assert_eq!(dropped, 1);
+        assert_eq!(dropped_bytes_out, 10);
+        let dropped2 = notif(b"ab");
+        assert_eq!(
+            syntra_ffi_client_on_frame(
+                c,
+                dropped2.as_ptr(),
+                dropped2.len(),
+                ptr::null_mut(),
+                0,
+                &mut terminal_n,
+                &mut was_queued
+            ),
+            SYNTRA_FFI_OK
+        );
+        assert_eq!(
+            syntra_ffi_client_notification_loss(c, &mut dropped, &mut dropped_bytes_out),
+            SYNTRA_FFI_OK
+        );
+        assert_eq!((dropped, dropped_bytes_out), (2, 12));
+        let mut first: *mut u8 = ptr::null_mut();
+        let mut first_len = 0usize;
+        let mut present = 0i32;
+        assert_eq!(
+            syntra_ffi_client_poll_notification(c, &mut first, &mut first_len, &mut present),
+            SYNTRA_FFI_OK
+        );
+        assert_eq!(present, 1);
+        syntra_ffi_free(first, first_len);
+        assert_eq!(syntra_ffi_client_close(c), SYNTRA_FFI_OK);
+        assert_eq!(syntra_ffi_host_close(h), SYNTRA_FFI_OK);
     }
 
     #[test]

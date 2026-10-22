@@ -184,3 +184,87 @@ cases:
       connection_state: ACTIVE
       session_state: active
     notes: "Resume accepted — OPTIONAL, gated on resume-v1. No resumption RFC exists in default v1, so conformant runners report SKIP with reason 'capability resume-v1 unclaimed'. When the RFC exists, this case asserts principal re-binding with fresh request_id space and no implicit restoration of RPCs/subscriptions/cursors."
+
+  - id: CONF-RS-001
+    requirement: [SNTR-SESS-030, SNTR-SESS-031, SNTR-CAP-008, SNTR-HS-015, SNTR-SESS-902, SNTR-CAP-902, SNTR-HS-902]
+    profile: SNTR-SESS-V1
+    roles: [client, server]
+    capabilities: [syntra.reliable-session/1]
+    mandatory: false
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      frames:
+        - { request_id: 21, body: result }
+    notes: "Reliable-session attach (OPTIONAL, gated): post-ACTIVE attach yields a 16-byte session_id distinct from connection_id with epoch 1; stale epoch rejected with FAILED_PRECONDITION and old attachment fenced with UNAVAILABLE; pre-ACTIVE session control fails per handshake §1B with no state-machine change. SKIP when unclaimed."
+
+  - id: CONF-RS-002
+    requirement: [SNTR-SESS-032, SNTR-SESS-902]
+    profile: SNTR-SESS-V1
+    roles: [client, server]
+    capabilities: [syntra.reliable-session/1]
+    mandatory: false
+    preconditions: [active_session]
+    input:
+      credentials: "fixture:reliable-resume-handle"
+      frames:
+        - { request_id: 0, body: hello, min_version: 1, max_version: 1 }
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+    notes: "Resume with rotation + revocation (OPTIONAL, gated): valid handle advances epoch and rotates (replay of rotated handle rejected as suspected replay); revoked/expired/wrong-audience handles yield UNAUTHENTICATED or FAILED_PRECONDITION + close. SKIP when unclaimed."
+
+  - id: CONF-RS-003
+    requirement: [SNTR-SESS-033, SNTR-SESS-902]
+    profile: SNTR-SESS-V1
+    roles: [client, server]
+    capabilities: [syntra.reliable-session/1]
+    mandatory: false
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 22, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      frames:
+        - { request_id: 22, body: result }
+    notes: "Lease negotiation (OPTIONAL, gated): zero selects host defaults; keepalive clamped below idle; under-minimum rejected with OUT_OF_RANGE; idle expiry yields idle-timeout UNAVAILABLE and clears the attachment without losing retained outcomes. SKIP when unclaimed."
+
+  - id: CONF-RS-004
+    requirement: [SNTR-SESS-034, SNTR-REL-015, SNTR-CAP-902, SNTR-SESS-902]
+    profile: SNTR-SESS-V1
+    roles: [client, server]
+    capabilities: [syntra.reliable-session/1]
+    mandatory: false
+    preconditions: [active_session]
+    input:
+      faults: { abrupt_transport_loss: true, in_flight_request_ids: [23] }
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE, message_pattern: "NEGATIVE:success" }
+    notes: "Lifecycle/drain/overload (OPTIONAL, gated): draining stops new work with going-away; overload yields RESOURCE_EXHAUSTED with backoff (never unbounded queueing); shutdown drains explicitly retaining outcomes per retention. Typed signals use existing codes only. SKIP when unclaimed."
+
+  - id: CONF-RS-005
+    requirement: [SNTR-REL-011, SNTR-REL-012, SNTR-REL-013, SNTR-REL-014, SNTR-REL-015, SNTR-RPC-011, SNTR-RPC-012, SNTR-RPC-013, SNTR-REL-902, SNTR-RPC-902, SNTR-SESS-902]
+    profile: SNTR-SESS-V1
+    roles: [client, server]
+    capabilities: [syntra.reliable-session/1]
+    mandatory: false
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 24, body: result }
+        - { request_id: 25, body: result }
+    notes: "Reliable delivery (OPTIONAL, gated): same delivery ID resends return the retained outcome without re-execution; mismatched content rejected with FAILED_PRECONDITION; forgotten/unknown treated as new decisions; deadline/cancel tombstones deterministic; control-plane bounds enforced with RESOURCE_EXHAUSTED. App payloads opaque; no exactly-once business effects claimed. SKIP when unclaimed."

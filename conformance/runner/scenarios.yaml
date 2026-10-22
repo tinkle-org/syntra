@@ -1,0 +1,71 @@
+# Shared conformance-runner scenarios (implementation-independent matrix).
+# Each scenario drives a live peer pairing through the same steps and asserts
+# wire payloads, durable state, bounds and terminal outcomes — not just
+# manifest validation. Deterministic fault injection uses seeded PRNGs so
+# every run reproduces byte-identically.
+format_version: "1.0"
+runner: "syntra-conformance-runner v1"
+pairings:
+  - id: rust-async
+    description: "async Rust tokio runtime via syntra-runtime::loopback_pair"
+  - id: go-pure
+    description: "pure-Go core via LoopbackPair (default build)"
+  - id: go-ffi
+    description: "Go+FFI native core via syntranative adapter (production Rust core)"
+  - id: interop
+    description: "Rust<->Go wire interop: Go frames decode against Rust golden vectors and vice versa"
+scenarios:
+  - id: SC-ECHO
+    name: "echo round trip incl empty and 64KiB"
+    steps: ["handshake", "echo empty", "echo hello", "echo 64KiB", "assert opaque bytes preserved", "assert exactly one terminal result per id"]
+  - id: SC-CONCURRENT-16
+    name: "16 concurrent out-of-order, no head-of-line blocking"
+    steps: ["handshake", "16 concurrent echo with distinct ids", "assert all correlate by id", "assert out-of-order completion legal"]
+  - id: SC-CANCEL-WINS
+    name: "cancel before completion yields CANCELLED; completion wins race"
+    steps: ["handshake", "slow handler", "cancel id 1", "assert terminal CANCELLED exactly once", "assert no second result after handler returns", "assert connection usable"]
+  - id: SC-DEADLINE
+    name: "budget expiry yields exactly one DEADLINE_EXCEEDED"
+    steps: ["handshake", "slow handler 300ms, budget 50ms", "assert client DEADLINE_EXCEEDED", "assert host auto-enqueues exactly one DEADLINE_EXCEEDED", "assert no duplicate after late handler", "assert unknown-outcome semantics"]
+  - id: SC-OVERSIZE-PAYLOAD
+    name: "oversize payload rejected bounded"
+    steps: ["handshake", "payload MaxPayloadBytes+1 rejected ResourceExhausted before send", "assert connection usable"]
+  - id: SC-OVERSIZE-HANDLER-RESULT
+    name: "oversize handler result bounded failure"
+    steps: ["handshake", "handler returns 2MiB payload", "assert terminal RESOURCE_EXHAUSTED exactly once", "assert connection usable afterwards"]
+  - id: SC-DUPLICATE-ID
+    name: "duplicate outstanding rejected, original continues"
+    steps: ["handshake", "blocking handler id 7", "duplicate id 7 rejected FAILED_PRECONDITION", "release original, assert single success", "assert no second result"]
+  - id: SC-UNKNOWN-METHOD
+    name: "unknown method per-RPC UNIMPLEMENTED, usable conn"
+    steps: ["handshake", "call /example.Unknown/Call", "assert UNIMPLEMENTED terminal", "assert follow-up echo succeeds"]
+  - id: SC-MALFORMED-METHOD
+    name: "malformed method per-RPC INVALID_ARGUMENT"
+    steps: ["handshake", "call not-a-method", "assert INVALID_ARGUMENT", "assert usable"]
+  - id: SC-NOTIFICATION
+    name: "notifications never complete RPC, overflow drops with loss totals"
+    steps: ["handshake", "start slow RPC", "emit events", "assert RPC completes with payload", "assert events in order", "assert overflow drops newest with cumulative loss"]
+  - id: SC-GRACEFUL-CLOSE
+    name: "graceful close draining per SNTR-HS-006/013"
+    steps: ["handshake", "complete echo", "initiate graceful close", "assert CLOSING then CLOSED", "assert queued results delivered before loss mapping", "assert new RPCs rejected FailedPrecondition", "assert per-connection state discarded"]
+  - id: SC-TRANSPORT-LOSS
+    name: "abrupt loss maps in-flight to UNAVAILABLE unknown-outcome"
+    steps: ["handshake", "blocking RPC outstanding", "transport lost", "assert UNAVAILABLE", "assert unknown-outcome", "assert reconnect needs fresh handshake"]
+fault_injection:
+  seed: 0x5EED1234
+  faults:
+    - { kind: drop, rate: "1/64", scope: notifications }
+    - { kind: duplicate, rate: "1/128", scope: results }
+    - { kind: truncate, rate: "1/256", scope: inbound-bytes }
+    - { kind: delay, max_ms: 5, scope: send }
+  rules:
+    - "deterministic: seeded PRNG, same seed replays same fault pattern"
+    - "exactly-once terminal preserved under all faults (no zero, no two results)"
+    - "wire bytes validated before and after faults (ValidateFrame, size bounds)"
+    - "durable state (StreamRecovery checkpoints) advances only on validated batches"
+verdicts: ["PASS", "FAIL", "SKIP"]
+notes:
+  - "Wire payloads: decoded Frame equality, opaque bytes bit-identical, no byte-equality across encoders (SNTR-SER-002)."
+  - "Durable state: recovery coordinator checkpoints only on validated complete batches; gaps map to GapDetected."
+  - "Bounds: 1MiB envelope, 16 concurrent, 30s max budget, 5s handshake — all enforced, all documented."
+  - "Terminal outcomes: exactly one result per id; codes CANCELLED/DEADLINE_EXCEEDED/UNAVAILABLE/RESOURCE_EXHAUSTED per scenario."

@@ -9,15 +9,25 @@
 //! recovery RPCs, constructs payloads, performs requests, persists
 //! checkpoints, and installs snapshots.
 
+pub mod cache;
+pub mod driver;
 pub mod engine;
 pub mod profile;
+pub mod reconcile;
+pub mod snapshot;
+pub mod store;
 
+pub use cache::DuplicateCache;
+pub use driver::{ConnectionContext, HostDriver, InitiatorDriver, InitiatorError, StoredBatch, TargetedEnvelope};
 pub use engine::ProfileEngine;
 pub use profile::{
     CommittedPosition, ProfileAction, ProfileCheckpoint, ProfileInput, ProfileRecovery,
     ProfileRecoveryAction, ProfileRecoveryInput, ProviderError, RecoveryAuthorizer, ReplayPage,
     ReplayProvider, SnapshotOffer, SnapshotProvider,
 };
+pub use reconcile::{CheckpointReconciler, ReconcilerConfig};
+pub use snapshot::{SnapshotError, StagedSnapshot};
+pub use store::{DurableStore, MemoryStore, StoreError};
 
 /// Position within one independently ordered stream.
 #[derive(Debug, Clone, PartialEq, Eq)]

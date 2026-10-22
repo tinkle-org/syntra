@@ -42,6 +42,20 @@ Replay responses are subject to the same queue bounds as live events (SNTR-REL-0
 
 **SNTR-REL-010** — No automatic exactly-once: Syntra MUST NOT claim exactly-once delivery or processing. Any claim of effectively-once behavior MUST be documented as application-level idempotency above Syntra, with explicit operation keys, retention, and duplicate windows.
 
+## 1C. Reliable delivery (OPTIONAL, gated on `syntra.reliable-session/1`)
+
+Default at-most-once (SNTR-REL-002) is unchanged. When the reliable-session capability is confirmed, the following bounded reconciliation contract applies. No envelope change; reserved values preserved; app payloads opaque (equality only); no exactly-once business effects claimed.
+
+**SNTR-REL-011** — ACK/resend with stable delivery IDs: initiators participating in reliable delivery assign one stable 16-byte delivery identifier per logical operation, distinct from the connection-scoped `request_id` (SNTR-RPC-011). The delivery ID is stable across resends on the same session; each resend uses a fresh `request_id` with the same delivery ID. Hosts retain terminal outcomes keyed by delivery ID for a bounded window (default 5 min, deployment-documented) and return the retained outcome instead of re-executing. Initiators MUST resend unacknowledged reliable operations only with the same delivery ID and MUST NOT reuse a delivery ID for a different logical operation.
+
+**SNTR-REL-012** — Duplicate-content validation: the same delivery ID MUST carry byte-identical `(method, payload)` on every presentation. Hosts MUST compare opaque bytes for equality only (never parse) and MUST reject mismatched resends with `FAILED_PRECONDITION` (never merged, never reinterpreted). Validation precedes dispatch; the connection stays usable.
+
+**SNTR-REL-013** — RPC outcome reconciliation with retained results and forgotten state: hosts MUST support explicit reconciliation per delivery ID returning exactly one of `Retained` (terminal outcome returned, no re-execution), `Forgotten` (retention expired or explicitly forgotten after initiator ACK + durable handling; the initiator MUST treat this as a new application decision, never as dedup proof), or `Unknown` (never seen; safe to dispatch as new). Retention is bounded in count (default 128/session) and bytes (default 1 MiB aggregate); beyond caps hosts fail with `RESOURCE_EXHAUSTED` and MUST NOT evict retained outcomes to admit new ones except per documented priority. Initiators MUST NOT treat `Forgotten`/`Unknown` as execution proof.
+
+**SNTR-REL-014** — Deadline/cancel tombstones: after `DEADLINE_EXCEEDED`/`CANCELLED`/`UNAVAILABLE` for a delivery ID, hosts MUST retain a bounded tombstone (default 128/session, 5 min) so late duplicates resolve deterministically to the same terminal code instead of re-executing or reporting unknown twice. Only deadline/cancel/unavailable codes may tombstone; tombstones expire per retention and are then `Forgotten`. Tombstone storage is bounded and reapable; exhaustion yields `RESOURCE_EXHAUSTED`.
+
+**SNTR-REL-015** — Bounded control-plane progress: all reliable-session control state (sessions, retained outcomes + bytes, tombstones, resume handles, revocation set, control queue + bytes) is bounded with documented defaults (see `syntra-core::reliable::ControlBounds`: 1024 sessions, 128 retained/session, 1 MiB retained bytes, 128 tombstones, 1024 resume handles, 64 queued signals, 64 KiB signal bytes). Admission beyond caps MUST fail with `RESOURCE_EXHAUSTED` (caller backs off with jitter, never tight loops). Control operations MUST be O(1) except bounded `reap`/`poll_idle` (at most `max_sessions` entries, at most `max_control_queue` signals). Implementations MUST NOT hold blocking locks across `await`, MUST NOT spawn unbounded per-message work, MUST propagate cancellation, MUST join owned tasks with a bounded grace, and MUST drain explicitly during shutdown (stop new, close active with `going-away`, retain outcomes/tombstones per retention, clear the control queue). No silent drops except per documented stream policy; no unbounded queueing; no silent deadlock.
+
 ## 2. Client behavior
 
 - **SNTR-REL-020** — The client MUST implement per-RPC timers, bounded retry budgets (max attempts + backoff), and MUST NOT retry non-idempotent operations without an application decision.
@@ -68,6 +82,7 @@ Bounds may tighten (minor, if documented) but MUST NOT silently loosen security-
 
 - **SNTR-REL-900** — Fixtures: loss-before-result → `UNAVAILABLE` + safe-retry proof (idempotent succeeds, non-idempotent not auto-retried); deadline → `DEADLINE_EXCEEDED`; flood → `RESOURCE_EXHAUSTED` with recovery; duplicate-event tolerance; no-exactly-once attestation (implementation documents operation-key approach or states at-most-once only).
 - **SNTR-REL-901** — Distinction proof: transport-ack without `RpcResult` MUST NOT be reported as success in any fixture.
+- **SNTR-REL-902** — Reliable-delivery fixtures (OPTIONAL, gated): stable delivery-ID resend returns retained outcome without re-execution; mismatched content rejected; forgotten/unknown handled as new decisions; tombstones deterministic; control-plane bounds enforced with `RESOURCE_EXHAUSTED` and explicit drain. `CONF-RS-005`.
 
 ```mermaid
 sequenceDiagram

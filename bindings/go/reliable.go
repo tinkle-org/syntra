@@ -1,0 +1,881 @@
+// Reliable-session contract for the Go binding: validation plus bounded
+// in-memory managers mirroring syntra-core::reliable and
+// syntra-runtime::reliable.
+//
+// OPTIONAL capability syntra.reliable-session/1, post-ACTIVE generic-RPC
+// control, no envelope changes, reserved values preserved, app payloads
+// opaque (equality only), no exactly-once claims, no custom crypto
+// (crypto/rand lookup handles only), production traffic requires TLS.
+package syntra
+
+import (
+	"crypto/rand"
+	"fmt"
+	"sync"
+	"time"
+)
+
+// ReliableSessionCapability is the optional capability identifier.
+const ReliableSessionCapability = "syntra.reliable-session/1"
+
+const (
+	sessionIDLen       = 16
+	deliveryIDLen      = 16
+	resumeCredentialLen = 32
+	maxResumeCredLen   = 256
+	maxReliablePrincipal = 512
+)
+
+const (
+	defaultMaxSessions       = 1024
+	defaultMaxRetained       = 128
+	defaultMaxRetainedBytes  = 1 << 20
+	defaultMaxTombstones     = 128
+	defaultMaxResumeCreds     = 1024
+	defaultMaxControlQueue    = 64
+	defaultMaxControlBytes    = 64 << 10
+	defaultResultRetentionMs  = 5 * 60 * 1000
+	defaultTombstoneRetention = 5 * 60 * 1000
+	defaultResumeLifetimeMs   = 24 * 60 * 60 * 1000
+)
+
+const (
+	minIdleTimeoutMs  = uint32(2000)
+	maxIdleTimeoutMs  = uint32(300000)
+	minKeepaliveMs    = uint32(1000)
+	maxKeepaliveMs    = uint32(60000)
+	defaultIdleMs     = uint32(30000)
+	defaultKeepaliveMs = uint32(10000)
+)
+
+// SessionID is a 16-byte opaque session identity, distinct from connection_id.
+type SessionID [sessionIDLen]byte
+
+// DeliveryID is a 16-byte stable delivery key, distinct from request_id.
+type DeliveryID [deliveryIDLen]byte
+
+// LeaseProposal is the client-proposed keepalive lease (zero = host default).
+type LeaseProposal struct {
+	IdleTimeoutMs      uint32
+	KeepaliveIntervalMs uint32
+}
+
+// ConfirmedLease is the host-confirmed bounded lease.
+type ConfirmedLease struct {
+	IdleTimeoutMs      uint32
+	KeepaliveIntervalMs uint32
+}
+
+// SessionSignal is a typed lifecycle signal (existing codes only).
+type SessionSignal string
+
+const (
+	SignalDraining   SessionSignal = "draining"
+	SignalGoingAway  SessionSignal = "going-away"
+	SignalOverloaded SessionSignal = "overloaded"
+	SignalFenced     SessionSignal = "fenced"
+	SignalExpired    SessionSignal = "expired"
+	SignalRevoked    SessionSignal = "revoked"
+	SignalIdleTimeout SessionSignal = "idle-timeout"
+)
+
+// SignalCode maps a signal to its existing wire code (no new codes).
+func SignalCode(s SessionSignal) ErrorCode {
+	switch s {
+	case SignalDraining, SignalGoingAway, SignalIdleTimeout:
+		return ErrorCodeUnavailable
+	case SignalOverloaded:
+		return ErrorCodeResourceExhausted
+	case SignalFenced:
+		return ErrorCodeFailedPrecondition
+	case SignalExpired, SignalRevoked:
+		return ErrorCodeUnauthenticated
+	default:
+		return ErrorCodeUnknown
+	}
+}
+
+// ParseSessionSignal parses a control-payload signal name (exact match).
+func ParseSessionSignal(name string) (SessionSignal, error) {
+	switch SessionSignal(name) {
+	case SignalDraining, SignalGoingAway, SignalOverloaded, SignalFenced, SignalExpired, SignalRevoked, SignalIdleTimeout:
+		return SessionSignal(name), nil
+	default:
+		return "", NewRpcError(ErrorCodeInvalidArgument, "syntra: unknown session signal")
+	}
+}
+
+// ValidateSessionID checks 16 non-zero bytes.
+func ValidateSessionID(id []byte) (SessionID, error) {
+	if len(id) != sessionIDLen {
+		return SessionID{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: session id must be 16 bytes")
+	}
+	var out SessionID
+	copy(out[:], id)
+	if out == (SessionID{}) {
+		return SessionID{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: session id must not be all zero")
+	}
+	return out, nil
+}
+
+// ValidateDeliveryID checks 16 non-zero bytes.
+func ValidateDeliveryID(id []byte) (DeliveryID, error) {
+	if len(id) != deliveryIDLen {
+		return DeliveryID{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must be 16 bytes")
+	}
+	var out DeliveryID
+	copy(out[:], id)
+	if out == (DeliveryID{}) {
+		return DeliveryID{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must not be all zero")
+	}
+	return out, nil
+}
+
+// ValidateResumeCredential checks opaque handle bounds (16..256, 32-byte v1).
+func ValidateResumeCredential(cred []byte) ([]byte, error) {
+	if len(cred) == 0 || len(cred) > maxResumeCredLen {
+		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: resume credential length out of bounds")
+	}
+	if len(cred) != resumeCredentialLen && len(cred) < 16 {
+		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: resume credential too short")
+	}
+	zero := true
+	for _, b := range cred {
+		if b != 0 {
+			zero = false
+			break
+		}
+	}
+	if zero {
+		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: resume credential must not be all zero")
+	}
+	out := make([]byte, len(cred))
+	copy(out, cred)
+	return out, nil
+}
+
+// ValidateEpoch checks nonzero.
+func ValidateEpoch(epoch uint64) error {
+	if epoch == 0 {
+		return NewRpcError(ErrorCodeInvalidArgument, "syntra: attachment epoch must be nonzero")
+	}
+	return nil
+}
+
+// CheckEpochAdvance enforces monotonic fencing (proposed > current).
+func CheckEpochAdvance(current, proposed uint64) error {
+	if proposed == 0 {
+		return NewRpcError(ErrorCodeInvalidArgument, "syntra: attachment epoch must be nonzero")
+	}
+	if proposed <= current {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: stale attachment epoch; fenced")
+	}
+	return nil
+}
+
+// NextEpoch advances the fencing epoch (u64::MAX is terminal).
+func NextEpoch(current uint64) (uint64, error) {
+	if current == ^uint64(0) {
+		return 0, NewRpcError(ErrorCodeFailedPrecondition, "syntra: attachment epoch exhausted; retire the session")
+	}
+	return current + 1, nil
+}
+
+// NegotiateLease applies host defaults, clamps, and enforces keepalive < idle.
+func NegotiateLease(p LeaseProposal) (ConfirmedLease, error) {
+	idle := p.IdleTimeoutMs
+	if idle == 0 {
+		idle = defaultIdleMs
+	}
+	keepalive := p.KeepaliveIntervalMs
+	if keepalive == 0 {
+		keepalive = defaultKeepaliveMs
+	}
+	if p.IdleTimeoutMs != 0 && (p.IdleTimeoutMs < minIdleTimeoutMs || p.IdleTimeoutMs > maxIdleTimeoutMs) {
+		return ConfirmedLease{}, NewRpcError(ErrorCodeOutOfRange, "syntra: idle timeout out of range")
+	}
+	if p.KeepaliveIntervalMs != 0 && (p.KeepaliveIntervalMs < minKeepaliveMs || p.KeepaliveIntervalMs > maxKeepaliveMs) {
+		return ConfirmedLease{}, NewRpcError(ErrorCodeOutOfRange, "syntra: keepalive interval out of range")
+	}
+	if idle > maxIdleTimeoutMs {
+		idle = maxIdleTimeoutMs
+	}
+	if keepalive > maxKeepaliveMs {
+		keepalive = maxKeepaliveMs
+	}
+	maxKeep := idle / 2
+	if maxKeep < minKeepaliveMs {
+		maxKeep = minKeepaliveMs
+	}
+	if keepalive >= idle {
+		keepalive = maxKeep
+		if keepalive >= idle {
+			if idle <= 1 {
+				return ConfirmedLease{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: keepalive must be less than idle timeout")
+			}
+			keepalive = idle - 1
+		}
+	} else if keepalive > maxKeep {
+		keepalive = maxKeep
+	}
+	if keepalive == 0 || idle == 0 || keepalive >= idle {
+		return ConfirmedLease{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: keepalive must be less than idle timeout")
+	}
+	return ConfirmedLease{IdleTimeoutMs: idle, KeepaliveIntervalMs: keepalive}, nil
+}
+
+// CheckDuplicateContent requires byte-identical (method, payload) on resend.
+func CheckDuplicateContent(expectedMethod string, expectedPayload []byte, actualMethod string, actualPayload []byte) error {
+	if expectedMethod != actualMethod || string(expectedPayload) != string(actualPayload) {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id reused with different content; rejected")
+	}
+	return nil
+}
+
+// ReconcileOutcome mirrors the Rust contract.
+type ReconcileOutcome string
+
+const (
+	ReconcileRetained  ReconcileOutcome = "retained"
+	ReconcileForgotten ReconcileOutcome = "forgotten"
+	ReconcileUnknown   ReconcileOutcome = "unknown"
+)
+
+// StoredOutcome is a retained terminal result (opaque payload or typed error).
+type StoredOutcome struct {
+	Payload []byte
+	Err     *RpcError
+}
+
+// ControlBounds documents every reliable-session bound.
+type ControlBounds struct {
+	MaxSessions          int
+	MaxRetainedResults   int
+	MaxRetainedBytes     int
+	MaxTombstones        int
+	MaxResumeCredentials int
+	MaxControlQueue      int
+	MaxControlBytes      int
+	ResultRetention      time.Duration
+	TombstoneRetention   time.Duration
+	ResumeLifetime       time.Duration
+}
+
+// DefaultControlBounds returns the normative v1 defaults.
+func DefaultControlBounds() ControlBounds {
+	return ControlBounds{
+		MaxSessions: defaultMaxSessions, MaxRetainedResults: defaultMaxRetained,
+		MaxRetainedBytes: defaultMaxRetainedBytes, MaxTombstones: defaultMaxTombstones,
+		MaxResumeCredentials: defaultMaxResumeCreds, MaxControlQueue: defaultMaxControlQueue,
+		MaxControlBytes: defaultMaxControlBytes, ResultRetention: defaultResultRetentionMs * time.Millisecond,
+		TombstoneRetention: defaultTombstoneRetention * time.Millisecond, ResumeLifetime: defaultResumeLifetimeMs * time.Millisecond,
+	}
+}
+
+type retainedEntry struct {
+	method     string
+	payload    []byte
+	outcome    StoredOutcome
+	retainedAt time.Time
+}
+
+type tombstoneEntry struct {
+	code       ErrorCode
+	retainedAt time.Time
+}
+
+type resumeEntry struct {
+	session    SessionID
+	principal  string
+	version    uint32
+	issuedAt   time.Time
+	expiresAt  time.Time
+}
+
+// QueuedSignal is one buffered lifecycle signal for a session.
+type QueuedSignal struct {
+	ID     SessionID
+	Signal SessionSignal
+}
+
+type sessionState struct {
+	principal        string
+	version          uint32
+	epoch            uint64
+	lastActivity     time.Time
+	lease            ConfirmedLease
+	activeConnection string
+	hasActive        bool
+	outcomes         map[DeliveryID]retainedEntry
+	outcomeBytes     int
+	tombstones       map[DeliveryID]tombstoneEntry
+	// forgotten retains bounded Forgotten markers per removed/expired outcome
+	// (bounded by MaxRetainedResults, independent from MaxTombstones) so
+	// Reconcile returns Forgotten for expired/forgotten IDs and Unknown only
+	// for never-seen IDs.
+	forgotten map[DeliveryID]time.Time
+}
+
+// ReliableManager is the bounded Go manager (sync, no goroutines, explicit drain).
+type ReliableManager struct {
+	mu       sync.Mutex
+	bounds   ControlBounds
+	sessions map[SessionID]*sessionState
+	resume   map[string]resumeEntry
+	revoked  map[string]time.Time
+	signals  []QueuedSignal
+	draining bool
+}
+
+// NewReliableManager constructs a bounded manager.
+func NewReliableManager(bounds ControlBounds) (*ReliableManager, error) {
+	if bounds.MaxSessions <= 0 || bounds.MaxRetainedResults <= 0 || bounds.MaxTombstones <= 0 ||
+		bounds.MaxResumeCredentials <= 0 || bounds.MaxControlQueue <= 0 || bounds.MaxControlBytes <= 0 ||
+		bounds.ResultRetention <= 0 || bounds.TombstoneRetention <= 0 || bounds.ResumeLifetime <= 0 {
+		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: control bounds must be nonzero")
+	}
+	if bounds.MaxRetainedBytes <= 0 {
+		return nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: control byte bounds must be nonzero")
+	}
+	return &ReliableManager{
+		bounds: bounds, sessions: make(map[SessionID]*sessionState),
+		resume: make(map[string]resumeEntry), revoked: make(map[string]time.Time),
+	}, nil
+}
+
+func newSessionID() (SessionID, error) {
+	var out SessionID
+	if _, err := rand.Read(out[:]); err != nil {
+		return SessionID{}, NewRpcError(ErrorCodeInternal, fmt.Sprintf("syntra: session id RNG failed: %v", err))
+	}
+	if out == (SessionID{}) {
+		return SessionID{}, NewRpcError(ErrorCodeInternal, "syntra: session id RNG returned zero")
+	}
+	return out, nil
+}
+
+func newResumeCredential() ([]byte, error) {
+	out := make([]byte, resumeCredentialLen)
+	if _, err := rand.Read(out); err != nil {
+		return nil, NewRpcError(ErrorCodeInternal, fmt.Sprintf("syntra: resume RNG failed: %v", err))
+	}
+	zero := true
+	for _, b := range out {
+		if b != 0 {
+			zero = false
+			break
+		}
+	}
+	if zero {
+		return nil, NewRpcError(ErrorCodeInternal, "syntra: resume RNG returned zero")
+	}
+	return out, nil
+}
+
+// pruneExpiredCredentialsLocked drops resume and revoked handles whose
+// resume lifetime has passed. Callers must hold m.mu. The except key (if
+// non-empty) is retained so the credential being validated keeps its
+// existing expired/revoked error instead of turning into unknown.
+func (m *ReliableManager) pruneExpiredCredentialsLocked(now time.Time, except string) {
+	for k, e := range m.resume {
+		if k == except {
+			continue
+		}
+		if now.After(e.expiresAt) {
+			delete(m.resume, k)
+		}
+	}
+	for k, exp := range m.revoked {
+		if k == except {
+			continue
+		}
+		if now.After(exp) {
+			delete(m.revoked, k)
+		}
+	}
+}
+
+// CreateSession issues a fresh session (epoch 1 + fresh resume handle).
+func (m *ReliableManager) CreateSession(now time.Time, principal string, version uint32, p LeaseProposal) (SessionID, uint64, []byte, ConfirmedLease, error) {
+	if principal == "" || len(principal) > maxReliablePrincipal {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: principal length out of bounds")
+	}
+	if version == 0 {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeInvalidArgument, "syntra: version must be nonzero")
+	}
+	lease, err := NegotiateLease(p)
+	if err != nil {
+		return SessionID{}, 0, nil, ConfirmedLease{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.draining {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeUnavailable, "syntra: draining; no new sessions")
+	}
+	if len(m.sessions) >= m.bounds.MaxSessions {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeResourceExhausted, "syntra: too many reliable sessions")
+	}
+	m.pruneExpiredCredentialsLocked(now, "")
+	if len(m.resume) >= m.bounds.MaxResumeCredentials {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeResourceExhausted, "syntra: too many resume credentials")
+	}
+	sid, err := newSessionID()
+	if err != nil {
+		return SessionID{}, 0, nil, ConfirmedLease{}, err
+	}
+	if _, dup := m.sessions[sid]; dup {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeInternal, "syntra: session id collision")
+	}
+	cred, err := newResumeCredential()
+	if err != nil {
+		return SessionID{}, 0, nil, ConfirmedLease{}, err
+	}
+	if _, dup := m.resume[string(cred)]; dup {
+		return SessionID{}, 0, nil, ConfirmedLease{}, NewRpcError(ErrorCodeInternal, "syntra: resume credential collision")
+	}
+	m.sessions[sid] = &sessionState{
+		principal: principal, version: version, epoch: 1,
+		lastActivity: now, lease: lease,
+		outcomes: make(map[DeliveryID]retainedEntry), tombstones: make(map[DeliveryID]tombstoneEntry),
+		forgotten: make(map[DeliveryID]time.Time),
+	}
+	m.resume[string(cred)] = resumeEntry{session: sid, principal: principal, version: version, issuedAt: now, expiresAt: now.Add(m.bounds.ResumeLifetime)}
+	return sid, 1, cred, lease, nil
+}
+
+// Attach binds a connection (fresh or resume with fencing + rotation).
+// On resume it rotates the credential and returns the freshly generated
+// resume credential for the next resume; callers must thread it forward.
+// The fenced connection (if any) is returned for observability.
+func (m *ReliableManager) Attach(now time.Time, sid SessionID, resumeCred []byte, connectionID, principal string, version uint32, p LeaseProposal) (uint64, ConfirmedLease, string, []byte, error) {
+	if connectionID == "" || len(connectionID) > 256 {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeInvalidArgument, "syntra: connection_id length out of bounds")
+	}
+	lease, err := NegotiateLease(p)
+	if err != nil {
+		return 0, ConfirmedLease{}, "", nil, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.draining {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnavailable, "syntra: draining; no new attachments")
+	}
+	st, ok := m.sessions[sid]
+	if !ok {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: unknown session")
+	}
+	if st.principal != principal {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: principal mismatch for session")
+	}
+	if st.version != version {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: version mismatch for session")
+	}
+	if len(resumeCred) > 0 {
+		cred, err := ValidateResumeCredential(resumeCred)
+		if err != nil {
+			return 0, ConfirmedLease{}, "", nil, err
+		}
+		if _, revoked := m.revoked[string(cred)]; revoked {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: resume credential revoked")
+		}
+		entry, ok := m.resume[string(cred)]
+		if !ok {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: unknown resume credential")
+		}
+		if entry.session != sid {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: resume credential audience mismatch")
+		}
+		if entry.principal != principal || entry.version != version {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: resume credential binding mismatch")
+		}
+		if now.After(entry.expiresAt) {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeUnauthenticated, "syntra: resume credential expired")
+		}
+		proposed, err := NextEpoch(st.epoch)
+		if err != nil {
+			return 0, ConfirmedLease{}, "", nil, err
+		}
+		if err := CheckEpochAdvance(st.epoch, proposed); err != nil {
+			return 0, ConfirmedLease{}, "", nil, err
+		}
+		fresh, err := newResumeCredential()
+		if err != nil {
+			return 0, ConfirmedLease{}, "", nil, err
+		}
+		m.pruneExpiredCredentialsLocked(now, string(cred))
+		if len(m.resume)+len(m.revoked)+1 > m.bounds.MaxResumeCredentials*2 {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeResourceExhausted, "syntra: too many resume credentials")
+		}
+		delete(m.resume, string(cred))
+		m.revoked[string(cred)] = now.Add(m.bounds.ResumeLifetime)
+		m.resume[string(fresh)] = resumeEntry{session: sid, principal: st.principal, version: st.version, issuedAt: now, expiresAt: now.Add(m.bounds.ResumeLifetime)}
+		fenced := ""
+		hadActive := st.hasActive
+		if hadActive {
+			fenced = st.activeConnection
+		}
+		st.epoch = proposed
+		st.activeConnection = connectionID
+		st.hasActive = true
+		st.lastActivity = now
+		st.lease = lease
+		if hadActive {
+			_ = m.pushSignalLocked(sid, SignalFenced)
+		}
+		return proposed, lease, fenced, fresh, nil
+	}
+	if st.hasActive {
+		return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: session already attached; present resume credential")
+	}
+	if err := ValidateEpoch(st.epoch); err != nil {
+		return 0, ConfirmedLease{}, "", nil, err
+	}
+	st.activeConnection = connectionID
+	st.hasActive = true
+	st.lastActivity = now
+	st.lease = lease
+	return st.epoch, lease, "", nil, nil
+}
+
+// RecordResult retains a terminal outcome (duplicate-content checked).
+func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did DeliveryID, method string, payload []byte, outcome StoredOutcome) (ReconcileOutcome, error) {
+	if len(payload) > MaxFrameBytes {
+		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: payload exceeds envelope bound")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.sessions[sid]
+	if !ok {
+		return "", NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for result")
+	}
+	st.lastActivity = now
+	if existing, dup := st.outcomes[did]; dup {
+		if err := CheckDuplicateContent(existing.method, existing.payload, method, payload); err != nil {
+			return "", err
+		}
+		return ReconcileRetained, nil
+	}
+	entryBytes := len(method) + len(payload)
+	if outcome.Err != nil {
+		entryBytes += len(outcome.Err.Message)
+	} else {
+		entryBytes += len(outcome.Payload)
+	}
+	if len(st.outcomes) >= m.bounds.MaxRetainedResults {
+		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result budget exhausted")
+	}
+	if st.outcomeBytes+entryBytes > m.bounds.MaxRetainedBytes {
+		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result bytes exhausted")
+	}
+	st.outcomes[did] = retainedEntry{method: method, payload: append([]byte(nil), payload...), outcome: outcome, retainedAt: now}
+	st.outcomeBytes += entryBytes
+	return ReconcileRetained, nil
+}
+
+// Reconcile returns retained/forgotten/unknown for a delivery ID.
+func (m *ReliableManager) Reconcile(now time.Time, sid SessionID, did DeliveryID) (ReconcileOutcome, *StoredOutcome, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.sessions[sid]
+	if !ok {
+		return "", nil, NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for reconcile")
+	}
+	entry, ok := st.outcomes[did]
+	if !ok {
+		if tomb, tok := st.tombstones[did]; tok {
+			if now.Sub(tomb.retainedAt) <= m.bounds.TombstoneRetention {
+				out := StoredOutcome{Err: NewRpcError(tomb.code, "syntra: tombstoned delivery")}
+				return ReconcileRetained, &out, nil
+			}
+		}
+		if forgotAt, fok := st.forgotten[did]; fok {
+			if now.Sub(forgotAt) <= m.bounds.ResultRetention {
+				return ReconcileForgotten, nil, nil
+			}
+		}
+		return ReconcileUnknown, nil, nil
+	}
+	if now.Sub(entry.retainedAt) > m.bounds.ResultRetention {
+		return ReconcileForgotten, nil, nil
+	}
+	out := entry.outcome
+	return ReconcileRetained, &out, nil
+}
+
+// pushSignalLocked queues one lifecycle signal, bounding the control queue.
+// Callers MUST hold m.mu. Full queues drop the signal with backpressure
+// (matching the Rust control-queue bound) rather than growing unbounded.
+func (m *ReliableManager) pushSignalLocked(sid SessionID, sig SessionSignal) error {
+	if len(m.signals) >= m.bounds.MaxControlQueue {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: control queue full; back off")
+	}
+	if (len(m.signals)+1)*32 > m.bounds.MaxControlBytes {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: control queue bytes exhausted")
+	}
+	m.signals = append(m.signals, QueuedSignal{ID: sid, Signal: sig})
+	return nil
+}
+
+// Detach clears the active connection when it matches (idempotent; unknown
+// sessions are a no-op, mirroring the Rust runtime).
+func (m *ReliableManager) Detach(sid SessionID, connectionID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if st, ok := m.sessions[sid]; ok {
+		if st.activeConnection == connectionID {
+			st.activeConnection = ""
+			st.hasActive = false
+		}
+	}
+}
+
+// Forget discards one retained outcome, adjusting byte accounting, and retains
+// a bounded Forgotten marker (bounded by MaxRetainedResults, independent from
+// MaxTombstones) so Reconcile reports Forgotten rather than Unknown.
+func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.sessions[sid]
+	if !ok {
+		return false, NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for forget")
+	}
+	entry, ok := st.outcomes[did]
+	if !ok {
+		return false, nil
+	}
+	freed := len(entry.method) + len(entry.payload)
+	if entry.outcome.Err != nil {
+		freed += len(entry.outcome.Err.Message)
+	} else {
+		freed += len(entry.outcome.Payload)
+	}
+	delete(st.outcomes, did)
+	st.outcomeBytes -= freed
+	if st.outcomeBytes < 0 {
+		st.outcomeBytes = 0
+	}
+	if st.forgotten == nil {
+		st.forgotten = make(map[DeliveryID]time.Time)
+	}
+	if _, dup := st.forgotten[did]; !dup && len(st.forgotten) >= m.bounds.MaxRetainedResults {
+		var oldest DeliveryID
+		var oldestAt time.Time
+		first := true
+		for k, t := range st.forgotten {
+			if first || t.Before(oldestAt) {
+				oldest, oldestAt, first = k, t, false
+			}
+		}
+		if !first {
+			delete(st.forgotten, oldest)
+		}
+	}
+	st.forgotten[did] = time.Now()
+	return true, nil
+}
+
+// RecordTombstone records a terminal tombstone (deadline/cancel/unavailable
+// only) for a delivery ID.
+func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did DeliveryID, code ErrorCode) error {
+	if code != ErrorCodeDeadlineExceeded && code != ErrorCodeCancelled && code != ErrorCodeUnavailable {
+		return NewRpcError(ErrorCodeInvalidArgument, "syntra: tombstones only for deadline/cancel/unavailable")
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.sessions[sid]
+	if !ok {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for tombstone")
+	}
+	if _, dup := st.tombstones[did]; !dup && len(st.tombstones) >= m.bounds.MaxTombstones {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: tombstone budget exhausted")
+	}
+	st.tombstones[did] = tombstoneEntry{code: code, retainedAt: now}
+	return nil
+}
+
+// TombstoneOf returns the tombstone code when present and unexpired.
+func (m *ReliableManager) TombstoneOf(now time.Time, sid SessionID, did DeliveryID) (ErrorCode, bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.sessions[sid]
+	if !ok {
+		return 0, false, NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for tombstone lookup")
+	}
+	entry, ok := st.tombstones[did]
+	if !ok {
+		return 0, false, nil
+	}
+	if now.Sub(entry.retainedAt) > m.bounds.TombstoneRetention {
+		return 0, false, nil
+	}
+	return entry.code, true, nil
+}
+
+// Revoke withdraws one resume credential (rotation already revokes the
+// predecessor; this covers explicit revocation).
+func (m *ReliableManager) Revoke(now time.Time, cred []byte) (bool, error) {
+	validated, err := ValidateResumeCredential(cred)
+	if err != nil {
+		return false, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, dup := m.revoked[string(validated)]; dup {
+		removed := false
+		if _, ok := m.resume[string(validated)]; ok {
+			delete(m.resume, string(validated))
+			removed = true
+		}
+		return removed, nil
+	}
+	m.pruneExpiredCredentialsLocked(now, string(validated))
+	if _, ok := m.resume[string(validated)]; !ok {
+		if _, dup := m.revoked[string(validated)]; !dup {
+			return false, nil
+		}
+	}
+	resumeCount := len(m.resume)
+	if _, ok := m.resume[string(validated)]; ok {
+		resumeCount--
+	}
+	if resumeCount+len(m.revoked) >= m.bounds.MaxResumeCredentials*2 {
+		return false, NewRpcError(ErrorCodeResourceExhausted, "syntra: revocation set exhausted; retire sessions")
+	}
+	removed := false
+	if _, ok := m.resume[string(validated)]; ok {
+		delete(m.resume, string(validated))
+		removed = true
+	}
+	m.revoked[string(validated)] = now.Add(m.bounds.ResumeLifetime)
+	return removed, nil
+}
+
+// Signal queues one lifecycle signal for a known session.
+func (m *ReliableManager) Signal(sid SessionID, sig SessionSignal) error {
+	if _, err := ParseSessionSignal(string(sig)); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.sessions[sid]; !ok {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for signal")
+	}
+	return m.pushSignalLocked(sid, sig)
+}
+
+// DrainSignals dequeues up to limit queued signals (bounded by
+// MaxControlQueue, at least one when limit > 0).
+func (m *ReliableManager) DrainSignals(limit int) []QueuedSignal {
+	if limit <= 0 {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	capped := limit
+	if capped > m.bounds.MaxControlQueue {
+		capped = m.bounds.MaxControlQueue
+	}
+	if capped > len(m.signals) {
+		capped = len(m.signals)
+	}
+	out := make([]QueuedSignal, capped)
+	copy(out, m.signals[:capped])
+	m.signals = append([]QueuedSignal(nil), m.signals[capped:]...)
+	return out
+}
+
+// ReapExpired discards retained outcomes, tombstones, and resume handles
+// past retention, returning per-kind counts. Expired outcomes leave a bounded
+// Forgotten marker (bounded by MaxRetainedResults, independent from
+// MaxTombstones); expired Forgotten markers beyond retention are dropped.
+// Expired resume and revoked handles share the resume lifetime; both are
+// reaped here and counted together in resumes.
+func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resumes int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, st := range m.sessions {
+		for did, entry := range st.outcomes {
+			if now.Sub(entry.retainedAt) > m.bounds.ResultRetention {
+				freed := len(entry.method) + len(entry.payload)
+				if entry.outcome.Err != nil {
+					freed += len(entry.outcome.Err.Message)
+				} else {
+					freed += len(entry.outcome.Payload)
+				}
+				delete(st.outcomes, did)
+				st.outcomeBytes -= freed
+				if st.outcomeBytes < 0 {
+					st.outcomeBytes = 0
+				}
+				if st.forgotten == nil {
+					st.forgotten = make(map[DeliveryID]time.Time)
+				}
+				if _, dup := st.forgotten[did]; !dup && len(st.forgotten) >= m.bounds.MaxRetainedResults {
+					var oldest DeliveryID
+					var oldestAt time.Time
+					first := true
+					for k, t := range st.forgotten {
+						if first || t.Before(oldestAt) {
+							oldest, oldestAt, first = k, t, false
+						}
+					}
+					if !first {
+						delete(st.forgotten, oldest)
+					}
+				}
+				st.forgotten[did] = now
+				outcomes++
+			}
+		}
+		for did, forgotAt := range st.forgotten {
+			if now.Sub(forgotAt) > m.bounds.ResultRetention {
+				delete(st.forgotten, did)
+			}
+		}
+		for did, entry := range st.tombstones {
+			if now.Sub(entry.retainedAt) > m.bounds.TombstoneRetention {
+				delete(st.tombstones, did)
+				tombstones++
+			}
+		}
+	}
+	for key, entry := range m.resume {
+		if now.After(entry.expiresAt) {
+			delete(m.resume, key)
+			resumes++
+		}
+	}
+	for key, exp := range m.revoked {
+		if now.After(exp) {
+			delete(m.revoked, key)
+			resumes++
+		}
+	}
+	return outcomes, tombstones, resumes
+}
+
+// DrainForShutdown enters draining, detaches active connections, queues a
+// going-away signal per detached session (best-effort), and returns the
+// drained session IDs with pending signals.
+func (m *ReliableManager) DrainForShutdown() ([]SessionID, []QueuedSignal) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.draining = true
+	var ids []SessionID
+	for sid, st := range m.sessions {
+		if st.hasActive {
+			ids = append(ids, sid)
+			st.hasActive = false
+			st.activeConnection = ""
+			_ = m.pushSignalLocked(sid, SignalGoingAway)
+		}
+	}
+	capped := len(m.signals)
+	if capped > m.bounds.MaxControlQueue {
+		capped = m.bounds.MaxControlQueue
+	}
+	out := make([]QueuedSignal, capped)
+	copy(out, m.signals[:capped])
+	m.signals = append([]QueuedSignal(nil), m.signals[capped:]...)
+	return ids, out
+}

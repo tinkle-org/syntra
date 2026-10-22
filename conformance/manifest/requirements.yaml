@@ -96,6 +96,8 @@ requirements:
     test_ids: [CONF-SESS-001, CONF-CORE-008]
     automation_status: partially_automated
     notes: "Sequence proof (mermaid in spec §8): runner executes accept/reject/timeout/mismatch rows; a human confirms the state diagram transitions match."
+  - { requirement_id: SNTR-HS-015, specification: specifications/core/handshake.md, section: "§2B", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-902, specification: specifications/core/handshake.md, section: "§8", test_ids: [CONF-RS-001], automation_status: automated }
 
   # ---- Authentication: specifications/core/authentication.md ----
   - { requirement_id: SNTR-AUTH-001, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
@@ -142,6 +144,12 @@ requirements:
     test_ids: [CONF-SESS-008]
     automation_status: manual
     notes: "No-promise proof (cross-transport resumption unsupported in default v1): verified by human review of the declaration's documented resumption posture plus the automated rejection rows."
+  - { requirement_id: SNTR-SESS-030, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-SESS-031, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-SESS-032, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-002], automation_status: automated }
+  - { requirement_id: SNTR-SESS-033, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-003], automation_status: automated }
+  - { requirement_id: SNTR-SESS-034, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-004], automation_status: automated }
+  - { requirement_id: SNTR-SESS-902, specification: specifications/core/sessions.md, section: "§7", test_ids: [CONF-RS-001, CONF-RS-002, CONF-RS-003, CONF-RS-004, CONF-RS-005], automation_status: automated }
 
   # ---- RPC: specifications/core/rpc.md ----
   - { requirement_id: SNTR-RPC-001, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-005], automation_status: automated }
@@ -161,6 +169,10 @@ requirements:
   - { requirement_id: SNTR-RPC-032, specification: specifications/core/rpc.md, section: "§3", test_ids: [CONF-SEC-007], automation_status: automated }
   - { requirement_id: SNTR-RPC-900, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001], automation_status: automated }
   - { requirement_id: SNTR-RPC-901, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001, CONF-RPC-004], automation_status: automated }
+  - { requirement_id: SNTR-RPC-011, specification: specifications/core/rpc.md, section: "§1J", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-012, specification: specifications/core/rpc.md, section: "§1K", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-013, specification: specifications/core/rpc.md, section: "§1L", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-902, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RS-005], automation_status: automated }
 
   # ---- Events: specifications/core/events.md ----
   - { requirement_id: SNTR-EVENT-001, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-001, CONF-EVT-002], automation_status: automated }
@@ -204,6 +216,12 @@ requirements:
   - { requirement_id: SNTR-REL-031, specification: specifications/core/reliability.md, section: "§3", test_ids: [CONF-SEC-011], automation_status: automated }
   - { requirement_id: SNTR-REL-900, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012, CONF-RPC-011], automation_status: automated }
   - { requirement_id: SNTR-REL-901, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012], automation_status: automated }
+  - { requirement_id: SNTR-REL-011, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-012, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-013, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-014, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-015, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-004, CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-902, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RS-005], automation_status: automated }
 
   # ---- Capabilities: specifications/core/capabilities.md ----
   - { requirement_id: SNTR-CAP-001, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-EVT-001], automation_status: automated }
@@ -234,6 +252,8 @@ requirements:
     test_ids: [CONF-EVT-001]
     automation_status: partially_automated
     notes: "Negotiation trace: the runner automates confirmation of advertised identifiers; a human confirms each cited identifier has an RFC reference."
+  - { requirement_id: SNTR-CAP-008, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-902, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-RS-001], automation_status: automated }
 
   # ---- Errors: specifications/core/errors.md ----
   - { requirement_id: SNTR-ERR-001, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-RPC-010], automation_status: automated }

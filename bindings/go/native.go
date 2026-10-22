@@ -70,6 +70,8 @@ int32_t syntra_ffi_client_take_outcome(syntra_ffi_client_t *c, uint64_t request_
     uint8_t **out, uintptr_t *out_len, int32_t *present);
 int32_t syntra_ffi_client_poll_notification(syntra_ffi_client_t *c,
     uint8_t **out, uintptr_t *out_len, int32_t *present);
+int32_t syntra_ffi_client_notification_loss(syntra_ffi_client_t *c,
+    uint64_t *dropped_out, uint64_t *dropped_bytes_out);
 int32_t syntra_ffi_client_reap_expired(syntra_ffi_client_t *c,
     uint64_t *ids, uintptr_t cap, uintptr_t *n);
 int32_t syntra_ffi_client_close(syntra_ffi_client_t *c);
@@ -453,6 +455,23 @@ func (c *ffiClientCore) pollNotification() (*Notification, bool) {
 		return nil, false
 	}
 	return ntf, true
+}
+
+// lossTotals reports cumulative notification-loss totals from the native
+// core via syntra_ffi_client_notification_loss. It unifies with the
+// pure-Go core lossTotals and the async Rust notification_loss signal:
+// (dropped_count, dropped_bytes), each advancing exactly once per drop.
+func (c *ffiClientCore) lossTotals() (uint64, uint64) {
+	h, err := c.locked()
+	if err != nil {
+		return 0, 0
+	}
+	defer c.unlockHandle()
+	var dropped, droppedBytes C.uint64_t
+	if serr := ffiStatus(C.syntra_ffi_client_notification_loss(h, &dropped, &droppedBytes), "notification_loss"); serr != nil {
+		return 0, 0
+	}
+	return uint64(dropped), uint64(droppedBytes)
 }
 
 func (c *ffiClientCore) reapExpired(now time.Time) []uint64 {

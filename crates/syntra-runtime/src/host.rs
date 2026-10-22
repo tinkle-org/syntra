@@ -714,14 +714,27 @@ impl Host {
                     outcome_error(sanitize_code(code), &message)
                 }
             };
-            let frame = Frame {
+            let mut frame = Frame {
                 version: negotiated,
                 request_id: id,
                 body: Some(Body::Result(RpcResult {
                     outcome: Some(outcome_value),
                 })),
             };
-            let bytes = frame.encode_to_vec();
+            let mut bytes = frame.encode_to_vec();
+            if bytes.len() > syntra_core::MAX_FRAME_BYTES {
+                frame = Frame {
+                    version: negotiated,
+                    request_id: id,
+                    body: Some(Body::Result(RpcResult {
+                        outcome: Some(outcome_error(
+                            ErrorCode::ResourceExhausted,
+                            "result exceeds bound",
+                        )),
+                    })),
+                };
+                bytes = frame.encode_to_vec();
+            }
             if sender.send_bytes(bytes).await.is_err() {
                 sessions.unbind(&session.connection_id);
             }
@@ -799,11 +812,18 @@ impl Host {
         result
     }
 
-    /// Graceful close: stop new RPCs, abort in-flight with terminal
-    /// mapping, unbind the session, teardown (SNTR-HS-006/013).
-    /// Bounded by one shared `SHUTDOWN_GRACE` across in-flight workers
-    /// and the handshake timer (not per-join).
+    /// Graceful close: stop new RPCs, drain already-queued results via the
+    /// transport pump, then teardown (SNTR-HS-006/013). Already-queued
+    /// terminal results are delivered by the pump drain in `loopback_pair`
+    /// (real adapters drain the writer before teardown); in-flight handlers
+    /// that complete after close observe `is_closed` and their late sends
+    /// fail, mapping to UNAVAILABLE/CANCELLED per spec. Bounded by the
+    /// shared SHUTDOWN_GRACE in `shutdown_tasks`.
     pub async fn close(&self) {
+        // Move ACTIVE->CLOSING first so new RPCs fail fast at admission
+        // while already-queued frames still drain (sends succeed until
+        // CLOSED). Best-effort: ignore transition errors (already closing).
+        let _ = self.conn.transition(StateEvent::GracefulClose).await;
         self.conn.close().await;
         self.unbind_session().await;
         self.shutdown_tasks().await;
