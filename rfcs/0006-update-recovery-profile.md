@@ -137,7 +137,8 @@ changes.
       MUST NOT reuse reserved numbers 16, 17 or reserved names `event`,
       `resume`, `ack`, and MUST keep unknown profile fields ignored on
       receipt where explicitly marked ignorable, rejecting unknown
-      profile operations with `UNIMPLEMENTED`.
+      profile operations with `UNIMPLEMENTED`. Full wire policy is in
+      `SYN-URP-021`.
     - `SYN-URP-012` — The host MUST maintain independent logical streams
       per confirmed subscription, MUST assign one continuity generation
       per stream, MUST increment the generation on every continuity loss
@@ -213,6 +214,129 @@ changes.
       possible. Credential bytes MUST be treated as opaque sensitive
       bytes: never logged, never persisted by the core, never placed in
       error detail.
+    - `SYN-URP-020` — Negotiation-version enforcement: the host MUST
+      select the maximum version it implements within the initiator
+      offered range in `RecoveryNegotiateRequest`, MUST confirm only
+      that selected version in `RecoveryNegotiateResponse`, and MUST
+      fail no overlap with `FAILED_PRECONDITION` in `RpcResult`. Both
+      peers MUST carry the confirmed `profile_version` on every other
+      profile payload; mismatch or missing version MUST fail with
+      `FAILED_PRECONDITION`.
+    - `SYN-URP-021` — Unknown-field/profile handling consistent with
+      `specifications/core/serialization.md` (`SNTR-SER-003`) and
+      `specifications/core/versioning.md` (`SNTR-VER-004`): unknown
+      Protobuf fields inside profile payloads MUST be ignored on
+      receipt unless explicitly marked `Critical` in
+      `proto/syntra/v1/recovery_profile.proto`; fields explicitly
+      marked `Ignorable` MUST be ignored; `profile_version` and
+      routing/identity fields (`stream_selector`,
+      `subscription_handle`, `snapshot_handle`, checkpoints,
+      boundaries, `capability`, versions) are required and
+      missing/mismatched MUST fail with `FAILED_PRECONDITION`, never
+      silently applied; unknown profile operations MUST be rejected
+      with `UNIMPLEMENTED`.
+    - `SYN-URP-022` — Replay continuation echo and idempotent retry:
+      replay applies only to resumption from a non-empty
+      `start_checkpoint`. When subscribe used an empty
+      `start_checkpoint` (initial subscription) the initiator MUST NOT
+      send `RecoveryReplayRequest` and MUST start live at the
+      subscribed boundary B on completion (or follow the snapshot path
+      if signaled). For resumption, the initiator MUST send an empty
+      `continuation_marker` on the first `RecoveryReplayRequest` with
+      `from_checkpoint` set to the last confirmed checkpoint
+      (non-empty), and MUST echo the previous page's marker verbatim
+      with `from_checkpoint` equal to the previous page's
+      `result_checkpoint` on each continuation. The host MUST reject a
+      request whose marker does not match the last issued marker for the
+      stream and generation, or whose `from_checkpoint` does not chain
+      from the previous result, with `FAILED_PRECONDITION`, except that
+      the host MUST retain the last issued `RecoveryReplayPage` per
+      subscription and generation and MUST return it verbatim without
+      advancing when a request duplicates the immediately preceding
+      completed request (identical payload in the current generation),
+      so a retry after an unknown RPC outcome (`UNAVAILABLE`,
+      `DEADLINE_EXCEEDED`, or loss with unknown outcome per
+      `SNTR-REL-003`/`SNTR-REL-009`) is safe with a fresh `request_id`.
+      The host MUST clear the retained page on generation increment,
+      stream termination, or supersede, and MUST NOT advance pagination
+      on a duplicate.
+    - `SYN-URP-023` — Subscribe boundary presence: the host MUST return a
+      non-empty `catchup_boundary` in `RecoverySubscribeResponse` fixed
+      at subscribe accept. Both peers MUST treat an empty boundary as
+      omitted and MUST reject it with `FAILED_PRECONDITION`; the
+      initiator MUST validate each `RecoveryReplayPage.catchup_boundary`
+      and each catch-up completion signal boundary
+      (`RecoveryReplayComplete.live_boundary_checkpoint`,
+      `RecoveryBatchTrailer.boundary_checkpoint` when `catchup_complete`,
+      `RecoveryCatchUpAccepted.catchup_boundary`) against the subscribed
+      boundary and MUST NOT release held live batches on mismatch;
+      mismatch MUST be rejected with `FAILED_PRECONDITION` (or treated
+      locally as recovery-needed) without releasing held batches.
+
+- Methods and payload mapping (proposed, no normative force):
+  Provisional draft only: this table carries no normative force and
+  lands only after acceptance, consistent with the Draft notice above.
+  All versioned profile payloads travel inside the existing
+  `RpcRequest` / `RpcResult` / `Notification` envelopes with no
+  `Frame` changes. Neutral examples only: echo, generic key/value,
+  generic subscription. Stream selectors name generic subscriptions;
+  batch payloads carry echo or generic key/value bytes; subscription
+  handles route generic subscription batches.
+
+  | Operation | Method string | Request payload | Result / stream payloads |
+  |---|---|---|---|
+  | Negotiate | `/syntra.update-recovery/1/Negotiate` | `RecoveryNegotiateRequest` (`profile_version`, `min_version`, `max_version`, `capability` `syntra.update-recovery/1`) | `RecoveryNegotiateResponse` (`selected_version` plus confirmed bounds) |
+  | Subscribe | `/syntra.update-recovery/1/Subscribe` | `RecoverySubscribeRequest` (`profile_version`, `stream_selector` for a generic subscription, `start_checkpoint`) | `RecoverySubscribeResponse` (`profile_version`, `subscription_handle`, `generation`, `catchup_boundary`) |
+  | Replay | `/syntra.update-recovery/1/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144, `continuation_marker` empty on first request, echo of previous page's marker thereafter) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
+  | CatchUp | `/syntra.update-recovery/1/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` in the terminal `RpcResult`; `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
+  | Confirm | `/syntra.update-recovery/1/Confirm` | `RecoveryConfirmRequest` (`profile_version`, `subscription_handle`, `generation`, `checkpoint` result or boundary) | `RecoveryConfirmResponse` (`confirmed_checkpoint`); snapshot boundary confirm yields `RecoverySnapshotInstalled` |
+  | SnapshotOffer | `/syntra.update-recovery/1/SnapshotOffer` | versioned bytes: `subscription_handle` accept (`profile_version=1`) | `RecoverySnapshotDescriptor` (`snapshot_handle`, provider-proven `boundary_checkpoint`, `total_pages` 1..256, `page_bytes_max` 1..262144) |
+  | SnapshotFetch | `/syntra.update-recovery/1/SnapshotFetch` | `RecoverySnapshotFetchRequest` (`profile_version`, `snapshot_handle`, `page_index` 0..255) | exactly one `RecoverySnapshotChunk` per `RpcResult` with `page_index` correlation plus `boundary_checkpoint` equality; completion as `RecoverySnapshotComplete` (`total_pages`, `total_bytes` 1..67108864) |
+  | Unsubscribe | `/syntra.update-recovery/1/Unsubscribe` | `RecoveryUnsubscribeRequest` (`profile_version`, `subscription_handle`) | versioned bytes acknowledgement; targeted `RecoveryBatchTrailer{terminated=true}` with `terminate_reason` where applicable |
+
+  Response framing rule (proposed, no normative force): each Replay
+  call returns exactly one `RecoveryReplayPage` in its `RpcResult` plus
+  its continuation marker; the initiator paginates with the same
+  `/syntra.update-recovery/1/Replay` method until the marker is empty.
+  Replay is sent only for resumption; initial subscriptions (empty
+  `start_checkpoint`) skip Replay and start live at B on completion.
+  The first `RecoveryReplayRequest` carries an empty `continuation_marker`
+  with `from_checkpoint` set to the last confirmed checkpoint (non-empty); each
+  continuation carries `continuation_marker` equal verbatim to the previous
+  page's marker with `from_checkpoint` equal to the previous page's
+  `result_checkpoint` (`SYN-URP-022`). The host MUST reject a non-empty marker that does
+  not match the last issued marker for the stream and generation, or a
+  `from_checkpoint` that does not chain from the previous result, with
+  `FAILED_PRECONDITION` (`SYN-URP-022`), except for an idempotent duplicate
+  of the immediately preceding completed request (identical payload in the
+  current generation), for which the host MUST return the retained page
+  verbatim without advancing so unknown-outcome retries stay safe
+  (`SYN-URP-022`).
+  Completion arrives separately as `RecoveryReplayComplete` or as a
+  trailer `Notification` carrying `RecoveryBatchTrailer`. Each
+  SnapshotFetch call returns exactly one `RecoverySnapshotChunk` per
+  `RpcResult` with `page_index` correlation; the same one-response-per-call
+  rule applies to both Replay and SnapshotFetch.
+
+  Version negotiation rule (proposed, no normative force,
+  `SYN-URP-020`/`SYN-URP-021`): every profile payload carries
+  `profile_version=1` in this draft. The Negotiate invocation carries
+  `RecoveryNegotiateRequest` offering min and max versions (proposing
+  1/1) with `capability` `syntra.update-recovery/1`; the host selects
+  the maximum version it implements within the offered range and
+  confirms it in `RecoveryNegotiateResponse`. No overlap MUST fail
+  with `FAILED_PRECONDITION` in `RpcResult`. Any other operation
+  carrying a `profile_version` outside the confirmed version MUST fail
+  with `FAILED_PRECONDITION`. Wire policy defers to
+  `specifications/core/serialization.md` (`SNTR-SER-003`) and
+  `specifications/core/versioning.md` (`SNTR-VER-004`): unknown
+  Protobuf fields inside profile payloads MUST be ignored unless
+  explicitly marked `Critical`; fields explicitly marked `Ignorable`
+  in `proto/syntra/v1/recovery_profile.proto` MUST be ignored;
+  `profile_version` and routing/identity fields are required and
+  missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
+  profile operations MUST be rejected with `UNIMPLEMENTED`, never
+  silently applied.
 
 - Schema diff (`.proto` snippet, field numbers, reserved handling):
   Provisional draft only: the IDL
@@ -235,9 +359,26 @@ changes.
   The connection handshake and ACTIVE/CLOSING/CLOSED transitions are
   unchanged. This profile adds one per-stream machine per confirmed
   subscription; connection end discards all per-stream state:
-  - `SUBSCRIBED → LIVE` on subscribe confirm; `LIVE → CATCHING_UP` on
-    accepted catch-up/replay RPC; `CATCHING_UP → LIVE` on catch-up
-    completion signal; `CATCHING_UP → SNAPSHOT_REQUIRED` on
+  - `SUBSCRIBED → CATCHING_UP` on subscribe confirm with fixed
+    catch-up boundary B captured at subscribe accept and carried in
+    `RecoverySubscribeResponse.catchup_boundary`; for resumption the initiator replays
+    from its last confirmed checkpoint via
+    `RecoveryReplayRequest.from_checkpoint` (non-empty; initial subscriptions with empty
+    `start_checkpoint` skip replay and start live at B on completion)
+    and validates each `RecoveryReplayPage.catchup_boundary` and each
+    completion signal boundary against B before releasing held live batches;
+    live `Notification`
+    batches for the stream held until the catch-up completion signal
+    under bounded holding per the documented overflow policy
+    (while held during CATCHING_UP, saturation MUST end the stream
+    with explicit continuity loss carrying a new generation and a
+    CATCHING_UP -> CONTINUITY_LOST transition clearing the held queue,
+    never a bare `RESOURCE_EXHAUSTED` that stalls waiting for an
+    unreachable completion signal; outside holding, reject with
+    `RESOURCE_EXHAUSTED` and/or continuity loss, never silent drop);
+    `CATCHING_UP → LIVE` on catch-up
+    completion signal with held then new live batches chaining from B;
+    `CATCHING_UP → SNAPSHOT_REQUIRED` on
      snapshot-required signal; `SNAPSHOT_REQUIRED → INSTALLING` on
     accepted snapshot offer; `INSTALLING → LIVE` on boundary confirm;
     any streamed state → `TERMINATED(targeted)` on per-stream terminal
@@ -258,7 +399,9 @@ changes.
 
 - Configuration and defaults (timeouts, limits, sizes):
   Every bound is deployment-documented; the following are the proposed
-  profile defaults (final numbers are TBD — blocker, see §10):
+  profile defaults matching `proto/syntra/v1/recovery_profile.proto`
+  header defaults (still Draft, see §10; carry no normative force until
+  acceptance):
   - Maximum subscriptions per connection: 64; per principal: 256.
   - Maximum pending profile RPCs per connection: 16.
   - Maximum queued `Notification` bytes per stream: 256 KiB; per
@@ -282,19 +425,26 @@ Initiator                              Host
     |--- request{negotiate profile v1} -->|
     |<-- result{confirmed v1 + bounds} ----|
     |--- request{subscribe generic} ----->|
-    |<-- result{opaque handle, gen 7} -----|
-    |<-- notification{batch P, pred A      |
-    |         result B, gen 7} ------------|
-    |--- request{replay from B} --------->|
+    |<-- result{opaque handle, gen 7,     |
+    |         fixed B} -------------------|
+    |         (live batches held until    |
+    |          catch-up done; bounded      |
+    |          holding per documented      |
+    |          overflow policy)            |
+    |--- request{replay from last confirmed}|
+    |                                   -->|
     |<-- notification{page 1, cont C} -----|
     |<-- notification{page 2, cont end} ---|
     |<-- notification{catch-up done} ------|
+    |<-- notification{held then new live  |
+    |         batch from B} ---------------|
     |--- request{confirm checkpoint D} --->|
     |<-- result{confirmed D} --------------|
     |--- request{catch-up trigger} ------->|
+    |<-- result{accepted with B} ----------|
     |<-- notification{recovered batch} -----|
-    |<-- notification{live batch} ---------|
     |<-- notification{catch-up done} ------|
+    |<-- notification{live batch from B} --|
     |<-- notification{snapshot-required} --|
     |--- request{snapshot offer accept} -->|
     |<-- result{snapshot page 1 / boundary||
@@ -313,13 +463,15 @@ capability negotiation, unknown-field/profile handling, resource bounds.
   envelope variant. Existing length/type prefixes and envelope
   validation apply unmodified.
 - Encoding: profile control operations use standardized generic RPC
-  methods under the profile identifier (for example,
-  `/syntra.update-recovery/1/Negotiate`,
+  methods under the profile identifier
+  (`/syntra.update-recovery/1/Negotiate`,
   `/syntra.update-recovery/1/Subscribe`,
   `/syntra.update-recovery/1/Replay`,
   `/syntra.update-recovery/1/CatchUp`,
+  `/syntra.update-recovery/1/Confirm`,
   `/syntra.update-recovery/1/SnapshotOffer`,
-  `/syntra.update-recovery/1/Confirm`), each with versioned opaque
+  `/syntra.update-recovery/1/SnapshotFetch`,
+  `/syntra.update-recovery/1/Unsubscribe`), each with versioned opaque
   payload bytes defined by this profile. Streamed content uses
   `Notification` payloads carrying versioned batch bytes
   (predecessor/result checkpoints, generation, continuation marker,
@@ -360,13 +512,20 @@ capability negotiation, unknown-field/profile handling, resource bounds.
   subscription where separately agreed); the host MUST NOT silently
   weaken confirmation and the initiator MUST NOT proceed as if
   confirmed.
-- Unknown-field/profile handling: envelope-level unknown fields are
-  ignored per the compatibility rule and unknown `Frame.body` variants
-  are rejected with `UNIMPLEMENTED`. Inside profile payload bytes,
-  explicitly marked ignorable additions MUST be ignored; unknown
-  profile operations and unknown required profile fields MUST be
-  rejected with `UNIMPLEMENTED` or `FAILED_PRECONDITION` respectively,
-  never silently applied.
+- Unknown-field/profile handling (`SYN-URP-021`, consistent with
+  `specifications/core/serialization.md` `SNTR-SER-003` and
+  `specifications/core/versioning.md` `SNTR-VER-004`): envelope-level
+  unknown fields are ignored per the compatibility rule and unknown
+  `Frame.body` variants are rejected with `UNIMPLEMENTED`. Inside
+  profile payload bytes, unknown Protobuf fields MUST be ignored
+  unless explicitly marked `Critical` in
+  `proto/syntra/v1/recovery_profile.proto`; fields explicitly marked
+  `Ignorable` MUST be ignored; `profile_version` and routing/identity
+  fields (`stream_selector`, `subscription_handle`, `snapshot_handle`,
+  checkpoints, boundaries, `capability`, versions) are required and
+  missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
+  profile operations MUST be rejected with `UNIMPLEMENTED`, never
+  silently applied.
 - Resource bounds: §3 `SYN-URP-007` / `SYN-URP-018` own the bounds. No
   per-batch unbounded work is permitted: hosts MUST NOT spawn
   unbounded workers per batch, MUST NOT hold blocking locks across
@@ -515,15 +674,21 @@ echo, generic key/value, generic subscription):
     `ack` untouched; mandatory-only peer interoperates with a
     profile-confirming peer at mandatory behavior.
 - [ ] Requirement-to-test trace (ID → test):
-  `SYN-URP-001` → negotiation fixtures; `SYN-URP-002` → envelope
-  preservation fixtures; `SYN-URP-003`/`SYN-URP-012`/`SYN-URP-013` →
+  `SYN-URP-001`/`SYN-URP-020` → negotiation/version fixtures;
+  `SYN-URP-002` → envelope preservation fixtures;
+  `SYN-URP-003`/`SYN-URP-012`/`SYN-URP-013` →
   generation/checkpoint fixtures; `SYN-URP-004`/`SYN-URP-014` →
   paging/catch-up fixtures; `SYN-URP-015` → completion/snapshot-required
   fixtures; `SYN-URP-005`/`SYN-URP-016` → commit/snapshot fixtures;
   `SYN-URP-006`/`SYN-URP-017` → routing/termination and state-separation
   fixtures; `SYN-URP-007`/`SYN-URP-018` → bound fixtures;
   `SYN-URP-010`/`SYN-URP-011`/`SYN-URP-019` → negotiation/schema/hook
-  fixtures.
+  fixtures; `SYN-URP-021` → unknown-field/schema fixtures;
+  `SYN-URP-022` → continuation-echo and idempotent-retry fixtures
+  (mismatched marker/from rejected; duplicate of the immediately
+  preceding completed request returns the retained page);
+  `SYN-URP-023` → subscribe-boundary fixtures (empty boundary rejected,
+  pages validated against the subscribed boundary).
 - [ ] Interop check (implementations or fixtures): at least two
   independent profile implementations (or recorded fixtures from two
   sources) demonstrating mandatory-only interop plus confirmed-profile
@@ -558,24 +723,118 @@ What gets harder, what could go wrong, and mitigations.
 
 ## 10. Unresolved questions and blockers
 
-1. TBD — blocker: final numeric defaults for §3 bounds (subscription
-   counts, pending RPC counts, queue bytes, page batch/byte limits,
-   snapshot page/total limits, profile RPC deadline). Proposed values
-   are in §3; maintainers must confirm or replace with rationale.
-2. TBD — blocker: exact standardized generic RPC method strings and
-   profile payload version negotiation rule (version negotiation rule,
-   ignorable-field marking). Payload message layout is decided by
-   `proto/syntra/v1/recovery_profile.proto`; method strings and version
-   negotiation need maintainer decision. This draft proposes the
-   `/syntra.update-recovery/1/*` shape and versioned opaque bytes.
-3. TBD — blocker: retention-minimum commitment for hosts that offer
-   replay (whether any minimum is required or retention stays purely
-   deployment-documented).
-4. TBD — blocker: snapshot offer lifetime and supersede rule when a
-   newer boundary appears mid-transfer (abort-and-reoffer vs.
-   complete-then-rebase).
-5. TBD — blocker: conformance fixture hosting (which suite owns the
-   profile fixtures and the two-implementation interop evidence).
+Proposed values below are still Draft, not Accepted. Maintainers must
+confirm or replace with rationale; implementations MUST NOT ship
+behavior from this proposal and no test, claim, or release may cite it
+as authority.
+
+1. Proposed numeric bounds (from `proto/syntra/v1/recovery_profile.proto`
+   header defaults): maximum subscriptions per connection 64; maximum
+   subscriptions per principal 256; maximum pending profile RPCs per
+   connection 16; maximum queued `Notification` bytes per stream 262144
+   (256 KiB); maximum queued `Notification` bytes per connection
+   aggregate 1048576 (1 MiB); maximum replay page 64 batches and 262144
+   total bytes, whichever binds first, with each serialized batch at
+   most 262144 bytes; `RecoveryReplayRequest{max_batches}` valid range
+   1..64 and `max_bytes` valid range 1..262144; maximum snapshot page
+   262144 bytes; maximum pages per snapshot offer 256
+   (`RecoverySnapshotDescriptor{total_pages}` 1..256,
+   `page_bytes_max` 1..262144, `RecoverySnapshotChunk{page_index}`
+   0..255, `page_bytes` non-empty at most 262144,
+   `RecoverySnapshotComplete{total_pages}` 1..256, `total_bytes`
+   1..67108864); effective deadline default for profile RPCs 5 s where
+   the `RpcRequest` carries no explicit bounded deadline, with every
+   profile RPC having an effective deadline and expiry surfaced as
+   `DEADLINE_EXCEEDED`. Opaque field caps: `stream_selector` non-empty
+  at most 1024 bytes; `start_checkpoint` empty means initial (skip replay, start live at B), otherwise
+  at most 4096 bytes; `subscription_handle` and `snapshot_handle`
+  non-empty at most 256 bytes; `from_checkpoint` non-empty (replay is sent only for resumption) at most 4096 bytes,
+  `predecessor_checkpoint`, `result_checkpoint`, `boundary_checkpoint`,
+  `live_boundary_checkpoint` at most 4096 bytes;
+   `RecoverySubscribeResponse.catchup_boundary` non-empty at most 4096 bytes
+   (empty means omitted and MUST be rejected with FAILED_PRECONDITION)
+  (`SYN-URP-023`);
+  other `catchup_boundary` and completion boundary fields at most 4096 bytes and MUST equal the subscribed boundary before releasing held live batches;
+   request `continuation_marker` empty on the first request, otherwise echo
+   of the previous page marker verbatim at most 4096 bytes (`SYN-URP-022`);
+   response `continuation_marker` empty means no further page, otherwise
+   at most 4096 bytes; `terminate_reason` non-empty when terminated, at most 256
+   bytes;    `profile_version` valid value 1; `capability` non-empty at most 256
+   bytes; `min_version`, `max_version`, and `selected_version` valid
+   value 1; `checkpoint` and `confirmed_checkpoint` non-empty at most
+   4096 bytes; `RecoveryNegotiateResponse` confirmed bounds are
+   `uint32` deployment values.
+2. Proposed method strings, canonical payloads, and version
+   negotiation rule (`SYN-URP-020`/`SYN-URP-021`): exact
+   standardized generic RPC methods are
+   `/syntra.update-recovery/1/Negotiate`,
+   `/syntra.update-recovery/1/Subscribe`,
+   `/syntra.update-recovery/1/Replay`,
+   `/syntra.update-recovery/1/CatchUp`,
+   `/syntra.update-recovery/1/Confirm`,
+   `/syntra.update-recovery/1/SnapshotOffer`,
+   `/syntra.update-recovery/1/SnapshotFetch`, and
+   `/syntra.update-recovery/1/Unsubscribe` under identifier
+   `syntra.update-recovery/1`. Canonical payloads are
+   `RecoveryNegotiateRequest`/`RecoveryNegotiateResponse`,
+    `RecoverySubscribeRequest`/`RecoverySubscribeResponse`
+    (response carries `catchup_boundary` fixed at subscribe accept),
+    `RecoveryReplayRequest` (with `profile_version` and `continuation_marker` echo) with exactly one `RecoveryReplayPage` per
+    `RpcResult`, `RecoveryCatchUpRequest` with `RecoveryCatchUpAccepted`
+    in the terminal `RpcResult` (batches and completion trailer via
+    `Notification`),
+   `RecoveryConfirmRequest`/`RecoveryConfirmResponse`, and
+   `RecoverySnapshotFetchRequest` with exactly one
+   `RecoverySnapshotChunk` per `RpcResult`, all defined in
+   `proto/syntra/v1/recovery_profile.proto`. The Negotiate invocation
+   offers min and max profile versions (proposing 1/1); the host selects
+   the maximum version it implements within the offered range. No
+   overlap MUST fail with `FAILED_PRECONDITION` in `RpcResult`. Every
+   other operation carries `profile_version=1`; mismatch MUST fail with
+   `FAILED_PRECONDITION`. Wire policy defers to
+   `specifications/core/serialization.md` (`SNTR-SER-003`) and
+   `specifications/core/versioning.md` (`SNTR-VER-004`): unknown
+   Protobuf fields MUST be ignored unless explicitly marked `Critical`;
+   fields explicitly marked `Ignorable` MUST be ignored;
+   `profile_version` and routing/identity fields are required and
+   missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
+   profile operations MUST be rejected with `UNIMPLEMENTED`, never
+   silently applied.
+3. Proposed retention rule: retention stays deployment-documented with
+   no implicit minimum assumed by initiators. Each deployment offering
+   replay documents its retention minimum. A replay or catch-up request
+   for a checkpoint outside retention MUST fail with
+   `FAILED_PRECONDITION` in `RpcResult` while emitting
+   `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification`
+   payload, per `SYN-URP-015`.
+4. Proposed snapshot offer lifetime and supersede rule: an offer is
+   valid from its `RecoverySnapshotDescriptor` until transfer completes
+   with `RecoverySnapshotComplete` plus boundary confirm, or until
+   targeted termination, continuity loss with a new generation, or
+   supersede. Invalidation flows through the snapshot handle and RPC
+   outcome without ordering checkpoint bytes: in-flight
+   `SnapshotFetch` under a superseded `snapshot_handle` fails with
+   `FAILED_PRECONDITION` (superseded), and/or the host emits an
+   explicit continuity-loss/new-offer signal; the initiator MUST
+   discard prior pages on supersede and MUST NOT install across
+   boundaries. A `RecoverySnapshotChunk` is associated only when its
+   `boundary_checkpoint` bytes equal the currently offered descriptor
+   `boundary_checkpoint` bytes; equality validates association only,
+   recency comes only from the explicit supersede signal or RPC
+   outcome. Completion requires matching `total_pages` and
+   `total_bytes`, and installation completes only when the initiator
+   confirms that exact boundary checkpoint through
+   `/syntra.update-recovery/1/Confirm`, yielding
+   `RecoverySnapshotInstalled` with the new generation per
+   `SYN-URP-016`.
+5. Proposed fixture hosting note: conformance fixtures for this profile
+   live in the conformance suite as additive fixtures using neutral
+   payloads only (echo, generic key/value, generic subscription),
+   tracing to §8 acceptance criteria and `SYN-URP` IDs. Interop evidence
+   requires two independent profile implementations or recorded
+   fixtures from two sources demonstrating mandatory-only interop plus
+   confirmed-profile recovery interop; placeholders are tracked where
+   implementations do not yet exist.
 
 ## Appendix: References
 

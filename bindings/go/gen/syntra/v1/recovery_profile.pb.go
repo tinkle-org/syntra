@@ -22,7 +22,8 @@ const (
 )
 
 // Update/recovery profile payloads for ordered delivery, bounded replay,
-// snapshot recovery, and committed progress (SYN-URP-001..019).
+// snapshot recovery, and committed progress (SYN-URP-001..007,
+// SYN-URP-010..021; SYN-URP-008/009 reserved).
 //
 // All payloads are versioned bytes carried inside the existing request,
 // result, and notification envelopes with no envelope changes. Each
@@ -38,11 +39,193 @@ const (
 // 262144 bytes per snapshot page, at most 256 pages per snapshot offer,
 // effective deadline 5 s where the request carries no explicit bounded
 // deadline.
+//
+// Wire compatibility (SNTR-SER-003, SNTR-VER-004): unknown Protobuf fields
+// inside profile payloads MUST be ignored on receipt unless a field comment
+// explicitly marks that field `Critical`. Fields explicitly marked
+// `Ignorable` in their comments MUST be ignored on receipt. All other
+// defined fields are required and validated: profile_version and
+// routing/identity fields (stream_selector, subscription_handle,
+// snapshot_handle, checkpoints, boundaries, capability, versions) missing
+// or mismatched MUST be rejected with FAILED_PRECONDITION, never silently
+// applied. Unknown profile operations (method strings) MUST be rejected
+// with UNIMPLEMENTED.
+type RecoveryNegotiateRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// min_version is the lowest offered profile version. Valid value is 1
+	// in this draft. Required.
+	MinVersion uint32 `protobuf:"varint,2,opt,name=min_version,json=minVersion,proto3" json:"min_version,omitempty"`
+	// max_version is the highest offered profile version. Valid value is 1
+	// in this draft, MUST be >= min_version. Required.
+	MaxVersion uint32 `protobuf:"varint,3,opt,name=max_version,json=maxVersion,proto3" json:"max_version,omitempty"`
+	// capability is the ASCII capability identifier. Non-empty, at most 256
+	// bytes. Required.
+	Capability    string `protobuf:"bytes,4,opt,name=capability,proto3" json:"capability,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecoveryNegotiateRequest) Reset() {
+	*x = RecoveryNegotiateRequest{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryNegotiateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryNegotiateRequest) ProtoMessage() {}
+
+func (x *RecoveryNegotiateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryNegotiateRequest.ProtoReflect.Descriptor instead.
+func (*RecoveryNegotiateRequest) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *RecoveryNegotiateRequest) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateRequest) GetMinVersion() uint32 {
+	if x != nil {
+		return x.MinVersion
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateRequest) GetMaxVersion() uint32 {
+	if x != nil {
+		return x.MaxVersion
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateRequest) GetCapability() string {
+	if x != nil {
+		return x.Capability
+	}
+	return ""
+}
+
+// RecoveryNegotiateResponse confirms the selected version and bounds.
+type RecoveryNegotiateResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// selected_version is the highest overlap within the offered range.
+	// Valid value is 1 in this draft. Required.
+	SelectedVersion uint32 `protobuf:"varint,2,opt,name=selected_version,json=selectedVersion,proto3" json:"selected_version,omitempty"`
+	// max_subscriptions_per_connection is the confirmed bound. Required.
+	MaxSubscriptionsPerConnection uint32 `protobuf:"varint,3,opt,name=max_subscriptions_per_connection,json=maxSubscriptionsPerConnection,proto3" json:"max_subscriptions_per_connection,omitempty"`
+	// max_pending_rpcs_per_connection is the confirmed bound. Required.
+	MaxPendingRpcsPerConnection uint32 `protobuf:"varint,4,opt,name=max_pending_rpcs_per_connection,json=maxPendingRpcsPerConnection,proto3" json:"max_pending_rpcs_per_connection,omitempty"`
+	// max_page_bytes is the confirmed per-page byte bound. Required.
+	MaxPageBytes uint32 `protobuf:"varint,5,opt,name=max_page_bytes,json=maxPageBytes,proto3" json:"max_page_bytes,omitempty"`
+	// max_snapshot_pages is the confirmed per-offer page count bound. Required.
+	MaxSnapshotPages uint32 `protobuf:"varint,6,opt,name=max_snapshot_pages,json=maxSnapshotPages,proto3" json:"max_snapshot_pages,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *RecoveryNegotiateResponse) Reset() {
+	*x = RecoveryNegotiateResponse{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryNegotiateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryNegotiateResponse) ProtoMessage() {}
+
+func (x *RecoveryNegotiateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryNegotiateResponse.ProtoReflect.Descriptor instead.
+func (*RecoveryNegotiateResponse) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *RecoveryNegotiateResponse) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateResponse) GetSelectedVersion() uint32 {
+	if x != nil {
+		return x.SelectedVersion
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateResponse) GetMaxSubscriptionsPerConnection() uint32 {
+	if x != nil {
+		return x.MaxSubscriptionsPerConnection
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateResponse) GetMaxPendingRpcsPerConnection() uint32 {
+	if x != nil {
+		return x.MaxPendingRpcsPerConnection
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateResponse) GetMaxPageBytes() uint32 {
+	if x != nil {
+		return x.MaxPageBytes
+	}
+	return 0
+}
+
+func (x *RecoveryNegotiateResponse) GetMaxSnapshotPages() uint32 {
+	if x != nil {
+		return x.MaxSnapshotPages
+	}
+	return 0
+}
+
 type RecoverySubscribeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
 	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
 	// stream_selector selects the stream. Opaque bytes, non-empty, at most 1024 bytes.
+	// Required.
 	StreamSelector []byte `protobuf:"bytes,2,opt,name=stream_selector,json=streamSelector,proto3" json:"stream_selector,omitempty"`
 	// start_checkpoint is the confirmed checkpoint to continue from. Opaque bytes,
 	// empty means initial, otherwise at most 4096 bytes.
@@ -53,7 +236,7 @@ type RecoverySubscribeRequest struct {
 
 func (x *RecoverySubscribeRequest) Reset() {
 	*x = RecoverySubscribeRequest{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[0]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -65,7 +248,7 @@ func (x *RecoverySubscribeRequest) String() string {
 func (*RecoverySubscribeRequest) ProtoMessage() {}
 
 func (x *RecoverySubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[0]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -78,7 +261,7 @@ func (x *RecoverySubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoverySubscribeRequest.ProtoReflect.Descriptor instead.
 func (*RecoverySubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{0}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RecoverySubscribeRequest) GetProfileVersion() uint32 {
@@ -102,6 +285,85 @@ func (x *RecoverySubscribeRequest) GetStartCheckpoint() []byte {
 	return nil
 }
 
+// RecoverySubscribeResponse confirms one subscription with its handle, generation,
+// and fixed catch-up boundary.
+type RecoverySubscribeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
+	// generation is the continuity generation of the stream. Required.
+	Generation uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	// catchup_boundary is the fixed boundary captured at subscribe accept where
+	// recovered history meets live delivery. Opaque bytes, non-empty, at most
+	// 4096 bytes. Required; empty means omitted and MUST be rejected with
+	// FAILED_PRECONDITION.
+	CatchupBoundary []byte `protobuf:"bytes,4,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RecoverySubscribeResponse) Reset() {
+	*x = RecoverySubscribeResponse{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoverySubscribeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoverySubscribeResponse) ProtoMessage() {}
+
+func (x *RecoverySubscribeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoverySubscribeResponse.ProtoReflect.Descriptor instead.
+func (*RecoverySubscribeResponse) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RecoverySubscribeResponse) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoverySubscribeResponse) GetSubscriptionHandle() []byte {
+	if x != nil {
+		return x.SubscriptionHandle
+	}
+	return nil
+}
+
+func (x *RecoverySubscribeResponse) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *RecoverySubscribeResponse) GetCatchupBoundary() []byte {
+	if x != nil {
+		return x.CatchupBoundary
+	}
+	return nil
+}
+
 // RecoveryUnsubscribeRequest ends one targeted subscription.
 type RecoveryUnsubscribeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -116,7 +378,7 @@ type RecoveryUnsubscribeRequest struct {
 
 func (x *RecoveryUnsubscribeRequest) Reset() {
 	*x = RecoveryUnsubscribeRequest{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[1]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -128,7 +390,7 @@ func (x *RecoveryUnsubscribeRequest) String() string {
 func (*RecoveryUnsubscribeRequest) ProtoMessage() {}
 
 func (x *RecoveryUnsubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[1]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +403,7 @@ func (x *RecoveryUnsubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryUnsubscribeRequest.ProtoReflect.Descriptor instead.
 func (*RecoveryUnsubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{1}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RecoveryUnsubscribeRequest) GetProfileVersion() uint32 {
@@ -167,19 +429,26 @@ type RecoveryReplayRequest struct {
 	// at most 256 bytes.
 	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
 	// from_checkpoint is the confirmed checkpoint to replay from. Opaque bytes,
-	// non-empty, at most 4096 bytes.
+	// non-empty, at most 4096 bytes. On the first request it is the last
+	// confirmed checkpoint; on continuation it MUST equal the previous page's
+	// result_checkpoint.
 	FromCheckpoint []byte `protobuf:"bytes,3,opt,name=from_checkpoint,json=fromCheckpoint,proto3" json:"from_checkpoint,omitempty"`
 	// max_batches bounds batches in one page. Valid range is 1 to 64.
 	MaxBatches uint32 `protobuf:"varint,4,opt,name=max_batches,json=maxBatches,proto3" json:"max_batches,omitempty"`
 	// max_bytes bounds page bytes. Valid range is 1 to 262144.
-	MaxBytes      uint32 `protobuf:"varint,5,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MaxBytes uint32 `protobuf:"varint,5,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	// continuation_marker echoes the previous page's marker. Opaque bytes, empty
+	// on the first request, otherwise MUST equal the previous
+	// RecoveryReplayPage.continuation_marker verbatim, at most 4096 bytes.
+	// Mismatch MUST be rejected with FAILED_PRECONDITION.
+	ContinuationMarker []byte `protobuf:"bytes,6,opt,name=continuation_marker,json=continuationMarker,proto3" json:"continuation_marker,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *RecoveryReplayRequest) Reset() {
 	*x = RecoveryReplayRequest{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[2]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -191,7 +460,7 @@ func (x *RecoveryReplayRequest) String() string {
 func (*RecoveryReplayRequest) ProtoMessage() {}
 
 func (x *RecoveryReplayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[2]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -204,7 +473,7 @@ func (x *RecoveryReplayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryReplayRequest.ProtoReflect.Descriptor instead.
 func (*RecoveryReplayRequest) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{2}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RecoveryReplayRequest) GetProfileVersion() uint32 {
@@ -242,6 +511,13 @@ func (x *RecoveryReplayRequest) GetMaxBytes() uint32 {
 	return 0
 }
 
+func (x *RecoveryReplayRequest) GetContinuationMarker() []byte {
+	if x != nil {
+		return x.ContinuationMarker
+	}
+	return nil
+}
+
 // RecoveryReplayPage carries one bounded replay page toward the catch-up boundary.
 type RecoveryReplayPage struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -274,7 +550,7 @@ type RecoveryReplayPage struct {
 
 func (x *RecoveryReplayPage) Reset() {
 	*x = RecoveryReplayPage{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[3]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -286,7 +562,7 @@ func (x *RecoveryReplayPage) String() string {
 func (*RecoveryReplayPage) ProtoMessage() {}
 
 func (x *RecoveryReplayPage) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[3]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -299,7 +575,7 @@ func (x *RecoveryReplayPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryReplayPage.ProtoReflect.Descriptor instead.
 func (*RecoveryReplayPage) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{3}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RecoveryReplayPage) GetProfileVersion() uint32 {
@@ -370,7 +646,7 @@ type RecoveryReplayComplete struct {
 
 func (x *RecoveryReplayComplete) Reset() {
 	*x = RecoveryReplayComplete{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[4]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -382,7 +658,7 @@ func (x *RecoveryReplayComplete) String() string {
 func (*RecoveryReplayComplete) ProtoMessage() {}
 
 func (x *RecoveryReplayComplete) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[4]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -395,7 +671,7 @@ func (x *RecoveryReplayComplete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryReplayComplete.ProtoReflect.Descriptor instead.
 func (*RecoveryReplayComplete) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{4}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RecoveryReplayComplete) GetProfileVersion() uint32 {
@@ -426,6 +702,139 @@ func (x *RecoveryReplayComplete) GetLiveBoundaryCheckpoint() []byte {
 	return nil
 }
 
+// RecoveryCatchUpRequest triggers catch-up streaming over the existing connection.
+type RecoveryCatchUpRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *RecoveryCatchUpRequest) Reset() {
+	*x = RecoveryCatchUpRequest{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryCatchUpRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryCatchUpRequest) ProtoMessage() {}
+
+func (x *RecoveryCatchUpRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryCatchUpRequest.ProtoReflect.Descriptor instead.
+func (*RecoveryCatchUpRequest) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RecoveryCatchUpRequest) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryCatchUpRequest) GetSubscriptionHandle() []byte {
+	if x != nil {
+		return x.SubscriptionHandle
+	}
+	return nil
+}
+
+// RecoveryCatchUpAccepted confirms accepted catch-up with its boundary.
+type RecoveryCatchUpAccepted struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
+	// generation is the continuity generation of the stream. Required.
+	Generation uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	// catchup_boundary is the fixed boundary being approached. Opaque bytes, at
+	// most 4096 bytes.
+	CatchupBoundary []byte `protobuf:"bytes,4,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RecoveryCatchUpAccepted) Reset() {
+	*x = RecoveryCatchUpAccepted{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryCatchUpAccepted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryCatchUpAccepted) ProtoMessage() {}
+
+func (x *RecoveryCatchUpAccepted) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryCatchUpAccepted.ProtoReflect.Descriptor instead.
+func (*RecoveryCatchUpAccepted) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RecoveryCatchUpAccepted) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryCatchUpAccepted) GetSubscriptionHandle() []byte {
+	if x != nil {
+		return x.SubscriptionHandle
+	}
+	return nil
+}
+
+func (x *RecoveryCatchUpAccepted) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *RecoveryCatchUpAccepted) GetCatchupBoundary() []byte {
+	if x != nil {
+		return x.CatchupBoundary
+	}
+	return nil
+}
+
 // RecoverySnapshotDescriptor offers a snapshot under a provider-proven boundary.
 type RecoverySnapshotDescriptor struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -450,7 +859,7 @@ type RecoverySnapshotDescriptor struct {
 
 func (x *RecoverySnapshotDescriptor) Reset() {
 	*x = RecoverySnapshotDescriptor{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[5]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +871,7 @@ func (x *RecoverySnapshotDescriptor) String() string {
 func (*RecoverySnapshotDescriptor) ProtoMessage() {}
 
 func (x *RecoverySnapshotDescriptor) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[5]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +884,7 @@ func (x *RecoverySnapshotDescriptor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoverySnapshotDescriptor.ProtoReflect.Descriptor instead.
 func (*RecoverySnapshotDescriptor) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{5}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RecoverySnapshotDescriptor) GetProfileVersion() uint32 {
@@ -541,7 +950,7 @@ type RecoverySnapshotChunk struct {
 
 func (x *RecoverySnapshotChunk) Reset() {
 	*x = RecoverySnapshotChunk{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[6]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -553,7 +962,7 @@ func (x *RecoverySnapshotChunk) String() string {
 func (*RecoverySnapshotChunk) ProtoMessage() {}
 
 func (x *RecoverySnapshotChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[6]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -566,7 +975,7 @@ func (x *RecoverySnapshotChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoverySnapshotChunk.ProtoReflect.Descriptor instead.
 func (*RecoverySnapshotChunk) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{6}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RecoverySnapshotChunk) GetProfileVersion() uint32 {
@@ -624,7 +1033,7 @@ type RecoverySnapshotComplete struct {
 
 func (x *RecoverySnapshotComplete) Reset() {
 	*x = RecoverySnapshotComplete{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[7]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +1045,7 @@ func (x *RecoverySnapshotComplete) String() string {
 func (*RecoverySnapshotComplete) ProtoMessage() {}
 
 func (x *RecoverySnapshotComplete) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[7]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +1058,7 @@ func (x *RecoverySnapshotComplete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoverySnapshotComplete.ProtoReflect.Descriptor instead.
 func (*RecoverySnapshotComplete) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{7}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RecoverySnapshotComplete) GetProfileVersion() uint32 {
@@ -705,7 +1114,7 @@ type RecoverySnapshotInstalled struct {
 
 func (x *RecoverySnapshotInstalled) Reset() {
 	*x = RecoverySnapshotInstalled{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[8]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +1126,7 @@ func (x *RecoverySnapshotInstalled) String() string {
 func (*RecoverySnapshotInstalled) ProtoMessage() {}
 
 func (x *RecoverySnapshotInstalled) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[8]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +1139,7 @@ func (x *RecoverySnapshotInstalled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoverySnapshotInstalled.ProtoReflect.Descriptor instead.
 func (*RecoverySnapshotInstalled) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{8}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RecoverySnapshotInstalled) GetProfileVersion() uint32 {
@@ -755,6 +1164,225 @@ func (x *RecoverySnapshotInstalled) GetBoundaryCheckpoint() []byte {
 }
 
 func (x *RecoverySnapshotInstalled) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+// RecoverySnapshotFetchRequest asks for one bounded snapshot page by index.
+type RecoverySnapshotFetchRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// snapshot_handle identifies the offered snapshot. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SnapshotHandle []byte `protobuf:"bytes,2,opt,name=snapshot_handle,json=snapshotHandle,proto3" json:"snapshot_handle,omitempty"`
+	// page_index orders the page within the offer. Valid range is 0 to 255.
+	// Required. The response page_index correlates the request.
+	PageIndex     uint32 `protobuf:"varint,3,opt,name=page_index,json=pageIndex,proto3" json:"page_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecoverySnapshotFetchRequest) Reset() {
+	*x = RecoverySnapshotFetchRequest{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoverySnapshotFetchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoverySnapshotFetchRequest) ProtoMessage() {}
+
+func (x *RecoverySnapshotFetchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoverySnapshotFetchRequest.ProtoReflect.Descriptor instead.
+func (*RecoverySnapshotFetchRequest) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RecoverySnapshotFetchRequest) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoverySnapshotFetchRequest) GetSnapshotHandle() []byte {
+	if x != nil {
+		return x.SnapshotHandle
+	}
+	return nil
+}
+
+func (x *RecoverySnapshotFetchRequest) GetPageIndex() uint32 {
+	if x != nil {
+		return x.PageIndex
+	}
+	return 0
+}
+
+// RecoveryConfirmRequest confirms a result or boundary checkpoint.
+type RecoveryConfirmRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
+	// generation is the continuity generation of the stream. Required.
+	Generation uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
+	// checkpoint is the result checkpoint or the boundary checkpoint being
+	// confirmed. Opaque bytes, non-empty, at most 4096 bytes. Required.
+	Checkpoint    []byte `protobuf:"bytes,4,opt,name=checkpoint,proto3" json:"checkpoint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecoveryConfirmRequest) Reset() {
+	*x = RecoveryConfirmRequest{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryConfirmRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryConfirmRequest) ProtoMessage() {}
+
+func (x *RecoveryConfirmRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryConfirmRequest.ProtoReflect.Descriptor instead.
+func (*RecoveryConfirmRequest) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *RecoveryConfirmRequest) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryConfirmRequest) GetSubscriptionHandle() []byte {
+	if x != nil {
+		return x.SubscriptionHandle
+	}
+	return nil
+}
+
+func (x *RecoveryConfirmRequest) GetGeneration() uint64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *RecoveryConfirmRequest) GetCheckpoint() []byte {
+	if x != nil {
+		return x.Checkpoint
+	}
+	return nil
+}
+
+// RecoveryConfirmResponse confirms the persisted checkpoint.
+type RecoveryConfirmResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// profile_version is the profile payload version. Valid value is 1.
+	// Required.
+	ProfileVersion uint32 `protobuf:"varint,1,opt,name=profile_version,json=profileVersion,proto3" json:"profile_version,omitempty"`
+	// subscription_handle identifies the targeted stream. Opaque bytes, non-empty,
+	// at most 256 bytes. Required.
+	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
+	// confirmed_checkpoint is the persisted checkpoint. Opaque bytes, at most
+	// 4096 bytes.
+	ConfirmedCheckpoint []byte `protobuf:"bytes,3,opt,name=confirmed_checkpoint,json=confirmedCheckpoint,proto3" json:"confirmed_checkpoint,omitempty"`
+	// generation is the continuity generation of the stream. Required.
+	Generation    uint64 `protobuf:"varint,4,opt,name=generation,proto3" json:"generation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecoveryConfirmResponse) Reset() {
+	*x = RecoveryConfirmResponse{}
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecoveryConfirmResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecoveryConfirmResponse) ProtoMessage() {}
+
+func (x *RecoveryConfirmResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecoveryConfirmResponse.ProtoReflect.Descriptor instead.
+func (*RecoveryConfirmResponse) Descriptor() ([]byte, []int) {
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RecoveryConfirmResponse) GetProfileVersion() uint32 {
+	if x != nil {
+		return x.ProfileVersion
+	}
+	return 0
+}
+
+func (x *RecoveryConfirmResponse) GetSubscriptionHandle() []byte {
+	if x != nil {
+		return x.SubscriptionHandle
+	}
+	return nil
+}
+
+func (x *RecoveryConfirmResponse) GetConfirmedCheckpoint() []byte {
+	if x != nil {
+		return x.ConfirmedCheckpoint
+	}
+	return nil
+}
+
+func (x *RecoveryConfirmResponse) GetGeneration() uint64 {
 	if x != nil {
 		return x.Generation
 	}
@@ -787,7 +1415,7 @@ type RecoveryBatch struct {
 
 func (x *RecoveryBatch) Reset() {
 	*x = RecoveryBatch{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[9]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -799,7 +1427,7 @@ func (x *RecoveryBatch) String() string {
 func (*RecoveryBatch) ProtoMessage() {}
 
 func (x *RecoveryBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[9]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +1440,7 @@ func (x *RecoveryBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryBatch.ProtoReflect.Descriptor instead.
 func (*RecoveryBatch) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{9}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RecoveryBatch) GetProfileVersion() uint32 {
@@ -893,7 +1521,7 @@ type RecoveryBatchTrailer struct {
 
 func (x *RecoveryBatchTrailer) Reset() {
 	*x = RecoveryBatchTrailer{}
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[10]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -905,7 +1533,7 @@ func (x *RecoveryBatchTrailer) String() string {
 func (*RecoveryBatchTrailer) ProtoMessage() {}
 
 func (x *RecoveryBatchTrailer) ProtoReflect() protoreflect.Message {
-	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[10]
+	mi := &file_syntra_v1_recovery_profile_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -918,7 +1546,7 @@ func (x *RecoveryBatchTrailer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecoveryBatchTrailer.ProtoReflect.Descriptor instead.
 func (*RecoveryBatchTrailer) Descriptor() ([]byte, []int) {
-	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{10}
+	return file_syntra_v1_recovery_profile_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *RecoveryBatchTrailer) GetProfileVersion() uint32 {
@@ -1039,21 +1667,45 @@ var File_syntra_v1_recovery_profile_proto protoreflect.FileDescriptor
 
 const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\n" +
-	" syntra/v1/recovery_profile.proto\x12\tsyntra.v1\"\x97\x01\n" +
+	" syntra/v1/recovery_profile.proto\x12\tsyntra.v1\"\xa5\x01\n" +
+	"\x18RecoveryNegotiateRequest\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12\x1f\n" +
+	"\vmin_version\x18\x02 \x01(\rR\n" +
+	"minVersion\x12\x1f\n" +
+	"\vmax_version\x18\x03 \x01(\rR\n" +
+	"maxVersion\x12\x1e\n" +
+	"\n" +
+	"capability\x18\x04 \x01(\tR\n" +
+	"capability\"\xd2\x02\n" +
+	"\x19RecoveryNegotiateResponse\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12)\n" +
+	"\x10selected_version\x18\x02 \x01(\rR\x0fselectedVersion\x12G\n" +
+	" max_subscriptions_per_connection\x18\x03 \x01(\rR\x1dmaxSubscriptionsPerConnection\x12D\n" +
+	"\x1fmax_pending_rpcs_per_connection\x18\x04 \x01(\rR\x1bmaxPendingRpcsPerConnection\x12$\n" +
+	"\x0emax_page_bytes\x18\x05 \x01(\rR\fmaxPageBytes\x12,\n" +
+	"\x12max_snapshot_pages\x18\x06 \x01(\rR\x10maxSnapshotPages\"\x97\x01\n" +
 	"\x18RecoverySubscribeRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12'\n" +
 	"\x0fstream_selector\x18\x02 \x01(\fR\x0estreamSelector\x12)\n" +
-	"\x10start_checkpoint\x18\x03 \x01(\fR\x0fstartCheckpoint\"v\n" +
+	"\x10start_checkpoint\x18\x03 \x01(\fR\x0fstartCheckpoint\"\xc0\x01\n" +
+	"\x19RecoverySubscribeResponse\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x03 \x01(\x04R\n" +
+	"generation\x12)\n" +
+	"\x10catchup_boundary\x18\x04 \x01(\fR\x0fcatchupBoundary\"v\n" +
 	"\x1aRecoveryUnsubscribeRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
-	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\xd8\x01\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\x89\x02\n" +
 	"\x15RecoveryReplayRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12'\n" +
 	"\x0ffrom_checkpoint\x18\x03 \x01(\fR\x0efromCheckpoint\x12\x1f\n" +
 	"\vmax_batches\x18\x04 \x01(\rR\n" +
 	"maxBatches\x12\x1b\n" +
-	"\tmax_bytes\x18\x05 \x01(\rR\bmaxBytes\"\xd5\x02\n" +
+	"\tmax_bytes\x18\x05 \x01(\rR\bmaxBytes\x12/\n" +
+	"\x13continuation_marker\x18\x06 \x01(\fR\x12continuationMarker\"\xd5\x02\n" +
 	"\x12RecoveryReplayPage\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x125\n" +
@@ -1068,7 +1720,17 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\n" +
 	"generation\x18\x03 \x01(\x04R\n" +
 	"generation\x128\n" +
-	"\x18live_boundary_checkpoint\x18\x04 \x01(\fR\x16liveBoundaryCheckpoint\"\x97\x02\n" +
+	"\x18live_boundary_checkpoint\x18\x04 \x01(\fR\x16liveBoundaryCheckpoint\"r\n" +
+	"\x16RecoveryCatchUpRequest\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\xbe\x01\n" +
+	"\x17RecoveryCatchUpAccepted\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x03 \x01(\x04R\n" +
+	"generation\x12)\n" +
+	"\x10catchup_boundary\x18\x04 \x01(\fR\x0fcatchupBoundary\"\x97\x02\n" +
 	"\x1aRecoverySnapshotDescriptor\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12'\n" +
@@ -1097,6 +1759,27 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12/\n" +
 	"\x13boundary_checkpoint\x18\x03 \x01(\fR\x12boundaryCheckpoint\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x04 \x01(\x04R\n" +
+	"generation\"\x8f\x01\n" +
+	"\x1cRecoverySnapshotFetchRequest\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12'\n" +
+	"\x0fsnapshot_handle\x18\x02 \x01(\fR\x0esnapshotHandle\x12\x1d\n" +
+	"\n" +
+	"page_index\x18\x03 \x01(\rR\tpageIndex\"\xb2\x01\n" +
+	"\x16RecoveryConfirmRequest\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12\x1e\n" +
+	"\n" +
+	"generation\x18\x03 \x01(\x04R\n" +
+	"generation\x12\x1e\n" +
+	"\n" +
+	"checkpoint\x18\x04 \x01(\fR\n" +
+	"checkpoint\"\xc6\x01\n" +
+	"\x17RecoveryConfirmResponse\x12'\n" +
+	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x121\n" +
+	"\x14confirmed_checkpoint\x18\x03 \x01(\fR\x13confirmedCheckpoint\x12\x1e\n" +
 	"\n" +
 	"generation\x18\x04 \x01(\x04R\n" +
 	"generation\"\x92\x02\n" +
@@ -1137,19 +1820,27 @@ func file_syntra_v1_recovery_profile_proto_rawDescGZIP() []byte {
 	return file_syntra_v1_recovery_profile_proto_rawDescData
 }
 
-var file_syntra_v1_recovery_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_syntra_v1_recovery_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_syntra_v1_recovery_profile_proto_goTypes = []any{
-	(*RecoverySubscribeRequest)(nil),   // 0: syntra.v1.RecoverySubscribeRequest
-	(*RecoveryUnsubscribeRequest)(nil), // 1: syntra.v1.RecoveryUnsubscribeRequest
-	(*RecoveryReplayRequest)(nil),      // 2: syntra.v1.RecoveryReplayRequest
-	(*RecoveryReplayPage)(nil),         // 3: syntra.v1.RecoveryReplayPage
-	(*RecoveryReplayComplete)(nil),     // 4: syntra.v1.RecoveryReplayComplete
-	(*RecoverySnapshotDescriptor)(nil), // 5: syntra.v1.RecoverySnapshotDescriptor
-	(*RecoverySnapshotChunk)(nil),      // 6: syntra.v1.RecoverySnapshotChunk
-	(*RecoverySnapshotComplete)(nil),   // 7: syntra.v1.RecoverySnapshotComplete
-	(*RecoverySnapshotInstalled)(nil),  // 8: syntra.v1.RecoverySnapshotInstalled
-	(*RecoveryBatch)(nil),              // 9: syntra.v1.RecoveryBatch
-	(*RecoveryBatchTrailer)(nil),       // 10: syntra.v1.RecoveryBatchTrailer
+	(*RecoveryNegotiateRequest)(nil),     // 0: syntra.v1.RecoveryNegotiateRequest
+	(*RecoveryNegotiateResponse)(nil),    // 1: syntra.v1.RecoveryNegotiateResponse
+	(*RecoverySubscribeRequest)(nil),     // 2: syntra.v1.RecoverySubscribeRequest
+	(*RecoverySubscribeResponse)(nil),    // 3: syntra.v1.RecoverySubscribeResponse
+	(*RecoveryUnsubscribeRequest)(nil),   // 4: syntra.v1.RecoveryUnsubscribeRequest
+	(*RecoveryReplayRequest)(nil),        // 5: syntra.v1.RecoveryReplayRequest
+	(*RecoveryReplayPage)(nil),           // 6: syntra.v1.RecoveryReplayPage
+	(*RecoveryReplayComplete)(nil),       // 7: syntra.v1.RecoveryReplayComplete
+	(*RecoveryCatchUpRequest)(nil),       // 8: syntra.v1.RecoveryCatchUpRequest
+	(*RecoveryCatchUpAccepted)(nil),      // 9: syntra.v1.RecoveryCatchUpAccepted
+	(*RecoverySnapshotDescriptor)(nil),   // 10: syntra.v1.RecoverySnapshotDescriptor
+	(*RecoverySnapshotChunk)(nil),        // 11: syntra.v1.RecoverySnapshotChunk
+	(*RecoverySnapshotComplete)(nil),     // 12: syntra.v1.RecoverySnapshotComplete
+	(*RecoverySnapshotInstalled)(nil),    // 13: syntra.v1.RecoverySnapshotInstalled
+	(*RecoverySnapshotFetchRequest)(nil), // 14: syntra.v1.RecoverySnapshotFetchRequest
+	(*RecoveryConfirmRequest)(nil),       // 15: syntra.v1.RecoveryConfirmRequest
+	(*RecoveryConfirmResponse)(nil),      // 16: syntra.v1.RecoveryConfirmResponse
+	(*RecoveryBatch)(nil),                // 17: syntra.v1.RecoveryBatch
+	(*RecoveryBatchTrailer)(nil),         // 18: syntra.v1.RecoveryBatchTrailer
 }
 var file_syntra_v1_recovery_profile_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -1164,7 +1855,7 @@ func file_syntra_v1_recovery_profile_proto_init() {
 	if File_syntra_v1_recovery_profile_proto != nil {
 		return
 	}
-	file_syntra_v1_recovery_profile_proto_msgTypes[10].OneofWrappers = []any{
+	file_syntra_v1_recovery_profile_proto_msgTypes[18].OneofWrappers = []any{
 		(*RecoveryBatchTrailer_NextGeneration)(nil),
 		(*RecoveryBatchTrailer_CatchupComplete)(nil),
 		(*RecoveryBatchTrailer_SnapshotRequired)(nil),
@@ -1176,7 +1867,7 @@ func file_syntra_v1_recovery_profile_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_syntra_v1_recovery_profile_proto_rawDesc), len(file_syntra_v1_recovery_profile_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

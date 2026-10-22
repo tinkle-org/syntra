@@ -19,8 +19,8 @@
 //!   (`PendingGuard`).
 
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, Ordering},
-    Arc,
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    Arc, Mutex as StdMutex,
 };
 use std::time::Duration;
 
@@ -492,6 +492,21 @@ pub(crate) struct Shared {
     pub closed: AtomicBool,
     /// ACTIVE-phase decode failures (misbehavior counter, SNTR-ASEC-020).
     pub misbehavior: AtomicU32,
+    /// Notification queue overflow observability for the Initiator path.
+    /// Counts dropped notifications and their bytes; the queue stays
+    /// bounded and drops remain non-blocking.
+    pub notification_dropped: AtomicU64,
+    pub notification_dropped_bytes: AtomicU64,
+    /// Serializes concurrent `record_notification_loss` updates so the
+    /// count/byte increments and the `notification_loss_tx` publication
+    /// form one atomic snapshot. Without this, two concurrent drops can
+    /// interleave increments and publish mismatched totals or publish a
+    /// stale snapshot that moves the watch channel backwards.
+    pub(crate) notification_loss_lock: StdMutex<()>,
+    /// Carries the latest loss totals so every loss waiter observes a
+    /// drop. Published on every drop alongside the counters; late
+    /// subscribers read the current totals instead of missing a signal.
+    pub notification_loss_tx: watch::Sender<(u64, u64)>,
     /// Close broadcast: fired on every path to CLOSED so transport pumps
     /// (which only hold byte channels) learn remote teardown promptly.
     /// Pumps `select!` on this alongside reads; firing is idempotent.
@@ -508,6 +523,7 @@ impl Shared {
     ) -> (Arc<Self>, mpsc::Receiver<Bytes>) {
         let (notif_tx, notif_rx) = mpsc::channel(config.notification_capacity);
         let (closed_tx, _) = watch::channel(false);
+        let (notification_loss_tx, _) = watch::channel((0, 0));
         let shared = Arc::new(Self {
             role,
             state: RwLock::new(ConnectionState::Connected),
@@ -522,9 +538,33 @@ impl Shared {
             config,
             closed: AtomicBool::new(false),
             misbehavior: AtomicU32::new(0),
+            notification_dropped: AtomicU64::new(0),
+            notification_dropped_bytes: AtomicU64::new(0),
+            notification_loss_lock: StdMutex::new(()),
+            notification_loss_tx,
             closed_tx,
         });
         (shared, notif_rx)
+    }
+}
+
+impl Shared {
+    /// Record one dropped Syntra notification: advance the cumulative
+    /// loss counters and publish the latest totals as one atomic
+    /// snapshot. The short critical section serializes concurrent drops
+    /// so count/byte totals stay paired and the watch channel never moves
+    /// backwards; every loss waiter observes the new totals and late
+    /// subscribers read them as current state.
+    pub(crate) fn record_notification_loss(&self, payload_bytes: u64) -> (u64, u64) {
+        let _guard = self.notification_loss_lock.lock().unwrap();
+        let dropped = self.notification_dropped.fetch_add(1, Ordering::Relaxed) + 1;
+        let dropped_bytes = self
+            .notification_dropped_bytes
+            .fetch_add(payload_bytes, Ordering::Relaxed)
+            + payload_bytes;
+        self.notification_loss_tx
+            .send_replace((dropped, dropped_bytes));
+        (dropped, dropped_bytes)
     }
 }
 
@@ -720,6 +760,15 @@ impl Connection {
         self.shared.closed_tx.send_replace(true);
     }
 
+    /// Test hook: hold the notification receiver lock so loss-wake tests
+    /// can park waiters without them consuming the queued notification.
+    #[cfg(test)]
+    pub(crate) async fn hold_notification_receiver_for_test(
+        &self,
+    ) -> tokio::sync::MutexGuard<'_, mpsc::Receiver<Bytes>> {
+        self.notif_rx.lock().await
+    }
+
     /// Take the next notification payload (opaque application bytes).
     /// Returns None when the connection is closed and drained.
     pub async fn next_notification(&self) -> Option<Vec<u8>> {
@@ -742,5 +791,22 @@ impl Connection {
     /// Number of outstanding RPCs (for backpressure observability).
     pub fn pending_len(&self) -> usize {
         self.shared.pending.len()
+    }
+
+    /// Notification queue overflow observability.
+    /// Returns `(dropped_count, dropped_bytes)` for notifications
+    /// discarded when the bounded notification queue was full.
+    /// Bounds are unchanged; the queue stays non-blocking and drops.
+    /// Reads under the loss lock so the paired totals are never torn.
+    pub fn notification_loss(&self) -> (u64, u64) {
+        let _guard = self.shared.notification_loss_lock.lock().unwrap();
+        (
+            self.shared
+                .notification_dropped
+                .load(Ordering::Relaxed),
+            self.shared
+                .notification_dropped_bytes
+                .load(Ordering::Relaxed),
+        )
     }
 }
