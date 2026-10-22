@@ -878,7 +878,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-core"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "bytes",
  "futures-util",
@@ -890,7 +890,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-ffi"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "prost",
  "syntra-core",
@@ -900,7 +900,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-runtime"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "bytes",
  "futures-util",
@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-web"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "js-sys",
  "syntra-core",
@@ -932,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "syntra-ws"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 dependencies = [
  "bytes",
  "futures-util",

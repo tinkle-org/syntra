@@ -7,14 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
 development, changes land under `Unreleased`.
 
-## [v1.0.0-rc.1] - TBD (pending; do not treat as released)
+## [v1.0.0-rc.1] - 2026-10-22 (release candidate, not stable)
 
-First release candidate scope (protocol v1). This section is a release
-plan, not a release announcement: the tag MUST NOT be created until
-`RELEASE.md` §1 is fully evidenced and `audits/v1-release-readiness.md`
-shows no BLOCKED area in RC scope. Known blockers: P0 findings F-01–F-06
+First release candidate scope (protocol v1) for external Rust/Go imports.
+Install: `cargo add syntra-core@1.0.0-rc.1`, Go `github.com/tinklehq/syntra/bindings/go@v1.0.0-rc.1`.
+Known blockers for stable (do not block RC import): P0 findings F-01–F-06
 (`audits/v1-consistency-review.md`), SESSION-OPEN-QUESTIONS items 1–11,
-pending RFCs 0001–0005, no stable release tagged yet. Distribution is
+pending RFCs 0001–0005. Distribution is
 per-crate tags `<crate>-vX.Y.Z` with crates.io publication plus GitHub
 Release assets (no BSR, no GHCR); license is Apache-2.0
 (`LICENSE`, `GOVERNANCE.md` §7). Where this plan differs from `Unreleased`,
