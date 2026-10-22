@@ -1,0 +1,37 @@
+rfcs/0006-update-recovery-profile.md
+  s_eeedb79b825f94::t_04e9df73035e27 253
+  s_eeedb79b825f94::t_dee3e8ac36125d 731
+  s_eeedb79b825f94::t_2e14109ab0304a 703-710
+  s_eeedb79b825f94::t_92079672a44a29 272
+  s_eeedb79b825f94::t_4e97b2481d2c2d 263-271
+conformance/manifest/recovery.yaml
+  s_eeedb79b825f94::t_5ab5db1a946775 165
+  s_eeedb79b825f94::t_a5f129539595d2 162
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_eeedb79b825f94::t_7eeb19d6e0c32d 352-354,382-384,393-398
+proto/syntra/v1/recovery_profile.proto
+  s_eeedb79b825f94::t_de556bfc388141 115-117,123-127
+  s_eeedb79b825f94::t_77f1b79114292b 92-94
+specifications/profiles/recovery.md
+  s_eeedb79b825f94::t_bb2364ac792441 129
+  s_eeedb79b825f94::t_4a0e22730d36c0 96
+  s_eeedb79b825f94::t_5ab5db1a946775 128
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_eeedb79b825f94::t_c91851dab6dfcf 301-303,432-434,439-446,514-520,1700,1707-1708
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e88dc83736dec6b212d0be1ce48579d6517e6f37",
+  "prompts": {},
+  "sessions": {
+    "s_eeedb79b825f94": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9e52a5f3ffeAAW3ReVypfhgRM",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
