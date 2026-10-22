@@ -1,0 +1,41 @@
+rfcs/0006-update-recovery-profile.md
+  s_eeedb79b825f94::t_27d48138638777 320-326
+  s_eeedb79b825f94::t_1c60c2a58b49fa 252-254
+  s_eeedb79b825f94::t_9d7942ad0db747 312-317
+  s_eeedb79b825f94::t_02572aba0129ac 381-382,391
+  s_eeedb79b825f94::t_988d85418a215c 716-721
+proto/syntra/v1/recovery_profile.proto
+  s_eeedb79b825f94::t_5b4924d68e4424 80-81,91-94
+specifications/profiles/recovery.md
+  s_eeedb79b825f94::t_845a8ecdc1d158 199
+  s_eeedb79b825f94::t_173a8ebaa337b6 128
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_eeedb79b825f94::t_81120a0dd61c7e 335-336,351-355
+conformance/recovery_profile/recovery.md
+  s_eeedb79b825f94::t_c81dfea675c681 17
+conformance/manifest/recovery.yaml
+  s_eeedb79b825f94::t_5595cd0e5f2cbf 162
+crates/syntra-runtime/src/connection.rs
+  s_eeedb79b825f94::t_0ed63e443b2b18 800,802
+  s_eeedb79b825f94::t_a681eaf6800d77 23
+  s_eeedb79b825f94::t_1291f43639a646 543,553-557,559
+  s_eeedb79b825f94::t_4686f9616c37ec 500-505
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_eeedb79b825f94::t_7b327bf414d379 288-289,299-305,359-365,1675,1681-1682
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "574d86ad50c00338107e801d7244110947516252",
+  "prompts": {},
+  "sessions": {
+    "s_eeedb79b825f94": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9e52a5f3ffeAAW3ReVypfhgRM",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
