@@ -69,7 +69,7 @@ KNOWN_PROFILES = {
     "SNTR-TCP-V1", "SNTR-TLS-TCP-V1", "SNTR-HTTP-V1", "SNTR-HTTPS-H1-V1",
     "SNTR-HTTPS-H2-V1", "SNTR-WS-V1", "SNTR-WSS-H1-V1",
 }
-KNOWN_CAPABILITIES = {"events-v1", "events-replay-v1", "resume-v1"}
+KNOWN_CAPABILITIES = {"events-v1", "events-replay-v1", "resume-v1", "syntra.update-recovery/1"}
 KNOWN_AUTOMATION = {"automated", "partially_automated", "manual", "not_testable"}
 KNOWN_ROLES = {"client", "server"}
 KNOWN_CONN_STATES = {"CONNECTED", "NEGOTIATING", "AUTHENTICATING", "ACTIVE", "CLOSING", "CLOSED"}

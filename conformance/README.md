@@ -112,7 +112,7 @@ Full definitions: `conformance/profiles.yaml`. Summary:
 | `SNTR-CORE-V1`  | MANDATORY CORE       | Envelope, serialization, handshake machine, RPC, errors, auth interface, bounds, security, capability-free event handling | **every** conformance claim |
 | `SNTR-SESS-V1`  | MANDATORY CORE       | Session = connection, close/loss, expiry, no-implicit-resumption | every claim (runs over any claimed transport) |
 | `SNTR-RPC-V1`   | MANDATORY CORE       | Correlation, concurrency, deadlines, cancel, idempotency discipline | every claim |
-| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` claims |
+| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery placeholder pending RFC 0006; must not be claimed until accepted) |
 | `SNTR-TCP-V1`   | TRANSPORT PROFILE    | Plaintext TCP framing (restricted development only)         | only TCP claims; never sufficient for production |
 | `SNTR-TLS-TCP-V1` | TRANSPORT PROFILE  | Same framing over TLS 1.3                                   | TLS/TCP claims |
 | `SNTR-HTTP-V1` | TRANSPORT PROFILE    | HTTP/1.1 request/response RPC binding (restricted dev only) | HTTP/1.1 claims |
