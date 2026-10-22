@@ -1,0 +1,108 @@
+rfcs/0006-update-recovery-profile.md
+  s_82dfca681ca206::t_6e6ba5f08a310a 126-129,131-132
+  s_82dfca681ca206::t_be00797fc78ffd 170-176
+  s_82dfca681ca206::t_de37e3a96c9c8a 235,338
+  s_82dfca681ca206::t_3094264f25a713 218-222
+  s_82dfca681ca206::t_f0fe393186ea6a 238-240
+  s_82dfca681ca206::t_1d4c9fd0cb3f24 341-343
+  s_82dfca681ca206::t_7e7cae2fb935a7 560-564
+conformance/recovery_profile/recovery.md
+  s_763c7152daf22c::t_91cd0ee7e374f5 104,107
+  s_763c7152daf22c::t_4e5d38e08d28df 17-18
+  s_e164609f1d753b::t_a800411aa58b8e 13,27,37,47,57,67,77,87,89
+conformance/recovery_profile/README.md
+  s_e164609f1d753b::t_68b79c96bea62a 14,22-25,61-62
+conformance/profiles.yaml
+  s_e164609f1d753b::t_a374ba9587ed49 47-48,50
+scripts/validate-repo.py
+  s_e164609f1d753b::t_a374ba9587ed49 72
+crates/syntra-runtime/src/recovery/profile.rs
+  s_0d3590410a5c96::t_bde4e49e8c91c3 273-274
+  s_0d3590410a5c96::t_b811c322dbdc4c 709-794
+  s_0d3590410a5c96::t_ddf4c379932fe0 385-388
+  s_0d3590410a5c96::t_b9218fe8832135 280-284
+  s_0d3590410a5c96::t_07957cfae14475 291,294-298
+  s_0d3590410a5c96::t_fb3116e14b286f 303-309
+  s_0d3590410a5c96::t_d634edc5b4987a 403,407-412
+  s_0d3590410a5c96::t_6ffb1659b927ed 35-36
+  s_0d3590410a5c96::t_a05fe3e0a9311c 433-436,439-442
+  s_0d3590410a5c96::t_ad9ee8593b6250 453-455,466-467,486-491,496,499-504,508
+  s_0d3590410a5c96::t_3fb16ce000362e 299
+proto/syntra/v1/recovery_profile.proto
+  s_4f375aacf963d1::t_f11a451d420447 178-180
+  s_4f375aacf963d1::t_87963f93030629 185-186,198-217
+  s_4f375aacf963d1::t_7c9c9d52dc13ec 19-20
+  s_4f375aacf963d1::t_909137dbfa5075 79-82
+specifications/profiles/recovery.md
+  s_82dfca681ca206::t_73294a5dbba90b 54
+  s_82dfca681ca206::t_e2021cb6112e6c 64
+  s_82dfca681ca206::t_6bdda7924c3ef5 187
+  s_89b4120c82a3f1::t_dfa87acd4eac82 34,44,100,182
+conformance/manifest/recovery.yaml
+  s_763c7152daf22c::t_c811e8a7554cc1 94-97
+  s_763c7152daf22c::t_13a50c10e279ba 109-110,114-115
+  s_0d3590410a5c96::t_7da597b33a8984 124,130
+  s_763c7152daf22c::t_6112675bb8d9c4 139,143-144,146
+  s_763c7152daf22c::t_d659100f6ed38e 46-48
+  s_763c7152daf22c::t_0d6d69c0d86423 61-66
+bindings/go/gen/syntra/v1/recovery_profile.pb.go
+  s_4f375aacf963d1::t_172bd100ac092d 36-37,266-269,780-782,861-862,875-888,952-958,961-963,970-972,979-981,988-990,1002-1037,1111,1118-1121,1123,1125-1126,1167-1172
+crates/syntra-core/src/generated/syntra.v1.rs
+  s_4f375aacf963d1::t_3ffb47e455308f 257-258,338-341,473-475,480-481,499-501,504-534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c1d775f8f336dcb276168c7934f5c346dc6bb3d",
+  "prompts": {},
+  "sessions": {
+    "s_0d3590410a5c96": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc37fffe1hqn9Uj0nlxcjK",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_4f375aacf963d1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc38affeyIg7EzFZ8iOsMV",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_763c7152daf22c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc39affeWvbFrLMpjFU0Qu",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_82dfca681ca206": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc371ffeg0OQ8QvQnbR4c4",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_89b4120c82a3f1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc368ffewDI5RIeCIRHulM",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_e164609f1d753b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9ebbc3b9ffeGaPb0lAluVMUCg",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
