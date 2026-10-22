@@ -159,10 +159,10 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       frames:
-        - {request_id: 1, body: request, method: "/syntra.update-recovery/1/Replay"}
+        - {request_id: 1, body: request, method: "/syntra.update-recovery/1/Replay", payload_b64: "CAESCGhhbmRsZS1BGghjdXJzb3ItSyAQKICABA=="}
       hygiene: {absent_from: [silent_stall]}
       retry: "initiator issues bounded recovery replay from the last confirmed checkpoint; never treats idle as caught-up"
-    notes: "Dropped-final-update silence: harness overflows the initiator's local notification queue so the loss counter changes and the stream goes idle without a catch-up boundary. Initiator maps the loss counter to recovery instead of treating idle as caught-up, issuing a bounded recovery replay invocation with no silent stall. Expected frames capture the recovery replay invocation and retry states the bounded-progress rule. SKIP when unclaimed."
+    notes: "Dropped-final-update silence: harness overflows the initiator's local notification queue so the loss counter changes and the stream goes idle without a catch-up boundary. Initiator maps the loss counter to recovery instead of treating idle as caught-up, issuing a bounded recovery replay invocation with no silent stall. Expected frames capture the recovery replay invocation (first-page Replay with profile_version 1, handle handle-A, from_checkpoint cursor-K, max_batches 16, max_bytes 65536, empty continuation marker) and retry states the bounded-progress rule. SKIP when unclaimed."
 
   - id: CONF-URP-011
     requirement: [SNTR-EVENT-008, SNTR-EVENT-009]

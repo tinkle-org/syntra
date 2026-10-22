@@ -349,8 +349,9 @@ pub struct RecoverySubscribeResponse {
     #[prost(uint64, tag="3")]
     pub generation: u64,
     /// catchup_boundary is the fixed boundary captured at subscribe accept where
-    /// recovered history meets live delivery. Opaque bytes, at most 4096 bytes.
-    /// Required.
+    /// recovered history meets live delivery. Opaque bytes, non-empty, at most
+    /// 4096 bytes. Required; empty means omitted and MUST be rejected with
+    /// FAILED_PRECONDITION.
     #[prost(bytes="vec", tag="4")]
     pub catchup_boundary: ::prost::alloc::vec::Vec<u8>,
 }
@@ -378,7 +379,9 @@ pub struct RecoveryReplayRequest {
     #[prost(bytes="vec", tag="2")]
     pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
     /// from_checkpoint is the confirmed checkpoint to replay from. Opaque bytes,
-    /// non-empty, at most 4096 bytes.
+    /// non-empty, at most 4096 bytes. On the first request it is the last
+    /// confirmed checkpoint; on continuation it MUST equal the previous page's
+    /// result_checkpoint.
     #[prost(bytes="vec", tag="3")]
     pub from_checkpoint: ::prost::alloc::vec::Vec<u8>,
     /// max_batches bounds batches in one page. Valid range is 1 to 64.
@@ -387,6 +390,12 @@ pub struct RecoveryReplayRequest {
     /// max_bytes bounds page bytes. Valid range is 1 to 262144.
     #[prost(uint32, tag="5")]
     pub max_bytes: u32,
+    /// continuation_marker echoes the previous page's marker. Opaque bytes, empty
+    /// on the first request, otherwise MUST equal the previous
+    /// RecoveryReplayPage.continuation_marker verbatim, at most 4096 bytes.
+    /// Mismatch MUST be rejected with FAILED_PRECONDITION.
+    #[prost(bytes="vec", tag="6")]
+    pub continuation_marker: ::prost::alloc::vec::Vec<u8>,
 }
 /// RecoveryReplayPage carries one bounded replay page toward the catch-up boundary.
 #[allow(clippy::derive_partial_eq_without_eq)]

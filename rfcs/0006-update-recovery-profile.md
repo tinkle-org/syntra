@@ -250,7 +250,7 @@ changes.
   |---|---|---|---|
   | Negotiate | `/syntra.update-recovery/1/Negotiate` | `RecoveryNegotiateRequest` (`profile_version`, `min_version`, `max_version`, `capability` `syntra.update-recovery/1`) | `RecoveryNegotiateResponse` (`selected_version` plus confirmed bounds) |
   | Subscribe | `/syntra.update-recovery/1/Subscribe` | `RecoverySubscribeRequest` (`profile_version`, `stream_selector` for a generic subscription, `start_checkpoint`) | `RecoverySubscribeResponse` (`profile_version`, `subscription_handle`, `generation`, `catchup_boundary`) |
-  | Replay | `/syntra.update-recovery/1/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
+  | Replay | `/syntra.update-recovery/1/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144, `continuation_marker` empty on first request, echo of previous page's marker thereafter) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
   | CatchUp | `/syntra.update-recovery/1/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` in the terminal `RpcResult`; `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
   | Confirm | `/syntra.update-recovery/1/Confirm` | `RecoveryConfirmRequest` (`profile_version`, `subscription_handle`, `generation`, `checkpoint` result or boundary) | `RecoveryConfirmResponse` (`confirmed_checkpoint`); snapshot boundary confirm yields `RecoverySnapshotInstalled` |
   | SnapshotOffer | `/syntra.update-recovery/1/SnapshotOffer` | versioned bytes: `subscription_handle` accept (`profile_version=1`) | `RecoverySnapshotDescriptor` (`snapshot_handle`, provider-proven `boundary_checkpoint`, `total_pages` 1..256, `page_bytes_max` 1..262144) |
@@ -260,8 +260,16 @@ changes.
   Response framing rule (proposed, no normative force): each Replay
   call returns exactly one `RecoveryReplayPage` in its `RpcResult` plus
   its continuation marker; the initiator paginates with the same
-  `/syntra.update-recovery/1/Replay` method until the marker is empty;
-  completion arrives separately as `RecoveryReplayComplete` or as a
+  `/syntra.update-recovery/1/Replay` method until the marker is empty.
+  The first `RecoveryReplayRequest` carries an empty `continuation_marker`
+  with `from_checkpoint` set to the last confirmed checkpoint; each
+  continuation carries `continuation_marker` equal verbatim to the previous
+  page's marker with `from_checkpoint` equal to the previous page's
+  `result_checkpoint`. The host MUST reject a non-empty marker that does
+  not match the last issued marker for the stream and generation, or a
+  `from_checkpoint` that does not chain from the previous result, with
+  `FAILED_PRECONDITION`.
+  Completion arrives separately as `RecoveryReplayComplete` or as a
   trailer `Notification` carrying `RecoveryBatchTrailer`. Each
   SnapshotFetch call returns exactly one `RecoverySnapshotChunk` per
   `RpcResult` with `page_index` correlation; the same one-response-per-call
@@ -692,9 +700,14 @@ as authority.
    at most 4096 bytes; `subscription_handle` and `snapshot_handle`
    non-empty at most 256 bytes; `from_checkpoint`,
    `predecessor_checkpoint`, `result_checkpoint`, `boundary_checkpoint`,
-   `live_boundary_checkpoint`, and `catchup_boundary` at most 4096 bytes;
-   `continuation_marker` empty means no further page, otherwise at most
-   4096 bytes; `terminate_reason` non-empty when terminated, at most 256
+   `live_boundary_checkpoint` at most 4096 bytes;
+   `RecoverySubscribeResponse.catchup_boundary` non-empty at most 4096 bytes
+   (empty means omitted and MUST be rejected with FAILED_PRECONDITION);
+   other `catchup_boundary` fields at most 4096 bytes;
+   request `continuation_marker` empty on the first request, otherwise echo
+   of the previous page marker verbatim at most 4096 bytes;
+   response `continuation_marker` empty means no further page, otherwise
+   at most 4096 bytes; `terminate_reason` non-empty when terminated, at most 256
    bytes;    `profile_version` valid value 1; `capability` non-empty at most 256
    bytes; `min_version`, `max_version`, and `selected_version` valid
    value 1; `checkpoint` and `confirmed_checkpoint` non-empty at most
@@ -715,7 +728,7 @@ as authority.
    `RecoveryNegotiateRequest`/`RecoveryNegotiateResponse`,
     `RecoverySubscribeRequest`/`RecoverySubscribeResponse`
     (response carries `catchup_boundary` fixed at subscribe accept),
-    `RecoveryReplayRequest` (with `profile_version`) with exactly one `RecoveryReplayPage` per
+    `RecoveryReplayRequest` (with `profile_version` and `continuation_marker` echo) with exactly one `RecoveryReplayPage` per
     `RpcResult`, `RecoveryCatchUpRequest` with `RecoveryCatchUpAccepted`
     in the terminal `RpcResult` (batches and completion trailer via
     `Notification`),

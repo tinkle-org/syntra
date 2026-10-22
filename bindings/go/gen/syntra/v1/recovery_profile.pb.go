@@ -298,8 +298,9 @@ type RecoverySubscribeResponse struct {
 	// generation is the continuity generation of the stream. Required.
 	Generation uint64 `protobuf:"varint,3,opt,name=generation,proto3" json:"generation,omitempty"`
 	// catchup_boundary is the fixed boundary captured at subscribe accept where
-	// recovered history meets live delivery. Opaque bytes, at most 4096 bytes.
-	// Required.
+	// recovered history meets live delivery. Opaque bytes, non-empty, at most
+	// 4096 bytes. Required; empty means omitted and MUST be rejected with
+	// FAILED_PRECONDITION.
 	CatchupBoundary []byte `protobuf:"bytes,4,opt,name=catchup_boundary,json=catchupBoundary,proto3" json:"catchup_boundary,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -428,14 +429,21 @@ type RecoveryReplayRequest struct {
 	// at most 256 bytes.
 	SubscriptionHandle []byte `protobuf:"bytes,2,opt,name=subscription_handle,json=subscriptionHandle,proto3" json:"subscription_handle,omitempty"`
 	// from_checkpoint is the confirmed checkpoint to replay from. Opaque bytes,
-	// non-empty, at most 4096 bytes.
+	// non-empty, at most 4096 bytes. On the first request it is the last
+	// confirmed checkpoint; on continuation it MUST equal the previous page's
+	// result_checkpoint.
 	FromCheckpoint []byte `protobuf:"bytes,3,opt,name=from_checkpoint,json=fromCheckpoint,proto3" json:"from_checkpoint,omitempty"`
 	// max_batches bounds batches in one page. Valid range is 1 to 64.
 	MaxBatches uint32 `protobuf:"varint,4,opt,name=max_batches,json=maxBatches,proto3" json:"max_batches,omitempty"`
 	// max_bytes bounds page bytes. Valid range is 1 to 262144.
-	MaxBytes      uint32 `protobuf:"varint,5,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MaxBytes uint32 `protobuf:"varint,5,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	// continuation_marker echoes the previous page's marker. Opaque bytes, empty
+	// on the first request, otherwise MUST equal the previous
+	// RecoveryReplayPage.continuation_marker verbatim, at most 4096 bytes.
+	// Mismatch MUST be rejected with FAILED_PRECONDITION.
+	ContinuationMarker []byte `protobuf:"bytes,6,opt,name=continuation_marker,json=continuationMarker,proto3" json:"continuation_marker,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *RecoveryReplayRequest) Reset() {
@@ -501,6 +509,13 @@ func (x *RecoveryReplayRequest) GetMaxBytes() uint32 {
 		return x.MaxBytes
 	}
 	return 0
+}
+
+func (x *RecoveryReplayRequest) GetContinuationMarker() []byte {
+	if x != nil {
+		return x.ContinuationMarker
+	}
+	return nil
 }
 
 // RecoveryReplayPage carries one bounded replay page toward the catch-up boundary.
@@ -1682,14 +1697,15 @@ const file_syntra_v1_recovery_profile_proto_rawDesc = "" +
 	"\x10catchup_boundary\x18\x04 \x01(\fR\x0fcatchupBoundary\"v\n" +
 	"\x1aRecoveryUnsubscribeRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
-	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\xd8\x01\n" +
+	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\"\x89\x02\n" +
 	"\x15RecoveryReplayRequest\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x12'\n" +
 	"\x0ffrom_checkpoint\x18\x03 \x01(\fR\x0efromCheckpoint\x12\x1f\n" +
 	"\vmax_batches\x18\x04 \x01(\rR\n" +
 	"maxBatches\x12\x1b\n" +
-	"\tmax_bytes\x18\x05 \x01(\rR\bmaxBytes\"\xd5\x02\n" +
+	"\tmax_bytes\x18\x05 \x01(\rR\bmaxBytes\x12/\n" +
+	"\x13continuation_marker\x18\x06 \x01(\fR\x12continuationMarker\"\xd5\x02\n" +
 	"\x12RecoveryReplayPage\x12'\n" +
 	"\x0fprofile_version\x18\x01 \x01(\rR\x0eprofileVersion\x12/\n" +
 	"\x13subscription_handle\x18\x02 \x01(\fR\x12subscriptionHandle\x125\n" +
