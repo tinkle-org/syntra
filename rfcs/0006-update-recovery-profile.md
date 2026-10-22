@@ -235,11 +235,17 @@ changes.
       missing/mismatched MUST fail with `FAILED_PRECONDITION`, never
       silently applied; unknown profile operations MUST be rejected
       with `UNIMPLEMENTED`.
-    - `SYN-URP-022` — Replay continuation echo and idempotent retry: the
-      initiator MUST send an empty `continuation_marker` on the first
-      `RecoveryReplayRequest` with `from_checkpoint` set to the last
-      confirmed checkpoint, and MUST echo the previous page's marker
-      verbatim with `from_checkpoint` equal to the previous page's
+    - `SYN-URP-022` — Replay continuation echo and idempotent retry:
+      replay applies only to resumption from a non-empty
+      `start_checkpoint`. When subscribe used an empty
+      `start_checkpoint` (initial subscription) the initiator MUST NOT
+      send `RecoveryReplayRequest` and MUST start live at the
+      subscribed boundary B on completion (or follow the snapshot path
+      if signaled). For resumption, the initiator MUST send an empty
+      `continuation_marker` on the first `RecoveryReplayRequest` with
+      `from_checkpoint` set to the last confirmed checkpoint
+      (non-empty), and MUST echo the previous page's marker verbatim
+      with `from_checkpoint` equal to the previous page's
       `result_checkpoint` on each continuation. The host MUST reject a
       request whose marker does not match the last issued marker for the
       stream and generation, or whose `from_checkpoint` does not chain
@@ -259,7 +265,13 @@ changes.
       at subscribe accept. Both peers MUST treat an empty boundary as
       omitted and MUST reject it with `FAILED_PRECONDITION`; the
       initiator MUST validate each `RecoveryReplayPage.catchup_boundary`
-      against the subscribed boundary.
+      and each catch-up completion signal boundary
+      (`RecoveryReplayComplete.live_boundary_checkpoint`,
+      `RecoveryBatchTrailer.boundary_checkpoint` when `catchup_complete`,
+      `RecoveryCatchUpAccepted.catchup_boundary`) against the subscribed
+      boundary and MUST NOT release held live batches on mismatch;
+      mismatch MUST be rejected with `FAILED_PRECONDITION` (or treated
+      locally as recovery-needed) without releasing held batches.
 
 - Methods and payload mapping (proposed, no normative force):
   Provisional draft only: this table carries no normative force and
@@ -286,8 +298,10 @@ changes.
   call returns exactly one `RecoveryReplayPage` in its `RpcResult` plus
   its continuation marker; the initiator paginates with the same
   `/syntra.update-recovery/1/Replay` method until the marker is empty.
+  Replay is sent only for resumption; initial subscriptions (empty
+  `start_checkpoint`) skip Replay and start live at B on completion.
   The first `RecoveryReplayRequest` carries an empty `continuation_marker`
-  with `from_checkpoint` set to the last confirmed checkpoint; each
+  with `from_checkpoint` set to the last confirmed checkpoint (non-empty); each
   continuation carries `continuation_marker` equal verbatim to the previous
   page's marker with `from_checkpoint` equal to the previous page's
   `result_checkpoint` (`SYN-URP-022`). The host MUST reject a non-empty marker that does
@@ -347,10 +361,12 @@ changes.
   subscription; connection end discards all per-stream state:
   - `SUBSCRIBED → CATCHING_UP` on subscribe confirm with fixed
     catch-up boundary B captured at subscribe accept and carried in
-    `RecoverySubscribeResponse.catchup_boundary`; the initiator replays
+    `RecoverySubscribeResponse.catchup_boundary`; for resumption the initiator replays
     from its last confirmed checkpoint via
-    `RecoveryReplayRequest.from_checkpoint` (non-empty unless initial)
-    and validates each `RecoveryReplayPage.catchup_boundary` against B;
+    `RecoveryReplayRequest.from_checkpoint` (non-empty; initial subscriptions with empty
+    `start_checkpoint` skip replay and start live at B on completion)
+    and validates each `RecoveryReplayPage.catchup_boundary` and each
+    completion signal boundary against B before releasing held live batches;
     live `Notification`
     batches for the stream held until the catch-up completion signal
     under bounded holding per the documented overflow policy
@@ -730,15 +746,15 @@ as authority.
    the `RpcRequest` carries no explicit bounded deadline, with every
    profile RPC having an effective deadline and expiry surfaced as
    `DEADLINE_EXCEEDED`. Opaque field caps: `stream_selector` non-empty
-   at most 1024 bytes; `start_checkpoint` empty means initial, otherwise
-   at most 4096 bytes; `subscription_handle` and `snapshot_handle`
-   non-empty at most 256 bytes; `from_checkpoint`,
-   `predecessor_checkpoint`, `result_checkpoint`, `boundary_checkpoint`,
-   `live_boundary_checkpoint` at most 4096 bytes;
+  at most 1024 bytes; `start_checkpoint` empty means initial (skip replay, start live at B), otherwise
+  at most 4096 bytes; `subscription_handle` and `snapshot_handle`
+  non-empty at most 256 bytes; `from_checkpoint` non-empty (replay is sent only for resumption) at most 4096 bytes,
+  `predecessor_checkpoint`, `result_checkpoint`, `boundary_checkpoint`,
+  `live_boundary_checkpoint` at most 4096 bytes;
    `RecoverySubscribeResponse.catchup_boundary` non-empty at most 4096 bytes
    (empty means omitted and MUST be rejected with FAILED_PRECONDITION)
-   (`SYN-URP-023`);
-   other `catchup_boundary` fields at most 4096 bytes;
+  (`SYN-URP-023`);
+  other `catchup_boundary` and completion boundary fields at most 4096 bytes and MUST equal the subscribed boundary before releasing held live batches;
    request `continuation_marker` empty on the first request, otherwise echo
    of the previous page marker verbatim at most 4096 bytes (`SYN-URP-022`);
    response `continuation_marker` empty means no further page, otherwise

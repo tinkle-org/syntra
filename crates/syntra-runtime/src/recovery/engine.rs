@@ -5,11 +5,18 @@
 //! state that stays transport-agnostic:
 //!
 //! - Per-stream coordinator map keyed by stream selector bytes.
-//! - Fixed catch-up boundary per stream. The first observed replay page
-//!   records its boundary; later pages must carry the same boundary.
-//!   A different boundary returns a recovery-needed action and leaves the
-//!   recorded boundary unchanged. The caller clears the boundary when
-//!   recovery completes.
+//! - Fixed catch-up boundary per stream. The subscribed boundary from
+//!   `RecoverySubscribeResponse.catchup_boundary` is recorded via
+//!   [`ProfileEngine::set_subscribed_boundary`]; when set, every replay
+//!   page and every catch-up completion boundary must equal it before held
+//!   live batches are released (SYN-URP-023). When no subscribed boundary
+//!   was recorded, the first observed replay page records its boundary for
+//!   backwards compatibility; later pages must carry the same boundary.
+//!   A different or empty boundary returns a recovery-needed action and
+//!   leaves the recorded boundary unchanged. The caller clears the boundary
+//!   when recovery completes. Initial subscriptions (empty
+//!   `start_checkpoint`) skip replay and validate completion directly
+//!   against the subscribed boundary.
 //! - Loss-counter polling hook. The caller supplies its cumulative loss
 //!   count; an increment maps to a gap report for the stream.
 //! - Stop-and-wait confirm tracking. The caller drives observe and
@@ -252,12 +259,48 @@ impl ProfileEngine {
         })
     }
 
+    /// Records the subscribed catch-up boundary from the subscribe response.
+    ///
+    /// The boundary is fixed at subscribe accept (SYN-URP-023) and MUST be
+    /// non-empty; an empty boundary returns a recovery-needed action and
+    /// leaves state unchanged. When a boundary was already recorded from an
+    /// earlier page, a different subscribed boundary returns recovery-needed
+    /// without replacing it. Untracked selectors return no actions.
+    pub fn set_subscribed_boundary(
+        &mut self,
+        stream_selector: &[u8],
+        boundary: Vec<u8>,
+    ) -> Vec<ProfileAction> {
+        let state = match self.streams.get_mut(stream_selector) {
+            Some(state) => state,
+            None => return vec![],
+        };
+        if boundary.is_empty() {
+            return vec![ProfileAction::RecoveryNeeded {
+                stream_selector: state.recovery.stream_selector().to_vec(),
+                committed: state.recovery.committed().to_vec(),
+            }];
+        }
+        match &state.catchup_boundary {
+            None => {
+                state.catchup_boundary = Some(boundary);
+                vec![]
+            },
+            Some(existing) if *existing == boundary => vec![],
+            Some(_) => vec![ProfileAction::RecoveryNeeded {
+                stream_selector: state.recovery.stream_selector().to_vec(),
+                committed: state.recovery.committed().to_vec(),
+            }],
+        }
+    }
+
     /// Tracks the fixed catch-up boundary across replay pages.
     ///
-    /// The first page records its boundary and returns no actions. Later
-    /// pages with the same boundary return no actions. A page with a
-    /// different boundary returns a recovery-needed action and leaves the
-    /// recorded boundary unchanged. Untracked selectors return no actions.
+    /// The first page records its boundary and returns no actions when no
+    /// subscribed boundary was recorded. Later pages with the same boundary
+    /// return no actions. An empty or different boundary returns a
+    /// recovery-needed action and leaves the recorded boundary unchanged.
+    /// Untracked selectors return no actions.
     /// The caller clears the boundary with
     /// [`Self::clear_catchup_boundary`] when recovery completes.
     pub fn observe_replay_page(
@@ -269,12 +312,57 @@ impl ProfileEngine {
             Some(state) => state,
             None => return vec![],
         };
+        if page.catchup_boundary.is_empty() {
+            return vec![ProfileAction::RecoveryNeeded {
+                stream_selector: state.recovery.stream_selector().to_vec(),
+                committed: state.recovery.committed().to_vec(),
+            }];
+        }
         match &state.catchup_boundary {
             None => {
                 state.catchup_boundary = Some(page.catchup_boundary.clone());
                 vec![]
             },
             Some(boundary) if *boundary == page.catchup_boundary => vec![],
+            Some(_) => vec![ProfileAction::RecoveryNeeded {
+                stream_selector: state.recovery.stream_selector().to_vec(),
+                committed: state.recovery.committed().to_vec(),
+            }],
+        }
+    }
+
+    /// Validates a catch-up completion boundary before releasing held live batches.
+    ///
+    /// The completion boundary (`RecoveryReplayComplete.live_boundary_checkpoint`,
+    /// `RecoveryBatchTrailer.boundary_checkpoint` when `catchup_complete`, or
+    /// `RecoveryCatchUpAccepted.catchup_boundary`) MUST equal the subscribed
+    /// boundary (SYN-URP-023). An empty or mismatched boundary returns a
+    /// recovery-needed action and MUST NOT release held batches; the recorded
+    /// boundary is left unchanged. When no boundary was recorded yet (for
+    /// example an initial subscription that skipped replay), a non-empty
+    /// completion boundary is recorded and returns no actions. Untracked
+    /// selectors return no actions.
+    pub fn observe_completion_boundary(
+        &mut self,
+        stream_selector: &[u8],
+        completion_boundary: &[u8],
+    ) -> Vec<ProfileAction> {
+        let state = match self.streams.get_mut(stream_selector) {
+            Some(state) => state,
+            None => return vec![],
+        };
+        if completion_boundary.is_empty() {
+            return vec![ProfileAction::RecoveryNeeded {
+                stream_selector: state.recovery.stream_selector().to_vec(),
+                committed: state.recovery.committed().to_vec(),
+            }];
+        }
+        match &state.catchup_boundary {
+            None => {
+                state.catchup_boundary = Some(completion_boundary.to_vec());
+                vec![]
+            },
+            Some(boundary) if *boundary == completion_boundary => vec![],
             Some(_) => vec![ProfileAction::RecoveryNeeded {
                 stream_selector: state.recovery.stream_selector().to_vec(),
                 committed: state.recovery.committed().to_vec(),
@@ -335,6 +423,47 @@ mod tests {
         assert_eq!(engine.catchup_boundary(&selector()), None);
         assert!(engine.observe_replay_page(&selector(), &moved).is_empty());
         assert_eq!(engine.catchup_boundary(&selector()), Some(b"boundary-101".as_slice()));
+    }
+
+    #[test]
+    fn subscribed_boundary_and_completion_validation() {
+        let mut engine = ProfileEngine::new();
+        engine.insert_stream(selector(), 7, b"cursor-40".to_vec());
+
+        // Empty subscribed boundary is rejected.
+        let empty = engine.set_subscribed_boundary(&selector(), Vec::new());
+        assert!(matches!(empty[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(engine.catchup_boundary(&selector()), None);
+
+        // Record subscribed boundary from subscribe response.
+        assert!(engine.set_subscribed_boundary(&selector(), b"boundary-100".to_vec()).is_empty());
+        assert_eq!(engine.catchup_boundary(&selector()), Some(b"boundary-100".as_slice()));
+
+        // Matching page passes; mismatched page fails without replacing.
+        assert!(engine.observe_replay_page(&selector(), &page_with_boundary(b"boundary-100")).is_empty());
+        let moved = engine.observe_replay_page(&selector(), &page_with_boundary(b"boundary-101"));
+        assert!(matches!(moved[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(engine.catchup_boundary(&selector()), Some(b"boundary-100".as_slice()));
+
+        // Matching completion passes; mismatched or empty completion fails.
+        assert!(engine.observe_completion_boundary(&selector(), b"boundary-100").is_empty());
+        let bad = engine.observe_completion_boundary(&selector(), b"boundary-101");
+        assert!(matches!(bad[0], ProfileAction::RecoveryNeeded { .. }));
+        let empty_completion = engine.observe_completion_boundary(&selector(), b"");
+        assert!(matches!(empty_completion[0], ProfileAction::RecoveryNeeded { .. }));
+        assert_eq!(engine.catchup_boundary(&selector()), Some(b"boundary-100".as_slice()));
+    }
+
+    #[test]
+    fn initial_subscription_skips_replay_validates_completion() {
+        let mut engine = ProfileEngine::new();
+        engine.insert_stream(selector(), 7, Vec::new());
+
+        // Initial subscription records subscribed boundary with no pages.
+        assert!(engine.set_subscribed_boundary(&selector(), b"boundary-100".to_vec()).is_empty());
+        // Completion at the subscribed boundary passes and releases held batches.
+        assert!(engine.observe_completion_boundary(&selector(), b"boundary-100").is_empty());
+        assert_eq!(engine.catchup_boundary(&selector()), Some(b"boundary-100".as_slice()));
     }
 
     #[test]
