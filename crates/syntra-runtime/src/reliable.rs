@@ -21,6 +21,43 @@ fn internal(msg: &str) -> SyntraError {
     SyntraError::Protocol { code: ErrorCode::Internal, message: msg.to_string() }
 }
 
+/// Bounded content identity for terminal markers.
+///
+/// Tombstone and forgotten markers suppress resends while live. To reject
+/// same-delivery-ID reuse with different method/payload (FAILED_PRECONDITION)
+/// without retaining unbounded request bytes, each marker stores a fixed-size
+/// digest (method/payload lengths plus FNV-1a 64-bit hash) instead of full
+/// content. Digests are constant size and bounded by the existing count caps
+/// (`max_tombstones` for tombstones, `max_retained_results` for forgotten
+/// markers); they consume no `max_retained_bytes` charge, so `forget` still
+/// frees request bytes and tombstoning still releases pending charge.
+/// Lengths are checked explicitly so length mismatches reject even on hash
+/// collision; a hash collision could cause false idempotent acceptance but
+/// requires identical lengths plus a 64-bit collision (negligible for
+/// in-memory, short-lived markers).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ContentDigest { method_len: usize, payload_len: usize, hash: u64 }
+fn digest_content(method: &str, payload: &[u8]) -> ContentDigest {
+    const OFFSET: u64 = 14695981039346656037;
+    const PRIME: u64 = 1099511628211;
+    let mut h = OFFSET;
+    for b in method.as_bytes() { h ^= *b as u64; h = h.wrapping_mul(PRIME); }
+    h ^= 0xff; h = h.wrapping_mul(PRIME);
+    for b in payload { h ^= *b as u64; h = h.wrapping_mul(PRIME); }
+    for b in (method.len() as u64).to_le_bytes() { h ^= b as u64; h = h.wrapping_mul(PRIME); }
+    for b in (payload.len() as u64).to_le_bytes() { h ^= b as u64; h = h.wrapping_mul(PRIME); }
+    ContentDigest { method_len: method.len(), payload_len: payload.len(), hash: h }
+}
+fn check_digest(expected: &ContentDigest, method: &str, payload: &[u8]) -> Result<(), SyntraError> {
+    if expected.method_len != method.len() || expected.payload_len != payload.len() {
+        return Err(failed_precondition("delivery id reused with different content; rejected"));
+    }
+    if expected.hash != digest_content(method, payload).hash {
+        return Err(failed_precondition("delivery id reused with different content; rejected"));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoredOutcome { Payload(Vec<u8>), Error { code: ErrorCode, message: String } }
 impl StoredOutcome {
@@ -38,12 +75,22 @@ struct PendingEntry { method: String, payload: Vec<u8> }
 impl PendingEntry {
     fn byte_len(&self) -> usize { self.method.len() + self.payload.len() }
 }
+/// A live Forgotten marker means retention expired or explicit forget, and
+/// while live it suppresses resends (stays Forgotten, not new work); only
+/// after expiry may the same delivery ID be reused as new work (Pending) with
+/// any content. Content handling is consistent: while live, resends validate
+/// against the stored digest (mismatches rejected); after expiry, any content
+/// is accepted as new work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ForgottenEntry { forgot_at_ms: u64, content: Option<ContentDigest> }
 #[derive(Debug, Default)]
 struct OutcomeStore {
     entries: HashMap<DeliveryId, RetainedEntry>,
     // Aggregate owned content: pending requests plus retained requests/results.
+    // Forgotten/tombstone digests are fixed-size and bounded by count caps,
+    // so they consume no byte-cap charge; forget still frees request bytes.
     bytes: usize,
-    forgotten: HashMap<DeliveryId, u64>,
+    forgotten: HashMap<DeliveryId, ForgottenEntry>,
     pending: HashMap<DeliveryId, PendingEntry>,
 }
 impl OutcomeStore {
@@ -92,8 +139,19 @@ impl OutcomeStore {
                 return check_duplicate_content(&existing.method, &existing.payload, &method, &payload);
             }
         }
-        if let Some(&forgot_at) = self.forgotten.get(&did) {
-            if now_ms.saturating_sub(forgot_at) <= bounds.result_retention_ms { return Ok(()); }
+        if let Some(entry) = self.forgotten.get(&did) {
+            if now_ms.saturating_sub(entry.forgot_at_ms) <= bounds.result_retention_ms {
+                if let Some(expected) = &entry.content {
+                    return check_digest(expected, &method, &payload);
+                }
+                // Content-less marker (explicit forget on Unknown): first live
+                // resend defines the digest so later mismatches reject.
+                let digest = digest_content(&method, &payload);
+                if let Some(slot) = self.forgotten.get_mut(&did) {
+                    slot.content = Some(digest);
+                }
+                return Ok(());
+            }
         }
         let n = method.len().checked_add(payload.len()).ok_or_else(|| resource("pending dispatch size overflow"))?;
         let bytes = self.replacement_bytes(bounds, &did, n)?;
@@ -109,7 +167,7 @@ impl OutcomeStore {
             Some(e) if now_ms.saturating_sub(e.retained_at_ms) > retention_ms => ReconcileOutcome::Forgotten,
             Some(_) => ReconcileOutcome::Retained,
             None => match self.forgotten.get(did) {
-                Some(&forgot_at) if now_ms.saturating_sub(forgot_at) > retention_ms => ReconcileOutcome::Unknown,
+                Some(entry) if now_ms.saturating_sub(entry.forgot_at_ms) > retention_ms => ReconcileOutcome::Unknown,
                 Some(_) => ReconcileOutcome::Forgotten,
                 None => match self.pending.get(did) {
                     Some(_) => ReconcileOutcome::Pending,
@@ -124,20 +182,23 @@ impl OutcomeStore {
     fn forget(&mut self, bounds: &ControlBounds, now_ms: u64, did: &DeliveryId) -> bool {
         if let Some(e) = self.entries.remove(did) {
             self.bytes -= e.byte_len();
+            let digest = digest_content(&e.method, &e.payload);
             if !self.forgotten.contains_key(did) && self.forgotten.len() >= bounds.max_retained_results {
-                if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(k, _)| *k) {
+                if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, v)| v.forgot_at_ms).map(|(k, _)| *k) {
                     self.forgotten.remove(&oldest);
                 }
             }
-            self.forgotten.insert(*did, now_ms);
+            self.forgotten.insert(*did, ForgottenEntry { forgot_at_ms: now_ms, content: Some(digest) });
             true
         } else if !self.forgotten.contains_key(did) {
             if self.forgotten.len() >= bounds.max_retained_results {
-                if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(k, _)| *k) {
+                if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, v)| v.forgot_at_ms).map(|(k, _)| *k) {
                     self.forgotten.remove(&oldest);
                 }
             }
-            self.forgotten.insert(*did, now_ms);
+            // No prior retained content to carry: content-less marker. The
+            // first live resend defines the digest (see note_dispatch).
+            self.forgotten.insert(*did, ForgottenEntry { forgot_at_ms: now_ms, content: None });
             true
         } else { false }
     }
@@ -150,18 +211,22 @@ impl OutcomeStore {
         // Time passing cannot prove a handler stopped executing. Pending owns
         // its content and budget until a successful result/tombstone mutation.
         let expired_forgotten: Vec<DeliveryId> = self.forgotten.iter()
-            .filter(|(_, &t)| now_ms.saturating_sub(t) > retention_ms)
+            .filter(|(_, v)| now_ms.saturating_sub(v.forgot_at_ms) > retention_ms)
             .map(|(k, _)| *k).collect();
         for k in expired_forgotten { self.forgotten.remove(&k); }
         n
     }
 }
+/// A live tombstone suppresses resends (stays Retained with the terminal
+/// error, not new work); only after expiry may the same delivery ID be reused
+/// as new work (Pending) with any content. While live, resends validate
+/// against the stored digest (mismatches rejected with FAILED_PRECONDITION).
 #[derive(Debug, Clone)]
-struct TombstoneEntry { code: ErrorCode, retained_at_ms: u64 }
+struct TombstoneEntry { code: ErrorCode, retained_at_ms: u64, content: Option<ContentDigest> }
 #[derive(Debug, Default)]
 struct TombstoneStore { entries: HashMap<DeliveryId, TombstoneEntry> }
 impl TombstoneStore {
-    fn record(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, code: ErrorCode) -> Result<(), SyntraError> {
+    fn record(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, code: ErrorCode, content: Option<ContentDigest>) -> Result<(), SyntraError> {
         // Spec (reliability): tombstones exist only for terminal
         // DEADLINE_EXCEEDED and CANCELLED. UNAVAILABLE means unknown
         // outcome and must stay reconcilable-as-Unknown, never tombstoned.
@@ -169,16 +234,23 @@ impl TombstoneStore {
             return Err(SyntraError::Protocol { code: ErrorCode::InvalidArgument, message: "tombstones only for deadline/cancel".to_string() });
         }
         // First-write-wins: racing deadline/cancel reports are deterministic.
-        if let Some(existing) = self.entries.get(&did) {
+        if let Some(existing) = self.entries.get_mut(&did) {
             if existing.code != code {
                 return Err(failed_precondition("tombstone already recorded with different terminal code"));
+            }
+            match (&existing.content, &content) {
+                (Some(e), Some(n)) if e != n => {
+                    return Err(failed_precondition("delivery id reused with different content; rejected"));
+                }
+                (None, Some(n)) => { existing.content = Some(*n); }
+                _ => {}
             }
             return Ok(());
         }
         if self.entries.len() >= bounds.max_tombstones {
             return Err(resource("tombstone budget exhausted"));
         }
-        self.entries.insert(did, TombstoneEntry { code, retained_at_ms: now_ms });
+        self.entries.insert(did, TombstoneEntry { code, retained_at_ms: now_ms, content });
         Ok(())
     }
     fn get(&self, now_ms: u64, retention_ms: u64, did: &DeliveryId) -> Option<ErrorCode> {
@@ -421,6 +493,14 @@ impl ReliableSessionManager {
     /// Pending content shares the retained count/byte caps and never expires by
     /// time alone. The owner must record a terminal result or deadline/cancel
     /// tombstone once work is terminal; `forget` cannot clear executing work.
+    ///
+    /// Suppression semantics: a live retained outcome, live tombstone, or live
+    /// forgotten marker suppresses resends (stays in that terminal state, not
+    /// new work) and validates content — mismatched method/payload is rejected
+    /// with FAILED_PRECONDITION. Only after expiry may the same delivery ID be
+    /// reused as new work (Pending) with any content. Tombstone and forgotten
+    /// markers store bounded digests (not full content) so validation holds
+    /// while live without charging `max_retained_bytes`.
     pub fn note_dispatch(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], method: String, payload: Vec<u8>) -> Result<(), SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
@@ -430,7 +510,47 @@ impl ReliableSessionManager {
         if st.epoch != expected_epoch {
             return Err(failed_precondition("stale attachment epoch; fenced connection cannot dispatch"));
         }
-        if st.tombstones.get(now_ms, self.bounds.tombstone_retention_ms, &did).is_some() {
+        // Live tombstone suppresses but must still validate content. Validate
+        // all live markers first (reject on any mismatch) before filling any
+        // content-less marker, so a rejected resend never pollutes an empty
+        // marker with mismatched content.
+        let tomb_live = st.tombstones.get(now_ms, self.bounds.tombstone_retention_ms, &did).is_some();
+        if tomb_live {
+            if let Some(entry) = st.tombstones.entries.get(&did) {
+                if let Some(expected) = &entry.content {
+                    check_digest(expected, &method, &payload)?;
+                }
+            }
+            // Validate live outcome markers without admitting new work.
+            if let Some(pending) = st.outcomes.pending.get(&did) {
+                check_duplicate_content(&pending.method, &pending.payload, &method, &payload)?;
+            }
+            if let Some(existing) = st.outcomes.entries.get(&did) {
+                if now_ms.saturating_sub(existing.retained_at_ms) <= self.bounds.result_retention_ms {
+                    check_duplicate_content(&existing.method, &existing.payload, &method, &payload)?;
+                }
+            }
+            if let Some(forgotten) = st.outcomes.forgotten.get(&did) {
+                if now_ms.saturating_sub(forgotten.forgot_at_ms) <= self.bounds.result_retention_ms {
+                    if let Some(expected) = &forgotten.content {
+                        check_digest(expected, &method, &payload)?;
+                    }
+                }
+            }
+            // All live markers match (or are content-less): fill empties so
+            // later mismatches reject, then suppress (no new pending).
+            let digest = digest_content(&method, &payload);
+            if let Some(slot) = st.tombstones.entries.get_mut(&did) {
+                if slot.content.is_none() { slot.content = Some(digest); }
+            }
+            if let Some(slot) = st.outcomes.forgotten.get_mut(&did) {
+                if now_ms.saturating_sub(slot.forgot_at_ms) <= self.bounds.result_retention_ms
+                    && slot.content.is_none()
+                {
+                    slot.content = Some(digest);
+                }
+            }
+            st.last_activity_ms = now_ms;
             return Ok(());
         }
         st.outcomes.note_dispatch(&self.bounds, now_ms, did, method, payload)?;
@@ -438,6 +558,17 @@ impl ReliableSessionManager {
         st.last_activity_ms = now_ms;
         Ok(())
     }
+    /// Record a terminal deadline/cancel tombstone.
+    ///
+    /// Outcomes and tombstones stay exclusive: tombstoning a delivery with a
+    /// live retained result is rejected with FAILED_PRECONDITION (the retained
+    /// outcome is preserved). Expired retained handling is expire-then-tombstone:
+    /// an expired retained entry is removed (bytes freed, digest carried into
+    /// the new tombstone) and the tombstone is recorded, consistent with
+    /// `note_dispatch` replacing expired retained without a reaper. A live
+    /// forgotten marker may coexist (reconcile still reports Forgotten until it
+    /// expires, then the tombstone surfaces); pending content is carried into
+    /// the tombstone digest and the pending charge is released.
     pub fn record_tombstone(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], code: ErrorCode) -> Result<(), SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
@@ -446,7 +577,36 @@ impl ReliableSessionManager {
         if st.epoch != expected_epoch {
             return Err(failed_precondition("stale attachment epoch; fenced connection cannot tombstone"));
         }
-        st.tombstones.record(&self.bounds, now_ms, did, code)?;
+        // P2: outcomes and tombstones stay exclusive while retained is live.
+        let mut expired_digest: Option<ContentDigest> = None;
+        if let Some(existing) = st.outcomes.entries.get(&did) {
+            if now_ms.saturating_sub(existing.retained_at_ms) <= self.bounds.result_retention_ms {
+                return Err(failed_precondition("tombstone conflicts with live retained outcome"));
+            }
+            // Expired: capture digest for carry-over, then remove below.
+            expired_digest = Some(digest_content(&existing.method, &existing.payload));
+        }
+        // Capture content for future resend validation: prefer pending
+        // (executing work), else the expired retained just observed, else copy
+        // a live forgotten digest for consistency, else content-less (the first
+        // live resend after tombstoning will define it).
+        let content: Option<ContentDigest> = if let Some(pending) = st.outcomes.pending.get(&did) {
+            Some(digest_content(&pending.method, &pending.payload))
+        } else if expired_digest.is_some() {
+            expired_digest
+        } else if let Some(forgotten) = st.outcomes.forgotten.get(&did) {
+            if now_ms.saturating_sub(forgotten.forgot_at_ms) <= self.bounds.result_retention_ms {
+                forgotten.content
+            } else { None }
+        } else { None };
+        // Expire-then-tombstone: drop the expired retained entry and free its
+        // bytes now that its digest is carried into the tombstone.
+        if expired_digest.is_some() {
+            if let Some(removed) = st.outcomes.entries.remove(&did) {
+                st.outcomes.bytes = st.outcomes.bytes.saturating_sub(removed.byte_len());
+            }
+        }
+        st.tombstones.record(&self.bounds, now_ms, did, code, content)?;
         st.outcomes.release_pending(&did);
         Ok(())
     }

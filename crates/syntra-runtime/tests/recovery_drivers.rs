@@ -488,3 +488,55 @@ fn final_batch_loss_with_idle_peers_recovers_via_loss_and_reconcile() {
         "older duplicate must not re-offer commit"
     );
 }
+
+struct RevocableReplay {
+    revoked: std::sync::atomic::AtomicBool,
+}
+
+impl RecoveryAuthorizer for RevocableReplay {
+    fn authorize_subscribe(&self, _s: &[u8]) -> Result<(), ProviderError> {
+        if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(ProviderError::Unauthorized);
+        }
+        Ok(())
+    }
+    fn authorize_replay(&self, _c: &ProfileCheckpoint) -> Result<(), ProviderError> {
+        if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(ProviderError::Unauthorized);
+        }
+        Ok(())
+    }
+    fn authorize_snapshot(
+        &self,
+        _c: &syntra_runtime::recovery::CommittedPosition,
+    ) -> Result<(), ProviderError> {
+        if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(ProviderError::Unauthorized);
+        }
+        Ok(())
+    }
+    fn authorize_confirm(&self, _c: &ProfileCheckpoint) -> Result<(), ProviderError> {
+        if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(ProviderError::Unauthorized);
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn replay_exact_retry_reauthorizes_after_revocation() {
+    let auth = Arc::new(RevocableReplay {
+        revoked: std::sync::atomic::AtomicBool::new(false),
+    });
+    let mut h = HostDriver::new(ctx("c1")).with_authorizer(auth.clone());
+    append(&mut h, 7, b"start", b"boundary", b"batch");
+    let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+    let first = h
+        .replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"")
+        .unwrap();
+    assert_eq!(first.batch_payloads, vec![b"batch".to_vec()]);
+    auth.revoked
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let retry = h.replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"");
+    assert_eq!(retry, Err(ProviderError::Unauthorized));
+}

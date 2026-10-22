@@ -550,6 +550,15 @@ impl HostDriver {
                 && max_bytes == previous.max_bytes
                 && continuation_marker == previous.continuation_marker
             {
+                let probe = ProfileCheckpoint {
+                    stream_selector: route.selector.clone(),
+                    generation: route.generation,
+                    base_cursor: from_checkpoint.to_vec(),
+                    result_cursor: from_checkpoint.to_vec(),
+                };
+                if let Some(auth) = &self.authorizer {
+                    auth.authorize_replay(&probe)?;
+                }
                 return Ok(lp.clone());
             }
             if lp.continuation_marker.is_empty()

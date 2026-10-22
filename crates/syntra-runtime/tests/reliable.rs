@@ -329,6 +329,86 @@ fn full_tombstone_store_preserves_pending_until_successful_terminal_mutation() {
 }
 
 #[test]
+fn mismatched_dispatch_after_live_tombstone_rejected() {
+    let (m, sid, _) = fixture(bounds());
+    dispatch(&m, 1, sid, &DID).unwrap();
+    m.record_tombstone(2, &sid.0, 1, &DID, ErrorCode::Cancelled)
+        .unwrap();
+    // Identical resend stays idempotent and suppressed.
+    dispatch(&m, 3, sid, &DID).unwrap();
+    assert_eq!(state(&m, 3, sid, &DID), ReconcileOutcome::Retained);
+    for (method, payload) in [("/example.Echo/Other", b"p".as_slice()), (METHOD, b"q")] {
+        assert_code(
+            m.note_dispatch(4, &sid.0, 1, &DID, method.into(), payload.to_vec()),
+            ErrorCode::FailedPrecondition,
+        );
+        assert_eq!(state(&m, 4, sid, &DID), ReconcileOutcome::Retained);
+    }
+    // Identical still accepted after rejected mismatches.
+    dispatch(&m, 5, sid, &DID).unwrap();
+    assert_eq!(state(&m, 5, sid, &DID), ReconcileOutcome::Retained);
+}
+
+#[test]
+fn mismatched_dispatch_after_live_forgotten_rejected() {
+    let (m, sid, _) = fixture(bounds());
+    result(&m, 1, sid, &DID, vec![]).unwrap();
+    assert!(m.forget(2, &sid.0, 1, &DID).unwrap());
+    assert_eq!(state(&m, 2, sid, &DID), ReconcileOutcome::Forgotten);
+    // Identical resend stays idempotent and suppressed (not new work).
+    dispatch(&m, 3, sid, &DID).unwrap();
+    assert_eq!(state(&m, 3, sid, &DID), ReconcileOutcome::Forgotten);
+    for (method, payload) in [("/example.Echo/Other", b"p".as_slice()), (METHOD, b"q")] {
+        assert_code(
+            m.note_dispatch(4, &sid.0, 1, &DID, method.into(), payload.to_vec()),
+            ErrorCode::FailedPrecondition,
+        );
+        assert_eq!(state(&m, 4, sid, &DID), ReconcileOutcome::Forgotten);
+    }
+    dispatch(&m, 5, sid, &DID).unwrap();
+    assert_eq!(state(&m, 5, sid, &DID), ReconcileOutcome::Forgotten);
+}
+
+#[test]
+fn tombstone_over_live_retained_rejected() {
+    let (m, sid, _) = fixture(bounds());
+    result(&m, 1, sid, &DID, vec![7]).unwrap();
+    assert_code(
+        m.record_tombstone(2, &sid.0, 1, &DID, ErrorCode::Cancelled),
+        ErrorCode::FailedPrecondition,
+    );
+    assert_eq!(state(&m, 2, sid, &DID), ReconcileOutcome::Retained);
+    assert_eq!(
+        m.reconcile(2, &sid.0, &DID).unwrap().1,
+        Some(StoredOutcome::Payload(vec![7]))
+    );
+    assert_eq!(m.tombstone_of(2, &sid.0, &DID).unwrap(), None);
+}
+
+#[test]
+fn tombstone_expiry_boundary_pinned_expire_then_tombstone() {
+    let (m, sid, _) = fixture(bounds()); // retention 10
+    result(&m, 1, sid, &DID, vec![]).unwrap();
+    // Age 10 (11-1) is still live: tombstone must be rejected.
+    assert_code(
+        m.record_tombstone(11, &sid.0, 1, &DID, ErrorCode::Cancelled),
+        ErrorCode::FailedPrecondition,
+    );
+    assert_eq!(state(&m, 11, sid, &DID), ReconcileOutcome::Retained);
+    // Age 11 (12-1) is expired: expire-then-tombstone is allowed.
+    m.record_tombstone(12, &sid.0, 1, &DID, ErrorCode::Cancelled)
+        .unwrap();
+    assert_eq!(state(&m, 12, sid, &DID), ReconcileOutcome::Retained);
+    // Tombstone carried the expired retained content: identical validates,
+    // mismatched rejects.
+    dispatch(&m, 13, sid, &DID).unwrap();
+    assert_code(
+        m.note_dispatch(13, &sid.0, 1, &DID, METHOD.into(), b"q".to_vec()),
+        ErrorCode::FailedPrecondition,
+    );
+}
+
+#[test]
 fn rejected_replacement_does_not_erase_expired_terminal_state() {
     let mut b = bounds();
     b.max_retained_bytes = METHOD.len() + 1;

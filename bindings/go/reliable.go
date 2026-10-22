@@ -10,6 +10,7 @@ package syntra
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"sync"
@@ -289,6 +290,75 @@ type pendingEntry struct {
 type tombstoneEntry struct {
 	code       ErrorCode
 	retainedAt time.Time
+	// digest retains the request identity (method, payload) for
+	// duplicate-content validation while the tombstone is live.
+	// Fixed-size FNV-1a 64-bit digest plus lengths (mirroring Rust
+	// ContentDigest), count-bounded by MaxTombstones, so no additional
+	// byte budget is required (total overhead bounded).
+	// hasContent false means the tombstone was created without prior
+	// request content (never-seen DID); the first live resend adopts
+	// its digest for future validation.
+	digest     contentDigest
+	hasContent bool
+}
+
+type forgottenEntry struct {
+	digest      contentDigest
+	hasContent  bool
+	forgottenAt time.Time
+}
+
+// contentDigest is the bounded content identity for terminal markers,
+// mirroring Rust ContentDigest: method/payload lengths plus FNV-1a 64-bit
+// hash. Fixed size and count-bounded, so tombstone and forgotten markers
+// remain bounded without charging the shared retained-byte budget (which
+// continues to cover pending + retained only, preserving
+// Forget-releases-bytes for different DIDs). Lengths are checked explicitly
+// so length mismatches reject even on hash collision; a hash collision could
+// cause false idempotent acceptance but requires identical lengths plus a
+// 64-bit collision (negligible for in-memory, short-lived markers).
+type contentDigest struct {
+	methodLen  int
+	payloadLen int
+	hash       uint64
+}
+
+func digestContent(method string, payload []byte) contentDigest {
+	const offset uint64 = 14695981039346656037
+	const prime uint64 = 1099511628211
+	h := offset
+	for _, b := range []byte(method) {
+		h ^= uint64(b)
+		h *= prime
+	}
+	h ^= 0xff
+	h *= prime
+	for _, b := range payload {
+		h ^= uint64(b)
+		h *= prime
+	}
+	var lb [8]byte
+	binary.LittleEndian.PutUint64(lb[:], uint64(len(method)))
+	for _, b := range lb {
+		h ^= uint64(b)
+		h *= prime
+	}
+	binary.LittleEndian.PutUint64(lb[:], uint64(len(payload)))
+	for _, b := range lb {
+		h ^= uint64(b)
+		h *= prime
+	}
+	return contentDigest{methodLen: len(method), payloadLen: len(payload), hash: h}
+}
+
+func checkDigest(expected contentDigest, method string, payload []byte) error {
+	if expected.methodLen != len(method) || expected.payloadLen != len(payload) {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id reused with different content; rejected")
+	}
+	if expected.hash != digestContent(method, payload).hash {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id reused with different content; rejected")
+	}
+	return nil
 }
 
 type resumeEntry struct {
@@ -319,8 +389,12 @@ type sessionState struct {
 	// forgotten retains bounded Forgotten markers per removed/expired outcome
 	// (bounded by MaxRetainedResults, independent from MaxTombstones) so
 	// Reconcile returns Forgotten for expired/forgotten IDs and Unknown only
-	// for never-seen IDs.
-	forgotten map[DeliveryID]time.Time
+	// for never-seen IDs. Each marker retains a content digest (when known)
+	// for duplicate-content validation while live; digests are fixed 32
+	// bytes and count-bounded, so they do not charge MaxRetainedBytes
+	// (which covers pending + retained only). Expired forgotten markers are
+	// replaced with Pending as a new decision.
+	forgotten map[DeliveryID]forgottenEntry
 	// Pending and retained entries share the count and byte budgets, including
 	// owned method/payload metadata. Live work never expires: only a terminal
 	// result or tombstone releases its pending reservation.
@@ -449,7 +523,7 @@ func (m *ReliableManager) CreateSession(now time.Time, principal string, version
 		principal: principal, version: version, epoch: 1,
 		lastActivity: now, lease: lease,
 		outcomes: make(map[DeliveryID]retainedEntry), tombstones: make(map[DeliveryID]tombstoneEntry),
-		forgotten: make(map[DeliveryID]time.Time), pending: make(map[DeliveryID]pendingEntry),
+		forgotten: make(map[DeliveryID]forgottenEntry), pending: make(map[DeliveryID]pendingEntry),
 	}
 	m.resume[string(cred)] = resumeEntry{session: sid, principal: principal, version: version, issuedAt: now, expiresAt: now.Add(m.bounds.ResumeLifetime)}
 	return sid, 1, cred, lease, nil
@@ -577,24 +651,32 @@ func idleTimeoutOf(st *sessionState) time.Duration {
 
 // addForgottenLocked inserts a bounded Forgotten marker for did, evicting
 // the oldest marker when at capacity. Callers MUST hold m.mu.
-func (m *ReliableManager) addForgottenLocked(st *sessionState, did DeliveryID, now time.Time) {
+// The marker retains a content digest (when hasContent) for live
+// duplicate-content validation; digests are fixed size and count-bounded.
+func (m *ReliableManager) addForgottenLocked(st *sessionState, did DeliveryID, digest contentDigest, hasContent bool, now time.Time) {
 	if st.forgotten == nil {
-		st.forgotten = make(map[DeliveryID]time.Time)
+		st.forgotten = make(map[DeliveryID]forgottenEntry)
 	}
 	if _, dup := st.forgotten[did]; !dup && len(st.forgotten) >= m.bounds.MaxRetainedResults {
 		var oldest DeliveryID
 		var oldestAt time.Time
 		first := true
-		for k, t := range st.forgotten {
-			if first || t.Before(oldestAt) {
-				oldest, oldestAt, first = k, t, false
+		for k, e := range st.forgotten {
+			if first || e.forgottenAt.Before(oldestAt) {
+				oldest, oldestAt, first = k, e.forgottenAt, false
 			}
 		}
 		if !first {
 			delete(st.forgotten, oldest)
 		}
 	}
-	st.forgotten[did] = now
+	st.forgotten[did] = forgottenEntry{digest: digest, hasContent: hasContent, forgottenAt: now}
+}
+
+// addForgottenForContentLocked is a convenience wrapper that digests
+// (method, payload) before delegating to addForgottenLocked.
+func (m *ReliableManager) addForgottenForContentLocked(st *sessionState, did DeliveryID, method string, payload []byte, now time.Time) {
+	m.addForgottenLocked(st, did, digestContent(method, payload), true, now)
 }
 
 // copyOutcome deep-copies a StoredOutcome so caller slices and the caller's
@@ -661,7 +743,15 @@ func (m *ReliableManager) CheckIdle(now time.Time, sid SessionID) (bool, error) 
 }
 
 // RecordResult retains a terminal outcome (duplicate-content checked).
-func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did DeliveryID, method string, payload []byte, outcome StoredOutcome) (ReconcileOutcome, error) {
+// The caller passes the attachment epoch it holds; stale/zero/future epochs
+// are rejected with FAILED_PRECONDITION before ANY mutation or activity
+// refresh (mirroring Rust record_result expected_epoch fencing and Go
+// NoteDispatch epoch ordering (now, sid, epoch, did, ...)).
+// Activity (lastActivity) is refreshed only when accepting a terminal result:
+// new insert, expired-marker replacement, and idempotent live duplicate.
+// Failed admission (epoch mismatch, content mismatch, budget exhaustion,
+// unknown session) preserves markers, bytes, and activity.
+func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, epoch uint64, did DeliveryID, method string, payload []byte, outcome StoredOutcome) (ReconcileOutcome, error) {
 	if did == (DeliveryID{}) {
 		return "", NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must not be all zero")
 	}
@@ -674,36 +764,33 @@ func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did Deliver
 	if !ok {
 		return "", NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for result")
 	}
+	// Fencing: a fenced connection (epoch advanced by resume) must not
+	// complete work. Zero, stale, and future epochs all fail with
+	// FAILED_PRECONDITION before any mutation or activity refresh.
+	if epoch != st.epoch {
+		return "", NewRpcError(ErrorCodeFailedPrecondition, "syntra: stale attachment epoch; fenced connection cannot complete")
+	}
 	pending, wasPending := st.pending[did]
 	if wasPending {
 		if err := CheckDuplicateContent(pending.method, pending.payload, method, payload); err != nil {
 			return "", err
 		}
 	}
-	if existing, dup := st.outcomes[did]; dup {
-		// Expiry-before-validate: an expired retained entry is not a
-		// duplicate. Drop it, account bytes, leave a bounded Forgotten
-		// marker, then fall through to the insert path below.
+	existing, hasOutcome := st.outcomes[did]
+	hasExpiredOutcome := false
+	if hasOutcome {
 		if now.Sub(existing.retainedAt) > m.bounds.ResultRetention {
-			freed := len(existing.method) + len(existing.payload)
-			if existing.outcome.Err != nil {
-				freed += len(existing.outcome.Err.Message)
-			} else {
-				freed += len(existing.outcome.Payload)
-			}
-			delete(st.outcomes, did)
-			st.outcomeBytes -= freed
-			if st.outcomeBytes < 0 {
-				st.outcomeBytes = 0
-			}
-			m.addForgottenLocked(st, did, now)
+			hasExpiredOutcome = true
 		} else {
 			if err := CheckDuplicateContent(existing.method, existing.payload, method, payload); err != nil {
 				return "", err
 			}
+			st.lastActivity = now
 			return ReconcileRetained, nil
 		}
 	}
+	// Compute replacement admission without mutating stale state.
+	// Failure must preserve markers, timestamps, bytes, and activity.
 	entryBytes := len(method) + len(payload)
 	if outcome.Err != nil {
 		entryBytes += len(outcome.Err.Message)
@@ -712,22 +799,38 @@ func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did Deliver
 	}
 	count := len(st.outcomes) + len(st.pending)
 	pendingBytes := st.pendingBytes
+	outcomeBytes := st.outcomeBytes
 	if wasPending {
 		count--
 		pendingBytes -= len(pending.method) + len(pending.payload)
 	}
+	if hasExpiredOutcome {
+		count--
+		outcomeBytes -= len(existing.method) + len(existing.payload)
+		if existing.outcome.Err != nil {
+			outcomeBytes -= len(existing.outcome.Err.Message)
+		} else {
+			outcomeBytes -= len(existing.outcome.Payload)
+		}
+	}
 	if count >= m.bounds.MaxRetainedResults {
 		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result budget exhausted")
 	}
-	if entryBytes > m.bounds.MaxRetainedBytes-st.outcomeBytes-pendingBytes {
+	if entryBytes > m.bounds.MaxRetainedBytes-outcomeBytes-pendingBytes {
 		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result bytes exhausted")
 	}
-	// Commit terminal-state replacement only after all admission checks pass.
+	// Commit only after all admission checks pass. Expired retained state is
+	// replaced (not left as Forgotten, since the new terminal supersedes it).
+	if hasExpiredOutcome {
+		delete(st.outcomes, did)
+		st.outcomeBytes = outcomeBytes
+	}
 	delete(st.tombstones, did)
 	st.outcomes[did] = retainedEntry{method: strings.Clone(method), payload: append([]byte(nil), payload...), outcome: copyOutcome(outcome), retainedAt: now}
 	st.outcomeBytes += entryBytes
 	delete(st.forgotten, did)
 	clearPending(st, did)
+	st.lastActivity = now
 	return ReconcileRetained, nil
 }
 
@@ -736,7 +839,8 @@ func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did Deliver
 // callers must use Reconcile to distinguish new work from Pending/Retained.
 // Pending and retained entries share MaxRetainedResults/MaxRetainedBytes.
 // Pending survives retention sweeps until a terminal result or tombstone.
-// Live terminal markers suppress dispatch; expired markers are replaced with
+// Live terminal markers suppress dispatch (with duplicate-content validation
+// against the retained digest); expired markers are replaced with
 // Pending only after count and byte admission succeeds.
 func (m *ReliableManager) NoteDispatch(now time.Time, sid SessionID, epoch uint64, did DeliveryID, method string, payload []byte) error {
 	if err := ValidateEpoch(epoch); err != nil {
@@ -778,11 +882,39 @@ func (m *ReliableManager) NoteDispatch(now time.Time, sid SessionID, epoch uint6
 		st.lastActivity = now
 		return nil
 	}
+	// Live tombstone/forgotten fast paths must still validate request
+	// identity. Same-delivery-ID different-content is rejected with
+	// FAILED_PRECONDITION (never merged); identical resends stay idempotent.
+	// Markers created without prior content (never-seen DID tombstoned or
+	// forgotten) adopt the first live resend's digest for future validation.
 	if tombstone, ok := st.tombstones[did]; ok && now.Sub(tombstone.retainedAt) <= m.bounds.TombstoneRetention {
+		incoming := digestContent(method, payload)
+		if tombstone.hasContent {
+			if incoming != tombstone.digest {
+				return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id reused with different content; rejected")
+			}
+			st.lastActivity = now
+			return nil
+		}
+		// Adopt content for a previously content-less tombstone.
+		tombstone.digest = incoming
+		tombstone.hasContent = true
+		st.tombstones[did] = tombstone
 		st.lastActivity = now
 		return nil
 	}
-	if forgottenAt, ok := st.forgotten[did]; ok && now.Sub(forgottenAt) <= m.bounds.ResultRetention {
+	if fent, ok := st.forgotten[did]; ok && now.Sub(fent.forgottenAt) <= m.bounds.ResultRetention {
+		incoming := digestContent(method, payload)
+		if fent.hasContent {
+			if incoming != fent.digest {
+				return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id reused with different content; rejected")
+			}
+			st.lastActivity = now
+			return nil
+		}
+		fent.digest = incoming
+		fent.hasContent = true
+		st.forgotten[did] = fent
 		st.lastActivity = now
 		return nil
 	}
@@ -847,13 +979,19 @@ func (m *ReliableManager) Reconcile(now time.Time, sid SessionID, did DeliveryID
 				return ReconcileRetained, &out, nil
 			}
 			// Expired tombstones are seen IDs: they become Forgotten,
-			// never Unknown. Leave a bounded marker and fall through.
+			// never Unknown. Propagate the tombstone digest when known so
+			// live-forgotten validation still rejects mismatched resends.
+			// Leave a bounded marker and fall through.
 			delete(st.tombstones, did)
-			m.addForgottenLocked(st, did, now)
+			if tomb.hasContent {
+				m.addForgottenLocked(st, did, tomb.digest, true, now)
+			} else {
+				m.addForgottenLocked(st, did, contentDigest{}, false, now)
+			}
 			return ReconcileForgotten, nil, nil
 		}
-		if forgotAt, fok := st.forgotten[did]; fok {
-			if now.Sub(forgotAt) <= m.bounds.ResultRetention {
+		if fent, fok := st.forgotten[did]; fok {
+			if now.Sub(fent.forgottenAt) <= m.bounds.ResultRetention {
 				return ReconcileForgotten, nil, nil
 			}
 			delete(st.forgotten, did)
@@ -875,7 +1013,9 @@ func (m *ReliableManager) Reconcile(now time.Time, sid SessionID, did DeliveryID
 		if st.outcomeBytes < 0 {
 			st.outcomeBytes = 0
 		}
-		m.addForgottenLocked(st, did, now)
+		// Expired outcome becomes Forgotten with its request digest so the
+		// live-forgotten window still enforces duplicate-content.
+		m.addForgottenLocked(st, did, digestContent(entry.method, entry.payload), true, now)
 		return ReconcileForgotten, nil, nil
 	}
 	out := copyOutcome(entry.outcome)
@@ -912,6 +1052,8 @@ func (m *ReliableManager) Detach(sid SessionID, connectionID string) {
 // Forget rejects live pending work, discards one retained outcome, and retains
 // a bounded Forgotten marker (bounded by MaxRetainedResults, independent from
 // MaxTombstones) so Reconcile reports Forgotten rather than Unknown.
+// The marker retains the outcome's request digest when known so the live
+// forgotten window still enforces duplicate-content validation.
 func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 	if did == (DeliveryID{}) {
 		return false, NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must not be all zero")
@@ -930,9 +1072,10 @@ func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 		if _, fok := st.forgotten[did]; fok {
 			return false, nil
 		}
-		m.addForgottenLocked(st, did, time.Now())
+		m.addForgottenLocked(st, did, contentDigest{}, false, time.Now())
 		return true, nil
 	}
+	digest := digestContent(entry.method, entry.payload)
 	freed := len(entry.method) + len(entry.payload)
 	if entry.outcome.Err != nil {
 		freed += len(entry.outcome.Err.Message)
@@ -944,7 +1087,7 @@ func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 	if st.outcomeBytes < 0 {
 		st.outcomeBytes = 0
 	}
-	m.addForgottenLocked(st, did, time.Now())
+	m.addForgottenLocked(st, did, digest, true, time.Now())
 	return true, nil
 }
 
@@ -956,7 +1099,15 @@ func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 // duplicate with the same code is idempotent (retainedAt untouched); a live
 // duplicate with a different code is rejected without overwriting. Outcomes
 // and tombstones are exclusive:
-// tombstoning a delivery ID with a live retained outcome is rejected.
+// tombstoning a delivery ID with a live retained outcome is rejected with
+// FAILED_PRECONDITION and preserves the outcome.
+// Expired-retained handling (explicit): an expired retained outcome is retired
+// (bytes freed, digest propagated to a transient Forgotten marker) and the
+// tombstone is then admitted as the new terminal; if tombstone admission
+// fails (budget exhausted) the expired outcome is preserved (no mutation).
+// The new tombstone retains the pending request digest when live pending work
+// exists for the DID (common deadline/cancel path); otherwise it starts
+// content-less and adopts the first live resend's digest in NoteDispatch.
 func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did DeliveryID, code ErrorCode) error {
 	if did == (DeliveryID{}) {
 		return NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must not be all zero")
@@ -970,30 +1121,25 @@ func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did Deli
 	if !ok {
 		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for tombstone")
 	}
+	var expiredOutcome *retainedEntry
 	if existing, dup := st.outcomes[did]; dup {
 		if now.Sub(existing.retainedAt) <= m.bounds.ResultRetention {
 			return NewRpcError(ErrorCodeFailedPrecondition, "syntra: delivery id already has a retained outcome")
 		}
-		// Expired outcome: retire it with a Forgotten marker, then allow
-		// the tombstone as the new terminal below.
-		freed := len(existing.method) + len(existing.payload)
-		if existing.outcome.Err != nil {
-			freed += len(existing.outcome.Err.Message)
-		} else {
-			freed += len(existing.outcome.Payload)
-		}
-		delete(st.outcomes, did)
-		st.outcomeBytes -= freed
-		if st.outcomeBytes < 0 {
-			st.outcomeBytes = 0
-		}
-		m.addForgottenLocked(st, did, now)
+		cpy := existing
+		expiredOutcome = &cpy
 	}
+	// Check tombstone budget before mutating expired outcome (preserve on failure).
 	if existing, dup := st.tombstones[did]; dup {
 		if now.Sub(existing.retainedAt) > m.bounds.TombstoneRetention {
-			// Expired tombstone: retire with Forgotten, then insert fresh.
+			// Expired tombstone: retire with Forgotten (propagating its
+			// digest when known), then insert fresh below.
 			delete(st.tombstones, did)
-			m.addForgottenLocked(st, did, now)
+			if existing.hasContent {
+				m.addForgottenLocked(st, did, existing.digest, true, now)
+			} else {
+				m.addForgottenLocked(st, did, contentDigest{}, false, now)
+			}
 		} else if existing.code == code {
 			return nil
 		} else {
@@ -1002,7 +1148,41 @@ func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did Deli
 	} else if len(st.tombstones) >= m.bounds.MaxTombstones {
 		return NewRpcError(ErrorCodeResourceExhausted, "syntra: tombstone budget exhausted")
 	}
-	st.tombstones[did] = tombstoneEntry{code: code, retainedAt: now}
+	// Admit expired-outcome retirement only after tombstone budget succeeds.
+	if expiredOutcome != nil {
+		freed := len(expiredOutcome.method) + len(expiredOutcome.payload)
+		if expiredOutcome.outcome.Err != nil {
+			freed += len(expiredOutcome.outcome.Err.Message)
+		} else {
+			freed += len(expiredOutcome.outcome.Payload)
+		}
+		delete(st.outcomes, did)
+		st.outcomeBytes -= freed
+		if st.outcomeBytes < 0 {
+			st.outcomeBytes = 0
+		}
+		// Transient Forgotten for expiry history; deleted below when the
+		// tombstone commits as the new terminal.
+		m.addForgottenLocked(st, did, digestContent(expiredOutcome.method, expiredOutcome.payload), true, now)
+	}
+	var digest contentDigest
+	hasContent := false
+	// Capture content for future resend validation: prefer pending
+	// (executing work), else the expired retained just observed, else copy
+	// a live forgotten digest for consistency, else content-less (the first
+	// live resend after tombstoning will define it). Mirrors Rust
+	// record_tombstone content priority.
+	if pending, ok := st.pending[did]; ok {
+		digest = digestContent(pending.method, pending.payload)
+		hasContent = true
+	} else if expiredOutcome != nil {
+		digest = digestContent(expiredOutcome.method, expiredOutcome.payload)
+		hasContent = true
+	} else if fent, ok := st.forgotten[did]; ok && now.Sub(fent.forgottenAt) <= m.bounds.ResultRetention && fent.hasContent {
+		digest = fent.digest
+		hasContent = true
+	}
+	st.tombstones[did] = tombstoneEntry{code: code, retainedAt: now, digest: digest, hasContent: hasContent}
 	delete(st.forgotten, did)
 	clearPending(st, did)
 	return nil
@@ -1128,12 +1308,12 @@ func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resu
 				if st.outcomeBytes < 0 {
 					st.outcomeBytes = 0
 				}
-				m.addForgottenLocked(st, did, now)
+				m.addForgottenLocked(st, did, digestContent(entry.method, entry.payload), true, now)
 				outcomes++
 			}
 		}
-		for did, forgotAt := range st.forgotten {
-			if now.Sub(forgotAt) > m.bounds.ResultRetention {
+		for did, fent := range st.forgotten {
+			if now.Sub(fent.forgottenAt) > m.bounds.ResultRetention {
 				delete(st.forgotten, did)
 			}
 		}
@@ -1141,8 +1321,12 @@ func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resu
 			if now.Sub(entry.retainedAt) > m.bounds.TombstoneRetention {
 				delete(st.tombstones, did)
 				// Expired tombstones are seen IDs: they become Forgotten,
-				// never Unknown.
-				m.addForgottenLocked(st, did, now)
+				// never Unknown. Propagate the digest when known.
+				if entry.hasContent {
+					m.addForgottenLocked(st, did, entry.digest, true, now)
+				} else {
+					m.addForgottenLocked(st, did, contentDigest{}, false, now)
+				}
 				tombstones++
 			}
 		}

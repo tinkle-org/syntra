@@ -115,13 +115,13 @@ func TestReliableReconciliation(t *testing.T) {
 		t.Fatalf("out=%v err=%v", out, err)
 	}
 	okOutcome := StoredOutcome{Payload: []byte("hello")}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("hello"), okOutcome); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("hello"), okOutcome); err != nil {
 		t.Fatal(err)
 	}
 	if out, stored, err := m.Reconcile(now, sid, did); err != nil || out != ReconcileRetained || stored == nil {
 		t.Fatalf("out=%v err=%v", out, err)
 	}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("different"), okOutcome); err == nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("different"), okOutcome); err == nil {
 		t.Fatal("mismatched content accepted")
 	}
 }
@@ -143,7 +143,7 @@ func TestReliableZeroDeliveryIDRejected(t *testing.T) {
 	now := time.Now()
 	sid, _, _, _ := mustCreate(t, m, now)
 	var zero DeliveryID
-	if _, err := m.RecordResult(now, sid, zero, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err == nil {
+	if _, err := m.RecordResult(now, sid, 1, zero, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err == nil {
 		t.Fatal("zero delivery id accepted by RecordResult")
 	}
 	if _, _, err := m.Reconcile(now, sid, zero); err == nil {
@@ -273,13 +273,13 @@ func TestReliableExpiredRetainedReinsert(t *testing.T) {
 	for i := range did {
 		did[i] = 9
 	}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("one"), StoredOutcome{Payload: []byte("one")}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("one"), StoredOutcome{Payload: []byte("one")}); err != nil {
 		t.Fatal(err)
 	}
 	later := now.Add(DefaultControlBounds().ResultRetention + time.Second)
 	// Expired entry must not behave as a duplicate: the new insert with
 	// different content succeeds and becomes Retained.
-	if _, err := m.RecordResult(later, sid, did, "/example.Echo/Echo", []byte("two"), StoredOutcome{Payload: []byte("two")}); err != nil {
+	if _, err := m.RecordResult(later, sid, 1, did, "/example.Echo/Echo", []byte("two"), StoredOutcome{Payload: []byte("two")}); err != nil {
 		t.Fatalf("expired retained must allow reinsert, got %v", err)
 	}
 	out, stored, err := m.Reconcile(later, sid, did)
@@ -298,7 +298,7 @@ func TestReliableOutcomeDeepCopy(t *testing.T) {
 	}
 	payload := []byte("mutable")
 	outcome := StoredOutcome{Payload: payload}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("m"), outcome); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("m"), outcome); err != nil {
 		t.Fatal(err)
 	}
 	payload[0] = 'X'
@@ -325,7 +325,7 @@ func TestReliableOutcomeDeepCopy(t *testing.T) {
 		did2[i] = 12
 	}
 	rerr := NewRpcError(ErrorCodeNotFound, "orig")
-	if _, err := m.RecordResult(now, sid, did2, "/example.Echo/Echo", []byte("m"), StoredOutcome{Err: rerr}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did2, "/example.Echo/Echo", []byte("m"), StoredOutcome{Err: rerr}); err != nil {
 		t.Fatal(err)
 	}
 	rerr.Message = "mutated"
@@ -377,7 +377,7 @@ func TestReliableReviewPendingContentAndLifetime(t *testing.T) {
 	for _, change := range []struct{ method, payload string }{{"other", "request"}, {"echo", "changed"}} {
 		t.Run(change.method+change.payload, func(t *testing.T) {
 			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, did, change.method, []byte(change.payload)), ErrorCodeFailedPrecondition)
-			_, err := m.RecordResult(now, sid, did, change.method, []byte(change.payload), StoredOutcome{})
+			_, err := m.RecordResult(now, sid, 1, did, change.method, []byte(change.payload), StoredOutcome{})
 			requireReliableCode(t, err, ErrorCodeFailedPrecondition)
 		})
 	}
@@ -391,7 +391,7 @@ func TestReliableReviewPendingContentAndLifetime(t *testing.T) {
 	if got, _, err := m.Reconcile(later, sid, did); err != nil || got != ReconcilePending {
 		t.Fatalf("live dispatch expired: got=%v err=%v", got, err)
 	}
-	if _, err := m.RecordResult(later, sid, did, "echo", []byte("request"), StoredOutcome{Payload: []byte("done")}); err != nil {
+	if _, err := m.RecordResult(later, sid, 1, did, "echo", []byte("request"), StoredOutcome{Payload: []byte("done")}); err != nil {
 		t.Fatal(err)
 	}
 	if got, _, err := m.Reconcile(later, sid, did); err != nil || got != ReconcileRetained {
@@ -452,7 +452,7 @@ func TestReliableReviewPendingSurvivesRetention(t *testing.T) {
 			if err := m.NoteDispatch(now, sid, epoch, did, "echo", nil); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := m.RecordResult(now, sid, did, "other", nil, StoredOutcome{}); err == nil {
+			if _, err := m.RecordResult(now, sid, 1, did, "other", nil, StoredOutcome{}); err == nil {
 				t.Error("terminal result accepted mismatched pending content")
 			}
 			later := now.Add(3 * m.bounds.ResultRetention)
@@ -487,10 +487,10 @@ func TestReliableReviewPendingBudgets(t *testing.T) {
 				t.Fatal(err)
 			}
 			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, DeliveryID{2}, "x", nil), ErrorCodeResourceExhausted)
-			_, err = m.RecordResult(now, sid, DeliveryID{2}, "x", nil, StoredOutcome{})
+			_, err = m.RecordResult(now, sid, 1, DeliveryID{2}, "x", nil, StoredOutcome{})
 			requireReliableCode(t, err, ErrorCodeResourceExhausted)
 			// Converting a pending entry reuses its metadata reservation.
-			if _, err := m.RecordResult(now, sid, did, "echo", []byte("data"), StoredOutcome{}); err != nil {
+			if _, err := m.RecordResult(now, sid, 1, did, "echo", []byte("data"), StoredOutcome{}); err != nil {
 				t.Fatalf("pending-to-retained double charged: %v", err)
 			}
 			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, DeliveryID{2}, "x", nil), ErrorCodeResourceExhausted)
@@ -523,11 +523,11 @@ func TestReliableReviewFailedResultPreservesTombstone(t *testing.T) {
 			method := "12345"
 			if kind == "count" {
 				method = "x"
-				if _, err := m.RecordResult(now, sid, DeliveryID{2}, "x", nil, StoredOutcome{}); err != nil {
+				if _, err := m.RecordResult(now, sid, 1, DeliveryID{2}, "x", nil, StoredOutcome{}); err != nil {
 					t.Fatal(err)
 				}
 			}
-			_, err = m.RecordResult(now, sid, did, method, nil, StoredOutcome{})
+			_, err = m.RecordResult(now, sid, 1, did, method, nil, StoredOutcome{})
 			requireReliableCode(t, err, ErrorCodeResourceExhausted)
 			if code, ok, err := m.TombstoneOf(now, sid, did); err != nil || !ok || code != ErrorCodeCancelled {
 				t.Fatalf("failed admission erased terminal tombstone: code=%v ok=%v err=%v", code, ok, err)
@@ -576,7 +576,7 @@ func TestReliableReviewReapReportsQueueError(t *testing.T) {
 	}
 	now := time.Now()
 	sid, epoch, _ := attachForReview(t, m, now)
-	if _, err := m.RecordResult(now, sid, DeliveryID{1}, "echo", nil, StoredOutcome{}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, DeliveryID{1}, "echo", nil, StoredOutcome{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := m.NoteDispatch(now, sid, epoch, DeliveryID{2}, "echo", nil); err != nil {
@@ -620,7 +620,7 @@ func TestReliablePendingTerminalAdmissionAndRelease(t *testing.T) {
 				t.Fatal(err)
 			}
 			if terminal == "result" {
-				_, err = m.RecordResult(now, sid, did, "echo", []byte("data"), StoredOutcome{Payload: []byte("x")})
+				_, err = m.RecordResult(now, sid, 1, did, "echo", []byte("data"), StoredOutcome{Payload: []byte("x")})
 				requireReliableCode(t, err, ErrorCodeResourceExhausted)
 			} else {
 				if err := m.RecordTombstone(now.Add(-2*bounds.TombstoneRetention), sid, DeliveryID{9}, ErrorCodeCancelled); err != nil {
@@ -633,7 +633,7 @@ func TestReliablePendingTerminalAdmissionAndRelease(t *testing.T) {
 			}
 			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, DeliveryID{2}, "x", nil), ErrorCodeResourceExhausted)
 			if terminal == "result" {
-				if _, err := m.RecordResult(now, sid, did, "echo", []byte("data"), StoredOutcome{}); err != nil {
+				if _, err := m.RecordResult(now, sid, 1, did, "echo", []byte("data"), StoredOutcome{}); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := m.Forget(sid, did); err != nil {
@@ -677,7 +677,7 @@ func TestReliableDispatchRejectsWithoutActivity(t *testing.T) {
 	}
 	requireReliableCode(t, m.NoteDispatch(now, sid, epoch, did, "echo", nil), ErrorCodeUnavailable)
 	// Shutdown stops admission but still permits already-dispatched completion.
-	if _, err := m.RecordResult(now, sid, did, "echo", nil, StoredOutcome{}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "echo", nil, StoredOutcome{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -712,7 +712,7 @@ func TestReliableInsertClearsForgotten(t *testing.T) {
 	for i := range did {
 		did[i] = 13
 	}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := m.Forget(sid, did); err != nil {
@@ -721,7 +721,7 @@ func TestReliableInsertClearsForgotten(t *testing.T) {
 	if out, _, _ := m.Reconcile(now, sid, did); out != ReconcileForgotten {
 		t.Fatalf("after forget = %v, want forgotten", out)
 	}
-	if _, err := m.RecordResult(now, sid, did, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err != nil {
+	if _, err := m.RecordResult(now, sid, 1, did, "/example.Echo/Echo", []byte("x"), StoredOutcome{Payload: []byte("x")}); err != nil {
 		t.Fatal(err)
 	}
 	if out, _, _ := m.Reconcile(now, sid, did); out != ReconcileRetained {
@@ -773,19 +773,24 @@ func TestReliableTombstoneFirstWriteWins(t *testing.T) {
 	}
 }
 
-func seedReliableDispatchMarker(t *testing.T, m *ReliableManager, now time.Time, sid SessionID, did DeliveryID, kind string) {
+func seedReliableDispatchMarker(t *testing.T, m *ReliableManager, now time.Time, sid SessionID, epoch uint64, did DeliveryID, kind string) {
 	t.Helper()
 	switch kind {
 	case "result":
-		if _, err := m.RecordResult(now, sid, did, "old", []byte("x"), StoredOutcome{Payload: []byte("done")}); err != nil {
+		if _, err := m.RecordResult(now, sid, epoch, did, "old", []byte("x"), StoredOutcome{Payload: []byte("done")}); err != nil {
 			t.Fatal(err)
 		}
 	case "tombstone":
+		// Seed via dispatch so the tombstone retains the request digest for
+		// live duplicate-content validation ("old"/"x").
+		if err := m.NoteDispatch(now, sid, epoch, did, "old", []byte("x")); err != nil {
+			t.Fatal(err)
+		}
 		if err := m.RecordTombstone(now, sid, did, ErrorCodeCancelled); err != nil {
 			t.Fatal(err)
 		}
 	case "forgotten":
-		if _, err := m.RecordResult(now.Add(-2*m.bounds.ResultRetention), sid, did, "old", nil, StoredOutcome{}); err != nil {
+		if _, err := m.RecordResult(now.Add(-2*m.bounds.ResultRetention), sid, epoch, did, "old", []byte("x"), StoredOutcome{Payload: []byte("done")}); err != nil {
 			t.Fatal(err)
 		}
 		if got, _, err := m.Reconcile(now, sid, did); err != nil || got != ReconcileForgotten {
@@ -811,7 +816,7 @@ func TestReliableDispatchExpiredMarkersBecomePending(t *testing.T) {
 			now := time.Unix(1000, 0)
 			sid, epoch, _ := attachForReview(t, m, now)
 			did := DeliveryID{1}
-			seedReliableDispatchMarker(t, m, now, sid, did, kind)
+			seedReliableDispatchMarker(t, m, now, sid, epoch, did, kind)
 			later := now.Add(bounds.ResultRetention + time.Nanosecond)
 			payload := []byte("12345")
 			// The changed content is a new decision after terminal retention.
@@ -862,7 +867,7 @@ func TestReliableDispatchFailedReplacementPreservesMarkers(t *testing.T) {
 				now := time.Unix(1000, 0)
 				sid, epoch, _ := attachForReview(t, m, now)
 				did := DeliveryID{1}
-				seedReliableDispatchMarker(t, m, now, sid, did, kind)
+				seedReliableDispatchMarker(t, m, now, sid, epoch, did, kind)
 				if budget == "count" {
 					if err := m.NoteDispatch(now, sid, epoch, DeliveryID{2}, "x", nil); err != nil {
 						t.Fatal(err)
@@ -911,7 +916,7 @@ func TestReliableDispatchLiveMarkersStillSuppress(t *testing.T) {
 			now := time.Unix(1000, 0)
 			sid, epoch, _ := attachForReview(t, m, now)
 			did := DeliveryID{1}
-			seedReliableDispatchMarker(t, m, now, sid, did, kind)
+			seedReliableDispatchMarker(t, m, now, sid, epoch, did, kind)
 			// The exact retention boundary is still live in both languages.
 			atBoundary := now.Add(bounds.ResultRetention)
 			if err := m.NoteDispatch(atBoundary, sid, epoch, did, "old", []byte("x")); err != nil {
@@ -920,9 +925,10 @@ func TestReliableDispatchLiveMarkersStillSuppress(t *testing.T) {
 			if _, admitted := m.sessions[sid].pending[did]; admitted || m.sessions[sid].pendingBytes != 0 {
 				t.Fatalf("live %s marker admitted pending work", kind)
 			}
-			if kind == "result" {
-				requireReliableCode(t, m.NoteDispatch(atBoundary, sid, epoch, did, "new", nil), ErrorCodeFailedPrecondition)
-			}
+			// Live markers must still enforce duplicate-content: same DID
+			// different content is rejected, identical stays idempotent.
+			requireReliableCode(t, m.NoteDispatch(atBoundary, sid, epoch, did, "new", nil), ErrorCodeFailedPrecondition)
+			requireReliableCode(t, m.NoteDispatch(atBoundary, sid, epoch, did, "old", []byte("y")), ErrorCodeFailedPrecondition)
 			want := ReconcileRetained
 			if kind == "forgotten" {
 				want = ReconcileForgotten
@@ -931,5 +937,156 @@ func TestReliableDispatchLiveMarkersStillSuppress(t *testing.T) {
 				t.Fatalf("live marker changed: got=%v want=%v err=%v", got, want, err)
 			}
 		})
+	}
+}
+
+func TestReliableRedRecordResultEpochFencing(t *testing.T) {
+	m := testReliableManager(t)
+	now := time.Now()
+	sid, epoch1, cred := attachForReview(t, m, now)
+	// Advance to epoch 2 via resume so stale (1), zero (0) and future (3) are distinct.
+	epoch2, _, _, _, err := m.Attach(now, sid, cred, "conn-2", "svc-a", 1, LeaseProposal{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if epoch2 != epoch1+1 {
+		t.Fatalf("epoch2=%d want %d", epoch2, epoch1+1)
+	}
+	did := DeliveryID{9}
+	oldActivity := m.sessions[sid].lastActivity
+	oldOutcomes := len(m.sessions[sid].outcomes)
+	for _, bad := range []uint64{0, epoch1, epoch2 + 1} {
+		_, err := m.RecordResult(now, sid, bad, did, "echo", []byte("p"), StoredOutcome{Payload: []byte("done")})
+		requireReliableCode(t, err, ErrorCodeFailedPrecondition)
+		if got, _, _ := m.Reconcile(now, sid, did); got != ReconcileUnknown {
+			t.Fatalf("stale/zero/future epoch %d mutated state: reconcile=%v", bad, got)
+		}
+		st := m.sessions[sid]
+		if len(st.outcomes) != oldOutcomes || len(st.pending) != 0 {
+			t.Fatalf("epoch %d mutated pending/outcomes", bad)
+		}
+		if !st.lastActivity.Equal(oldActivity) {
+			t.Fatalf("epoch %d refreshed activity: got %v want %v", bad, st.lastActivity, oldActivity)
+		}
+	}
+	// Current epoch must succeed.
+	if _, err := m.RecordResult(now, sid, epoch2, did, "echo", []byte("p"), StoredOutcome{Payload: []byte("done")}); err != nil {
+		t.Fatalf("current epoch rejected: %v", err)
+	}
+	if got, _, _ := m.Reconcile(now, sid, did); got != ReconcileRetained {
+		t.Fatalf("current epoch did not retain: got=%v", got)
+	}
+}
+
+func TestReliableRedRecordResultRefreshesActivity(t *testing.T) {
+	m := testReliableManager(t)
+	now := time.Unix(2000, 0)
+	sid, epoch, _ := attachForReview(t, m, now)
+	didNew := DeliveryID{21}
+	// New insert must refresh activity.
+	t1 := now.Add(1500 * time.Millisecond)
+	if _, err := m.RecordResult(t1, sid, epoch, didNew, "echo", nil, StoredOutcome{Payload: []byte("ok")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.sessions[sid].lastActivity; !got.Equal(t1) {
+		t.Fatalf("new insert did not refresh activity: got %v want %v", got, t1)
+	}
+	// Idempotent live duplicate must also refresh.
+	t2 := t1.Add(100 * time.Millisecond)
+	if _, err := m.RecordResult(t2, sid, epoch, didNew, "echo", nil, StoredOutcome{Payload: []byte("ok")}); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.sessions[sid].lastActivity; !got.Equal(t2) {
+		t.Fatalf("idempotent duplicate did not refresh activity: got %v want %v", got, t2)
+	}
+	// Expired-marker replacement must refresh.
+	didExp := DeliveryID{22}
+	if _, err := m.RecordResult(now, sid, epoch, didExp, "echo", []byte("a"), StoredOutcome{Payload: []byte("a")}); err != nil {
+		t.Fatal(err)
+	}
+	// Failed admission (mismatch on live didNew) must NOT refresh. Check
+	// before advancing to expiry so didNew is still live.
+	beforeFail := m.sessions[sid].lastActivity
+	_, err := m.RecordResult(t2.Add(100*time.Millisecond), sid, epoch, didNew, "echo", []byte("different"), StoredOutcome{})
+	requireReliableCode(t, err, ErrorCodeFailedPrecondition)
+	if got := m.sessions[sid].lastActivity; !got.Equal(beforeFail) {
+		t.Fatalf("mismatched result refreshed activity: got %v want %v", got, beforeFail)
+	}
+	later := now.Add(DefaultControlBounds().ResultRetention + time.Second)
+	t3 := later
+	if _, err := m.RecordResult(t3, sid, epoch, didExp, "echo", []byte("b"), StoredOutcome{Payload: []byte("b")}); err != nil {
+		t.Fatalf("expired replacement rejected: %v", err)
+	}
+	if got := m.sessions[sid].lastActivity; !got.Equal(t3) {
+		t.Fatalf("expired replacement did not refresh activity: got %v want %v", got, t3)
+	}
+}
+
+func TestReliableRedTerminalMarkerContentValidation(t *testing.T) {
+	for _, kind := range []string{"tombstone", "forgotten"} {
+		t.Run(kind, func(t *testing.T) {
+			m := testReliableManager(t)
+			now := time.Now()
+			sid, epoch, _ := attachForReview(t, m, now)
+			did := DeliveryID{31}
+			// Seed live marker with known content "echo"/"req".
+			if err := m.NoteDispatch(now, sid, epoch, did, "echo", []byte("req")); err != nil {
+				t.Fatal(err)
+			}
+			if kind == "tombstone" {
+				if err := m.RecordTombstone(now, sid, did, ErrorCodeCancelled); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if _, err := m.RecordResult(now, sid, epoch, did, "echo", []byte("req"), StoredOutcome{Payload: []byte("done")}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := m.Forget(sid, did); err != nil {
+					t.Fatal(err)
+				}
+				if got, _, _ := m.Reconcile(now, sid, did); got != ReconcileForgotten {
+					t.Fatalf("seed forgotten: got=%v want forgotten", got)
+				}
+			}
+			oldActivity := m.sessions[sid].lastActivity
+			// Identical resend must be idempotent success.
+			if err := m.NoteDispatch(now, sid, epoch, did, "echo", []byte("req")); err != nil {
+				t.Fatalf("identical %s resend rejected: %v", kind, err)
+			}
+			// Mismatched resend must be rejected without mutation or activity refresh.
+			midActivity := m.sessions[sid].lastActivity
+			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, did, "echo", []byte("different")), ErrorCodeFailedPrecondition)
+			requireReliableCode(t, m.NoteDispatch(now, sid, epoch, did, "other", []byte("req")), ErrorCodeFailedPrecondition)
+			st := m.sessions[sid]
+			if _, admitted := st.pending[did]; admitted {
+				t.Fatalf("mismatched %s resend admitted pending", kind)
+			}
+			if !st.lastActivity.Equal(midActivity) {
+				t.Fatalf("mismatched %s resend refreshed activity: got %v want %v", kind, st.lastActivity, midActivity)
+			}
+			_ = oldActivity
+		})
+	}
+}
+
+func TestReliableRedTombstoneOverLiveOutcomeRejected(t *testing.T) {
+	m := testReliableManager(t)
+	now := time.Now()
+	sid, epoch, _ := attachForReview(t, m, now)
+	did := DeliveryID{41}
+	if _, err := m.RecordResult(now, sid, epoch, did, "echo", []byte("req"), StoredOutcome{Payload: []byte("done")}); err != nil {
+		t.Fatal(err)
+	}
+	requireReliableCode(t, m.RecordTombstone(now, sid, did, ErrorCodeCancelled), ErrorCodeFailedPrecondition)
+	if got, stored, _ := m.Reconcile(now, sid, did); got != ReconcileRetained || stored == nil || string(stored.Payload) != "done" {
+		t.Fatalf("tombstone over live outcome mutated retained result: got=%v stored=%v", got, stored)
+	}
+	// Expired retained handling: after retention, tombstone must succeed as new terminal.
+	later := now.Add(DefaultControlBounds().ResultRetention + time.Second)
+	if err := m.RecordTombstone(later, sid, did, ErrorCodeCancelled); err != nil {
+		t.Fatalf("tombstone over expired outcome rejected: %v", err)
+	}
+	if code, ok, err := m.TombstoneOf(later, sid, did); err != nil || !ok || code != ErrorCodeCancelled {
+		t.Fatalf("expired-outcome tombstone missing: code=%v ok=%v err=%v", code, ok, err)
 	}
 }

@@ -60,9 +60,12 @@ def load_scenarios():
         if not ids or len(set(ids)) != len(ids):
             raise ValueError("missing/duplicate scenario IDs")
         for scenario in scenarios:
-            if not re.fullmatch(r"SC-[A-Z0-9-]+", scenario["id"]) or not scenario["name"]:
+            if (not re.fullmatch(r"SC-[A-Z0-9-]+", scenario["id"])
+                    or not isinstance(scenario["name"], str) or not scenario["name"]):
                 raise ValueError("invalid scenario")
-            if not scenario["steps"] or not all(isinstance(s, str) and s for s in scenario["steps"]):
+            steps = scenario["steps"]
+            if (not isinstance(steps, list) or not steps
+                    or not all(isinstance(s, str) and s for s in steps)):
                 raise ValueError("missing scenario steps")
         injection = data["fault_injection"]
         seed = injection["seed"]
@@ -124,7 +127,7 @@ def _corpus_expected():
         for key in ("credential_b64", "payload_b64"):
             if key in sem:
                 sem[key[:-4]] = base64.b64decode(sem.pop(key), validate=True).decode("ascii")
-        expected[vid] = {"id": vid, "frame_hex": frame_hex[0].lower(), "semantic_fields": sem}
+        expected[vid] = {"id": vid, "frame_hex": frame_hex[0], "semantic_fields": sem}
     return expected
 
 
@@ -137,7 +140,16 @@ def _shared_corpus_check(go_output, rust_output):
             if len(records) != len(expected) or {r["id"] for r in records} != set(expected):
                 raise ValueError(f"{language}: missing/duplicate executed corpus records")
             for record in records:
-                if record != expected[record["id"]]:
+                exp = expected[record["id"]]
+                rec_hex = record.get("frame_hex")
+                exp_hex = exp.get("frame_hex")
+                if not isinstance(rec_hex, str) or not isinstance(exp_hex, str):
+                    raise ValueError(f"{language}: corpus bytes/decoded fields differ for {record.get('id')}")
+                rec_norm = dict(record)
+                exp_norm = dict(exp)
+                rec_norm["frame_hex"] = rec_hex.lower()
+                exp_norm["frame_hex"] = exp_hex.lower()
+                if rec_norm != exp_norm:
                     raise ValueError(f"{language}: corpus bytes/decoded fields differ for {record['id']}")
     except (OSError, ValueError, KeyError, TypeError) as e:
         return False, str(e)

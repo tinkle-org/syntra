@@ -98,8 +98,10 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
 11. **Revocation-propagation bound, channel-binding, proxy propagation** — per security open questions.
 12. **Reliable-session/reliable-delivery shipping authority and wire contract** —
     `sessions.md` §1H, `capabilities.md` SNTR-CAP-008/902, and
-    `reliability.md` §1C/§7 remain proposals without an accepted authorizing
-    RFC. This RFC does not authorize them; RFC 0006 is a separate Draft
+    `reliability.md` §1C and the reliable-delivery coverage in §7
+    (e.g. SNTR-REL-902) remain proposals without an accepted authorizing
+    RFC. SNTR-REL-900/901 remain shipping baseline. This RFC does not
+    authorize them; RFC 0006 is a separate Draft
     update/recovery proposal. Canonical negotiation/control methods,
     versioned binary schemas, delivery-ID carriage, confirmation/fallback,
     and deterministic fixtures are still required. Former `CONF-RS-001..005`

@@ -122,6 +122,51 @@ class RunnerTests(unittest.TestCase):
                 with patch.object(runner, "ROOT", root):
                     self.assertFalse(runner._shared_corpus_check(good, good)[0])
 
+    def test_rejects_string_steps(self):
+        matrix = self.matrix()
+        matrix["scenarios"][0]["steps"] = "echo"
+        self.assertFalse(self.load(matrix)["ok"])
+
+    def test_rejects_nonstring_name(self):
+        matrix = self.matrix()
+        matrix["scenarios"][0]["name"] = 123
+        self.assertFalse(self.load(matrix)["ok"])
+
+    def test_uppercase_hex_corpus_still_passes(self):
+        corpus = ROOT / "conformance/test-vectors/protobuf/vectors.yaml"
+        text = corpus.read_text()
+        upper_text = re.sub(
+            r'frame_hex: "([0-9a-fA-F]+)"',
+            lambda m: 'frame_hex: "%s"' % m.group(1).upper(),
+            text)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = root / "conformance/test-vectors/protobuf"
+            directory.mkdir(parents=True)
+            (directory / "vectors.yaml").write_text(upper_text)
+            with patch.object(runner, "ROOT", root):
+                expected = runner._corpus_expected()
+                for vid in ("GOLD-PROT-HELLO-01", "GOLD-PROT-REQ-01"):
+                    hexval = expected[vid]["frame_hex"]
+                    assert isinstance(hexval, str)
+                    self.assertEqual(hexval, hexval.upper())
+                    self.assertTrue(any(c.isupper() for c in hexval if c.isalpha()))
+                upper_records = list(expected.values())
+                upper_output = self.corpus_output(upper_records)
+                self.assertTrue(runner._shared_corpus_check(upper_output, upper_output)[0])
+        # Mixed case must also pass: lowercase fixture vs uppercase
+        # execution records (case-insensitive comparison).
+        real_records = list(runner._corpus_expected().values())
+        mixed = copy.deepcopy(real_records)
+        for record in mixed:
+            record["frame_hex"] = record["frame_hex"].upper()
+        self.assertTrue(
+            runner._shared_corpus_check(
+                self.corpus_output(mixed), self.corpus_output(mixed))[0])
+        self.assertTrue(
+            runner._shared_corpus_check(
+                self.corpus_output(real_records), self.corpus_output(mixed))[0])
+
     def test_verdicts_require_execution_and_reject_skips_failures(self):
         go = "\n".join(f"--- PASS: {name} (0.00s)" for name in runner.GO_REQUIRED_TESTS)
         self.assertTrue(runner._go_ok(0, go))
