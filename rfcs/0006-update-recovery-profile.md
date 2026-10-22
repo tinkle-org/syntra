@@ -235,6 +235,31 @@ changes.
       missing/mismatched MUST fail with `FAILED_PRECONDITION`, never
       silently applied; unknown profile operations MUST be rejected
       with `UNIMPLEMENTED`.
+    - `SYN-URP-022` — Replay continuation echo and idempotent retry: the
+      initiator MUST send an empty `continuation_marker` on the first
+      `RecoveryReplayRequest` with `from_checkpoint` set to the last
+      confirmed checkpoint, and MUST echo the previous page's marker
+      verbatim with `from_checkpoint` equal to the previous page's
+      `result_checkpoint` on each continuation. The host MUST reject a
+      request whose marker does not match the last issued marker for the
+      stream and generation, or whose `from_checkpoint` does not chain
+      from the previous result, with `FAILED_PRECONDITION`, except that
+      the host MUST retain the last issued `RecoveryReplayPage` per
+      subscription and generation and MUST return it verbatim without
+      advancing when a request duplicates the immediately preceding
+      completed request (identical payload in the current generation),
+      so a retry after an unknown RPC outcome (`UNAVAILABLE`,
+      `DEADLINE_EXCEEDED`, or loss with unknown outcome per
+      `SNTR-REL-003`/`SNTR-REL-009`) is safe with a fresh `request_id`.
+      The host MUST clear the retained page on generation increment,
+      stream termination, or supersede, and MUST NOT advance pagination
+      on a duplicate.
+    - `SYN-URP-023` — Subscribe boundary presence: the host MUST return a
+      non-empty `catchup_boundary` in `RecoverySubscribeResponse` fixed
+      at subscribe accept. Both peers MUST treat an empty boundary as
+      omitted and MUST reject it with `FAILED_PRECONDITION`; the
+      initiator MUST validate each `RecoveryReplayPage.catchup_boundary`
+      against the subscribed boundary.
 
 - Methods and payload mapping (proposed, no normative force):
   Provisional draft only: this table carries no normative force and
@@ -265,10 +290,14 @@ changes.
   with `from_checkpoint` set to the last confirmed checkpoint; each
   continuation carries `continuation_marker` equal verbatim to the previous
   page's marker with `from_checkpoint` equal to the previous page's
-  `result_checkpoint`. The host MUST reject a non-empty marker that does
+  `result_checkpoint` (`SYN-URP-022`). The host MUST reject a non-empty marker that does
   not match the last issued marker for the stream and generation, or a
   `from_checkpoint` that does not chain from the previous result, with
-  `FAILED_PRECONDITION`.
+  `FAILED_PRECONDITION` (`SYN-URP-022`), except for an idempotent duplicate
+  of the immediately preceding completed request (identical payload in the
+  current generation), for which the host MUST return the retained page
+  verbatim without advancing so unknown-outcome retries stay safe
+  (`SYN-URP-022`).
   Completion arrives separately as `RecoveryReplayComplete` or as a
   trailer `Notification` carrying `RecoveryBatchTrailer`. Each
   SnapshotFetch call returns exactly one `RecoverySnapshotChunk` per
@@ -638,7 +667,12 @@ echo, generic key/value, generic subscription):
   `SYN-URP-006`/`SYN-URP-017` → routing/termination and state-separation
   fixtures; `SYN-URP-007`/`SYN-URP-018` → bound fixtures;
   `SYN-URP-010`/`SYN-URP-011`/`SYN-URP-019` → negotiation/schema/hook
-  fixtures; `SYN-URP-021` → unknown-field/schema fixtures.
+  fixtures; `SYN-URP-021` → unknown-field/schema fixtures;
+  `SYN-URP-022` → continuation-echo and idempotent-retry fixtures
+  (mismatched marker/from rejected; duplicate of the immediately
+  preceding completed request returns the retained page);
+  `SYN-URP-023` → subscribe-boundary fixtures (empty boundary rejected,
+  pages validated against the subscribed boundary).
 - [ ] Interop check (implementations or fixtures): at least two
   independent profile implementations (or recorded fixtures from two
   sources) demonstrating mandatory-only interop plus confirmed-profile
@@ -702,10 +736,11 @@ as authority.
    `predecessor_checkpoint`, `result_checkpoint`, `boundary_checkpoint`,
    `live_boundary_checkpoint` at most 4096 bytes;
    `RecoverySubscribeResponse.catchup_boundary` non-empty at most 4096 bytes
-   (empty means omitted and MUST be rejected with FAILED_PRECONDITION);
+   (empty means omitted and MUST be rejected with FAILED_PRECONDITION)
+   (`SYN-URP-023`);
    other `catchup_boundary` fields at most 4096 bytes;
    request `continuation_marker` empty on the first request, otherwise echo
-   of the previous page marker verbatim at most 4096 bytes;
+   of the previous page marker verbatim at most 4096 bytes (`SYN-URP-022`);
    response `continuation_marker` empty means no further page, otherwise
    at most 4096 bytes; `terminate_reason` non-empty when terminated, at most 256
    bytes;    `profile_version` valid value 1; `capability` non-empty at most 256
