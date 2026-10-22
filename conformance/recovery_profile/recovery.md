@@ -94,7 +94,7 @@ Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_dupl
 - Expected output: `RESOURCE_EXHAUSTED` on new work with documented backoff (this case covers the reject-new-work outcome and runs only when the host documents that policy; `CONF-URP-009` covers the permitted continuity-loss alternative and runs only under that policy; satisfying either satisfies the overflow requirement); never unbounded queueing; never silent truncation without the documented signal.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host documents the alternative continuity-loss policy).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host does not document reject-new-work).
 
 ## CONF-URP-009 overflow with continuity loss
 
@@ -104,7 +104,7 @@ Harness fault injection: `faults` keys (`emit_batches`, `skip_batch`, `emit_dupl
 - Expected output: explicit continuity loss with a new generation ending only the affected stream (this case covers the continuity-loss alternative and runs only when the host documents that policy; `CONF-URP-008` covers the permitted `RESOURCE_EXHAUSTED` alternative and runs only under that policy; satisfying either satisfies the overflow requirement); never unbounded queueing; never silent truncation without the documented signal.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
-- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host documents the alternative reject-new-work policy).
+- Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (placeholder pending RFC 0006 acceptance; SKIP when unclaimed or when the host does not document continuity-loss).
 
 ## Sequence view
 

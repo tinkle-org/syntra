@@ -215,8 +215,14 @@ changes.
       error detail.
 
 - Schema diff (`.proto` snippet, field numbers, reserved handling):
-  Additive and envelope-neutral: `proto/syntra/v1/recovery_profile.proto`
-  adds profile payload messages carried inside the existing `request`
+  Provisional draft only: the IDL
+  (`proto/syntra/v1/recovery_profile.proto`), generated code, and
+  conformance fixtures in this PR are provisional drafts, carry no
+  normative force, and land only after acceptance, consistent with the
+  Draft notice above that implementations MUST NOT ship behavior from
+  this proposal. The proposed change is additive and envelope-neutral:
+  `proto/syntra/v1/recovery_profile.proto` adds profile payload messages
+  carried inside the existing `request`
   (field 12), `result` (field 13), and `notification` (field 15) variants
   exactly as defined in `proto/syntra/v1/envelope.proto`. No `Frame`
   field is added, deprecated, or renumbered. Reserved numbers 16, 17 and

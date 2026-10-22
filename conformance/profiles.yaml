@@ -42,7 +42,7 @@ profiles:
   - id: SNTR-EVENTS-V1
     kind: OPTIONAL_CAPABILITY
     title: "Syntra Events v1 — optional subscriptions, delivery, ordering, replay, cursors"
-    required_for: "only implementations claiming events-v1 and/or events-replay-v1"
+    required_for: "only implementations claiming events-v1 and/or events-replay-v1 and/or syntra.update-recovery/1"
     requirement_families: [SNTR-EVENT, SNTR-CAP, SNTR-REL]
     manifests: [manifest/events.yaml, manifest/recovery.yaml]
     capabilities: [events-v1, events-replay-v1, syntra.update-recovery/1]

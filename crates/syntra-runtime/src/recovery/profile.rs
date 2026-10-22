@@ -277,11 +277,6 @@ pub trait RecoveryAuthorizer {
 /// already equals the committed cursor is tolerated with no actions and
 /// no mutation. A duplicate is never a violation. Duplicate confirmation
 /// is idempotent and leaves progress unchanged.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PendingOffer {
-    checkpoint: ProfileCheckpoint,
-    is_snapshot: bool,
-}
 #[derive(Debug, Clone)]
 pub struct ProfileRecovery {
     stream_selector: Vec<u8>,
@@ -289,6 +284,11 @@ pub struct ProfileRecovery {
     committed: Vec<u8>,
     snapshot_pending: bool,
     pending: Option<PendingOffer>,
+}
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PendingOffer {
+    checkpoint: ProfileCheckpoint,
+    is_snapshot: bool,
 }
 
 /// Committable checkpoint returned by observe with its snapshot source.

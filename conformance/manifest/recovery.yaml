@@ -77,8 +77,10 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: {code: FAILED_PRECONDITION, message_pattern: snapshot}
+      frames:
+        - {request_id: 0, body: notification}
       hygiene: {absent_from: [silent_restart]}
-    notes: "Expired continuation with snapshot-required signal: replay from the expired checkpoint yields FAILED_PRECONDITION carrying the snapshot-required signal; the signal marker is required in the error detail so the case fails when the signal is absent. Recovery follows the snapshot path, never silent restart. SKIP when unclaimed."
+    notes: "Expired continuation with snapshot-required signal: replay from the expired checkpoint yields FAILED_PRECONDITION in the failed replay RpcResult while the snapshot-required signal arrives as the trailer Notification; recovery follows the snapshot path, never silent restart. SKIP when unclaimed."
 
   - id: CONF-URP-006
     requirement: [SNTR-EVENT-008]
