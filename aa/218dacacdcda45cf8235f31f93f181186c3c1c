@@ -1,0 +1,102 @@
+bindings/go/reliable_test.go
+  s_9fcde7b0d65463::t_754f888ae673c6 328
+  s_9fcde7b0d65463::t_7d56b45a665e9e 1007-1014
+  s_9fcde7b0d65463::t_25d496decc0de6 776,780,784-788,793
+  s_9fcde7b0d65463::t_42f4731c2b853d 146
+  s_9fcde7b0d65463::t_d780619acac047 276,301,380,455,493,530,623,636,680,715,724
+  s_9fcde7b0d65463::t_8a84dd55a25337 118
+  s_9fcde7b0d65463::t_96dd5494794ef1 124
+  s_9fcde7b0d65463::t_42721b6f4c190d 579
+  s_9fcde7b0d65463::t_ebaa4daa5a0345 490,526
+  s_9fcde7b0d65463::t_4ca7ced738c3fa 819
+  s_9fcde7b0d65463::t_16e0a78f9d4a09 928-931
+  s_9fcde7b0d65463::t_7688c27204284e 942-1006,1015-1092
+  s_9fcde7b0d65463::t_6889c46baf7436 870
+  s_9fcde7b0d65463::t_fcb222b7d4d17f 919
+  s_9fcde7b0d65463::t_78eab33a3aeeb8 282,394
+conformance/runner/runner.py
+  s_fa841a72e8abc8::t_445ea85a9a389e 63-64,66-68
+  s_fa841a72e8abc8::t_253d86ae9989e0 130
+  s_fa841a72e8abc8::t_eb318c5edb079c 143-152
+crates/syntra-runtime/tests/recovery_drivers.rs
+  s_f167b44703e62f::t_79674de85a0b51 491-542
+rfcs/0002-auth-session-lifecycle.md
+  s_fa841a72e8abc8::t_26ab17d69c4365 101-104
+crates/syntra-runtime/src/recovery/driver.rs
+  s_f167b44703e62f::t_724c49322ef2d5 553-561
+crates/syntra-runtime/src/reliable.rs
+  s_6ec9b437402804::t_e5dff11fd3ed62 24-60
+  s_6ec9b437402804::t_5ad958e198f39e 185,187,191,195,199-201,214
+  s_6ec9b437402804::t_d92c057a974401 142-154
+  s_6ec9b437402804::t_afd9856bdaf167 78-85,90-91,93
+  s_6ec9b437402804::t_3ea4e7cdbc5f4c 170
+  s_6ec9b437402804::t_ab8b7ee1c63223 496-503,513-553,561-571,580-609
+  s_6ec9b437402804::t_f9a64483418022 220-223,225,229,237,241-247,253
+bindings/go/reliable.go
+  s_9fcde7b0d65463::t_a0d8978c8bb4a4 392-397
+  s_9fcde7b0d65463::t_268f6770474707 1102-1110,1124,1129-1130,1132,1135-1136,1138-1140,1142,1151-1165,1167,1169,1175,1183-1185
+  s_9fcde7b0d65463::t_55e3a4e0b5c93f 746-753,767-772,779-781,783,788,792-793,802,807-815,819,822-827,833
+  s_9fcde7b0d65463::t_4498fbdcb8897f 13
+  s_9fcde7b0d65463::t_88c4a5a07234d1 1075
+  s_9fcde7b0d65463::t_7f6db2ecac3c40 989,1141,1328
+  s_9fcde7b0d65463::t_067ec43a41cc9d 526
+  s_9fcde7b0d65463::t_c24278581d6ef1 1055-1056,1090
+  s_9fcde7b0d65463::t_36a2d76a998c6b 1168
+  s_9fcde7b0d65463::t_9ac487841407cd 754
+  s_9fcde7b0d65463::t_f3bcf770ea203d 293-294,298-300,302-305,307-310
+  s_9fcde7b0d65463::t_9203c921d5a278 656
+  s_9fcde7b0d65463::t_7037ccfb4245e5 842-843,885-889,892-902,906,908-917
+  s_9fcde7b0d65463::t_89fe7a6896ffc5 679
+  s_9fcde7b0d65463::t_703aaeca05eef1 982-984,986-988,990,993-994,1016-1017
+  s_9fcde7b0d65463::t_061e91189b928b 1170-1174,1177-1182
+  s_9fcde7b0d65463::t_efe6dde4ff4df6 654-655,658,664-666,673-678
+  s_9fcde7b0d65463::t_7ad3c395429488 1315-1316,1324-1327,1329
+  s_9fcde7b0d65463::t_841b47cd8f9d93 295-297,301,306,311-361
+  s_9fcde7b0d65463::t_cbd32e61fd9225 891,907,1018,1078,1166,1176,1311
+crates/syntra-runtime/tests/reliable.rs
+  s_6ec9b437402804::t_4fad44dce18b82 331-410
+tests/test_conformance_runner.py
+  s_fa841a72e8abc8::t_e30f4063a62e78 125-137,142-149,154-156,169
+  s_fa841a72e8abc8::t_eedfb03dda6c6e 157-168
+  s_fa841a72e8abc8::t_5fb22cccc08a5a 138-141,150-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aa218dacacdcda45cf8235f31f93f181186c3c1c",
+  "prompts": {},
+  "sessions": {
+    "s_6ec9b437402804": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9b1486faffeDyz9yVitNKx7gl",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_9fcde7b0d65463": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9b14870cffeN2F8JnOtX5Nd5j",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_f167b44703e62f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9b1486e7ffeqdTkN3S5oXkGMW",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_fa841a72e8abc8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e9b148729ffeC8F91Dhc2kBWee",
+        "model": "muse-spark-1.3-contributor"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
