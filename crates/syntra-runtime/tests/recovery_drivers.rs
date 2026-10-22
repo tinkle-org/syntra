@@ -17,13 +17,303 @@ use std::time::{Duration, Instant};
 
 use syntra_runtime::recovery::{
     CheckpointReconciler, ConnectionContext, HostDriver, InitiatorDriver, ProfileAction,
-    ProfileCheckpoint, ProfileEngine, ProfileInput, ProviderError, RecoveryAuthorizer,
-    ReconcilerConfig, StagedSnapshot, StoredBatch,
+    ProfileCheckpoint, ProfileEngine, ProfileInput, ProviderError, ReconcilerConfig,
+    RecoveryAuthorizer, SnapshotError, StagedSnapshot, StoredBatch,
 };
 use syntra_runtime::session::Principal;
 
 fn ctx(id: &str) -> ConnectionContext {
     ConnectionContext::new(id.to_string(), Principal::new("svc-test"), 1)
+}
+
+fn append(h: &mut HostDriver, generation: u64, from: &[u8], to: &[u8], payload: &[u8]) {
+    h.append_batch(
+        b"s".to_vec(),
+        StoredBatch {
+            predecessor: from.to_vec(),
+            result: to.to_vec(),
+            payload: payload.to_vec(),
+            generation,
+        },
+    );
+}
+
+#[test]
+fn replay_filters_stored_generations_before_lookup_and_paging() {
+    let mut h = HostDriver::new(ctx("c1"));
+    append(&mut h, 6, b"start", b"old", b"old");
+    append(&mut h, 7, b"start", b"middle", b"first");
+    append(&mut h, 6, b"middle", b"old-end", b"old");
+    append(&mut h, 7, b"middle", b"boundary", b"second");
+    let (handle, boundary) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+    let page = h.replay_page(&handle, b"start", 7, 64, 1024).unwrap();
+    assert_eq!(
+        page.batch_payloads,
+        vec![b"first".to_vec(), b"second".to_vec()]
+    );
+    assert_eq!(page.result_checkpoint, boundary);
+    assert!(page.continuation_marker.is_empty());
+}
+
+#[test]
+fn replay_rejects_predecessor_found_only_in_another_generation() {
+    let mut h = HostDriver::new(ctx("c1"));
+    append(&mut h, 6, b"old-start", b"old-end", b"old");
+    append(&mut h, 7, b"start", b"boundary", b"current");
+    let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+    assert_eq!(
+        h.replay_page(&handle, b"old-start", 7, 64, 1024),
+        Err(ProviderError::StaleCheckpoint)
+    );
+    assert_eq!(
+        h.replay_page(&handle, b"start", 7, 64, 1024)
+            .unwrap()
+            .batch_payloads,
+        vec![b"current".to_vec()]
+    );
+}
+
+#[test]
+fn replay_stops_at_subscribed_boundary_despite_later_appends() {
+    for page_size in [1, 64] {
+        let mut h = HostDriver::new(ctx("c1"));
+        append(&mut h, 7, b"start", b"middle", b"first");
+        append(&mut h, 7, b"middle", b"boundary", b"second");
+        let (handle, boundary) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+        append(&mut h, 7, b"boundary", b"live", b"live");
+        let first = h
+            .replay_page(&handle, b"start", 7, page_size, 1024)
+            .unwrap();
+        assert_eq!(first.catchup_boundary, boundary);
+        let last = if page_size == 1 {
+            assert!(!first.continuation_marker.is_empty());
+            h.replay_page(&handle, &first.result_checkpoint, 7, page_size, 1024)
+                .unwrap()
+        } else {
+            assert_eq!(first.batch_payloads.len(), 2);
+            first
+        };
+        assert_eq!(last.result_checkpoint, boundary);
+        assert!(
+            last.continuation_marker.is_empty(),
+            "live data is not another replay page"
+        );
+        assert_eq!(
+            h.replay_page(&handle, b"live", 7, page_size, 1024),
+            Err(ProviderError::StaleCheckpoint)
+        );
+    }
+}
+
+#[test]
+fn replay_retry_requires_identical_raw_batch_bound() {
+    for changed in [1, 65] {
+        let mut h = HostDriver::new(ctx("c1"));
+        append(&mut h, 7, b"start", b"boundary", b"batch");
+        let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+        let page = h.replay_page(&handle, b"start", 7, 64, 1024).unwrap();
+        assert_eq!(
+            h.replay_page(&handle, b"start", 7, changed, 1024),
+            Err(ProviderError::StaleCheckpoint)
+        );
+        assert_eq!(h.replay_page(&handle, b"start", 7, 64, 1024), Ok(page));
+    }
+}
+
+#[test]
+fn replay_retry_requires_identical_raw_byte_bound() {
+    for changed in [1, 262_145] {
+        let mut h = HostDriver::new(ctx("c1"));
+        append(&mut h, 7, b"start", b"boundary", b"batch");
+        let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+        let page = h.replay_page(&handle, b"start", 7, 64, 262_144).unwrap();
+        assert_eq!(
+            h.replay_page(&handle, b"start", 7, 64, changed),
+            Err(ProviderError::StaleCheckpoint)
+        );
+        assert_eq!(h.replay_page(&handle, b"start", 7, 64, 262_144), Ok(page));
+    }
+}
+
+fn two_page_replay() -> (HostDriver, Vec<u8>) {
+    let mut h = HostDriver::new(ctx("c1"));
+    append(&mut h, 7, b"start", b"middle", b"first");
+    append(&mut h, 7, b"middle", b"boundary", b"second");
+    let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+    (h, handle)
+}
+
+#[test]
+fn replay_first_request_rejects_nonempty_continuation() {
+    let (mut h, handle) = two_page_replay();
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"forged"),
+        Err(ProviderError::StaleCheckpoint)
+    );
+    assert!(h
+        .replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"")
+        .is_ok());
+}
+
+#[test]
+fn replay_continuation_requires_echo_and_checkpoint_chain() {
+    let (mut h, handle) = two_page_replay();
+    let first = h
+        .replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"")
+        .unwrap();
+    for marker in [b"".as_slice(), b"forged"] {
+        assert_eq!(
+            h.replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, marker),
+            Err(ProviderError::StaleCheckpoint)
+        );
+    }
+    assert_eq!(
+        h.replay_page_with_continuation(
+            &handle,
+            b"unrelated",
+            7,
+            1,
+            1024,
+            &first.continuation_marker
+        ),
+        Err(ProviderError::StaleCheckpoint)
+    );
+    let last = h
+        .replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, &first.continuation_marker)
+        .unwrap();
+    assert_eq!(last.batch_payloads, vec![b"second".to_vec()]);
+    assert!(last.continuation_marker.is_empty());
+}
+
+#[test]
+fn replay_retry_requires_identical_continuation_and_retains_last_request_only() {
+    let (mut h, handle) = two_page_replay();
+    let first = h
+        .replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"")
+        .unwrap();
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"forged"),
+        Err(ProviderError::StaleCheckpoint)
+    );
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b""),
+        Ok(first.clone())
+    );
+    let last = h
+        .replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, &first.continuation_marker)
+        .unwrap();
+    append(&mut h, 7, b"boundary", b"live", b"live");
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, b"forged"),
+        Err(ProviderError::StaleCheckpoint)
+    );
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, &first.continuation_marker),
+        Ok(last)
+    );
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b""),
+        Err(ProviderError::StaleCheckpoint)
+    );
+}
+
+#[test]
+fn replay_continuation_retry_compares_bounds_and_generation_without_changing_cache() {
+    let (mut h, handle) = two_page_replay();
+    let first = h
+        .replay_page_with_continuation(&handle, b"start", 7, 1, 1024, b"")
+        .unwrap();
+    let marker = &first.continuation_marker;
+    let last = h
+        .replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, marker)
+        .unwrap();
+    for (generation, batches, bytes) in [(6, 1, 1024), (7, 2, 1024), (7, 1, 1)] {
+        assert_eq!(
+            h.replay_page_with_continuation(&handle, b"middle", generation, batches, bytes, marker),
+            Err(ProviderError::StaleCheckpoint)
+        );
+    }
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, marker),
+        Ok(last)
+    );
+    h.unsubscribe(&handle).unwrap();
+    assert_eq!(
+        h.replay_page_with_continuation(&handle, b"middle", 7, 1, 1024, marker),
+        Err(ProviderError::UnknownStream)
+    );
+}
+
+#[test]
+fn replay_byte_bound_pages_only_matching_generation_and_stops_at_boundary() {
+    let mut h = HostDriver::new(ctx("c1"));
+    append(&mut h, 6, b"start", b"old", &[0; 32]);
+    append(&mut h, 7, b"start", b"middle", b"ab");
+    append(&mut h, 6, b"middle", b"old-end", &[0; 32]);
+    append(&mut h, 7, b"middle", b"boundary", b"cd");
+    let (handle, _) = h.subscribe(b"s".to_vec(), b"start".to_vec(), 7).unwrap();
+    append(&mut h, 7, b"boundary", b"live", b"ef");
+    assert_eq!(
+        h.replay_page(&handle, b"start", 7, 64, 1),
+        Err(ProviderError::Overloaded)
+    );
+    let first = h.replay_page(&handle, b"start", 7, 64, 2).unwrap();
+    assert_eq!(first.batch_payloads, vec![b"ab".to_vec()]);
+    let last = h
+        .replay_page_with_continuation(&handle, b"middle", 7, 64, 2, &first.continuation_marker)
+        .unwrap();
+    assert_eq!(last.batch_payloads, vec![b"cd".to_vec()]);
+    assert_eq!(last.result_checkpoint, b"boundary");
+    assert!(last.continuation_marker.is_empty());
+}
+
+#[test]
+fn snapshot_constructor_rejects_empty_handle() {
+    assert!(matches!(
+        StagedSnapshot::new(Vec::new(), b"boundary".to_vec(), 1, 1),
+        Err(SnapshotError::HandleMismatch)
+    ));
+}
+
+#[test]
+fn snapshot_constructor_rejects_handle_over_256_bytes() {
+    assert!(matches!(
+        StagedSnapshot::new(vec![0; 257], b"boundary".to_vec(), 1, 1),
+        Err(SnapshotError::OverLimit)
+    ));
+}
+
+#[test]
+fn snapshot_constructor_accepts_handle_at_both_valid_limits() {
+    for len in [1, 256] {
+        let handle = vec![0; len];
+        let mut staged = StagedSnapshot::new(handle.clone(), b"boundary".to_vec(), 1, 1).unwrap();
+        assert_eq!(staged.snapshot_handle(), handle);
+        staged
+            .stage_page(&handle, 0, vec![42], b"boundary")
+            .unwrap();
+        assert_eq!(staged.install().unwrap(), vec![42]);
+    }
+}
+
+#[test]
+fn invalid_snapshot_handle_does_not_replace_existing_staging() {
+    let mut d = InitiatorDriver::new(ctx("c1"), 16);
+    d.track_stream(b"s".to_vec(), 7, b"start".to_vec()).unwrap();
+    d.stage_snapshot(b"s".to_vec(), b"valid".to_vec(), b"boundary".to_vec(), 1, 8)
+        .unwrap();
+    for handle in [Vec::new(), vec![0; 257]] {
+        assert!(d
+            .stage_snapshot(b"s".to_vec(), handle, b"other".to_vec(), 1, 8)
+            .is_err());
+    }
+    d.stage_snapshot_page(b"s", b"valid", 0, b"snapshot".to_vec(), b"boundary")
+        .unwrap();
+    let (checkpoint, bytes) = d.install_snapshot(b"s", 8).unwrap();
+    assert_eq!(checkpoint.result_cursor, b"boundary");
+    assert_eq!(bytes, b"snapshot");
+    assert_eq!(d.engine().generation(b"s"), Some(7));
+    assert_eq!(d.engine().committed(b"s"), Some(b"start".as_slice()));
 }
 
 fn cp(sel: &[u8], gen: u64, base: &[u8], result: &[u8]) -> ProfileCheckpoint {
@@ -94,24 +384,26 @@ fn lost_confirm_discovered_by_reconciliation_without_new_update() {
 fn snapshot_failure_never_advances_generation() {
     let mut d = InitiatorDriver::new(ctx("c1"), 16);
     d.track_stream(b"s".to_vec(), 7, b"c-40".to_vec()).unwrap();
-    d.stage_snapshot(
-        b"s".to_vec(),
-        b"h1".to_vec(),
-        b"b-100".to_vec(),
-        2,
-        1024,
-    )
-    .unwrap();
-    d.stage_snapshot_page(b"s", b"h1", 0, b"half".to_vec(), b"b-100").unwrap();
+    d.stage_snapshot(b"s".to_vec(), b"h1".to_vec(), b"b-100".to_vec(), 2, 1024)
+        .unwrap();
+    d.stage_snapshot_page(b"s", b"h1", 0, b"half".to_vec(), b"b-100")
+        .unwrap();
     assert!(d.install_snapshot(b"s", 8).is_err());
     assert_eq!(d.engine().generation(b"s"), Some(7));
     assert_eq!(d.engine().committed(b"s"), Some(b"c-40".as_slice()));
-    d.stage_snapshot_page(b"s", b"h1", 1, b"rest".to_vec(), b"b-100").unwrap();
+    d.stage_snapshot_page(b"s", b"h1", 1, b"rest".to_vec(), b"b-100")
+        .unwrap();
     let (snap_cp, snap_bytes) = d.install_snapshot(b"s", 8).unwrap();
     assert_eq!(snap_cp.result_cursor, b"b-100");
     assert_eq!(snap_bytes, b"halfrest");
-    assert!(d.install_snapshot(b"s", 9).is_err(), "staged entry removed after success");
-    assert!(d.install_snapshot(b"s", 7).is_err(), "stale generation rejected");
+    assert!(
+        d.install_snapshot(b"s", 9).is_err(),
+        "staged entry removed after success"
+    );
+    assert!(
+        d.install_snapshot(b"s", 7).is_err(),
+        "stale generation rejected"
+    );
     let mut engine = ProfileEngine::new();
     engine.insert_stream(b"s".to_vec(), 7, b"c-40".to_vec());
     let offered = engine.observe(ProfileInput::SnapshotInstalled {
@@ -126,20 +418,30 @@ fn snapshot_failure_never_advances_generation() {
 #[test]
 fn directed_delivery_isolates_subscription_handles() {
     let mut h = HostDriver::new(ctx("c1")).with_authorizer(Arc::new(AllowAll));
-    h.append_batch(b"stream-a".to_vec(), StoredBatch {
-        predecessor: b"c-40".to_vec(),
-        result: b"c-43".to_vec(),
-        payload: b"batch-a".to_vec(),
-        generation: 7,
-    });
-    h.append_batch(b"stream-b".to_vec(), StoredBatch {
-        predecessor: b"d-40".to_vec(),
-        result: b"d-43".to_vec(),
-        payload: b"batch-b".to_vec(),
-        generation: 7,
-    });
-    let (ha, _) = h.subscribe(b"stream-a".to_vec(), b"c-40".to_vec(), 7).unwrap();
-    let (hb, _) = h.subscribe(b"stream-b".to_vec(), b"d-40".to_vec(), 7).unwrap();
+    h.append_batch(
+        b"stream-a".to_vec(),
+        StoredBatch {
+            predecessor: b"c-40".to_vec(),
+            result: b"c-43".to_vec(),
+            payload: b"batch-a".to_vec(),
+            generation: 7,
+        },
+    );
+    h.append_batch(
+        b"stream-b".to_vec(),
+        StoredBatch {
+            predecessor: b"d-40".to_vec(),
+            result: b"d-43".to_vec(),
+            payload: b"batch-b".to_vec(),
+            generation: 7,
+        },
+    );
+    let (ha, _) = h
+        .subscribe(b"stream-a".to_vec(), b"c-40".to_vec(), 7)
+        .unwrap();
+    let (hb, _) = h
+        .subscribe(b"stream-b".to_vec(), b"d-40".to_vec(), 7)
+        .unwrap();
     assert_ne!(ha, hb);
     let env_a = h.directed_delivery(&ha, b"batch-a".to_vec()).unwrap();
     assert_eq!(env_a.subscription_handle, ha);

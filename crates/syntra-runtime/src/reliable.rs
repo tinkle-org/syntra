@@ -30,46 +30,78 @@ impl StoredOutcome {
 }
 #[derive(Debug, Clone)]
 struct RetainedEntry { method: String, payload: Vec<u8>, outcome: StoredOutcome, retained_at_ms: u64 }
+impl RetainedEntry {
+    fn byte_len(&self) -> usize { self.method.len() + self.payload.len() + self.outcome.byte_len() }
+}
+#[derive(Debug, Clone)]
+struct PendingEntry { method: String, payload: Vec<u8> }
+impl PendingEntry {
+    fn byte_len(&self) -> usize { self.method.len() + self.payload.len() }
+}
 #[derive(Debug, Default)]
-struct OutcomeStore { entries: HashMap<DeliveryId, RetainedEntry>, bytes: usize, forgotten: HashMap<DeliveryId, u64>, pending: HashMap<DeliveryId, u64> }
+struct OutcomeStore {
+    entries: HashMap<DeliveryId, RetainedEntry>,
+    // Aggregate owned content: pending requests plus retained requests/results.
+    bytes: usize,
+    forgotten: HashMap<DeliveryId, u64>,
+    pending: HashMap<DeliveryId, PendingEntry>,
+}
 impl OutcomeStore {
+    fn replacement_bytes(&self, bounds: &ControlBounds, did: &DeliveryId, n: usize) -> Result<usize, SyntraError> {
+        let retained = self.entries.get(did);
+        let pending = self.pending.get(did);
+        let count = self.entries.len() + self.pending.len()
+            - usize::from(retained.is_some()) - usize::from(pending.is_some());
+        if count >= bounds.max_retained_results { return Err(resource("retained and pending result budget exhausted")); }
+        let replaced = retained.map_or(0, RetainedEntry::byte_len) + pending.map_or(0, PendingEntry::byte_len);
+        self.bytes.checked_sub(replaced).and_then(|bytes| bytes.checked_add(n))
+            .filter(|&bytes| bytes <= bounds.max_retained_bytes)
+            .ok_or_else(|| resource("retained and pending result bytes exhausted"))
+    }
+    fn release_pending(&mut self, did: &DeliveryId) {
+        if let Some(pending) = self.pending.remove(did) {
+            self.bytes -= pending.byte_len();
+        }
+    }
     fn insert(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, method: String, payload: Vec<u8>, outcome: StoredOutcome) -> Result<ReconcileOutcome, SyntraError> {
+        if let Some(pending) = self.pending.get(&did) {
+            check_duplicate_content(&pending.method, &pending.payload, &method, &payload)?;
+        }
         if let Some(existing) = self.entries.get(&did) {
-            if now_ms.saturating_sub(existing.retained_at_ms) > bounds.result_retention_ms {
-                let old = self.entries.remove(&did).expect("checked above");
-                let f = old.method.len() + old.payload.len() + old.outcome.byte_len();
-                self.bytes = self.bytes.saturating_sub(f);
-            } else {
+            if now_ms.saturating_sub(existing.retained_at_ms) <= bounds.result_retention_ms {
                 check_duplicate_content(&existing.method, &existing.payload, &method, &payload)?;
                 return Ok(ReconcileOutcome::Retained);
             }
         }
-        if let Some(&forgot_at) = self.forgotten.get(&did) {
-            if now_ms.saturating_sub(forgot_at) > bounds.result_retention_ms {
-                self.forgotten.remove(&did);
-            } else {
-                self.forgotten.remove(&did);
-            }
-        }
-        let n = method.len() + payload.len() + outcome.byte_len();
-        if self.entries.len() >= bounds.max_retained_results { return Err(resource("retained result budget exhausted")); }
-        if self.bytes.saturating_add(n) > bounds.max_retained_bytes { return Err(resource("retained result bytes exhausted")); }
-        self.bytes = self.bytes.saturating_add(n);
-        self.entries.insert(did, RetainedEntry { method, payload, outcome, retained_at_ms: now_ms });
+        let n = method.len().checked_add(payload.len()).and_then(|n| n.checked_add(outcome.byte_len()))
+            .ok_or_else(|| resource("retained result size overflow"))?;
+        let bytes = self.replacement_bytes(bounds, &did, n)?;
+        // Commit only after content validation and replacement admission succeed.
         self.pending.remove(&did);
+        self.forgotten.remove(&did);
+        self.entries.insert(did, RetainedEntry { method, payload, outcome, retained_at_ms: now_ms });
+        self.bytes = bytes;
         Ok(ReconcileOutcome::Retained)
     }
-    fn note_dispatch(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId) -> Result<(), SyntraError> {
-        if self.entries.contains_key(&did) || self.forgotten.contains_key(&did) {
-            return Ok(());
+    fn note_dispatch(&mut self, bounds: &ControlBounds, now_ms: u64, did: DeliveryId, method: String, payload: Vec<u8>) -> Result<(), SyntraError> {
+        if let Some(pending) = self.pending.get(&did) {
+            return check_duplicate_content(&pending.method, &pending.payload, &method, &payload);
         }
-        if self.pending.contains_key(&did) {
-            return Ok(());
+        if let Some(existing) = self.entries.get(&did) {
+            if now_ms.saturating_sub(existing.retained_at_ms) <= bounds.result_retention_ms {
+                return check_duplicate_content(&existing.method, &existing.payload, &method, &payload);
+            }
         }
-        if self.pending.len() >= bounds.max_retained_results {
-            return Err(resource("pending dispatch budget exhausted"));
+        if let Some(&forgot_at) = self.forgotten.get(&did) {
+            if now_ms.saturating_sub(forgot_at) <= bounds.result_retention_ms { return Ok(()); }
         }
-        self.pending.insert(did, now_ms);
+        let n = method.len().checked_add(payload.len()).ok_or_else(|| resource("pending dispatch size overflow"))?;
+        let bytes = self.replacement_bytes(bounds, &did, n)?;
+        // Stale terminal markers must not hide a newly admitted Pending entry.
+        self.entries.remove(&did);
+        self.forgotten.remove(&did);
+        self.pending.insert(did, PendingEntry { method, payload });
+        self.bytes = bytes;
         Ok(())
     }
     fn get(&self, now_ms: u64, retention_ms: u64, did: &DeliveryId) -> ReconcileOutcome {
@@ -80,7 +112,6 @@ impl OutcomeStore {
                 Some(&forgot_at) if now_ms.saturating_sub(forgot_at) > retention_ms => ReconcileOutcome::Unknown,
                 Some(_) => ReconcileOutcome::Forgotten,
                 None => match self.pending.get(did) {
-                    Some(&dispatched_at) if now_ms.saturating_sub(dispatched_at) > retention_ms => ReconcileOutcome::Forgotten,
                     Some(_) => ReconcileOutcome::Pending,
                     None => ReconcileOutcome::Unknown,
                 },
@@ -91,10 +122,8 @@ impl OutcomeStore {
         self.entries.get(did).map(|e| e.outcome.clone())
     }
     fn forget(&mut self, bounds: &ControlBounds, now_ms: u64, did: &DeliveryId) -> bool {
-        self.pending.remove(did);
         if let Some(e) = self.entries.remove(did) {
-            let f = e.method.len() + e.payload.len() + e.outcome.byte_len();
-            self.bytes = self.bytes.saturating_sub(f);
+            self.bytes -= e.byte_len();
             if !self.forgotten.contains_key(did) && self.forgotten.len() >= bounds.max_retained_results {
                 if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(k, _)| *k) {
                     self.forgotten.remove(&oldest);
@@ -118,20 +147,8 @@ impl OutcomeStore {
             .map(|(k, _)| *k).collect();
         let n = expired.len();
         for k in expired { self.forget(bounds, now_ms, &k); }
-        let expired_pending: Vec<DeliveryId> = self.pending.iter()
-            .filter(|(_, &t)| now_ms.saturating_sub(t) > retention_ms)
-            .map(|(k, _)| *k).collect();
-        for k in expired_pending {
-            self.pending.remove(&k);
-            if !self.forgotten.contains_key(&k) {
-                if self.forgotten.len() >= bounds.max_retained_results {
-                    if let Some(oldest) = self.forgotten.iter().min_by_key(|(_, &t)| t).map(|(kk, _)| *kk) {
-                        self.forgotten.remove(&oldest);
-                    }
-                }
-                self.forgotten.insert(k, now_ms);
-            }
-        }
+        // Time passing cannot prove a handler stopped executing. Pending owns
+        // its content and budget until a successful result/tombstone mutation.
         let expired_forgotten: Vec<DeliveryId> = self.forgotten.iter()
             .filter(|(_, &t)| now_ms.saturating_sub(t) > retention_ms)
             .map(|(k, _)| *k).collect();
@@ -395,15 +412,31 @@ impl ReliableSessionManager {
         if st.epoch != expected_epoch {
             return Err(failed_precondition("stale attachment epoch; fenced connection cannot forget"));
         }
+        if st.outcomes.pending.contains_key(&did) {
+            return Err(failed_precondition("cannot forget a pending dispatch before a terminal outcome"));
+        }
         Ok(st.outcomes.forget(&self.bounds, now_ms, &did))
     }
-    pub fn note_dispatch(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8]) -> Result<(), SyntraError> {
+    /// Admit request content before handler dispatch; identical resends are idempotent.
+    /// Pending content shares the retained count/byte caps and never expires by
+    /// time alone. The owner must record a terminal result or deadline/cancel
+    /// tombstone once work is terminal; `forget` cannot clear executing work.
+    pub fn note_dispatch(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], method: String, payload: Vec<u8>) -> Result<(), SyntraError> {
         let sid = validate_session_id(session_id)?;
         let did = validate_delivery_id(delivery_id)?;
+        if payload.len() > syntra_core::MAX_FRAME_BYTES { return Err(resource("payload exceeds envelope bound")); }
         let mut inner = self.lock()?;
         let st = inner.sessions.get_mut(&sid).ok_or_else(|| failed_precondition("unknown session for dispatch"))?;
+        if st.epoch != expected_epoch {
+            return Err(failed_precondition("stale attachment epoch; fenced connection cannot dispatch"));
+        }
+        if st.tombstones.get(now_ms, self.bounds.tombstone_retention_ms, &did).is_some() {
+            return Ok(());
+        }
+        st.outcomes.note_dispatch(&self.bounds, now_ms, did, method, payload)?;
+        st.tombstones.entries.remove(&did);
         st.last_activity_ms = now_ms;
-        st.outcomes.note_dispatch(&self.bounds, now_ms, did)
+        Ok(())
     }
     pub fn record_tombstone(&self, now_ms: u64, session_id: &[u8], expected_epoch: u64, delivery_id: &[u8], code: ErrorCode) -> Result<(), SyntraError> {
         let sid = validate_session_id(session_id)?;
@@ -413,8 +446,9 @@ impl ReliableSessionManager {
         if st.epoch != expected_epoch {
             return Err(failed_precondition("stale attachment epoch; fenced connection cannot tombstone"));
         }
-        st.outcomes.pending.remove(&did);
-        st.tombstones.record(&self.bounds, now_ms, did, code)
+        st.tombstones.record(&self.bounds, now_ms, did, code)?;
+        st.outcomes.release_pending(&did);
+        Ok(())
     }
     pub fn tombstone_of(&self, now_ms: u64, session_id: &[u8], delivery_id: &[u8]) -> Result<Option<ErrorCode>, SyntraError> {
         let sid = validate_session_id(session_id)?;

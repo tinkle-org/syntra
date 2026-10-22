@@ -291,6 +291,8 @@ type CheckpointReconciler struct {
 	mu       sync.Mutex
 	config   ReconcilerConfig
 	lastTick time.Time
+	// Stored cursor slices are owned and immutable: NoteObserved copies
+	// inputs and replaces whole entries, never mutating their backing arrays.
 	observed map[string]Checkpoint
 }
 
@@ -351,12 +353,9 @@ func (r *CheckpointReconciler) Tick(now time.Time, committed func(stream string)
 	r.lastTick = now
 	snap := make(map[string]Checkpoint, len(r.observed))
 	for s, cp := range r.observed {
-		snap[s] = Checkpoint{
-			Stream:     cp.Stream,
-			Generation: cp.Generation,
-			Base:       append([]byte(nil), cp.Base...),
-			Result:     append([]byte(nil), cp.Result...),
-		}
+		// The snapshot retains the immutable owned slices even if a callback
+		// replaces or forgets this entry after we release the lock.
+		snap[s] = cp
 	}
 	max := r.config.MaxStreamsPerTick
 	r.mu.Unlock()

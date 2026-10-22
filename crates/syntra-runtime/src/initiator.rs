@@ -96,6 +96,10 @@ impl Initiator {
         self.conn.subscribe_close()
     }
 
+    pub(crate) async fn fence_writer(&self) {
+        self.conn.fence_writer().await;
+    }
+
     // -- Handshake -------------------------------------------------------
 
     /// Send `hello` and await `ready` (or a terminal handshake error).
@@ -520,7 +524,7 @@ impl Initiator {
             // Hold the read lock only through pending insertion, so close
             // cannot drain the table just before a late insertion.
             let state = self.conn.shared.state.read().await;
-            if self.conn.is_closed() {
+            if self.conn.is_closed() || self.conn.writer_is_fenced() {
                 return Err(SyntraError::Closed("connection closed".to_string()));
             }
             if *state != ConnectionState::Active {
@@ -563,7 +567,10 @@ impl Initiator {
             }
             let permit = self.conn.reserve_writer().await?;
             let state = self.conn.shared.state.read().await;
-            if self.conn.is_closed() || *state != ConnectionState::Active {
+            if self.conn.is_closed()
+                || self.conn.writer_is_fenced()
+                || *state != ConnectionState::Active
+            {
                 return Err(SyntraError::Closed("connection closed".to_string()));
             }
             // select! checked before polling admission. Re-check at the
@@ -660,6 +667,10 @@ impl Initiator {
         };
         // Send best-effort; ignore transport errors for unknown ids.
         let bytes = frame.encode_to_vec();
+        let _state = self.conn.shared.state.read().await;
+        if self.conn.is_closed() || self.conn.writer_is_fenced() {
+            return Ok(());
+        }
         let _ = self.conn.shared.writer.try_send(bytes);
         Ok(())
     }

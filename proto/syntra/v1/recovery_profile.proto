@@ -8,6 +8,10 @@ option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntra
 // snapshot recovery, and committed progress (SYN-URP-001..007,
 // SYN-URP-010..026; SYN-URP-008/009 reserved).
 //
+// DRAFT proposal under RFC 0006, not accepted shipping authority. These
+// comments describe proposed validation; generated codecs alone do not
+// enforce it. No conformance or release claim may cite the draft as authority.
+//
 // All payloads are versioned bytes carried inside the existing request,
 // result, and notification envelopes with no envelope changes. Each
 // subscription is one independent logical stream with one continuity
@@ -356,12 +360,23 @@ message RecoverySnapshotConfirmRequest {
   // at most 256 bytes. Required.
   bytes subscription_handle = 2;
   // generation is the continuity generation at confirm time (pre-install).
-  // Required. MUST equal the current generation before install.
+  // Required. MUST equal the current generation before a first install.
+  // Draft retained-install retry exception (SYN-URP-025): after successful
+  // installation, an exact duplicate for the same authorized subscription,
+  // profile version, pre-install generation, and boundary bytes MAY carry
+  // that pre-install generation only while its installed response is retained
+  // and the current generation still equals that response's installed
+  // generation. The host MUST return the original RecoverySnapshotInstalled
+  // without reinstalling or advancing generation. Supersede, termination,
+  // later continuity change, or retention expiry invalidates this exception;
+  // other stale-generation requests MUST fail with FAILED_PRECONDITION.
   uint64 generation = 3;
   // boundary_checkpoint is the offered boundary being confirmed. Opaque bytes,
   // non-empty, at most 4096 bytes. Required. MUST equal the offered
   // RecoverySnapshotDescriptor.boundary_checkpoint bytes; mismatch MUST be
   // rejected with FAILED_PRECONDITION without installing.
+  // On the retained-install retry path, MUST equal the retained installed
+  // boundary exactly; matching bytes alone do not authorize a stale confirm.
   bytes boundary_checkpoint = 4;
 }
 

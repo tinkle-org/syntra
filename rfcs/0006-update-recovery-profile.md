@@ -230,10 +230,16 @@ changes.
       `proto/syntra/v1/recovery_profile.proto`; fields explicitly
       marked `Ignorable` MUST be ignored; `profile_version` and
       routing/identity fields (`stream_selector`,
-      `subscription_handle`, `snapshot_handle`, checkpoints,
-      boundaries, `capability`, versions) are required and
-      missing/mismatched MUST fail with `FAILED_PRECONDITION`, never
-      silently applied; unknown profile operations MUST be rejected
+      `subscription_handle`, `snapshot_handle`, `capability`, versions)
+      are required and missing/mismatched MUST fail with
+      `FAILED_PRECONDITION`, never
+      silently applied. Checkpoints, boundaries, and markers follow their
+      per-field rules: empty `start_checkpoint` means initial subscription;
+      empty `continuation_marker` means first request or no further page;
+      `terminate_reason` is non-empty only for the terminated outcome.
+      Other checkpoint/boundary presence and pairing follow the field comments
+      and `SYN-URP-013`/`SYN-URP-023`/`SYN-URP-024`.
+      Unknown profile operations MUST be rejected
       with `UNIMPLEMENTED`.
     - `SYN-URP-022` — Replay continuation echo and idempotent retry:
       replay applies only to resumption from a non-empty
@@ -299,12 +305,25 @@ changes.
       `SnapshotFetch` under a superseded `snapshot_handle` MUST fail with
       `FAILED_PRECONDITION`, and the initiator MUST discard prior pages on
       supersede and MUST NOT install across boundaries. Confirm is
-      idempotent with stop-and-wait fencing: re-presenting the same
-      checkpoint bytes in the same generation (`RecoveryConfirmRequest`
-      batch or `RecoverySnapshotConfirmRequest` boundary) MUST return
-      confirmed (`RecoveryConfirmResponse` or `RecoverySnapshotInstalled`)
-      without new side effects or generation change; a checkpoint never
-      returned as committable MUST be rejected with `FAILED_PRECONDITION`
+      idempotent with stop-and-wait fencing: re-presenting the same batch
+      checkpoint bytes in the same generation (`RecoveryConfirmRequest`)
+      MUST return `RecoveryConfirmResponse` without new side effects or
+      generation change. Snapshot-boundary confirmation uses the distinct
+      `/syntra.v1.UpdateRecovery/SnapshotConfirm` method. Its first install
+      requires the current pre-install generation and exact offered boundary.
+      An exact duplicate `RecoverySnapshotConfirmRequest` for the same
+      authorized subscription and profile version, carrying that pre-install
+      generation and installed boundary bytes, MUST return the original
+      retained `RecoverySnapshotInstalled` without reinstalling or further
+      generation change, only while the response is retained and the current
+      generation equals its installed generation. Supersede, termination,
+      later continuity change, or retention expiry invalidates this narrow
+      exception; other stale-generation requests MUST fail with
+      `FAILED_PRECONDITION`. Boundary equality alone does not establish
+      retry eligibility. Retention is bounded in count, bytes, and lifetime
+      and documented by the deployment; this draft sets no implicit minimum.
+      A checkpoint never returned as committable MUST be rejected with
+      `FAILED_PRECONDITION`
       without advancing; gap, continuity-loss, and continuation-expiry
       reports invalidate any pending offer.
     - `SYN-URP-026` — Subscriber-local versus shared generation
@@ -342,7 +361,7 @@ changes.
   | Replay | `/syntra.v1.UpdateRecovery/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144, `continuation_marker` empty on first request, echo of previous page's marker thereafter) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
   | CatchUp | `/syntra.v1.UpdateRecovery/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` in the terminal `RpcResult`; `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
   | Confirm (batch) | `/syntra.v1.UpdateRecovery/Confirm` | `RecoveryConfirmRequest` (`profile_version`, `subscription_handle`, `generation`, `checkpoint` batch result) | `RecoveryConfirmResponse` (`confirmed_checkpoint`, `generation` unchanged; idempotent retry echoes same bytes) |
-  | Confirm (snapshot boundary) | `/syntra.v1.UpdateRecovery/Confirm` | `RecoverySnapshotConfirmRequest` (`profile_version`, `subscription_handle`, `generation` pre-install, `boundary_checkpoint` must equal offered boundary) | `RecoverySnapshotInstalled` (`boundary_checkpoint`, new `generation` after install) |
+  | Confirm (snapshot boundary) | `/syntra.v1.UpdateRecovery/SnapshotConfirm` | `RecoverySnapshotConfirmRequest` (`profile_version`, `subscription_handle`, `generation` pre-install, `boundary_checkpoint` must equal offered boundary; exact retained-install retry per `SYN-URP-025`) | `RecoverySnapshotInstalled` (`boundary_checkpoint`, new `generation` after install; original retained response on retry) |
   | SnapshotOffer | `/syntra.v1.UpdateRecovery/SnapshotOffer` | `RecoverySnapshotOfferRequest` (`profile_version`, `subscription_handle`, `generation` at offer time) | `RecoverySnapshotDescriptor` (`snapshot_handle`, provider-proven `boundary_checkpoint`, `total_pages` 1..256, `page_bytes_max` 1..262144) |
   | SnapshotFetch | `/syntra.v1.UpdateRecovery/SnapshotFetch` | `RecoverySnapshotFetchRequest` (`profile_version`, `snapshot_handle`, `page_index` 0..255) | exactly one `RecoverySnapshotChunk` per `RpcResult` with `page_index` correlation plus `boundary_checkpoint` equality; completion as `RecoverySnapshotComplete` (`total_pages`, `total_bytes` 1..67108864) |
   | Unsubscribe | `/syntra.v1.UpdateRecovery/Unsubscribe` | `RecoveryUnsubscribeRequest` (`profile_version`, `subscription_handle`) | `RecoveryUnsubscribeResponse` (`profile_version`, `subscription_handle`, `generation` at termination); targeted `RecoveryBatchTrailer{terminated=true}` with `terminate_reason` where applicable |
@@ -380,7 +399,7 @@ changes.
   representable by codecs but is not valid and MUST be rejected with
   `FAILED_PRECONDITION`. `RpcResult` payloads stay bare typed messages
   per the table above. No `Frame` field is added or renumbered; reserved
-  16, 17 and `event`, `resume`, `ack` are preserved. All eight method
+  16, 17 and `event`, `resume`, `ack` are preserved. All nine method
   strings are canonical `/package.Service/Method` paths with exactly two
   slashes per `SNTR-RPC-001`; any other shape MUST be rejected with
   `INVALID_ARGUMENT` before dispatch and MUST NOT be treated as a profile
@@ -402,7 +421,9 @@ changes.
   explicitly marked `Critical`; fields explicitly marked `Ignorable`
   in `proto/syntra/v1/recovery_profile.proto` MUST be ignored;
   `profile_version` and routing/identity fields are required and
-  missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
+  missing/mismatch MUST fail with `FAILED_PRECONDITION`; checkpoint,
+  boundary, and marker emptiness follows per-field rules in `SYN-URP-021`
+  and the IDL, including initial-subscribe and pagination sentinels; unknown
   profile operations MUST be rejected with `UNIMPLEMENTED`, never
   silently applied.
 
@@ -537,10 +558,11 @@ capability negotiation, unknown-field/profile handling, resource bounds.
   `/syntra.v1.UpdateRecovery/Replay`,
   `/syntra.v1.UpdateRecovery/CatchUp`,
   `/syntra.v1.UpdateRecovery/Confirm`,
+  `/syntra.v1.UpdateRecovery/SnapshotConfirm`,
   `/syntra.v1.UpdateRecovery/SnapshotOffer`,
   `/syntra.v1.UpdateRecovery/SnapshotFetch`,
   `/syntra.v1.UpdateRecovery/Unsubscribe`), each with versioned opaque
-  payload bytes defined by this profile. All eight method strings are
+  payload bytes defined by this profile. All nine method strings are
   canonical `/package.Service/Method` paths with exactly two slashes per
   `SNTR-RPC-001`. Streamed content uses `Notification` payloads carrying
   exactly one versioned `RecoveryNotification` discriminator
@@ -595,8 +617,10 @@ capability negotiation, unknown-field/profile handling, resource bounds.
   `proto/syntra/v1/recovery_profile.proto`; fields explicitly marked
   `Ignorable` MUST be ignored; `profile_version` and routing/identity
   fields (`stream_selector`, `subscription_handle`, `snapshot_handle`,
-  checkpoints, boundaries, `capability`, versions) are required and
-  missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
+  `capability`, versions) are required and missing/mismatch MUST fail
+  with `FAILED_PRECONDITION`; checkpoints, boundaries, and markers use
+  the per-field emptiness and pairing rules in `SYN-URP-021` and the IDL,
+  not a blanket non-empty rule; unknown
   profile operations MUST be rejected with `UNIMPLEMENTED`, never
   silently applied.
 - Resource bounds: §3 `SYN-URP-007` / `SYN-URP-018` own the bounds. No
@@ -749,7 +773,7 @@ echo, generic key/value, generic subscription):
 - [ ] Requirement-to-test trace (ID → test):
   `SYN-URP-001`/`SYN-URP-020` → negotiation/version fixtures;
   `SYN-URP-002` → envelope preservation fixtures (no new `Frame` fields,
-  reserved 16/17 and `event`/`resume`/`ack` untouched, all eight methods
+  reserved 16/17 and `event`/`resume`/`ack` untouched, all nine methods
   canonical `/package.Service/Method` with exactly two slashes,
   `RecoveryNotification` inside `Notification.payload`);
   `SYN-URP-003`/`SYN-URP-012`/`SYN-URP-013` →
@@ -772,7 +796,10 @@ echo, generic key/value, generic subscription):
   `SYN-URP-024` → bootstrap/repeated-rounds/lost-completion fixtures
   (initial skip-replay, fixed-B validation, new round from last confirmed,
   no idle-as-caught-up); `SYN-URP-025` → snapshot-generation and
-  confirm-fencing fixtures (new generation on install, idempotent retry,
+  confirm-fencing fixtures (new generation on install, exact pre-install
+  generation retry returns the original retained installed response,
+  different subscription/version/boundary rejected, later generation or
+  supersede/termination/retention expiry rejects the old request,
   un-offered confirm rejected, supersede discards pages);
   `SYN-URP-026` → invalidation-scope and revocation fixtures
   (shared vs subscriber-local, revoked principal stops with typed signal
@@ -859,8 +886,8 @@ as authority.
    `/syntra.v1.UpdateRecovery/Subscribe`,
    `/syntra.v1.UpdateRecovery/Replay`,
    `/syntra.v1.UpdateRecovery/CatchUp`,
-   `/syntra.v1.UpdateRecovery/Confirm` (batch and snapshot-boundary
-   variants),
+   `/syntra.v1.UpdateRecovery/Confirm` (batch),
+   `/syntra.v1.UpdateRecovery/SnapshotConfirm` (snapshot boundary),
    `/syntra.v1.UpdateRecovery/SnapshotOffer`,
    `/syntra.v1.UpdateRecovery/SnapshotFetch`, and
    `/syntra.v1.UpdateRecovery/Unsubscribe` under identifier
@@ -877,8 +904,9 @@ as authority.
     in the terminal `RpcResult` (batches and completion trailer via
     `Notification` as `RecoveryNotification`),
    batch `RecoveryConfirmRequest`/`RecoveryConfirmResponse` and snapshot
-   `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled` sharing
-   the Confirm method,
+   `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled` using
+   distinct Confirm and SnapshotConfirm methods so identical Protobuf field
+   shapes cannot confuse batch and snapshot intent,
    `RecoverySnapshotOfferRequest` with `RecoverySnapshotDescriptor`,
    `RecoverySnapshotFetchRequest` with exactly one
    `RecoverySnapshotChunk` per `RpcResult`, and
@@ -899,8 +927,9 @@ as authority.
    Protobuf fields MUST be ignored unless explicitly marked `Critical`;
    fields explicitly marked `Ignorable` MUST be ignored;
    `profile_version` and routing/identity fields are required and
-   missing/mismatch MUST fail with `FAILED_PRECONDITION`; unknown
-   profile operations MUST be rejected with `UNIMPLEMENTED`, never
+   missing/mismatch MUST fail with `FAILED_PRECONDITION`; checkpoint,
+   boundary, and marker emptiness is per-field (`SYN-URP-021`), not blanket;
+   unknown profile operations MUST be rejected with `UNIMPLEMENTED`, never
    silently applied.
 3. Proposed retention rule: retention stays deployment-documented with
    no implicit minimum assumed by initiators. Each deployment offering
@@ -926,9 +955,15 @@ as authority.
    outcome. Completion requires matching `total_pages` and
    `total_bytes`, and installation completes only when the initiator
    confirms that exact boundary checkpoint through
-   `/syntra.v1.UpdateRecovery/Confirm`, yielding
+   `/syntra.v1.UpdateRecovery/SnapshotConfirm`, yielding
    `RecoverySnapshotInstalled` with the new generation per
    `SYN-URP-016`.
+   Exact retained-install retries use the original pre-install generation
+   only under the `SYN-URP-025` exception, returning the original installed
+   response. They do not reopen an offer or authorize old-generation work.
+   Retained responses are bounded by deployment-documented count, bytes,
+   and lifetime and invalidated on supersede, termination, or later
+   continuity change; no implicit retry-retention minimum is proposed.
 5. Proposed fixture hosting note: conformance fixtures for this profile
    live in the conformance suite as additive fixtures using neutral
    payloads only (echo, generic key/value, generic subscription),
@@ -937,6 +972,16 @@ as authority.
    fixtures from two sources demonstrating mandatory-only interop plus
    confirmed-profile recovery interop; placeholders are tracked where
    implementations do not yet exist.
+
+6. Review synchronization (Draft only): the separate SnapshotConfirm method,
+   per-field empty sentinels, and narrow retained-install retry exception
+   above align the proposal with the draft profile/IDL intent. They are not
+   accepted normative changes. Generated codecs do not enforce these
+   validation rules; implementation validation and deterministic positive and
+   negative retained-install tests must be verified before any conformance
+   claim. Shipping authority remains blocked on maintainer acceptance and
+   protocol/security review; this edit records neither approval nor interop
+   evidence.
 
 ## Appendix: References
 

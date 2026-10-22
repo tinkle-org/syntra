@@ -11,6 +11,7 @@ package syntra
 import (
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,18 +20,18 @@ import (
 const ReliableSessionCapability = "syntra.reliable-session/1"
 
 const (
-	sessionIDLen       = 16
-	deliveryIDLen      = 16
-	resumeCredentialLen = 32
-	maxResumeCredLen   = 256
+	sessionIDLen         = 16
+	deliveryIDLen        = 16
+	resumeCredentialLen  = 32
+	maxResumeCredLen     = 256
 	maxReliablePrincipal = 512
 )
 
 const (
-	defaultMaxSessions       = 1024
-	defaultMaxRetained       = 128
-	defaultMaxRetainedBytes  = 1 << 20
-	defaultMaxTombstones     = 128
+	defaultMaxSessions        = 1024
+	defaultMaxRetained        = 128
+	defaultMaxRetainedBytes   = 1 << 20
+	defaultMaxTombstones      = 128
 	defaultMaxResumeCreds     = 1024
 	defaultMaxControlQueue    = 64
 	defaultMaxControlBytes    = 64 << 10
@@ -40,11 +41,11 @@ const (
 )
 
 const (
-	minIdleTimeoutMs  = uint32(2000)
-	maxIdleTimeoutMs  = uint32(300000)
-	minKeepaliveMs    = uint32(1000)
-	maxKeepaliveMs    = uint32(60000)
-	defaultIdleMs     = uint32(30000)
+	minIdleTimeoutMs   = uint32(2000)
+	maxIdleTimeoutMs   = uint32(300000)
+	minKeepaliveMs     = uint32(1000)
+	maxKeepaliveMs     = uint32(60000)
+	defaultIdleMs      = uint32(30000)
 	defaultKeepaliveMs = uint32(10000)
 )
 
@@ -56,13 +57,13 @@ type DeliveryID [deliveryIDLen]byte
 
 // LeaseProposal is the client-proposed keepalive lease (zero = host default).
 type LeaseProposal struct {
-	IdleTimeoutMs      uint32
+	IdleTimeoutMs       uint32
 	KeepaliveIntervalMs uint32
 }
 
 // ConfirmedLease is the host-confirmed bounded lease.
 type ConfirmedLease struct {
-	IdleTimeoutMs      uint32
+	IdleTimeoutMs       uint32
 	KeepaliveIntervalMs uint32
 }
 
@@ -70,12 +71,12 @@ type ConfirmedLease struct {
 type SessionSignal string
 
 const (
-	SignalDraining   SessionSignal = "draining"
-	SignalGoingAway  SessionSignal = "going-away"
-	SignalOverloaded SessionSignal = "overloaded"
-	SignalFenced     SessionSignal = "fenced"
-	SignalExpired    SessionSignal = "expired"
-	SignalRevoked    SessionSignal = "revoked"
+	SignalDraining    SessionSignal = "draining"
+	SignalGoingAway   SessionSignal = "going-away"
+	SignalOverloaded  SessionSignal = "overloaded"
+	SignalFenced      SessionSignal = "fenced"
+	SignalExpired     SessionSignal = "expired"
+	SignalRevoked     SessionSignal = "revoked"
 	SignalIdleTimeout SessionSignal = "idle-timeout"
 )
 
@@ -251,8 +252,8 @@ type StoredOutcome struct {
 // ControlBounds documents every reliable-session bound.
 type ControlBounds struct {
 	MaxSessions          int
-	MaxRetainedResults   int
-	MaxRetainedBytes     int
+	MaxRetainedResults   int // Shared pending + retained count per session.
+	MaxRetainedBytes     int // Shared owned method/payload + terminal outcome bytes.
 	MaxTombstones        int
 	MaxResumeCredentials int
 	MaxControlQueue      int
@@ -280,17 +281,22 @@ type retainedEntry struct {
 	retainedAt time.Time
 }
 
+type pendingEntry struct {
+	method  string
+	payload []byte
+}
+
 type tombstoneEntry struct {
 	code       ErrorCode
 	retainedAt time.Time
 }
 
 type resumeEntry struct {
-	session    SessionID
-	principal  string
-	version    uint32
-	issuedAt   time.Time
-	expiresAt  time.Time
+	session   SessionID
+	principal string
+	version   uint32
+	issuedAt  time.Time
+	expiresAt time.Time
 }
 
 // QueuedSignal is one buffered lifecycle signal for a session.
@@ -315,11 +321,11 @@ type sessionState struct {
 	// Reconcile returns Forgotten for expired/forgotten IDs and Unknown only
 	// for never-seen IDs.
 	forgotten map[DeliveryID]time.Time
-	// pending tracks dispatched-but-uncompleted delivery IDs (in-flight).
-	// Reconcile returns Pending for these so callers resend the same ID
-	// instead of dispatching as new. Bounded by MaxRetainedResults,
-	// cleared on terminal outcome/tombstone/forget/expiry.
-	pending map[DeliveryID]time.Time
+	// Pending and retained entries share the count and byte budgets, including
+	// owned method/payload metadata. Live work never expires: only a terminal
+	// result or tombstone releases its pending reservation.
+	pending      map[DeliveryID]pendingEntry
+	pendingBytes int
 }
 
 // ReliableManager is the bounded Go manager (sync, no goroutines, explicit drain).
@@ -443,7 +449,7 @@ func (m *ReliableManager) CreateSession(now time.Time, principal string, version
 		principal: principal, version: version, epoch: 1,
 		lastActivity: now, lease: lease,
 		outcomes: make(map[DeliveryID]retainedEntry), tombstones: make(map[DeliveryID]tombstoneEntry),
-		forgotten: make(map[DeliveryID]time.Time), pending: make(map[DeliveryID]time.Time),
+		forgotten: make(map[DeliveryID]time.Time), pending: make(map[DeliveryID]pendingEntry),
 	}
 	m.resume[string(cred)] = resumeEntry{session: sid, principal: principal, version: version, issuedAt: now, expiresAt: now.Add(m.bounds.ResumeLifetime)}
 	return sid, 1, cred, lease, nil
@@ -514,6 +520,13 @@ func (m *ReliableManager) Attach(now time.Time, sid SessionID, resumeCred []byte
 		if err := CheckEpochAdvance(st.epoch, proposed); err != nil {
 			return 0, ConfirmedLease{}, "", nil, err
 		}
+		// Reserve fence capacity before consuming the caller's credential.
+		// Under m.mu no concurrent mutation can invalidate this check.
+		hadActive := st.hasActive
+		if hadActive && (len(m.signals) >= m.bounds.MaxControlQueue ||
+			(len(m.signals)+1)*32 > m.bounds.MaxControlBytes) {
+			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeResourceExhausted, "syntra: control queue full; back off")
+		}
 		fresh, err := newResumeCredential()
 		if err != nil {
 			return 0, ConfirmedLease{}, "", nil, err
@@ -526,18 +539,8 @@ func (m *ReliableManager) Attach(now time.Time, sid SessionID, resumeCred []byte
 		m.revoked[string(cred)] = now.Add(m.bounds.ResumeLifetime)
 		m.resume[string(fresh)] = resumeEntry{session: sid, principal: st.principal, version: st.version, issuedAt: now, expiresAt: now.Add(m.bounds.ResumeLifetime)}
 		fenced := ""
-		hadActive := st.hasActive
 		if hadActive {
 			fenced = st.activeConnection
-		}
-		// Pre-reserve Fenced-signal capacity BEFORE committing the
-		// epoch/connection rotation: the control queue is bounded and a
-		// post-mutation push failure must not leave a committed rotation
-		// without its fence signal (or swallow the error). Under m.mu no
-		// concurrent mutation can invalidate this check.
-		if hadActive && (len(m.signals) >= m.bounds.MaxControlQueue ||
-			(len(m.signals)+1)*32 > m.bounds.MaxControlBytes) {
-			return 0, ConfirmedLease{}, "", nil, NewRpcError(ErrorCodeResourceExhausted, "syntra: control queue full; back off")
 		}
 		st.epoch = proposed
 		st.activeConnection = connectionID
@@ -600,6 +603,7 @@ func copyOutcome(in StoredOutcome) StoredOutcome {
 	out := StoredOutcome{}
 	if in.Err != nil {
 		cp := *in.Err
+		cp.Message = strings.Clone(in.Err.Message)
 		out.Err = &cp
 	} else if in.Payload != nil {
 		out.Payload = append([]byte(nil), in.Payload...)
@@ -670,7 +674,12 @@ func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did Deliver
 	if !ok {
 		return "", NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for result")
 	}
-	st.lastActivity = now
+	pending, wasPending := st.pending[did]
+	if wasPending {
+		if err := CheckDuplicateContent(pending.method, pending.payload, method, payload); err != nil {
+			return "", err
+		}
+	}
 	if existing, dup := st.outcomes[did]; dup {
 		// Expiry-before-validate: an expired retained entry is not a
 		// duplicate. Drop it, account bytes, leave a bounded Forgotten
@@ -695,65 +704,124 @@ func (m *ReliableManager) RecordResult(now time.Time, sid SessionID, did Deliver
 			return ReconcileRetained, nil
 		}
 	}
-	// Outcome/tombstone exclusivity: a live tombstone and a retained
-	// outcome must never coexist for one delivery ID. Outcomes win: clear
-	// any tombstone (live or expired) before inserting. Expired tombstones
-	// leave a Forgotten marker first so the transition is observable.
-	if tomb, tok := st.tombstones[did]; tok {
-		if now.Sub(tomb.retainedAt) > m.bounds.TombstoneRetention {
-			m.addForgottenLocked(st, did, now)
-		}
-		delete(st.tombstones, did)
-	}
 	entryBytes := len(method) + len(payload)
 	if outcome.Err != nil {
 		entryBytes += len(outcome.Err.Message)
 	} else {
 		entryBytes += len(outcome.Payload)
 	}
-	if len(st.outcomes) >= m.bounds.MaxRetainedResults {
+	count := len(st.outcomes) + len(st.pending)
+	pendingBytes := st.pendingBytes
+	if wasPending {
+		count--
+		pendingBytes -= len(pending.method) + len(pending.payload)
+	}
+	if count >= m.bounds.MaxRetainedResults {
 		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result budget exhausted")
 	}
-	if st.outcomeBytes+entryBytes > m.bounds.MaxRetainedBytes {
+	if entryBytes > m.bounds.MaxRetainedBytes-st.outcomeBytes-pendingBytes {
 		return "", NewRpcError(ErrorCodeResourceExhausted, "syntra: retained result bytes exhausted")
 	}
-	st.outcomes[did] = retainedEntry{method: method, payload: append([]byte(nil), payload...), outcome: copyOutcome(outcome), retainedAt: now}
+	// Commit terminal-state replacement only after all admission checks pass.
+	delete(st.tombstones, did)
+	st.outcomes[did] = retainedEntry{method: strings.Clone(method), payload: append([]byte(nil), payload...), outcome: copyOutcome(outcome), retainedAt: now}
 	st.outcomeBytes += entryBytes
 	delete(st.forgotten, did)
-	delete(st.pending, did)
+	clearPending(st, did)
 	return ReconcileRetained, nil
 }
 
-// NoteDispatch marks a delivery ID as in-flight (dispatched, no terminal yet).
-// Reconcile returns Pending for these so callers resend the same ID instead
-// of dispatching as new. Bounded by MaxRetainedResults, idempotent.
-func (m *ReliableManager) NoteDispatch(now time.Time, sid SessionID, did DeliveryID) error {
+// NoteDispatch validates the active attachment epoch and reserves owned
+// method/payload metadata before dispatch. Identical duplicates are idempotent;
+// callers must use Reconcile to distinguish new work from Pending/Retained.
+// Pending and retained entries share MaxRetainedResults/MaxRetainedBytes.
+// Pending survives retention sweeps until a terminal result or tombstone.
+// Live terminal markers suppress dispatch; expired markers are replaced with
+// Pending only after count and byte admission succeeds.
+func (m *ReliableManager) NoteDispatch(now time.Time, sid SessionID, epoch uint64, did DeliveryID, method string, payload []byte) error {
+	if err := ValidateEpoch(epoch); err != nil {
+		return err
+	}
 	if did == (DeliveryID{}) {
 		return NewRpcError(ErrorCodeInvalidArgument, "syntra: delivery id must not be all zero")
 	}
+	if len(payload) > MaxFrameBytes {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: payload exceeds envelope bound")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.draining {
+		return NewRpcError(ErrorCodeUnavailable, "syntra: draining; no new dispatches")
+	}
 	st, ok := m.sessions[sid]
 	if !ok {
 		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for dispatch")
 	}
-	if _, ok := st.outcomes[did]; ok {
+	if epoch != st.epoch || !st.hasActive {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: stale or inactive attachment; fenced")
+	}
+	if idle := idleTimeoutOf(st); idle > 0 && now.Sub(st.lastActivity) > idle {
+		return NewRpcError(ErrorCodeFailedPrecondition, "syntra: attachment idle lease expired")
+	}
+	if existing, ok := st.pending[did]; ok {
+		if err := CheckDuplicateContent(existing.method, existing.payload, method, payload); err != nil {
+			return err
+		}
+		st.lastActivity = now
 		return nil
 	}
-	if _, ok := st.forgotten[did]; ok {
+	existing, hasOutcome := st.outcomes[did]
+	if hasOutcome && now.Sub(existing.retainedAt) <= m.bounds.ResultRetention {
+		if err := CheckDuplicateContent(existing.method, existing.payload, method, payload); err != nil {
+			return err
+		}
+		st.lastActivity = now
 		return nil
 	}
-	if _, ok := st.pending[did]; ok {
+	if tombstone, ok := st.tombstones[did]; ok && now.Sub(tombstone.retainedAt) <= m.bounds.TombstoneRetention {
+		st.lastActivity = now
 		return nil
 	}
-	if st.pending == nil {
-		st.pending = make(map[DeliveryID]time.Time)
+	if forgottenAt, ok := st.forgotten[did]; ok && now.Sub(forgottenAt) <= m.bounds.ResultRetention {
+		st.lastActivity = now
+		return nil
 	}
-	if len(st.pending) >= m.bounds.MaxRetainedResults {
+	// Compute replacement admission without retiring stale terminal state.
+	// Failure must preserve its marker, timestamp, bytes, and activity.
+	count := len(st.pending) + len(st.outcomes)
+	outcomeBytes := st.outcomeBytes
+	if hasOutcome {
+		count--
+		outcomeBytes -= len(existing.method) + len(existing.payload)
+		if existing.outcome.Err != nil {
+			outcomeBytes -= len(existing.outcome.Err.Message)
+		} else {
+			outcomeBytes -= len(existing.outcome.Payload)
+		}
+	}
+	if count >= m.bounds.MaxRetainedResults {
 		return NewRpcError(ErrorCodeResourceExhausted, "syntra: pending dispatch budget exhausted")
 	}
-	st.pending[did] = now
+	entryBytes := len(method) + len(payload)
+	if entryBytes > m.bounds.MaxRetainedBytes-outcomeBytes-st.pendingBytes {
+		return NewRpcError(ErrorCodeResourceExhausted, "syntra: pending dispatch bytes exhausted")
+	}
+	delete(st.outcomes, did)
+	delete(st.tombstones, did)
+	delete(st.forgotten, did)
+	st.outcomeBytes = outcomeBytes
+	st.pending[did] = pendingEntry{method: strings.Clone(method), payload: append([]byte(nil), payload...)}
+	st.pendingBytes += entryBytes
+	st.lastActivity = now
 	return nil
+}
+
+// clearPending releases a reservation only after a terminal admission commits.
+func clearPending(st *sessionState, did DeliveryID) {
+	if pending, ok := st.pending[did]; ok {
+		st.pendingBytes -= len(pending.method) + len(pending.payload)
+		delete(st.pending, did)
+	}
 }
 
 // Reconcile returns retained/forgotten/unknown/pending for a delivery ID.
@@ -790,13 +858,8 @@ func (m *ReliableManager) Reconcile(now time.Time, sid SessionID, did DeliveryID
 			}
 			delete(st.forgotten, did)
 		}
-		if dispatchedAt, pok := st.pending[did]; pok {
-			if now.Sub(dispatchedAt) <= m.bounds.ResultRetention {
-				return ReconcilePending, nil, nil
-			}
-			delete(st.pending, did)
-			m.addForgottenLocked(st, did, now)
-			return ReconcileForgotten, nil, nil
+		if _, pok := st.pending[did]; pok {
+			return ReconcilePending, nil, nil
 		}
 		return ReconcileUnknown, nil, nil
 	}
@@ -846,7 +909,7 @@ func (m *ReliableManager) Detach(sid SessionID, connectionID string) {
 	}
 }
 
-// Forget discards one retained outcome, adjusting byte accounting, and retains
+// Forget rejects live pending work, discards one retained outcome, and retains
 // a bounded Forgotten marker (bounded by MaxRetainedResults, independent from
 // MaxTombstones) so Reconcile reports Forgotten rather than Unknown.
 func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
@@ -859,12 +922,11 @@ func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 	if !ok {
 		return false, NewRpcError(ErrorCodeFailedPrecondition, "syntra: unknown session for forget")
 	}
-	delete(st.pending, did)
+	if _, pending := st.pending[did]; pending {
+		return false, NewRpcError(ErrorCodeFailedPrecondition, "syntra: cannot forget live pending delivery")
+	}
 	entry, ok := st.outcomes[did]
 	if !ok {
-		if _, pok := st.pending[did]; pok {
-			delete(st.pending, did)
-		}
 		if _, fok := st.forgotten[did]; fok {
 			return false, nil
 		}
@@ -888,9 +950,12 @@ func (m *ReliableManager) Forget(sid SessionID, did DeliveryID) (bool, error) {
 
 // RecordTombstone records a terminal tombstone (deadline/cancel only;
 // UNAVAILABLE is unknown-outcome and must never be tombstoned) for a
-// delivery ID. First-write-wins: a live duplicate with the same code is
-// idempotent (retainedAt untouched); a live duplicate with a different code
-// is rejected without overwriting. Outcomes and tombstones are exclusive:
+// delivery ID. The caller must establish that execution is terminal and can
+// no longer produce effects; a cancellation request or elapsed deadline alone
+// is insufficient to release live Pending work. First-write-wins: a live
+// duplicate with the same code is idempotent (retainedAt untouched); a live
+// duplicate with a different code is rejected without overwriting. Outcomes
+// and tombstones are exclusive:
 // tombstoning a delivery ID with a live retained outcome is rejected.
 func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did DeliveryID, code ErrorCode) error {
 	if did == (DeliveryID{}) {
@@ -939,7 +1004,7 @@ func (m *ReliableManager) RecordTombstone(now time.Time, sid SessionID, did Deli
 	}
 	st.tombstones[did] = tombstoneEntry{code: code, retainedAt: now}
 	delete(st.forgotten, did)
-	delete(st.pending, did)
+	clearPending(st, did)
 	return nil
 }
 
@@ -1042,15 +1107,13 @@ func (m *ReliableManager) DrainSignals(limit int) []QueuedSignal {
 // Forgotten marker (bounded by MaxRetainedResults, independent from
 // MaxTombstones); expired Forgotten markers beyond retention are dropped.
 // Expired resume and revoked handles share the resume lifetime; both are
-// reaped here and counted together in resumes.
-func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resumes int) {
+// reaped here and counted together in resumes. Live pending work is never
+// reaped. Idle attachments are detached even if their signal cannot be queued;
+// err reports the first queue failure while retention cleanup still completes.
+func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resumes int, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	// Enforce idle timeouts on the reap path as well: stale actives are
-	// detached here so a session that goes quiet without an explicit poll
-	// still converges. Queue errors are ignored on this path (no error
-	// return); use SweepIdle for a fallible explicit sweep.
-	_, _ = m.sweepIdleLocked(now)
+	_, err = m.sweepIdleLocked(now)
 	for _, st := range m.sessions {
 		for did, entry := range st.outcomes {
 			if now.Sub(entry.retainedAt) > m.bounds.ResultRetention {
@@ -1065,13 +1128,6 @@ func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resu
 				if st.outcomeBytes < 0 {
 					st.outcomeBytes = 0
 				}
-				m.addForgottenLocked(st, did, now)
-				outcomes++
-			}
-		}
-		for did, dispatchedAt := range st.pending {
-			if now.Sub(dispatchedAt) > m.bounds.ResultRetention {
-				delete(st.pending, did)
 				m.addForgottenLocked(st, did, now)
 				outcomes++
 			}
@@ -1103,14 +1159,14 @@ func (m *ReliableManager) ReapExpired(now time.Time) (outcomes, tombstones, resu
 			resumes++
 		}
 	}
-	return outcomes, tombstones, resumes
+	return outcomes, tombstones, resumes, err
 }
 
 // DrainForShutdown enters draining, detaches active connections, queues a
 // going-away signal per detached session, and returns the drained session
 // IDs with pending signals plus the count of signals dropped to a full
 // queue. Dropped signals are reported, never swallowed.
-func (m *ReliableManager) DrainForShutdown() ([]SessionID, []QueuedSignal, error) {
+func (m *ReliableManager) DrainForShutdown() ([]SessionID, []QueuedSignal, int, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.draining = true
@@ -1137,6 +1193,5 @@ func (m *ReliableManager) DrainForShutdown() ([]SessionID, []QueuedSignal, error
 	out := make([]QueuedSignal, capped)
 	copy(out, m.signals[:capped])
 	m.signals = append([]QueuedSignal(nil), m.signals[capped:]...)
-	_ = dropped
-	return ids, out, firstErr
+	return ids, out, dropped, firstErr
 }

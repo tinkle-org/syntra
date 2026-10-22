@@ -60,10 +60,45 @@ func TestNoteObservedDeepCopy(t *testing.T) {
 	base[0] = 'X'
 	result[0] = 'X'
 	found := rec.Tick(time.Now(), func(stream string) ([]byte, uint64, bool) {
-		return []byte("other"), 1, true
+		return []byte("res-1"), 1, true
 	})
-	if len(found) != 1 {
+	if len(found) != 0 {
 		t.Fatalf("mutated caller bytes must not affect observed state, got %v", found)
+	}
+}
+
+func TestReconcilerTickDoesNotCopyOwnedCursors(t *testing.T) {
+	allocations := func(cursor []byte) float64 {
+		rec := NewCheckpointReconciler(ReconcilerConfig{MaxStreamsPerTick: 1})
+		rec.NoteObserved(Checkpoint{Stream: "s", Generation: 1, Base: cursor, Result: cursor})
+		return testing.AllocsPerRun(20, func() {
+			if gaps := rec.Tick(time.Now(), func(string) ([]byte, uint64, bool) {
+				return cursor, 1, true
+			}); len(gaps) != 0 {
+				t.Fatalf("converged checkpoint reported gaps: %v", gaps)
+			}
+		})
+	}
+	empty, large := allocations(nil), allocations(make([]byte, 64*1024))
+	if large > empty {
+		t.Fatalf("Tick copied owned cursor buffers: empty=%.0f allocations, large=%.0f", empty, large)
+	}
+}
+
+func TestReconcilerTickSnapshotSurvivesReplacement(t *testing.T) {
+	rec := NewCheckpointReconciler(ReconcilerConfig{MaxStreamsPerTick: 1})
+	rec.NoteObserved(Checkpoint{Stream: "s", Generation: 1, Result: []byte("res-1")})
+	if gaps := rec.Tick(time.Now(), func(stream string) ([]byte, uint64, bool) {
+		rec.Forget(stream)
+		rec.NoteObserved(Checkpoint{Stream: stream, Generation: 2, Result: []byte("res-2")})
+		return []byte("res-1"), 1, true
+	}); len(gaps) != 0 {
+		t.Fatalf("replacement mutated in-progress snapshot: %v", gaps)
+	}
+	if gaps := rec.Tick(time.Now(), func(string) ([]byte, uint64, bool) {
+		return []byte("res-2"), 2, true
+	}); len(gaps) != 0 {
+		t.Fatalf("replacement not visible on next tick: %v", gaps)
 	}
 }
 
@@ -354,6 +389,14 @@ func TestLossTotalsCumulativeNoDoubleCount(t *testing.T) {
 	d0, b0 := p.client.LossTotals()
 	for i := 0; i < 64; i++ {
 		_ = p.host.NotifyAll([]byte("x"))
+	}
+	// A terminal RPC result follows the previously queued notifications on
+	// this connection. Wait for it before sampling totals so the pump cannot
+	// still be recording the tail of the burst during the idle assertion.
+	barrier, stop := context.WithTimeout(context.Background(), 3*time.Second)
+	defer stop()
+	if _, err := p.client.Call(barrier, "/example.Echo/Echo", nil, 1000); err != nil {
+		t.Fatal(err)
 	}
 	deadline := time.Now().Add(3 * time.Second)
 	for {

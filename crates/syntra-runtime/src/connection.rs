@@ -490,6 +490,9 @@ pub(crate) struct Shared {
     pub handshake_tx: AsyncMutex<Option<oneshot::Sender<Result<HandshakeDone, SyntraError>>>>,
     pub config: ConnectionConfig,
     pub closed: AtomicBool,
+    /// Intentional outbound admission fence. Unlike CLOSED, this leaves
+    /// inbound validation and existing RPC waiters live until the pump drains.
+    writer_fenced: AtomicBool,
     /// ACTIVE-phase decode failures (misbehavior counter, SNTR-ASEC-020).
     pub misbehavior: AtomicU32,
     /// Notification queue overflow observability for the Initiator path.
@@ -537,6 +540,7 @@ impl Shared {
             handshake_tx: AsyncMutex::new(None),
             config,
             closed: AtomicBool::new(false),
+            writer_fenced: AtomicBool::new(false),
             misbehavior: AtomicU32::new(0),
             notification_dropped: AtomicU64::new(0),
             notification_dropped_bytes: AtomicU64::new(0),
@@ -597,6 +601,19 @@ impl Connection {
         self.shared.closed.load(Ordering::Acquire)
     }
 
+    pub(crate) fn writer_is_fenced(&self) -> bool {
+        self.shared.writer_fenced.load(Ordering::Acquire)
+    }
+
+    /// Stop new sends without failing admitted RPCs or inbound frames.
+    /// The pump must fence BEFORE closing its writer receiver and must
+    /// report transport loss once the inbound drain has completed.
+    pub(crate) async fn fence_writer(&self) {
+        // Same linearization point as send_bytes and RPC queue admission.
+        let _state = self.shared.state.write().await;
+        self.shared.writer_fenced.store(true, Ordering::Release);
+    }
+
     pub(crate) async fn ctx(&self) -> syntra_core::ValidationContext {
         let s = self.shared.state.read().await;
         let v = *self.shared.version.read().await;
@@ -622,7 +639,7 @@ impl Connection {
         // Close and queue admission linearize on state. No lifecycle lock
         // is held while waiting for channel capacity.
         let _state = self.shared.state.read().await;
-        if self.is_closed() {
+        if self.is_closed() || self.writer_is_fenced() {
             return Err(SyntraError::Closed("connection closed".to_string()));
         }
         permit.send(bytes);
@@ -631,7 +648,7 @@ impl Connection {
 
     pub(crate) async fn reserve_writer(&self) -> Result<mpsc::Permit<'_, Vec<u8>>, SyntraError> {
         let mut closed = self.subscribe_close();
-        if self.is_closed() {
+        if self.is_closed() || self.writer_is_fenced() {
             return Err(SyntraError::Closed("connection closed".to_string()));
         }
         tokio::select! {
@@ -640,7 +657,12 @@ impl Connection {
             result = self.shared.writer.reserve() => match result {
                 Ok(permit) => Ok(permit),
                 Err(_) => {
-                    self.on_transport_lost().await;
+                    // An intentional receiver-close rejects new/blocked
+                    // sends but must not erase queued inbound outcomes.
+                    // Unexpected writer disappearance still fails globally.
+                    if !self.writer_is_fenced() {
+                        self.on_transport_lost().await;
+                    }
                     Err(SyntraError::Closed("transport writer gone".to_string()))
                 }
             },

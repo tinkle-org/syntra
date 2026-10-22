@@ -1,39 +1,13 @@
 #!/usr/bin/env python3
-"""Shared conformance runner (executable, not just manifest validation).
+"""Run implementation test legs and compare executed shared-corpus decodes.
 
-Drives four peer pairings with deterministic fault injection, asserting wire
-payloads, durable state, bounds and terminal outcomes:
-  1. rust-async  — async Rust tokio runtime (syntra-runtime loopback)
-  2. go-pure     — pure-Go core (default build)
-  3. go-ffi      — Go+FFI native core (production Rust via syntranative)
-  4. interop — Rust<->Go wire interop (golden vectors + cross-decode, alias rust-go-interop)
-
-Usage:
-  python3 conformance/runner/runner.py [--pair rust-async|go-pure|go-ffi|interop|rust-go-interop|all]
-  python3 conformance/runner/runner.py --all  # CI entrypoint, exits nonzero on FAIL
-
-Each leg runs the executable harness (not the YAML validator):
-  rust-async: cargo test --locked -p syntra-runtime --test conformance_runner
-              plus --test recovery_drivers (checkpoint/reconcile asserts)
-  go-pure:    go test -run 'TestRunner|TestReliable|TestCheckpoint|TestRecovery'
-              (bindings/go, default tags)
-  go-ffi:     cargo build -p syntra-ffi --features production, then
-              go test -tags syntranative -run
-              'TestRunner|TestReliable|TestCheckpoint|TestRecovery' ./...
-  interop:    go test -run 'TestGoldenVectors|TestRunnerWireInteropGolden' +
-              Rust vector test (sc_wire_vectors_decode) + shared-corpus check:
-              both sides decode bytes registered in the shared corpus
-              (protobuf vectors.yaml / websocket fixtures.yaml) and the runner
-              compares the logical frames — never cross-encoder byte equality.
-
-The shared fault matrix (scenarios.yaml: seed, fault kinds/rates) is loaded
-at startup by load_scenarios() and printed every run; it is descriptive where
-legs differ (see scenarios.yaml rules/notes).
-
-Verdicts per scenario: PASS/FAIL/SKIP with logs. Results also written to
-conformance/runner/results.json for declarations.
+Uses only the Python standard library. scenarios.yaml is JSON-compatible YAML;
+its full descriptive fault matrix is validated, printed and saved, not used to
+configure the hard-coded Rust/Go fault injectors. See README.md for coverage.
+Verdicts are per leg, not per manifest case or scenario.
 """
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -67,98 +41,107 @@ def _cargo_ok(rc, combined):
 
 
 def _go_ok(rc, combined):
-    # Require exit 0, no FAIL, at least one passing required test,
-    # and no skipped required tests — not just exit code/absence of FAIL.
-    # Caller must run go test with -v so --- PASS:/--- SKIP: lines exist.
-    # Counts runner, reliable-session, checkpoint and recovery tests: the legs
-    # run -run 'TestRunner|TestReliable|TestCheckpoint|TestRecovery' so
-    # recovery coverage is asserted, not excluded.
-    if rc != 0:
-        return False
-    if "FAIL" in combined:
-        return False
-    passes = len(re.findall(r"--- PASS: Test(Runner|Reliable|Checkpoint|Recovery|Golden)", combined))
-    skips = combined.count("--- SKIP:")
-    if passes < 1:
-        return False
-    if skips != 0:
-        return False
-    return True
+    passed = set(re.findall(r"--- PASS: (Test\w+)\s", combined))
+    return (rc == 0 and "FAIL" not in combined and "--- SKIP:" not in combined
+            and GO_REQUIRED_TESTS <= passed)
 
 
 def load_scenarios():
-    """Load the shared fault matrix from conformance/runner/scenarios.yaml.
-
-    Returns a dict with seed, scenario count and fault kinds. The matrix is
-    descriptive where legs differ (see scenarios.yaml rules/notes); loading it
-    here keeps the runner honest about which seed/pattern each run used.
-    """
+    """Validate JSON-compatible YAML, failing closed on incomplete entries."""
     path = ROOT / "conformance" / "runner" / "scenarios.yaml"
     try:
-        text = path.read_text()
-    except OSError as e:
-        return {"ok": False, "detail": f"scenarios.yaml unreadable: {e}"}
-    m = re.search(r"seed:\s*(0x[0-9A-Fa-f]+|\d+)", text)
-    seed = m.group(1) if m else "0x5EED1234"
-    scenarios = len(re.findall(r"-\s*id:\s*SC-", text))
-    faults = re.findall(r"kind:\s*(\w+)", text)
-    return {"ok": True, "seed": seed, "scenarios": scenarios, "faults": faults}
+        data = json.loads(path.read_text())
+        if data["format_version"] != "1.0" or data["runner"] != "syntra-conformance-runner v1":
+            raise ValueError("unsupported matrix format/runner")
+        if [p["id"] for p in data["pairings"]] != PAIRINGS:
+            raise ValueError("unexpected pairings")
+        scenarios = data["scenarios"]
+        ids = [s["id"] for s in scenarios]
+        if not ids or len(set(ids)) != len(ids):
+            raise ValueError("missing/duplicate scenario IDs")
+        for scenario in scenarios:
+            if not re.fullmatch(r"SC-[A-Z0-9-]+", scenario["id"]) or not scenario["name"]:
+                raise ValueError("invalid scenario")
+            if not scenario["steps"] or not all(isinstance(s, str) and s for s in scenario["steps"]):
+                raise ValueError("missing scenario steps")
+        injection = data["fault_injection"]
+        seed = injection["seed"]
+        if not isinstance(seed, str) or not re.fullmatch(r"0x[0-9A-Fa-f]+|[0-9]+", seed):
+            raise ValueError("missing/invalid seed")
+        if not 0 < int(seed, 16 if seed.startswith("0x") else 10) < 2**64:
+            raise ValueError("seed outside nonzero u64 range")
+        faults = injection["faults"]
+        if not isinstance(faults, list) or not faults:
+            raise ValueError("missing faults")
+        for fault in faults:
+            kind = fault["kind"]
+            if kind not in {"drop", "duplicate", "truncate", "delay"}:
+                raise ValueError(f"unknown fault kind: {kind}")
+            if fault["scope"] not in {"notifications", "results", "inbound-bytes", "send"}:
+                raise ValueError("missing/unknown fault scope")
+            keys = {"kind", "scope", "max_ms" if kind == "delay" else "rate"}
+            if set(fault) != keys:
+                raise ValueError("unexpected/missing fault fields")
+            if kind == "delay":
+                if type(fault["max_ms"]) is not int or fault["max_ms"] < 0:
+                    raise ValueError("invalid max_ms")
+            else:
+                rate = re.fullmatch(r"([0-9]+)/([0-9]+)", fault["rate"])
+                if not rate or not 0 < int(rate[1]) <= int(rate[2]):
+                    raise ValueError("invalid fault rate")
+        return {"ok": True, "seed": seed, "scenarios": len(ids), "faults": faults}
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return {"ok": False, "detail": f"invalid scenarios.yaml: {e}"}
 
 
-def _shared_corpus_check():
-    """Compare logical frames from the shared corpus file (both sides).
+def _corpus_expected():
+    """Read only the two selected flat fixture records, not general YAML.
 
-    Verifies the interop legs decode bytes registered in the shared corpus:
-    Go's golden tests must decode the exact GOLD-PROT-HELLO-01 / GOLD-PROT-REQ-01
-    frame_hex bytes from conformance/test-vectors/protobuf/vectors.yaml and
-    assert the same logical fields (version, hello versions, credential,
-    method); the Rust vector test must decode a hello registered in the
-    websocket fixtures. Fails on mismatch — independent self-tests that never
-    touch the corpus do not pass as interop.
+    Unsupported/multiline syntax fails closed. This avoids a hidden PyYAML
+    prerequisite while leaving the shared corpus format and files untouched.
     """
-    tv = ROOT / "conformance" / "test-vectors"
-    try:
-        import yaml  # type: ignore
+    text = (ROOT / "conformance/test-vectors/protobuf/vectors.yaml").read_text()
+    expected = {}
+    for vid in ("GOLD-PROT-HELLO-01", "GOLD-PROT-REQ-01"):
+        blocks = re.findall(r"^  - id: " + vid + r"\n(.*?)(?=^  - id:|^verification:|\Z)", text, re.M | re.S)
+        if len(blocks) != 1:
+            raise ValueError(f"{vid}: missing/duplicate fixture")
+        block = blocks[0]
+        frame_hex = re.findall(r'^    frame_hex: "([0-9a-fA-F]+)"$', block, re.M)
+        fields = re.findall(r"^    semantic_fields: \{ (.+) \}$", block, re.M)
+        if len(frame_hex) != 1 or len(fields) != 1:
+            raise ValueError(f"{vid}: expected single-line hex and flat semantic_fields")
+        bytes.fromhex(frame_hex[0])
+        sem = {}
+        remaining = fields[0]
+        while remaining:
+            match = re.match(r'(\w+): ("(?:[^"\\]|\\.)*"|[\w.-]+)(?:, |$)', remaining)
+            if not match or match[1] in sem:
+                raise ValueError(f"{vid}: unsupported/duplicate semantic field")
+            value = match[2]
+            sem[match[1]] = json.loads(value) if value.startswith('"') or value.isdigit() else value
+            remaining = remaining[match.end():]
+        for key in ("credential_b64", "payload_b64"):
+            if key in sem:
+                sem[key[:-4]] = base64.b64decode(sem.pop(key), validate=True).decode("ascii")
+        expected[vid] = {"id": vid, "frame_hex": frame_hex[0].lower(), "semantic_fields": sem}
+    return expected
 
-        vectors = yaml.safe_load((tv / "protobuf" / "vectors.yaml").read_text())
-        by_id = {v.get("id"): v for v in vectors.get("vectors", [])}
-    except Exception as e:
-        return (False, f"cannot load protobuf vectors.yaml: {e}")
-    problems = []
-    go_test = (ROOT / "bindings" / "go" / "wire_test.go").read_text()
-    for vid, needles in (
-        ("GOLD-PROT-HELLO-01", ["0801521e080110011a186f70617175652d746573742d63726564656e7469616c2d41",
-                                "opaque-test-credential-A"]),
-        ("GOLD-PROT-REQ-01", ["08011007621e0a122f6578616d706c652e4563686f2f4563686f120568656c6c6f18f403",
-                              "/example.Echo/Echo"]),
-    ):
-        entry = by_id.get(vid)
-        if not entry:
-            problems.append(f"{vid} missing from vectors.yaml")
-            continue
-        frame_hex = (entry.get("frame_hex") or "").lower()
-        for needle in needles:
-            if needle.lower() not in frame_hex and needle not in go_test:
-                problems.append(f"{vid}: {needle[:24]}... in neither corpus nor go test")
-        if frame_hex and frame_hex not in go_test.lower():
-            problems.append(f"{vid}: corpus frame_hex not decoded by go golden test")
-        sem = entry.get("semantic_fields", {}) or {}
-        if sem.get("version") != 1 or sem.get("request_id") not in (0, 7):
-            problems.append(f"{vid}: unexpected semantic_fields {sem}")
-    rust_hex = "0801520408011001"  # WS no-length-prefix good hello (VEC-WS-009)
+
+def _shared_corpus_check(go_output, rust_output):
+    """Compare actual test-emitted bytes and decoded fields to the corpus."""
     try:
-        ws_fix = (tv / "websocket" / "fixtures.yaml").read_text()
-    except OSError as e:
-        problems.append(f"cannot read websocket fixtures.yaml: {e}")
-        ws_fix = ""
-    if rust_hex not in ws_fix.replace(" ", ""):
-        problems.append("rust vector hello not registered in websocket fixtures.yaml")
-    rust_runner = (ROOT / "crates" / "syntra-runtime" / "tests" / "conformance_runner.rs").read_text()
-    if "sc_wire_vectors_decode" not in rust_runner or "Body::Hello" not in rust_runner:
-        problems.append("rust sc_wire_vectors_decode hello assertion missing")
-    if problems:
-        return (False, "; ".join(problems))
-    return (True, "go + rust legs decode shared-corpus bytes (HELLO-01, REQ-01, WS hello); logical fields match")
+        expected = _corpus_expected()
+        for language, output in (("go", go_output), ("rust", rust_output)):
+            records = [json.loads(s) for s in re.findall(r"CORPUS (\{[^\n]+\})", output)]
+            if len(records) != len(expected) or {r["id"] for r in records} != set(expected):
+                raise ValueError(f"{language}: missing/duplicate executed corpus records")
+            for record in records:
+                if record != expected[record["id"]]:
+                    raise ValueError(f"{language}: corpus bytes/decoded fields differ for {record['id']}")
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return False, str(e)
+    return True, "Rust and Go executed HELLO-01/REQ-01 decodes; bytes and all corpus fields match"
 
 
 def run(cmd, cwd, env=None, timeout=300):
@@ -183,7 +166,19 @@ def run(cmd, cwd, env=None, timeout=300):
         return 124, out, err, time.time() - start
 
 
-GO_COVERAGE_RUN = "TestRunner|TestReliable|TestCheckpoint|TestRecovery"
+GO_COVERAGE_RUN = (
+    "^Test(Runner|Reliable|MemoryStore|NoteObserved|DuplicateCache|StagedSnapshot|"
+    "DirectedDelivery|Checkpoint|Reconciler|LossTotals|WaitLossChange)"
+)
+GO_REQUIRED_TESTS = {
+    "TestRunnerEcho", "TestRunnerEchoWithFaultInjection", "TestRunnerDuplicateResultDeduped",
+    "TestRunnerDuplicateRequestThroughTransport", "TestRunnerDuplicateResultThroughTransport",
+    "TestReliableReconciliation", "TestMemoryStoreAtomicFailure", "TestMemoryStoreDeepCopy",
+    "TestNoteObservedDeepCopy", "TestDuplicateCacheBounded", "TestStagedSnapshotFailure",
+    "TestDirectedDeliveryIsolation", "TestCheckpointReconciliationIdlePeers",
+    "TestReconcilerBoundedTick", "TestLossTotalsCumulativeNoDoubleCount",
+    "TestWaitLossChangeBroadcastsToAllWaiters",
+}
 
 
 def leg_rust_async():
@@ -237,19 +232,14 @@ def leg_go_ffi():
 
 
 def leg_interop():
-    # Wire interop as cross-decode against the shared corpus: the Go golden
-    # tests decode the exact vectors.yaml bytes (HELLO-01/REQ-01) and the Rust
-    # vector test decodes the registered WS hello; _shared_corpus_check then
-    # compares the logical frames from the corpus file. Fails on mismatch —
-    # decoded Frame equality, opaque bytes preserved, never byte equality
-    # across encoders.
+    # Both tests emit evidence from actual decodes of the same corpus bytes.
     d = ROOT / "bindings" / "go"
     rc1, out1, err1, dt1 = run(
         ["go", "test", "-run", "TestGoldenVectors|TestRunnerWireInteropGolden", "-count=1", "-v", "."],
         cwd=d,
     )
     rc2, out2, err2, dt2 = run(
-        ["cargo", "test", "--locked", "-p", "syntra-runtime", "--test", "conformance_runner", "sc_wire_vectors_decode"],
+        ["cargo", "test", "--locked", "-p", "syntra-runtime", "--test", "conformance_runner", "sc_wire_vectors_decode", "--", "--nocapture"],
         cwd=ROOT,
     )
     go_combined = out1 + err1
@@ -262,7 +252,7 @@ def leg_interop():
         and "FAIL" not in go_combined
     )
     rust_ran = _cargo_ok(rc2, rust_combined) and "sc_wire_vectors_decode" in rust_combined
-    corpus_ok, corpus_detail = _shared_corpus_check()
+    corpus_ok, corpus_detail = _shared_corpus_check(go_combined, rust_combined)
     passed = go_ran and rust_ran and corpus_ok
     return (
         "PASS" if passed else "FAIL",
@@ -300,7 +290,7 @@ def main():
     print(
         f"Syntra shared conformance runner — {len(pairs)} pairing(s), "
         f"seed {matrix['seed']} ({matrix['scenarios']} scenarios, "
-        f"faults: {', '.join(matrix['faults'])})"
+        f"descriptive faults: {json.dumps(matrix['faults'], sort_keys=True)})"
     )
     for pid in pairs:
         verdict, detail, log = LEGS[pid]()
@@ -310,7 +300,7 @@ def main():
         if verdict != "PASS":
             print(f"--- log {pid} ---\n{log}\n--- end log {pid} ---", file=sys.stderr)
         results.append({"pairing": pid, "verdict": verdict, "detail": detail})
-    Path(args.json).write_text(json.dumps({"runner": "syntra-conformance-runner v1", "results": results}, indent=2))
+    Path(args.json).write_text(json.dumps({"runner": "syntra-conformance-runner v1", "matrix": matrix, "results": results}, indent=2) + "\n")
     print(f"results -> {args.json}")
     return 0 if overall else 1
 

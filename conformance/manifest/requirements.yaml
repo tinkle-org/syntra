@@ -96,8 +96,10 @@ requirements:
     test_ids: [CONF-SESS-001, CONF-CORE-008]
     automation_status: partially_automated
     notes: "Sequence proof (mermaid in spec §8): runner executes accept/reject/timeout/mismatch rows; a human confirms the state diagram transitions match."
-  - { requirement_id: SNTR-HS-015, specification: specifications/core/handshake.md, section: "§2B", test_ids: [CONF-RS-001], automation_status: automated }
-  - { requirement_id: SNTR-HS-902, specification: specifications/core/handshake.md, section: "§8", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-HS-015, specification: specifications/core/handshake.md, section: "§2B", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001 is not executable: reliable-session RFC acceptance and canonical wire contract pending. Existing implementation unit tests are not wire-conformance evidence." }
+  - { requirement_id: SNTR-HS-902, specification: specifications/core/handshake.md, section: "§8", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001 is not executable pending accepted reliable-session wire contract; see sessions.md §7.1." }
 
   # ---- Authentication: specifications/core/authentication.md ----
   - { requirement_id: SNTR-AUTH-001, specification: specifications/core/authentication.md, section: "§1", test_ids: [CONF-SESS-001], automation_status: automated }
@@ -144,17 +146,22 @@ requirements:
     test_ids: [CONF-SESS-008]
     automation_status: manual
     notes: "No-promise proof (cross-transport resumption unsupported in default v1): verified by human review of the declaration's documented resumption posture plus the automated rejection rows."
-  - { requirement_id: SNTR-SESS-030, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-001], automation_status: automated }
-  - { requirement_id: SNTR-SESS-031, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-001], automation_status: automated }
-  - { requirement_id: SNTR-SESS-032, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-002], automation_status: automated }
-  - { requirement_id: SNTR-SESS-033, specification: specifications/core/sessions.md, section: "§1H", test_ids: [CONF-RS-003], automation_status: automated }
+  - { requirement_id: SNTR-SESS-030, specification: specifications/core/sessions.md, section: "§1H", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001: draft identity/attachment contract; no accepted canonical control payloads. See sessions.md §7.1." }
+  - { requirement_id: SNTR-SESS-031, specification: specifications/core/sessions.md, section: "§1H", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001: draft epoch/fencing contract; no executable wire fixture pending accepted canonical control payloads." }
+  - { requirement_id: SNTR-SESS-032, specification: specifications/core/sessions.md, section: "§1H", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-002: resume from initial epoch 1 expects epoch 2; draft rotation/revocation contract awaits accepted wire representation and fixture setup." }
+  - { requirement_id: SNTR-SESS-033, specification: specifications/core/sessions.md, section: "§1H", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-003: lease/keepalive/idle test plan only, pending accepted canonical control payloads and injected-clock fixture setup." }
   - requirement_id: SNTR-SESS-034
     specification: specifications/core/sessions.md
     section: "§1H"
-    test_ids: [CONF-RS-004]
-    automation_status: partially_automated
-    notes: "Drain/overload vectors are fixture-declared in CONF-RS-004 (going-away drain, RESOURCE_EXHAUSTED overload, retention); queue-bound/backoff/drain execution is exercised in unit tests, not end-to-end by every runner leg — human confirms leg coverage."
-  - { requirement_id: SNTR-SESS-902, specification: specifications/core/sessions.md, section: "§7", test_ids: [CONF-RS-001, CONF-RS-002, CONF-RS-003, CONF-RS-004, CONF-RS-005], automation_status: automated }
+    test_ids: []
+    automation_status: not_testable
+    notes: "Planned CONF-RS-003 (idle-timeout lifecycle) and CONF-RS-004 (drain/overload); neither is executable pending accepted canonical wire contract. Implementation unit coverage does not establish wire conformance."
+  - { requirement_id: SNTR-SESS-902, specification: specifications/core/sessions.md, section: "§7", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001..005 are reserved non-executable draft test plans in sessions.md §7.1, pending accepted canonical wire contract." }
 
   # ---- RPC: specifications/core/rpc.md ----
   - { requirement_id: SNTR-RPC-001, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-005], automation_status: automated }
@@ -174,10 +181,14 @@ requirements:
   - { requirement_id: SNTR-RPC-032, specification: specifications/core/rpc.md, section: "§3", test_ids: [CONF-SEC-007], automation_status: automated }
   - { requirement_id: SNTR-RPC-900, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001], automation_status: automated }
   - { requirement_id: SNTR-RPC-901, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RPC-001, CONF-RPC-004], automation_status: automated }
-  - { requirement_id: SNTR-RPC-011, specification: specifications/core/rpc.md, section: "§1J", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-RPC-012, specification: specifications/core/rpc.md, section: "§1K", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-RPC-013, specification: specifications/core/rpc.md, section: "§1L", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-RPC-902, specification: specifications/core/rpc.md, section: "§7", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-RPC-011, specification: specifications/core/rpc.md, section: "§1J", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 awaits accepted delivery-ID carriage inside canonical control payloads; no delivery_id field exists in Frame/RpcRequest/RpcResult." }
+  - { requirement_id: SNTR-RPC-012, specification: specifications/core/rpc.md, section: "§1K", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 is not executable pending accepted reconciliation wire contract; implementation unit tests remain separate evidence." }
+  - { requirement_id: SNTR-RPC-013, specification: specifications/core/rpc.md, section: "§1L", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 is not executable pending accepted tombstone/retry wire contract." }
+  - { requirement_id: SNTR-RPC-902, specification: specifications/core/rpc.md, section: "§7", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 is a draft test plan only; see sessions.md §7.1. No reliable RPC wire-conformance claim." }
 
   # ---- Events: specifications/core/events.md ----
   - { requirement_id: SNTR-EVENT-001, specification: specifications/core/events.md, section: "§1", test_ids: [CONF-EVT-001, CONF-EVT-002], automation_status: automated }
@@ -221,17 +232,22 @@ requirements:
   - { requirement_id: SNTR-REL-031, specification: specifications/core/reliability.md, section: "§3", test_ids: [CONF-SEC-011], automation_status: automated }
   - { requirement_id: SNTR-REL-900, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012, CONF-RPC-011], automation_status: automated }
   - { requirement_id: SNTR-REL-901, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RPC-012], automation_status: automated }
-  - { requirement_id: SNTR-REL-011, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-REL-012, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-REL-013, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
-  - { requirement_id: SNTR-REL-014, specification: specifications/core/reliability.md, section: "§1C", test_ids: [CONF-RS-005], automation_status: automated }
+  - { requirement_id: SNTR-REL-011, specification: specifications/core/reliability.md, section: "§1C", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005: draft stable-ID resend contract lacks accepted wire representation; implementation unit tests are not wire-conformance evidence." }
+  - { requirement_id: SNTR-REL-012, specification: specifications/core/reliability.md, section: "§1C", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005: duplicate-content validation awaits accepted canonical reliable-delivery payloads." }
+  - { requirement_id: SNTR-REL-013, specification: specifications/core/reliability.md, section: "§1C", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 includes Pending surviving retention while execution is live; no executable fixture pending accepted reconciliation contract." }
+  - { requirement_id: SNTR-REL-014, specification: specifications/core/reliability.md, section: "§1C", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005: deterministic DEADLINE_EXCEEDED/CANCELLED tombstones await accepted canonical wire contract." }
   - requirement_id: SNTR-REL-015
     specification: specifications/core/reliability.md
     section: "§1C"
-    test_ids: [CONF-RS-004, CONF-RS-005]
-    automation_status: partially_automated
-    notes: "CONF-RS-004/005 declare drain/retention/tombstone vectors but assert no numeric queue-bound, backoff-schedule, or drain-ordering execution; overload/queue-bound/backoff/drain need dedicated bound tests plus human review of the ControlBounds defaults."
-  - { requirement_id: SNTR-REL-902, specification: specifications/core/reliability.md, section: "§7", test_ids: [CONF-RS-005], automation_status: automated }
+    test_ids: []
+    automation_status: not_testable
+    notes: "Planned CONF-RS-004/005: bounded admission, backoff, retention and explicit drain need accepted wire contract and deterministic fixtures. Keep implementation bound tests; they do not execute these draft manifest plans."
+  - { requirement_id: SNTR-REL-902, specification: specifications/core/reliability.md, section: "§7", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-005 is not executable pending accepted reliable-delivery wire contract; see sessions.md §7.1." }
 
   # ---- Capabilities: specifications/core/capabilities.md ----
   - { requirement_id: SNTR-CAP-001, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-EVT-001], automation_status: automated }
@@ -262,8 +278,10 @@ requirements:
     test_ids: [CONF-EVT-001]
     automation_status: partially_automated
     notes: "Negotiation trace: the runner automates confirmation of advertised identifiers; a human confirms each cited identifier has an RFC reference."
-  - { requirement_id: SNTR-CAP-008, specification: specifications/core/capabilities.md, section: "§1", test_ids: [CONF-RS-001], automation_status: automated }
-  - { requirement_id: SNTR-CAP-902, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-RS-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-008, specification: specifications/core/capabilities.md, section: "§1", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001 awaits accepted negotiation identifier/binding/payloads; Draft proposal is not shipping authority." }
+  - { requirement_id: SNTR-CAP-902, specification: specifications/core/capabilities.md, section: "§7", test_ids: [], automation_status: not_testable,
+      notes: "Planned CONF-RS-001 needs explicit negotiation confirm/partial-accept/unconfirmed-use/connection-isolation subcases. Former attach/drain rows did not test negotiation; accepted canonical wire contract pending." }
 
   # ---- Errors: specifications/core/errors.md ----
   - { requirement_id: SNTR-ERR-001, specification: specifications/core/errors.md, section: "§1", test_ids: [CONF-RPC-010], automation_status: automated }

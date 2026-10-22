@@ -246,6 +246,10 @@ pub mod frame {
 /// snapshot recovery, and committed progress (SYN-URP-001..007,
 /// SYN-URP-010..026; SYN-URP-008/009 reserved).
 ///
+/// DRAFT proposal under RFC 0006, not accepted shipping authority. These
+/// comments describe proposed validation; generated codecs alone do not
+/// enforce it. No conformance or release claim may cite the draft as authority.
+///
 /// All payloads are versioned bytes carried inside the existing request,
 /// result, and notification envelopes with no envelope changes. Each
 /// subscription is one independent logical stream with one continuity
@@ -267,8 +271,9 @@ pub mod frame {
 /// `/syntra.v1.UpdateRecovery/Replay`,
 /// `/syntra.v1.UpdateRecovery/CatchUp`,
 /// `/syntra.v1.UpdateRecovery/Confirm` (batch variant
-/// `RecoveryConfirmRequest`/`RecoveryConfirmResponse` and snapshot-boundary
-/// variant `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled`),
+/// `RecoveryConfirmRequest`/`RecoveryConfirmResponse`),
+/// `/syntra.v1.UpdateRecovery/SnapshotConfirm` (snapshot-boundary variant
+/// `RecoverySnapshotConfirmRequest`/`RecoverySnapshotInstalled`),
 /// `/syntra.v1.UpdateRecovery/SnapshotOffer`
 /// (`RecoverySnapshotOfferRequest`/`RecoverySnapshotDescriptor`),
 /// `/syntra.v1.UpdateRecovery/SnapshotFetch`,
@@ -282,12 +287,17 @@ pub mod frame {
 /// Wire compatibility (SNTR-SER-003, SNTR-VER-004): unknown Protobuf fields
 /// inside profile payloads MUST be ignored on receipt unless a field comment
 /// explicitly marks that field `Critical`. Fields explicitly marked
-/// `Ignorable` in their comments MUST be ignored on receipt. All other
-/// defined fields are required and validated: profile_version and
-/// routing/identity fields (stream_selector, subscription_handle,
-/// snapshot_handle, checkpoints, boundaries, capability, versions) missing
-/// or mismatched MUST be rejected with FAILED_PRECONDITION, never silently
-/// applied. Unknown profile operations (method strings) MUST be rejected
+/// `Ignorable` in their comments MUST be ignored on receipt. Defined fields
+/// are validated per their field comments: profile_version and routing/identity
+/// fields (stream_selector, subscription_handle, snapshot_handle, capability,
+/// versions) missing or mismatched MUST be rejected with FAILED_PRECONDITION,
+/// never silently applied. Checkpoint/boundary/marker fields follow per-field
+/// emptiness rules, not a blanket non-empty rule: `start_checkpoint` empty
+/// means initial (SYN-URP-022), `continuation_marker` empty means first request
+/// or no further page (SYN-URP-022), `terminate_reason` empty means no
+/// termination unless the terminated outcome is selected (SYN-URP-026), and
+/// predecessor/result/boundary emptiness is governed by each field comment.
+/// Unknown profile operations (method strings) MUST be rejected
 /// with UNIMPLEMENTED.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -642,8 +652,12 @@ pub struct RecoverySnapshotFetchRequest {
     pub page_index: u32,
 }
 /// RecoveryConfirmRequest confirms a batch result checkpoint (batch variant).
-/// Snapshot-boundary confirms use RecoverySnapshotConfirmRequest and yield
-/// RecoverySnapshotInstalled. Both variants share the Confirm method.
+/// Transport: `/syntra.v1.UpdateRecovery/Confirm`, yielding
+/// RecoveryConfirmResponse. Snapshot-boundary confirms use
+/// RecoverySnapshotConfirmRequest on
+/// `/syntra.v1.UpdateRecovery/SnapshotConfirm` and yield
+/// RecoverySnapshotInstalled. The two variants use distinct methods so batch
+/// and snapshot confirms are wire-distinguishable.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoveryConfirmRequest {
@@ -668,7 +682,8 @@ pub struct RecoveryConfirmRequest {
     pub checkpoint: ::prost::alloc::vec::Vec<u8>,
 }
 /// RecoverySnapshotConfirmRequest confirms a snapshot boundary checkpoint
-/// (snapshot variant). Yields RecoverySnapshotInstalled with the new generation.
+/// (snapshot variant) on `/syntra.v1.UpdateRecovery/SnapshotConfirm`.
+/// Yields RecoverySnapshotInstalled with the new generation.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RecoverySnapshotConfirmRequest {
@@ -681,13 +696,24 @@ pub struct RecoverySnapshotConfirmRequest {
     #[prost(bytes="vec", tag="2")]
     pub subscription_handle: ::prost::alloc::vec::Vec<u8>,
     /// generation is the continuity generation at confirm time (pre-install).
-    /// Required. MUST equal the current generation before install.
+    /// Required. MUST equal the current generation before a first install.
+    /// Draft retained-install retry exception (SYN-URP-025): after successful
+    /// installation, an exact duplicate for the same authorized subscription,
+    /// profile version, pre-install generation, and boundary bytes MAY carry
+    /// that pre-install generation only while its installed response is retained
+    /// and the current generation still equals that response's installed
+    /// generation. The host MUST return the original RecoverySnapshotInstalled
+    /// without reinstalling or advancing generation. Supersede, termination,
+    /// later continuity change, or retention expiry invalidates this exception;
+    /// other stale-generation requests MUST fail with FAILED_PRECONDITION.
     #[prost(uint64, tag="3")]
     pub generation: u64,
     /// boundary_checkpoint is the offered boundary being confirmed. Opaque bytes,
     /// non-empty, at most 4096 bytes. Required. MUST equal the offered
     /// RecoverySnapshotDescriptor.boundary_checkpoint bytes; mismatch MUST be
     /// rejected with FAILED_PRECONDITION without installing.
+    /// On the retained-install retry path, MUST equal the retained installed
+    /// boundary exactly; matching bytes alone do not authorize a stale confirm.
     #[prost(bytes="vec", tag="4")]
     pub boundary_checkpoint: ::prost::alloc::vec::Vec<u8>,
 }

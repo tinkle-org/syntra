@@ -1,22 +1,83 @@
 // Shared conformance runner — Go legs (pairings `go-pure`, `go-ffi`,
 // `interop`).
 //
-// Drives the linked core (pure-Go by default, production Rust via
-// -tags syntranative) through the shared scenario matrix
-// (conformance/runner/scenarios.yaml) with deterministic fault injection,
-// asserting wire payloads, durable state, bounds and terminal outcomes.
-// The same file runs in both builds; TestCoreBackend logs which core is
-// linked. Rust<->Go interop is proven at the wire level: Go frames decode
-// against Rust golden vectors and Go golden frames decode via UnmarshalFrame.
+// Exercises selected cases described in conformance/runner/scenarios.yaml
+// with the pure-Go or production Rust FFI core. Recovery tests run separately.
+// Interop compares executed Rust/Go decodes of shared corpus bytes; it does
+// not establish a live cross-language connection.
 package syntra
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+type runnerRecordedTransport struct {
+	Transport
+	sent       [][]byte
+	failSecond bool
+}
+
+func (r *runnerRecordedTransport) Send(_ context.Context, raw []byte) error {
+	r.sent = append(r.sent, append([]byte(nil), raw...))
+	if r.failSecond && len(r.sent) == 2 {
+		return errors.New("second send failed")
+	}
+	return nil
+}
+
+func runnerDuplicateFaults(t *testing.T) *seededFaults {
+	t.Helper()
+	f := newSeededFaults(0x5EED1234)
+	for i := 0; i < 100000; i++ {
+		n := f.n
+		drop := f.drop()
+		if f.duplicate() && !drop {
+			return &seededFaults{state: f.state, n: n}
+		}
+	}
+	t.Fatal("seed did not reach duplicate branch")
+	return nil
+}
+
+func TestRunnerFaultTransportOnlyDuplicatesRequestsAndResults(t *testing.T) {
+	for _, frame := range []*Frame{
+		NewHelloFrame(&ClientHello{MinVersion: 1, MaxVersion: 1}, 1),
+		NewNotificationFrame(1, &Notification{Payload: []byte("event")}),
+	} {
+		raw, err := MarshalFrame(frame)
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorded := &runnerRecordedTransport{}
+		ft := &faultTransport{Transport: recorded, faults: runnerDuplicateFaults(t)}
+		if err := ft.Send(context.Background(), raw); err != nil {
+			t.Fatal(err)
+		}
+		if len(recorded.sent) != 1 {
+			t.Fatalf("non-RPC frame duplicated %d times", len(recorded.sent))
+		}
+	}
+}
+
+func TestRunnerFaultTransportDuplicateSendFailureVisible(t *testing.T) {
+	raw, err := MarshalFrame(NewResultFrame(1, 7, NewSuccessResult([]byte("echo"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := &runnerRecordedTransport{failSecond: true}
+	ft := &faultTransport{Transport: recorded, faults: runnerDuplicateFaults(t)}
+	if err := ft.Send(context.Background(), raw); err == nil {
+		t.Fatal("duplicate send failure hidden")
+	}
+}
 
 // seededFaults is a deterministic xorshift64* PRNG (seed 0x5EED1234).
 type seededFaults struct {
@@ -41,17 +102,27 @@ func (s *seededFaults) duplicate() bool { return s.next()%128 == 0 }
 // faultTransport wraps a Transport with deterministic send faults.
 type faultTransport struct {
 	Transport
-	faults *seededFaults
-	drops  int
-	dups   int
+	mu                sync.Mutex
+	faults            *seededFaults
+	drops             int
+	requestDups       int
+	resultDups        int
+	notificationSends chan struct{}
 }
 
 func (f *faultTransport) Send(ctx context.Context, frame []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fr, err := UnmarshalFrame(frame)
+	if err != nil {
+		return err
+	}
+	kind := BodyKindOf(fr)
+	if kind == BodyKindNotification && f.notificationSends != nil {
+		defer func() { f.notificationSends <- struct{}{} }()
+	}
 	if f.faults.drop() {
-		// Simulate a notification drop (counted, not fatal for RPC tests).
-		// For request frames, do NOT drop (would break exactly-once); only
-		// delay deterministically.
-		if fr, err := UnmarshalFrame(frame); err == nil && BodyKindOf(fr) == BodyKindNotification {
+		if kind == BodyKindNotification {
 			f.drops++
 			return nil
 		}
@@ -59,17 +130,25 @@ func (f *faultTransport) Send(ctx context.Context, frame []byte) error {
 	if err := f.Transport.Send(ctx, frame); err != nil {
 		return err
 	}
-	// Duplicate delivery: hand the same serialized frame to the transport a
-	// second time. Exactly-once holds because receivers dedup: the client
-	// ignores a second terminal result for one request id, and the host
-	// answers a duplicate request without a second dispatch storm.
-	if f.faults.duplicate() {
+	// Always consume the seeded draw; only request/result copies are delivered.
+	if f.faults.duplicate() && (kind == BodyKindRequest || kind == BodyKindResult) {
 		cp := append([]byte(nil), frame...)
-		if err := f.Transport.Send(ctx, cp); err == nil {
-			f.dups++
+		if err := f.Transport.Send(ctx, cp); err != nil {
+			return err
+		}
+		if kind == BodyKindRequest {
+			f.requestDups++
+		} else {
+			f.resultDups++
 		}
 	}
 	return nil
+}
+
+func (f *faultTransport) counts() (drops, requests, results int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.drops, f.requestDups, f.resultDups
 }
 
 func runnerHostConfig(handler HandlerFunc) HostConfig {
@@ -83,7 +162,7 @@ func runnerHostConfig(handler HandlerFunc) HostConfig {
 func TestRunnerEcho(t *testing.T) {
 	p := newPair(t, testClientConfig(), runnerHostConfig(nil))
 	defer p.Cleanup()
-	for _, payload := range [][]byte{{}, []byte("hello"), make([]byte, 64 << 10)} {
+	for _, payload := range [][]byte{{}, []byte("hello"), make([]byte, 64<<10)} {
 		got, err := p.client.Call(context.Background(), "/example.Echo/Echo", payload, 2000)
 		if err != nil {
 			t.Fatalf("echo: %v", err)
@@ -123,15 +202,14 @@ func TestRunnerConcurrent16(t *testing.T) {
 }
 
 func TestRunnerEchoWithFaultInjection(t *testing.T) {
-	// RPCs stay exactly-once under notification-drop AND duplicate faults:
-	// the transports wrap both directions (requests pass through; only
-	// notifications drop; any frame may duplicate), notifications are
-	// exercised, and terminal results remain exactly-once (the receiver
-	// ignores/dedups the second copy).
+	// Seeded notification loss with a real echo. Separate tests below force
+	// the PRNG's request/result duplicate branches with observable outcomes.
 	a, b := LoopbackPair()
 	clientFault := &faultTransport{Transport: b, faults: newSeededFaults(0x5EED1234)}
-	hostFault := &faultTransport{Transport: a, faults: newSeededFaults(0x5EED1234)}
-	c, err := OpenClient(testClientConfig())
+	hostFault := &faultTransport{Transport: a, faults: newSeededFaults(0x5EED1234), notificationSends: make(chan struct{}, 64)}
+	cfg := testClientConfig()
+	cfg.NotifyBuffer = 128
+	c, err := OpenClient(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,37 +219,256 @@ func TestRunnerEchoWithFaultInjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	defer a.Close()
-	defer b.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	runDone := make(chan error, 1)
 	go func() { runDone <- c.Run(ctx, clientFault) }()
 	serveDone := make(chan error, 1)
 	go func() { serveDone <- h.Serve(ctx, hostFault) }()
+	t.Cleanup(func() {
+		cancel()
+		_ = a.Close()
+		_ = b.Close()
+		for _, done := range []chan error{runDone, serveDone} {
+			select {
+			case <-done:
+			case <-time.After(3 * time.Second):
+				t.Error("fault pump did not stop")
+			}
+		}
+	})
 	warm, wcancel := context.WithTimeout(ctx, 3*time.Second)
 	defer wcancel()
 	if _, err := c.Call(warm, "/example.Echo/Echo", []byte("warmup"), 1000); err != nil {
 		t.Fatalf("handshake not ready: %v", err)
 	}
 	for i := 0; i < 64; i++ {
-		_ = h.NotifyAll([]byte{byte(i)})
+		if err := h.NotifyAll([]byte{byte(i)}); err != nil {
+			t.Fatal(err)
+		}
 	}
-	got, err := c.Call(context.Background(), "/example.Echo/Echo", []byte("hello-fault"), 2000)
+	for i := 0; i < 64; i++ {
+		select {
+		case <-hostFault.notificationSends:
+		case <-ctx.Done():
+			t.Fatal("notifications not sent")
+		}
+	}
+	drops, _, _ := hostFault.counts()
+	if drops == 0 {
+		t.Fatal("no seeded notification drops")
+	}
+	for i := 0; i < 64-drops; i++ {
+		select {
+		case <-c.Notifications():
+		case <-ctx.Done():
+			t.Fatal("non-dropped notification missing")
+		}
+	}
+	got, err := c.Call(ctx, "/example.Echo/Echo", []byte("hello-fault"), 2000)
 	if err != nil {
 		t.Fatalf("echo under faults: %v", err)
 	}
 	if string(got) != "hello-fault" {
 		t.Fatalf("opaque bytes not preserved under faults: %q", got)
 	}
-	if hostFault.drops == 0 && clientFault.drops == 0 {
-		t.Fatalf("fault injection dropped no notifications (host=%d client=%d)", hostFault.drops, clientFault.drops)
+	select {
+	case extra := <-c.Notifications():
+		t.Fatalf("extra notification after sent-minus-dropped count: %v", extra)
+	default:
 	}
-	if hostFault.dups == 0 && clientFault.dups == 0 {
-		t.Fatalf("fault injection duplicated no frames (host=%d client=%d)", hostFault.dups, clientFault.dups)
+	if c.DroppedNotifications() != 0 {
+		t.Fatal("client overflow must not hide transport loss accounting")
 	}
-	_ = runDone
-	_ = serveDone
+	t.Logf("seeded notification drops=%d, delivered=%d", drops, 64-drops)
+}
+
+func runnerSend(t *testing.T, ctx context.Context, transport Transport, frame *Frame) {
+	t.Helper()
+	raw, err := MarshalFrame(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.Send(ctx, raw); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runnerRecv(t *testing.T, ctx context.Context, transport Transport) *Frame {
+	t.Helper()
+	raw, err := transport.Recv(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := UnmarshalFrame(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return frame
+}
+
+func TestRunnerDuplicateRequestThroughTransport(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	a, b := LoopbackPair()
+	started, release := make(chan struct{}, 2), make(chan struct{})
+	var dispatched atomic.Int32
+	h, err := OpenHost(runnerHostConfig(func(ctx context.Context, req *RpcRequest) (*RpcResult, error) {
+		dispatched.Add(1)
+		if string(req.GetPayload()) == "held" {
+			started <- struct{}{}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		return NewSuccessResult(req.GetPayload()), nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- h.Serve(ctx, a) }()
+	t.Cleanup(func() {
+		cancel()
+		_ = h.Close()
+		_ = a.Close()
+		_ = b.Close()
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Error("host pump did not stop")
+		}
+	})
+	runnerSend(t, ctx, b, NewHelloFrame(&ClientHello{MinVersion: 1, MaxVersion: 1}, 1))
+	if runnerRecv(t, ctx, b).GetReady() == nil {
+		t.Fatal("no ready")
+	}
+	ft := &faultTransport{Transport: b, faults: runnerDuplicateFaults(t)}
+	runnerSend(t, ctx, ft, NewRequestFrame(1, 7, &RpcRequest{Method: "/example.Echo/Echo", Payload: []byte("held"), TimeoutMs: 4000}))
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("handler did not start")
+	}
+	rejected := runnerRecv(t, ctx, b)
+	if rejected.GetRequestId() != 7 || rejected.GetResult().GetError().GetCode() != ErrorCodeFailedPrecondition {
+		t.Fatalf("duplicate rejection = %v", rejected)
+	}
+	if dispatched.Load() != 1 {
+		t.Fatal("duplicate request dispatched twice")
+	}
+	close(release)
+	original := runnerRecv(t, ctx, b)
+	if original.GetRequestId() != 7 || string(original.GetResult().GetPayload()) != "held" {
+		t.Fatalf("original = %v", original)
+	}
+	runnerSend(t, ctx, b, NewRequestFrame(1, 8, &RpcRequest{Method: "/example.Echo/Echo", Payload: []byte("follow"), TimeoutMs: 4000}))
+	follow := runnerRecv(t, ctx, b)
+	if follow.GetRequestId() != 8 || string(follow.GetResult().GetPayload()) != "follow" {
+		t.Fatalf("follow-up = %v", follow)
+	}
+	_, requests, results := ft.counts()
+	if requests != 1 || results != 0 || dispatched.Load() != 2 {
+		t.Fatalf("duplicates req=%d result=%d dispatch=%d", requests, results, dispatched.Load())
+	}
+	quiet, stop := context.WithTimeout(ctx, 20*time.Millisecond)
+	defer stop()
+	if raw, err := b.Recv(quiet); err == nil {
+		t.Fatalf("extra terminal: %x", raw)
+	}
+}
+
+func TestRunnerDuplicateResultThroughTransport(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	a, b := LoopbackPair()
+	c, err := OpenClient(testClientConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx, b) }()
+	t.Cleanup(func() {
+		cancel()
+		_ = c.Close()
+		_ = a.Close()
+		_ = b.Close()
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			t.Error("client pump did not stop")
+		}
+	})
+	if runnerRecv(t, ctx, a).GetHello() == nil {
+		t.Fatal("no hello")
+	}
+	runnerSend(t, ctx, a, NewReadyFrame(1, &ServerReady{ConnectionId: "runner-conn"}))
+	type outcome struct {
+		payload []byte
+		err     error
+	}
+	call := func(payload string) <-chan outcome {
+		ch := make(chan outcome, 1)
+		go func() { p, err := c.Call(ctx, "/example.Echo/Echo", []byte(payload), 4000); ch <- outcome{p, err} }()
+		return ch
+	}
+	first := call("first")
+	req := runnerRecv(t, ctx, a)
+	ft := &faultTransport{Transport: a, faults: runnerDuplicateFaults(t)}
+	result := NewResultFrame(1, req.GetRequestId(), NewSuccessResult(req.GetRequest().GetPayload()))
+	runnerSend(t, ctx, ft, result)
+	select {
+	case got := <-first:
+		if got.err != nil || string(got.payload) != "first" {
+			t.Fatalf("first = %v %q", got.err, got.payload)
+		}
+	case <-ctx.Done():
+		t.Fatal("first result missing")
+	}
+	follow := call("follow")
+	next := runnerRecv(t, ctx, a)
+	if next.GetRequestId() == req.GetRequestId() {
+		t.Fatal("request id reused")
+	}
+	runnerSend(t, ctx, a, result) // late duplicate while another call is pending
+	runnerSend(t, ctx, a, NewNotificationFrame(1, &Notification{Payload: []byte("barrier")}))
+	select {
+	case <-c.Notifications():
+	case <-ctx.Done():
+		t.Fatal("pump barrier missing")
+	}
+	select {
+	case got := <-follow:
+		t.Fatalf("duplicate settled follow-up: %v", got)
+	default:
+	}
+	c.mu.Lock()
+	pending := len(c.waiters)
+	c.mu.Unlock()
+	if pending != 1 {
+		t.Fatalf("pending waiters = %d", pending)
+	}
+	if _, ok := c.core.takeOutcome(req.GetRequestId()); ok {
+		t.Fatal("duplicate retained a second outcome")
+	}
+	runnerSend(t, ctx, a, NewResultFrame(1, next.GetRequestId(), NewSuccessResult(next.GetRequest().GetPayload())))
+	select {
+	case got := <-follow:
+		if got.err != nil || string(got.payload) != "follow" {
+			t.Fatalf("follow-up = %v %q", got.err, got.payload)
+		}
+	case <-ctx.Done():
+		t.Fatal("follow-up missing")
+	}
+	_, requests, results := ft.counts()
+	if requests != 0 || results != 1 {
+		t.Fatalf("duplicates req=%d result=%d", requests, results)
+	}
+	c.mu.Lock()
+	pending = len(c.waiters)
+	c.mu.Unlock()
+	if pending != 0 {
+		t.Fatalf("settled calls retained %d waiters", pending)
+	}
 }
 
 func TestRunnerDuplicateResultDeduped(t *testing.T) {
@@ -400,7 +697,7 @@ func TestRunnerOversizeHandlerResultBounded(t *testing.T) {
 	}
 }
 
-func TestRunnerGracefulCloseDrains(t *testing.T) {
+func TestRunnerCloseAfterCompletedEcho(t *testing.T) {
 	p := newPair(t, testClientConfig(), testHostConfig())
 	defer p.Cleanup()
 	out, err := p.client.Call(context.Background(), "/example.Echo/Echo", []byte("before"), 1000)
@@ -410,7 +707,7 @@ func TestRunnerGracefulCloseDrains(t *testing.T) {
 	if err := p.host.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// Close rejects new RPCs: second Close and new Serve fail fast.
+	// Repeated Close and Serve on the closed Host fail fast.
 	if err := p.host.Close(); callCode(t, err) != ErrorCodeFailedPrecondition {
 		t.Fatalf("second Close = %v, want FAILED_PRECONDITION", err)
 	}
@@ -420,7 +717,7 @@ func TestRunnerGracefulCloseDrains(t *testing.T) {
 	if err := p.host.Serve(context.Background(), a); callCode(t, err) != ErrorCodeFailedPrecondition {
 		t.Fatalf("Serve after Close = %v, want FAILED_PRECONDITION", err)
 	}
-	// Serve exits via gracefulDrain flushing queued frames first.
+	// No queued result is held during close in this test.
 	select {
 	case err := <-p.serveErr:
 		if err != nil {
@@ -459,18 +756,47 @@ func TestRunnerFaultInjectionDeterministic(t *testing.T) {
 }
 
 func TestRunnerWireInteropGolden(t *testing.T) {
-	// Rust<->Go wire interop: Go frames decode against Rust golden vectors.
-	// VEC-WS-001 style hello must round-trip through Go validators.
-	hello, err := MarshalFrame(NewHelloFrame(&ClientHello{MinVersion: 1, MaxVersion: 1, Credential: []byte("opaque-test-credential-A")}, 1))
+	text, err := os.ReadFile("../../conformance/test-vectors/protobuf/vectors.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := UnmarshalFrame(hello)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if BodyKindOf(f) != BodyKindHello || f.GetVersion() != 1 {
-		t.Fatalf("hello = %v", f)
+	for _, id := range []string{"GOLD-PROT-HELLO-01", "GOLD-PROT-REQ-01"} {
+		selected := false
+		var hexes []string
+		for _, line := range strings.Split(string(text), "\n") {
+			if strings.HasPrefix(line, "  - id: ") {
+				selected = line == "  - id: "+id
+			}
+			if selected && strings.HasPrefix(line, "    frame_hex: ") {
+				hexes = append(hexes, strings.Trim(strings.TrimPrefix(line, "    frame_hex: "), "\""))
+			}
+		}
+		if len(hexes) != 1 {
+			t.Fatalf("expected one corpus hex for %s, got %d", id, len(hexes))
+		}
+		f, err := UnmarshalFrame(mustHex(t, hexes[0]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		sem := map[string]any{"version": f.GetVersion(), "request_id": f.GetRequestId()}
+		if id == "GOLD-PROT-HELLO-01" {
+			h := f.GetHello()
+			if h == nil || f.GetVersion() != 1 || f.GetRequestId() != 0 || h.GetMinVersion() != 1 || h.GetMaxVersion() != 1 || string(h.GetCredential()) != "opaque-test-credential-A" {
+				t.Fatalf("hello = %v", f)
+			}
+			sem["body"], sem["min_version"], sem["max_version"], sem["credential"] = "hello", h.GetMinVersion(), h.GetMaxVersion(), string(h.GetCredential())
+		} else {
+			r := f.GetRequest()
+			if r == nil || f.GetVersion() != 1 || f.GetRequestId() != 7 || r.GetMethod() != "/example.Echo/Echo" || string(r.GetPayload()) != "hello" || r.GetTimeoutMs() != 500 {
+				t.Fatalf("request = %v", f)
+			}
+			sem["body"], sem["method"], sem["payload"], sem["timeout_ms"] = "request", r.GetMethod(), string(r.GetPayload()), r.GetTimeoutMs()
+		}
+		record, err := json.Marshal(map[string]any{"id": id, "frame_hex": hexes[0], "semantic_fields": sem})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("CORPUS %s", record)
 	}
 	// Error-code normalization (SNTR-ERR-005): unknown codes map to UNKNOWN.
 	if got := NormalizeErrorCode(99); got != ErrorCodeUnknown {

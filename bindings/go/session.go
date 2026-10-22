@@ -490,6 +490,10 @@ type Client struct {
 	coreCachedDropped atomic.Uint64
 	coreCachedBytes   atomic.Uint64
 	transport         Transport
+	// Serializes frame ingestion (the only core loss producer) with the
+	// final loss snapshot and destruction. Never held while waiting for Run
+	// or while publishing notifications; Close may interrupt delivery.
+	coreLifecycleMu sync.Mutex
 }
 
 // OpenClient creates an initiator session. It validates the config and
@@ -571,7 +575,7 @@ func (c *Client) LossTotals() (dropped uint64, droppedBytes uint64) {
 }
 
 // snapshotCoreLoss caches the current core loss totals, keeping the max so
-// LossTotals stays monotonic across Close.
+// LossTotals stays monotonic across Close. Caller holds coreLifecycleMu.
 func (c *Client) snapshotCoreLoss() {
 	if c == nil || c.core == nil {
 		return
@@ -589,6 +593,17 @@ func (c *Client) snapshotCoreLoss() {
 			break
 		}
 	}
+}
+
+// closeCore fences onFrame before taking the final snapshot. Waiting for
+// Run itself here would deadlock its deferred cleanup; only the in-flight
+// core operation must finish. Callers have already set closed under mu,
+// and must release mu before acquiring coreLifecycleMu.
+func (c *Client) closeCore() error {
+	c.coreLifecycleMu.Lock()
+	defer c.coreLifecycleMu.Unlock()
+	c.snapshotCoreLoss()
+	return c.core.close()
 }
 
 // broadcastLoss wakes ALL WaitLossChange waiters: the current channel is
@@ -747,8 +762,7 @@ func (c *Client) Run(ctx context.Context, t Transport) error {
 		}
 		c.mu.Unlock()
 		if closeCore {
-			c.snapshotCoreLoss()
-			_ = c.core.close()
+			_ = c.closeCore()
 		}
 	}()
 	if _, err := c.handshake(runCtx, t); err != nil {
@@ -846,7 +860,16 @@ func (c *Client) pump(ctx context.Context, t Transport) error {
 				return NewRpcError(ErrorCodeUnavailable, fmt.Sprintf("syntra: transport recv: %v", r.err))
 			}
 			prevDropped, prevBytes := c.LossTotals()
+			c.coreLifecycleMu.Lock()
+			c.mu.Lock()
+			closed := c.closed
+			c.mu.Unlock()
+			if closed {
+				c.coreLifecycleMu.Unlock()
+				return nil
+			}
 			terminal, n, fatal := c.core.onFrame(r.raw)
+			c.coreLifecycleMu.Unlock()
 			if fatal != nil {
 				c.failWaiters(fatal.Code, fatal.Message)
 				return fatal
@@ -1114,13 +1137,8 @@ func (c *Client) Close() error {
 	if !c.pumpStarted {
 		close(c.notifyCh)
 	}
-	core := c.core
 	c.mu.Unlock()
-	c.snapshotCoreLoss()
-	if err := core.close(); err != nil {
-		return err
-	}
-	return nil
+	return c.closeCore()
 }
 
 // resolvedHostConfig is a HostConfig with defaults applied.

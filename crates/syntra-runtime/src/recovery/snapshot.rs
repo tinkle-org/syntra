@@ -16,13 +16,13 @@ pub enum SnapshotError {
     /// Page index outside `0..total_pages`, conflicting bytes, or
     /// zero-length page bytes.
     InvalidPage,
-    /// Page handle differs from the staged snapshot handle.
+    /// Snapshot handle is empty or a page handle differs from the staged handle.
     HandleMismatch,
     /// Page boundary differs from the staged boundary.
     BoundaryMismatch,
     /// Not every page has arrived; installation is incomplete.
     Incomplete,
-    /// Snapshot limits violated (too many pages, page too large).
+    /// Snapshot limits violated (handle too long, too many pages, page too large).
     OverLimit,
     /// Generation is not greater than the engine's current generation.
     StaleGeneration,
@@ -42,13 +42,20 @@ pub struct StagedSnapshot {
 
 impl StagedSnapshot {
     /// Begin staging `total_pages` pages under `boundary_checkpoint`.
-    /// Bounds: `1 <= total_pages <= 256`, `1 <= page_bytes_max <= 262144`.
+    /// Bounds: handle length `1..=256`, `1 <= total_pages <= 256`,
+    /// `1 <= page_bytes_max <= 262144`.
     pub fn new(
         snapshot_handle: Vec<u8>,
         boundary_checkpoint: Vec<u8>,
         total_pages: u32,
         page_bytes_max: u32,
     ) -> Result<Self, SnapshotError> {
+        if snapshot_handle.is_empty() {
+            return Err(SnapshotError::HandleMismatch);
+        }
+        if snapshot_handle.len() > 256 {
+            return Err(SnapshotError::OverLimit);
+        }
         if total_pages == 0 || total_pages > 256 {
             return Err(SnapshotError::OverLimit);
         }
@@ -128,7 +135,7 @@ impl StagedSnapshot {
             None => {
                 *slot = Some(bytes);
                 Ok(())
-            },
+            }
         }
     }
 
@@ -159,7 +166,8 @@ mod tests {
         assert!(!s.is_complete());
         s.stage_page(b"h1", 1, b"world".to_vec(), b"b-100").unwrap();
         assert!(s.install().is_err());
-        s.stage_page(b"h1", 0, b"hello-".to_vec(), b"b-100").unwrap();
+        s.stage_page(b"h1", 0, b"hello-".to_vec(), b"b-100")
+            .unwrap();
         assert!(s.is_complete());
         assert_eq!(s.install().unwrap(), b"hello-world");
     }

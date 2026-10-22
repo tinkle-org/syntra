@@ -1,74 +1,49 @@
-# Shared conformance-runner scenarios (implementation-independent matrix).
-# Each scenario drives a live peer pairing through the same steps and asserts
-# wire payloads, durable state, bounds and terminal outcomes — not just
-# manifest validation. Deterministic fault injection uses seeded PRNGs so
-# every run reproduces byte-identically.
-format_version: "1.0"
-runner: "syntra-conformance-runner v1"
-validated_by: "conformance/runner/runner.py:load_scenarios (seed + fault matrix loaded at startup; matrix descriptive where legs differ — see fault_injection rules and notes)"
-pairings:
-  - id: rust-async
-    description: "async Rust tokio runtime via syntra-runtime::loopback_pair"
-  - id: go-pure
-    description: "pure-Go core via LoopbackPair (default build)"
-  - id: go-ffi
-    description: "Go+FFI native core via syntranative adapter (production Rust core)"
-  - id: interop
-    description: "Rust<->Go wire interop: Go frames decode against Rust golden vectors and vice versa"
-scenarios:
-  - id: SC-ECHO
-    name: "echo round trip incl empty and 64KiB"
-    steps: ["handshake", "echo empty", "echo hello", "echo 64KiB", "assert opaque bytes preserved", "assert exactly one terminal result per id"]
-  - id: SC-CONCURRENT-16
-    name: "16 concurrent out-of-order, no head-of-line blocking"
-    steps: ["handshake", "16 concurrent echo with distinct ids", "assert all correlate by id", "assert out-of-order completion legal"]
-  - id: SC-CANCEL-WINS
-    name: "cancel before completion yields CANCELLED; completion wins race"
-    steps: ["handshake", "slow handler", "cancel id 1", "assert terminal CANCELLED exactly once", "assert no second result after handler returns", "assert connection usable", "fast handler id 2 completes before cancel arrives", "assert exactly one success for id 2", "assert late cancel after terminal tolerated with no second outcome"]
-  - id: SC-DEADLINE
-    name: "budget expiry yields exactly one DEADLINE_EXCEEDED"
-    steps: ["handshake", "slow handler 300ms, budget 50ms", "assert client DEADLINE_EXCEEDED", "assert host auto-enqueues exactly one DEADLINE_EXCEEDED", "assert no duplicate after late handler", "assert unknown-outcome semantics"]
-  - id: SC-OVERSIZE-PAYLOAD
-    name: "oversize payload rejected bounded"
-    steps: ["handshake", "payload MaxPayloadBytes+1 rejected ResourceExhausted before send", "assert connection usable"]
-  - id: SC-OVERSIZE-HANDLER-RESULT
-    name: "oversize handler result bounded failure"
-    steps: ["handshake", "handler returns 2MiB payload", "assert terminal RESOURCE_EXHAUSTED exactly once", "assert connection usable afterwards"]
-  - id: SC-DUPLICATE-ID
-    name: "duplicate outstanding rejected, original continues"
-    steps: ["handshake", "blocking handler id 7", "duplicate id 7 rejected FAILED_PRECONDITION", "release original, assert single success", "assert no second result"]
-  - id: SC-UNKNOWN-METHOD
-    name: "unknown method per-RPC UNIMPLEMENTED, usable conn"
-    steps: ["handshake", "call /example.Unknown/Call", "assert UNIMPLEMENTED terminal", "assert follow-up echo succeeds"]
-  - id: SC-MALFORMED-METHOD
-    name: "malformed method per-RPC INVALID_ARGUMENT"
-    steps: ["handshake", "call not-a-method", "assert INVALID_ARGUMENT", "assert usable"]
-  - id: SC-NOTIFICATION
-    name: "notifications never complete RPC, overflow drops with loss totals"
-    steps: ["handshake", "start slow RPC", "emit events", "assert RPC completes with payload", "assert events in order", "assert overflow drops newest with cumulative loss"]
-  - id: SC-GRACEFUL-CLOSE
-    name: "graceful close draining per SNTR-HS-006/013"
-    steps: ["handshake", "blocking handler id 9", "initiate graceful close while result queued", "release handler", "assert queued result drained before CLOSED", "assert CLOSING then CLOSED", "assert new RPCs rejected FailedPrecondition", "assert per-connection state discarded"]
-  - id: SC-TRANSPORT-LOSS
-    name: "abrupt loss maps in-flight to UNAVAILABLE unknown-outcome"
-    steps: ["handshake", "blocking RPC outstanding", "transport lost", "assert UNAVAILABLE", "assert unknown-outcome", "assert reconnect needs fresh handshake"]
-fault_injection:
-  seed: 0x5EED1234
-  faults:
-    - { kind: drop, rate: "1/64", scope: notifications }
-    - { kind: duplicate, rate: "1/128", scope: results }
-    - { kind: truncate, rate: "1/256", scope: inbound-bytes }
-    - { kind: delay, max_ms: 5, scope: send }
-  rules:
-    - "deterministic: seeded PRNG, same seed replays same fault pattern"
-    - "exactly-once terminal preserved under all faults (no zero, no two results)"
-    - "wire bytes validated before and after faults (ValidateFrame, size bounds)"
-    - "durable state (StreamRecovery checkpoints) advances only on validated batches"
-    - "matrix is descriptive until legs converge: go leg drops notifications only (1/64) and duplicates any frame (1/128) with no truncate/delay; rust leg drops/duplicates/truncates any transport unit (1/64, 1/128, 1/96); delay 5ms send unimplemented — legs must converge on the target matrix"
-verdicts: ["PASS", "FAIL", "SKIP"]
-notes:
-  - "Wire payloads: decoded Frame equality, opaque bytes bit-identical, no byte-equality across encoders (SNTR-SER-002)."
-  - "Durable state: recovery coordinator checkpoints only on validated complete batches; gaps map to GapDetected."
-  - "Bounds: 1MiB envelope, 16 concurrent, 30s max budget, 5s handshake — all enforced, all documented."
-  - "Terminal outcomes: exactly one result per id; codes CANCELLED/DEADLINE_EXCEEDED/UNAVAILABLE/RESOURCE_EXHAUSTED per scenario."
-  - "Fault matrix target (drop 1/64 notifications, duplicate 1/128 results, truncate 1/256 inbound-bytes, delay 5ms send) is descriptive: implemented legs differ per the rules above; runner.py:load_scenarios prints the matrix every run so drift is visible."
+{
+  "format_version": "1.0",
+  "runner": "syntra-conformance-runner v1",
+  "validated_by": "runner.py:load_scenarios (JSON-compatible YAML; full descriptive fault entries validated, printed and saved)",
+  "pairings": [
+    {"id": "rust-async", "description": "Rust runtime loopback and manually pumped byte channels"},
+    {"id": "go-pure", "description": "Go session/transport tests with pure-Go core"},
+    {"id": "go-ffi", "description": "Go session/transport tests with production Rust FFI core"},
+    {"id": "interop", "description": "Independent Rust/Go decodes of shared HELLO-01 and REQ-01 corpus bytes; no live cross-language connection"}
+  ],
+  "scenarios": [
+    {"id": "SC-ECHO", "name": "echo with empty, hello and 64KiB payloads", "steps": ["handshake", "assert returned opaque bytes"]},
+    {"id": "SC-CONCURRENT-16", "name": "16 concurrent correlated calls", "steps": ["handshake", "assert each caller receives its own payload; completion order is not forced"]},
+    {"id": "SC-CANCEL-WINS", "name": "Rust cancellation and follow-up usability", "steps": ["cancel a waiting call", "assert caller CANCELLED", "assert follow-up echo succeeds"], "limitations": "Rust only; completion-wins race and wire terminal count are not asserted here"},
+    {"id": "SC-DEADLINE", "name": "deadline outcomes", "steps": ["Rust caller reports DEADLINE_EXCEEDED unknown outcome", "Go stalled send respects call budget", "Go core expiry queues one deadline result and rejects late answer"], "limitations": "These are separate tests, not one end-to-end host expiry race"},
+    {"id": "SC-OVERSIZE-PAYLOAD", "name": "oversize request", "steps": ["not executed by these legs"], "limitations": "uncovered"},
+    {"id": "SC-OVERSIZE-HANDLER-RESULT", "name": "bounded oversize handler failure", "steps": ["handler returns 2MiB", "assert RESOURCE_EXHAUSTED", "assert follow-up echo"]},
+    {"id": "SC-DUPLICATE-ID", "name": "duplicate outstanding request", "steps": ["hold original handler", "deliver identical request again", "assert FAILED_PRECONDITION without another dispatch", "release original and assert payload"], "limitations": "Rejection and original success are two wire results for the same id, not an exactly-once wire claim"},
+    {"id": "SC-UNKNOWN-METHOD", "name": "unknown method", "steps": ["not executed by these legs"], "limitations": "uncovered"},
+    {"id": "SC-MALFORMED-METHOD", "name": "malformed method", "steps": ["not executed by these legs"], "limitations": "uncovered"},
+    {"id": "SC-NOTIFICATION", "name": "notification drops alongside RPC", "steps": ["Go sends 64 notifications through fault transport", "assert delivered count equals sent minus drops", "assert following echo"], "limitations": "No notification overflow/order contract asserted by runner fault test"},
+    {"id": "SC-GRACEFUL-CLOSE", "name": "close after completed echo", "steps": ["echo completes before close", "Rust closes host and checks session count zero", "Go checks repeated Close and Serve-after-Close rejected and existing Serve exits"], "limitations": "No queued-result drain, in-flight close, CLOSING transition or new-client-call rejection assertion"},
+    {"id": "SC-TRANSPORT-LOSS", "name": "abrupt transport loss", "steps": ["not executed by these legs"], "limitations": "uncovered"}
+  ],
+  "fault_injection": {
+    "seed": "0x5EED1234",
+    "faults": [
+      {"kind": "drop", "rate": "1/64", "scope": "notifications"},
+      {"kind": "duplicate", "rate": "1/128", "scope": "results"},
+      {"kind": "truncate", "rate": "1/256", "scope": "inbound-bytes"},
+      {"kind": "delay", "max_ms": 5, "scope": "send"}
+    ],
+    "rules": [
+      "Target matrix is descriptive, not injector configuration; changing this file does not change hard-coded Rust/Go fault schedules.",
+      "Rust request seed 0x5EED1234: drop 1/64, truncate 1/96, duplicate 1/128; response seed 0xBE5E11 uses the same draws; hello seed 0xCAFE01 is separate.",
+      "Rust response copies feed Initiator::ingest with a pending caller. Drops/truncations leave it pending until the held intact response is redelivered; duplicates settle once and cannot settle a follow-up call.",
+      "Rust request retries are ordinary core request-id retries, not reliable-session reconciliation or a durable exactly-once guarantee.",
+      "Go seed 0x5EED1234 drops notifications 1/64 and duplicates request/result frames 1/128; no handshake/notification duplication, truncation or delay. Forced seeded request and result cases guarantee each duplication branch executes.",
+      "Recovery/checkpoint tests execute separately from transport fault scenarios."
+    ]
+  },
+  "verdicts": ["PASS", "FAIL"],
+  "notes": [
+    "Verdicts are per leg; a PASS does not certify every scenario or manifest case.",
+    "Interop compares emitted consumed fixture bytes and decoded logical fields to the shared corpus. It does not compare arbitrary encoder bytes or run Rust-to-Go sockets.",
+    "No boundary claims for the 1MiB envelope, 30s maximum budget or 5s handshake timeout.",
+    "No delay fault is executed. Rust truncation is exercised; Go truncation is not."
+  ]
+}

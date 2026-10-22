@@ -184,7 +184,8 @@ impl InitiatorDriver {
                 saved.committed.clone(),
             );
         } else {
-            self.engine.insert_stream(stream_selector, generation, committed);
+            self.engine
+                .insert_stream(stream_selector, generation, committed);
         }
         Ok(())
     }
@@ -197,7 +198,8 @@ impl InitiatorDriver {
         if self.cache.contains(&key) {
             return vec![];
         }
-        self.engine.observe(ProfileInput::BatchValidated { checkpoint })
+        self.engine
+            .observe(ProfileInput::BatchValidated { checkpoint })
     }
 
     /// Confirm durable persistence of a previously offered checkpoint.
@@ -237,11 +239,7 @@ impl InitiatorDriver {
     }
 
     /// Poll a caller-supplied cumulative loss count for the stream.
-    pub fn poll_loss(
-        &mut self,
-        stream_selector: &[u8],
-        loss_count: u64,
-    ) -> Vec<ProfileAction> {
+    pub fn poll_loss(&mut self, stream_selector: &[u8], loss_count: u64) -> Vec<ProfileAction> {
         self.engine.poll_loss(stream_selector, loss_count)
     }
 
@@ -251,7 +249,8 @@ impl InitiatorDriver {
         stream_selector: &[u8],
         boundary: Vec<u8>,
     ) -> Vec<ProfileAction> {
-        self.engine.set_subscribed_boundary(stream_selector, boundary)
+        self.engine
+            .set_subscribed_boundary(stream_selector, boundary)
     }
 
     /// Track a replay page boundary.
@@ -269,7 +268,8 @@ impl InitiatorDriver {
         stream_selector: &[u8],
         completion_boundary: &[u8],
     ) -> Vec<ProfileAction> {
-        self.engine.observe_completion_boundary(stream_selector, completion_boundary)
+        self.engine
+            .observe_completion_boundary(stream_selector, completion_boundary)
     }
 
     /// Begin staging a snapshot under a provider-proven boundary.
@@ -301,7 +301,9 @@ impl InitiatorDriver {
         boundary_checkpoint: &[u8],
     ) -> Result<(), SnapshotError> {
         match self.staged.get_mut(stream_selector) {
-            Some(staged) => staged.stage_page(snapshot_handle, page_index, bytes, boundary_checkpoint),
+            Some(staged) => {
+                staged.stage_page(snapshot_handle, page_index, bytes, boundary_checkpoint)
+            }
             None => Err(SnapshotError::InvalidPage),
         }
     }
@@ -323,7 +325,10 @@ impl InitiatorDriver {
                 return Err(SnapshotError::StaleGeneration);
             }
         }
-        let staged = self.staged.get(stream_selector).ok_or(SnapshotError::Incomplete)?;
+        let staged = self
+            .staged
+            .get(stream_selector)
+            .ok_or(SnapshotError::Incomplete)?;
         let bytes = staged.install()?;
         let boundary = staged.boundary_checkpoint().to_vec();
         let checkpoint = ProfileCheckpoint {
@@ -376,10 +381,22 @@ struct Route {
     boundary: Vec<u8>,
     /// Continuity generation captured at subscribe time.
     generation: u64,
-    /// `from_checkpoint` of the last served page, if any.
-    last_from: Option<Vec<u8>>,
+    /// Exclusive storage index captured with the boundary; later appends
+    /// belong to live delivery, not this replay round.
+    replay_end: usize,
+    /// Exact request of the last served page, before clamping bounds.
+    last_request: Option<ReplayRequest>,
     /// Last served page for verbatim duplicate retries.
     last_page: Option<ReplayPage>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ReplayRequest {
+    from_checkpoint: Vec<u8>,
+    generation: u64,
+    max_batches: u32,
+    max_bytes: u32,
+    continuation_marker: Vec<u8>,
 }
 
 /// One stored batch: predecessor/result cursors plus opaque payload.
@@ -439,16 +456,17 @@ impl HostDriver {
         if let Some(auth) = &self.authorizer {
             auth.authorize_subscribe(&stream_selector)?;
         }
-        let boundary = self
+        let (replay_end, boundary) = self
             .batches
             .get(&stream_selector)
             .and_then(|v| {
                 v.iter()
+                    .enumerate()
                     .rev()
-                    .find(|b| b.generation == generation)
-                    .map(|b| b.result.clone())
+                    .find(|(_, b)| b.generation == generation)
+                    .map(|(i, b)| (i + 1, b.result.clone()))
             })
-            .unwrap_or_else(|| start_checkpoint.clone());
+            .unwrap_or_else(|| (0, start_checkpoint.clone()));
         if boundary.is_empty() {
             return Err(ProviderError::StaleCheckpoint);
         }
@@ -460,7 +478,8 @@ impl HostDriver {
                 selector: stream_selector,
                 boundary: boundary.clone(),
                 generation,
-                last_from: None,
+                replay_end,
+                last_request: None,
                 last_page: None,
             },
         );
@@ -470,10 +489,12 @@ impl HostDriver {
     /// Serve one bounded replay page continuing from `from_checkpoint`.
     /// The caller transmits the page inside the terminal `RpcResult`.
     /// Validates the generation against the subscription, enforces
-    /// per-handle fencing (exact duplicate `from` returns the verbatim
-    /// last page; any other `from` that does not continue from the last
-    /// page's result is rejected), and always returns the subscribe-time
-    /// boundary.
+    /// per-handle fencing (only an identical request returns the verbatim
+    /// last page; any other request must continue from the last page's
+    /// result), and serves only the captured generation through the fixed
+    /// subscribe-time boundary. This compatibility entry point infers the
+    /// continuation marker from the last request/page. Wire adapters must use
+    /// [`Self::replay_page_with_continuation`] to validate the peer's marker.
     pub fn replay_page(
         &mut self,
         subscription_handle: &[u8],
@@ -482,67 +503,122 @@ impl HostDriver {
         max_batches: u32,
         max_bytes: u32,
     ) -> Result<ReplayPage, ProviderError> {
-        let (selector, boundary, route_generation, last_from, last_page) = {
-            let route = self.routes.get(subscription_handle).ok_or(ProviderError::UnknownStream)?;
-            (
-                route.selector.clone(),
-                route.boundary.clone(),
-                route.generation,
-                route.last_from.clone(),
-                route.last_page.clone(),
-            )
+        let route = self
+            .routes
+            .get(subscription_handle)
+            .ok_or(ProviderError::UnknownStream)?;
+        let marker = match (&route.last_request, &route.last_page) {
+            (Some(previous), _) if previous.from_checkpoint == from_checkpoint => {
+                previous.continuation_marker.clone()
+            }
+            (_, Some(page)) => page.continuation_marker.clone(),
+            _ => Vec::new(),
         };
-        if generation != route_generation {
+        self.replay_page_with_continuation(
+            subscription_handle,
+            from_checkpoint,
+            generation,
+            max_batches,
+            max_bytes,
+            &marker,
+        )
+    }
+
+    /// Serve a replay request carrying the peer's explicit continuation
+    /// marker. Only an identical complete request retries the retained page;
+    /// otherwise both the previous result and non-empty marker must chain.
+    pub fn replay_page_with_continuation(
+        &mut self,
+        subscription_handle: &[u8],
+        from_checkpoint: &[u8],
+        generation: u64,
+        max_batches: u32,
+        max_bytes: u32,
+        continuation_marker: &[u8],
+    ) -> Result<ReplayPage, ProviderError> {
+        let route = self
+            .routes
+            .get(subscription_handle)
+            .ok_or(ProviderError::UnknownStream)?;
+        if generation != route.generation {
             return Err(ProviderError::StaleCheckpoint);
         }
-        if let (Some(lf), Some(lp)) = (last_from, last_page) {
-            if from_checkpoint == lf.as_slice() {
-                return Ok(lp);
+        if let (Some(previous), Some(lp)) = (&route.last_request, &route.last_page) {
+            if from_checkpoint == previous.from_checkpoint
+                && generation == previous.generation
+                && max_batches == previous.max_batches
+                && max_bytes == previous.max_bytes
+                && continuation_marker == previous.continuation_marker
+            {
+                return Ok(lp.clone());
             }
-            if from_checkpoint != lp.result_checkpoint.as_slice() {
+            if lp.continuation_marker.is_empty()
+                || from_checkpoint != lp.result_checkpoint.as_slice()
+                || continuation_marker != lp.continuation_marker
+            {
                 return Err(ProviderError::StaleCheckpoint);
             }
+        } else if !continuation_marker.is_empty() {
+            return Err(ProviderError::StaleCheckpoint);
+        }
+        if from_checkpoint == route.boundary {
+            return Err(ProviderError::StaleCheckpoint);
         }
         let probe = ProfileCheckpoint {
-            stream_selector: selector.clone(),
-            generation: route_generation,
+            stream_selector: route.selector.clone(),
+            generation: route.generation,
             base_cursor: from_checkpoint.to_vec(),
             result_cursor: from_checkpoint.to_vec(),
         };
         if let Some(auth) = &self.authorizer {
             auth.authorize_replay(&probe)?;
         }
-        let batches = self.batches.get(&selector).ok_or(ProviderError::OutsideRetention)?;
+        let batches = self
+            .batches
+            .get(&route.selector)
+            .ok_or(ProviderError::OutsideRetention)?;
         let start = batches
             .iter()
-            .position(|b| b.predecessor == from_checkpoint)
+            .take(route.replay_end)
+            .position(|b| b.generation == route.generation && b.predecessor == from_checkpoint)
             .ok_or(ProviderError::StaleCheckpoint)?;
-        let max_batches = max_batches.clamp(1, self.max_batches_per_page).min(64);
-        let max_bytes = max_bytes.clamp(1, self.max_bytes_per_page).min(262_144);
+        let batch_limit = max_batches.clamp(1, self.max_batches_per_page).min(64);
+        let byte_limit = max_bytes.clamp(1, self.max_bytes_per_page).min(262_144);
         let mut payloads = Vec::new();
         let mut bytes = 0u32;
         let mut end = start;
         let mut last_result = from_checkpoint.to_vec();
-        for b in batches.iter().skip(start).take(max_batches as usize) {
-            if payloads.len() as u32 >= max_batches {
+        for (i, b) in batches
+            .iter()
+            .enumerate()
+            .take(route.replay_end)
+            .skip(start)
+            .filter(|(_, b)| b.generation == route.generation)
+        {
+            if payloads.len() as u32 >= batch_limit {
                 break;
             }
-            let len = b.payload.len() as u32;
-            if bytes.saturating_add(len) > max_bytes {
+            if b.predecessor != last_result {
+                return Err(ProviderError::OutsideRetention);
+            }
+            if b.payload.len() > (byte_limit - bytes) as usize {
                 if payloads.is_empty() {
                     return Err(ProviderError::Overloaded);
                 }
                 break;
             }
-            bytes = bytes.saturating_add(len);
+            bytes += b.payload.len() as u32;
             last_result = b.result.clone();
             payloads.push(b.payload.clone());
-            end += 1;
+            end = i + 1;
+            if last_result == route.boundary {
+                break;
+            }
         }
         if payloads.is_empty() {
             return Err(ProviderError::OutsideRetention);
         }
-        let more = end < batches.len();
+        let more = last_result != route.boundary;
         let page = ReplayPage {
             predecessor_checkpoint: from_checkpoint.to_vec(),
             result_checkpoint: last_result,
@@ -551,11 +627,17 @@ impl HostDriver {
             } else {
                 Vec::new()
             },
-            catchup_boundary: boundary,
+            catchup_boundary: route.boundary.clone(),
             batch_payloads: payloads,
         };
         if let Some(route) = self.routes.get_mut(subscription_handle) {
-            route.last_from = Some(from_checkpoint.to_vec());
+            route.last_request = Some(ReplayRequest {
+                from_checkpoint: from_checkpoint.to_vec(),
+                generation,
+                max_batches,
+                max_bytes,
+                continuation_marker: continuation_marker.to_vec(),
+            });
             route.last_page = Some(page.clone());
         }
         Ok(page)
@@ -580,7 +662,10 @@ impl HostDriver {
     /// Terminate exactly one subscription. Connection state is untouched;
     /// other handles keep their routing entries.
     pub fn unsubscribe(&mut self, subscription_handle: &[u8]) -> Result<(), ProviderError> {
-        self.routes.remove(subscription_handle).map(|_| ()).ok_or(ProviderError::UnknownStream)
+        self.routes
+            .remove(subscription_handle)
+            .map(|_| ())
+            .ok_or(ProviderError::UnknownStream)
     }
 
     /// Handles currently routed.

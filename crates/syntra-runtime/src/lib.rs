@@ -61,16 +61,40 @@ pub fn loopback_pair(
     handler: std::sync::Arc<dyn Handler>,
     config: ConnectionConfig,
 ) -> (Initiator, std::sync::Arc<Host>) {
-    let (initiator, mut init_rx) = Initiator::new(config.clone());
-    let (host, mut host_rx) = Host::new(config, auth, handler);
+    let (initiator, init_rx) = Initiator::new(config.clone());
+    let (host, host_rx) = Host::new(config, auth, handler);
+    bridge_pair(&initiator, &host, init_rx, host_rx);
+    (initiator, host)
+}
 
-    // Teardown coordination: the two pumps must BOTH finish draining their
-    // queued frames before either side observes transport loss. Previously
-    // each pump called on_transport_lost() after its own drain, so the first
-    // pump to finish could close the peer while the other pump still held
-    // queued terminal results, losing them. Now both pumps rendezvous at a
-    // barrier after draining, and exactly the barrier leader performs the
-    // transport-lost notifications. Public API is unchanged.
+fn bridge_pair(
+    initiator: &Initiator,
+    host: &std::sync::Arc<Host>,
+    init_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+    host_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+) -> [crate::connection::TaskHandle; 2] {
+    let (to_host, to_initiator) = bridge_pumps(initiator, host, init_rx, host_rx);
+    [
+        crate::connection::spawn_task(to_host),
+        crate::connection::spawn_task(to_initiator),
+    ]
+}
+
+fn bridge_pumps(
+    initiator: &Initiator,
+    host: &std::sync::Arc<Host>,
+    mut init_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+    mut host_rx: tokio::sync::mpsc::Receiver<Vec<u8>>,
+) -> (
+    impl std::future::Future<Output = ()>,
+    impl std::future::Future<Output = ()>,
+) {
+    // Fence each writer before draining it. A receiver close preserves
+    // admitted frames (including outstanding permits), but rejects new sends
+    // so the sibling drain cannot refill a queue nobody will consume.
+    // Host loss must be visible before the rendezvous: its inbound drain may
+    // otherwise block trying to reply to the closed initiator. Only initiator
+    // loss waits for BOTH drains, preserving already-admitted terminal results.
     let teardown = std::sync::Arc::new(tokio::sync::Barrier::new(2));
 
     let pump_host = host.clone();
@@ -78,7 +102,7 @@ pub fn loopback_pair(
     let mut init_closed_a = pump_init.subscribe_close();
     let mut host_closed_a = pump_host.subscribe_close();
     let teardown_a = teardown.clone();
-    crate::connection::spawn_task(async move {
+    let to_host = async move {
         loop {
             if pump_host.is_closed() || pump_init.is_closed() {
                 break;
@@ -95,22 +119,25 @@ pub fn loopback_pair(
                 }
             }
         }
-        while let Ok(bytes) = init_rx.try_recv() {
+        // Receiver-close also wakes capacity-blocked sends with an error.
+        // Mark it intentional before doing so: rejected sends must not
+        // close the initiator while the sibling still holds inbound frames.
+        pump_init.fence_writer().await;
+        init_rx.close();
+        while let Some(bytes) = init_rx.recv().await {
             pump_host.ingest(&bytes).await;
         }
-        // Drain complete: wait for the sibling pump before tearing down, so
-        // no queued terminal result is lost to an early close.
+        pump_host.on_transport_lost().await;
         if teardown_a.wait().await.is_leader() {
             pump_init.on_transport_lost().await;
-            pump_host.on_transport_lost().await;
         }
-    });
+    };
     let pump_host = host.clone();
     let pump_init = initiator.clone();
     let mut init_closed_b = pump_init.subscribe_close();
     let mut host_closed_b = pump_host.subscribe_close();
     let teardown_b = teardown.clone();
-    crate::connection::spawn_task(async move {
+    let to_initiator = async move {
         loop {
             if pump_host.is_closed() || pump_init.is_closed() {
                 break;
@@ -127,19 +154,21 @@ pub fn loopback_pair(
                 }
             }
         }
-        while let Ok(bytes) = host_rx.try_recv() {
+        host_rx.close();
+        while let Some(bytes) = host_rx.recv().await {
             pump_init.ingest(&bytes).await;
         }
-        // Drain complete: wait for the sibling pump before tearing down, so
-        // no queued terminal result is lost to an early close.
+        pump_host.on_transport_lost().await;
         if teardown_b.wait().await.is_leader() {
             pump_init.on_transport_lost().await;
-            pump_host.on_transport_lost().await;
         }
-    });
+    };
 
-    (initiator, host)
+    (to_host, to_initiator)
 }
+
+#[cfg(test)]
+mod transport_teardown_tests;
 
 #[cfg(test)]
 mod tests {
