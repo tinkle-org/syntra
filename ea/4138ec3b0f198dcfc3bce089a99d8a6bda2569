@@ -1,0 +1,21 @@
+.github/workflows/schema-validation.yml
+  s_5c4abee0a91914::t_55e4681af2dc81 26
+.github/workflows/release-please.yml
+  s_5c4abee0a91914::t_1dc29853836f1c 61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea4138ec3b0f198dcfc3bce089a99d8a6bda2569",
+  "prompts": {},
+  "sessions": {
+    "s_5c4abee0a91914": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e822dc2c8ffeuoSnmey9d4Bf5l",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
