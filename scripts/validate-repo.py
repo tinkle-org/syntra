@@ -36,8 +36,8 @@ BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+)\b")
 # Directories that are tool output, vendored deps, or agent config — never
 # normative content. Markdown/link checks are scoped to repository content.
 # Specification-first policy: no implementation code and no generated language
-# types are committed here (they live in tinkle-org/syntra-rs and
-# tinkle-org/syntra-go; see MIGRATION.md §10). Legacy gen//generated/ trees
+# types are committed here (implementations are separate projects, out of
+# scope for this repository; see MIGRATION.md §10). Legacy gen//generated/ trees
 # and implementation roots must not exist at all (see the boundary check).
 # The exclusions below are defense in depth so doc checks stay quiet if such
 # a tree ever reappears; boundary still fails.
@@ -709,9 +709,9 @@ def check_markdown():
 # Specification-first boundary (see MIGRATION.md §10):
 #   FORBIDDEN: implementation trees (crates/, bindings/, including any
 #            generated language sources) and legacy gen//generated/ trees.
-#   Language implementations live in tinkle-org/syntra-rs and
-#            tinkle-org/syntra-go. Distribution of schema assets is via
-#            GitHub Release assets (no BSR, no GHCR, no crates.io).
+#   Language implementations are separate projects, out of scope here.
+#            Schema asset distribution is via GitHub Release assets (no
+#            BSR, no GHCR, no external registries).
 LEGACY_GEN_DIRS = ("gen", "generated")
 
 IMPL_ROOTS = ("crates", "bindings")
@@ -750,8 +750,7 @@ def _tracked_files():
 def check_boundary():
     """Enforce the specification-first repository boundary.
 
-    FORBIDDEN (moved to tinkle-org/syntra-rs and tinkle-org/syntra-go in
-    MIGRATION.md §10):
+    FORBIDDEN (removed from this repository in MIGRATION.md §10):
       implementation trees (crates/, bindings/), root Cargo manifests,
       release-plz.toml and buf.gen.yaml templates, gen//generated/ legacy
       trees, any generated language sources, and tracked .tmp/ output.
@@ -768,8 +767,8 @@ def check_boundary():
         for root in IMPL_ROOTS:
             if _under(path, root):
                 err(path, f"implementation tree '{root}/' must not return; "
-                          "implementations live in tinkle-org/syntra-rs and "
-                          "tinkle-org/syntra-go (see MIGRATION.md §10)")
+                          "implementations are separate projects, out of "
+                          "scope for this repository (see MIGRATION.md §10)")
                 break
 
     # 2. Implementation trees present on disk (untracked counts too).
@@ -777,7 +776,7 @@ def check_boundary():
         if (ROOT / root).exists():
             err(root + "/",
                 "implementation directory exists; remove it "
-                "(implementations live in syntra-rs and syntra-go)")
+                "(implementations are out of scope for this repository)")
 
     # 3. Root manifests that imply in-tree implementations or committed
     # generation templates (tracked and on disk).
@@ -816,7 +815,7 @@ def check_boundary():
         name = path.rsplit("/", 1)[-1]
         if name.endswith(".pb.go") or name.endswith("_grpc.pb.go"):
             err(path, "generated Go protobuf file must not be committed here; "
-                      "the Go module lives in tinkle-org/syntra-go")
+                      "no language types are committed in this repository")
 
     # 7. Generated-code headers in tracked language sources (not docs,
     # fixtures, or prose about generated SDKs). No allowed roots remain.

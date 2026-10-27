@@ -16,7 +16,7 @@ Each ADR has an explicit owner and status. Amendments REQUIRE an RFC
 | [ADR-007](ADR-007-event-streams.md) | Optional generic event streams | Accepted | Syntra maintainers |
 | [ADR-008](ADR-008-transport-security.md) | Transport security policy | Accepted | Syntra maintainers |
 | [ADR-009](ADR-009-versioning-compatibility.md) | Protocol versioning and compatibility | Accepted | Syntra maintainers |
-| [ADR-010](ADR-010-rust-reference-status.md) | Rust reference implementation status | Accepted | Syntra maintainers |
+| [ADR-010](ADR-010-rust-reference-status.md) | Reference implementation status (non-normative; implementations external since 2026-10-27) | Accepted | Syntra maintainers |
 | [ADR-011](ADR-011-noise-device-authorization.md) | Shared secure channel and persistent device authorization | Proposed (Draft RFC 0007) | Syntra maintainers |
 
 ADR-011 records the selected SC1 direction; it does not mark ADR-008

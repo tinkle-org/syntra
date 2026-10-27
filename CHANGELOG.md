@@ -249,6 +249,22 @@ the crates.io model governs.
   production; insecure profiles restricted to development) and private
   vulnerability reporting via GitHub. No wire change.
 
+### Removed
+
+- In-tree language implementations and their tooling: the Rust workspace
+  (all five crates, including committed generated types, native C ABI and
+  WASM adapters), the Go module (committed protobuf types, pure-Go core,
+  native adapter), root Cargo manifests, `release-plz.toml`, the root
+  generation template, the four-leg conformance runner harness, the
+  crate/Go release workflows, and implementation-only test fixtures.
+  Source snapshot `2a91da7` (PR #12 merge) is the provenance record; see
+  [MIGRATION.md §10](MIGRATION.md#10-implementation-extraction-record-2026-10-27).
+- Distribution model changed: this repository publishes documents and
+  schema provenance only via release-please document releases (`vX.Y.Z`
+  tags, GitHub Releases); no crates.io, no Go module proxy, no nested
+  tags, no language artifacts. Pre-release status unchanged; no wire or
+  normative behavior change.
+
 ## [0.1.0] — TBD (first stable candidate, not yet tagged)
 
 A stable `0.1.0` or `1.0.0` will be declared only when `GOVERNANCE.md`

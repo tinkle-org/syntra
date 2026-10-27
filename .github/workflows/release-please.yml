@@ -1,9 +1,9 @@
 # Document-only releases. release-please maintains a release PR that bundles
 # specification/schema/conformance document changes into CHANGELOG.md and,
 # on merge, tags vX.Y.Z and creates the GitHub Release. This repository
-# publishes no language artifacts: implementations live in
-# tinkle-org/syntra-rs and tinkle-org/syntra-go (see MIGRATION.md §10).
-# Tags are never moved; historical crate-era tags keep their names.
+# publishes no language artifacts; language implementations are separate
+# projects, out of scope for this repository (see MIGRATION.md §10).
+# Tags are never moved; historical release tags keep their names.
 name: release-please
 
 on:

@@ -4,10 +4,10 @@
 Requires the versions documented in specifications/schema/generation.md.
 Read-only over proto/, compatibility/, and tests/schema; writes nothing.
 
-This repository is specification-first: `proto/` is the sole IDL source of
-truth and no language bindings are committed or generated here. Regenerating
-Rust/Go types is a downstream responsibility owned by the implementation
-repositories (tinkle-org/syntra-rs, tinkle-org/syntra-go), which pin the
+This repository is specification-first and pre-release: `proto/` is the
+sole IDL source of truth and no language bindings are committed or
+generated here. Regenerating language types is a downstream responsibility
+owned by the separate language implementation projects, which pin the
 generator template documented in specifications/schema/generation.md.
 """
 

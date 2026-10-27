@@ -2,9 +2,9 @@
 # never publishes. Fails closed: any error blocks the release checklist
 # (RELEASE.md). Network use is limited to the pinned Buf CLI invoked by
 # scripts/validate-schema.py; no credentials are required or read.
-# Rust/Go implementation tests live in tinkle-org/syntra-rs and
-# tinkle-org/syntra-go (see MIGRATION.md §10); this repository validates
-# specifications, schemas, and conformance definitions only.
+# Language implementation tests are out of scope for this repository (see
+# MIGRATION.md §10); it validates specifications, schemas, and conformance
+# definitions only. This repository is pre-release; no stable v1 exists.
 name: repo-validation
 
 on:

@@ -183,9 +183,9 @@ are generic RPCs returning opaque handles; delivery is `notification`
 frames (`request_id == 0`); tolerate duplicates; re-subscribe explicitly
 after reconnect; replay/cursors only under a negotiated stream spec.
 Mandatory-only hosts correctly refuse subscriptions with `UNIMPLEMENTED`.
-Test with `CONF-EVT-*` (`UNSUPPORTED`/`SKIP` where unclaimed). For the
-reference embedding path and recovery boundary, see
-`docs/production-runtime.md`.
+Test with `CONF-EVT-*` (`UNSUPPORTED`/`SKIP` where unclaimed). The
+recovery boundary is specified in the defining drafts and owned by your
+implementation.
 
 ## 10. Run the conformance suite
 

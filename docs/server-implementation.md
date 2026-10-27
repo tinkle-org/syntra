@@ -109,16 +109,13 @@ requires it); binding withdrawal closes by default. Never let one
 connection's credential authorize another connection's work; never merge
 namespaces across connections, streams, or profiles.
 
-Rust `Host` (`crates/syntra-runtime/src/host.rs`) is fail-closed: the
-`Handler::authorize` default denies every RPC with generic
-`PERMISSION_DENIED`. Implement a principal-aware `authorize`, wrap a
-legacy permissive handler in `AllowAll` to opt in explicitly, or use
-`FnHandler` for closures (allow-all by construction, unchanged). Go
-`Host` (`bindings/go/session.go`) exposes the same check as the optional
-`HostConfig.Authorize`; nil preserves the legacy allow-everything
-behavior for backward compatibility (divergent from Rust until set
-explicitly — use `DenyAllAuthorize` for parity). Denials expose only
-generic `UNAUTHENTICATED`/`PERMISSION_DENIED` codes/messages.
+Authorization is fail-closed in a conforming server: deny every RPC with
+generic `PERMISSION_DENIED` unless an explicit allow decision exists for
+the bound principal and method. Implement a principal-aware authorization
+hook invoked before handler effects; treat a missing or unset hook as deny
+(no implicit allow-everything default). Allow-all behavior, where a legacy
+compatibility mode offers it, must be an explicit opt-in. Denials expose
+only generic `UNAUTHENTICATED`/`PERMISSION_DENIED` codes/messages.
 
 ## Backpressure
 
@@ -140,12 +137,10 @@ or TCP FIN per profile). In-flight RPCs receive `UNAVAILABLE` or
 `CANCELLED`. Abrupt loss maps to `UNAVAILABLE` with unknown outcome for all
 in-flight RPCs; never synthesize a `result` the host did not send; never
 report loss as success. There is no `CloseSession` message in v1. Shutdown
-joins are bounded: Rust `Host::close` waits at most one shared
-`SHUTDOWN_GRACE` (1s total across in-flight workers and the handshake
-timer) when `TaskHandle::abort` is cooperative-only (wasm), mirroring Go
-`handlerShutdownGrace` (1s) and WS `shutdown_grace`; Go `Serve` likewise
-bounds a `Transport.Recv` that violates its context contract to the same
-grace instead of hanging teardown.
+joins are bounded: wait at most one shared shutdown grace (1s total across
+in-flight workers and the handshake timer), skip non-cooperative tasks
+rather than hanging teardown, and bound a transport receive that violates
+its context contract to the same grace.
 
 ## Error sanitization
 

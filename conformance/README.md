@@ -9,21 +9,21 @@
   `proto/syntra/v1/*.proto`, transport specifications in `specifications/transports/`.
 - Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
 
-This directory is the **sole executable definition of conformance**. The Rust
-reference implementation in `crates/` is expected to conform to it — an
-executable conformance run against the Rust crates is a pending verification
-goal (CI currently validates manifests and vectors only); it is never the
-source of truth (ADR-010, SYN-ARCH-041).
+This directory is the **sole executable definition of conformance**.
+Language implementations are separate projects, out of scope for this
+repository; executing conformance runs against any implementation is a
+pending verification goal (CI currently validates manifests and vectors
+only) and never the source of truth (ADR-010, SYN-ARCH-041). This
+repository is pre-release.
 
 Planned Draft RFC 0007 coverage for secure channels and device authorization is
 recorded in [`plans/secure-channel.md`](plans/secure-channel.md). Its 25 proposed
 requirements have manual/planned traceability only: no executable cases,
 executed conformance evidence, active profiles, or production Noise authorization.
 
-> A completely separate repository (for example `syntra-rs`, `syntra-go`, or a
-> third-party implementation in any language) MUST be able to read these files
-> and build its own conformance runner. No language-specific runtime is required
-> to understand the tests.
+> A completely separate repository or a third-party implementation in any
+> language MUST be able to read these files and build its own conformance
+> runner. No language-specific runtime is required to understand the tests.
 
 ---
 

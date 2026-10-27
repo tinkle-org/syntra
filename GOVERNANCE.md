@@ -42,21 +42,18 @@ for:
 - Enforcing the review bar (`rfcs/README.md`): requirement IDs, client/
   server obligations, bounded resources, unknown-field handling, security
   and compatibility considerations, testable acceptance criteria.
-- Authorizing releases and notes per Sec. 5 through reviewed Release PRs.
-  release-plz publishes Rust crates and per-crate tags on their behalf;
-  the artifact workflow owns the matching nested Go tag. Maintainers alone
-  may create recovery tags or dispatch artifact recovery (`RELEASE.md` §4).
-  The artifact workflow enforces this for `workflow_dispatch` by requiring
-  `admin`/`maintain` repository permission before the `contents: write` job
-  runs; `syntra-*-v*` and `bindings/go/v*` tag namespaces additionally
-  require ruleset restriction to maintainers plus the release automation
-  identity.
-- Custody of release and reporting credentials (crates.io Trusted Publishing
-  OIDC or bootstrap `CARGO_REGISTRY_TOKEN`, automatic `github.token`, private
-  vulnerability reports): least
-  privilege, no exposure in logs or PR jobs, rotation on suspected
-  exposure. Registry credentials belong only in the publishing job; there
-  is no BSR or GHCR publishing path.
+- Authorizing releases and notes per Sec. 5 through reviewed release PRs.
+  Language artifact publishing is out of scope for this repository; its
+  document and schema-provenance releases are maintained by release-please
+  release PRs (see `RELEASE.md` §4). Maintainers alone may create recovery
+  releases. `syntra-*-v*` tag namespaces require ruleset restriction to
+  maintainers plus the release automation identity; `main` requires pull
+  requests for all updates.
+- Custody of release and reporting credentials (automatic `github.token`
+  for release-please and validation workflows, private vulnerability
+  reports): least privilege, no exposure in logs or PR jobs, rotation on
+  suspected exposure. There is no external registry publishing path from
+  this repository.
 - Keeping `CHANGELOG.md`, `MIGRATION.md`, and the conformance suite
   consistent with every normative merge.
 
@@ -136,9 +133,11 @@ does not assert protocol stability):
    least two independent implementations (or one implementation plus
    independent packet-fixture verification, during bootstrap).
 3. `CHANGELOG.md` lists every wire-affecting change with migration notes.
-4. Maintainers authorize the release and notes. release-plz creates
-   `<crate>-vX.Y.Z` tags; the schema/Go release uses `syntra-core-vX.Y.Z`
-   paired with `bindings/go/vX.Y.Z` at the same commit. Branches do not
+4. Maintainers authorize the release and notes. This repository's
+   document releases are tagged `vX.Y.Z` by release-please after a
+   reviewed release PR merge; schema provenance rides those tags.
+   Language artifact releases are owned by the implementation
+   repositories and pin a revision of this repository. Branches do not
    define stability; see `RELEASE.md` §4 for recovery and ownership.
 
 Pre-stable development happens on `main` under `Unreleased`. No
@@ -159,8 +158,7 @@ stability is implied until a tag meeting the above criteria exists.
 ## 7. License — Apache-2.0
 
 The project is licensed under Apache-2.0 — see the complete terms in
-`LICENSE`. Rust packages inherit `license = "Apache-2.0"` and are eligible
-for crates.io publication through the reviewed release-plz flow.
+`LICENSE`.
 
 The selection was made by maintainers via a public proposal before the
 first stable release. Alternatives considered and why Apache-2.0 was

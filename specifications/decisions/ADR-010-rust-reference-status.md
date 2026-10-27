@@ -57,9 +57,15 @@ independent implementation becomes impossible.
 
 ## Status
 
-Accepted. The reference implementation is present in `crates/` (including
-the production native ABI) and lives outside the normative paths defined
-in `specifications/architecture.md` Sec. 8.
+Accepted (with 2026-10-27 addendum). The in-tree implementation snapshot
+was removed from this repository on 2026-10-27; language implementations
+are separate projects, out of scope for this repository, and remain
+non-normative with unchanged engineering bars. The decision itself and its
+normative/non-normative boundary are unchanged (see `MIGRATION.md` §10).
+
+Historical status text at acceptance time: the reference implementation
+was present in `crates/` (including the production native ABI) outside the
+normative paths defined in `specifications/architecture.md` Sec. 8.
 
 Note: `specifications/architecture.md` Sec. 8 still lists the Rust
 reference and the conformance suite as forthcoming; that row needs a

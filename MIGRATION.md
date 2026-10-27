@@ -304,3 +304,41 @@ in [the compatibility archive](compatibility/v1-initial/README.md).
 find . -type f -not -path "./.opencode/*" -not -name ".DS_Store" | sort
 grep -ri "chat\|contact\|receipt\|messenger\|tinkle-server\|kafka\|payment" proto/ || echo "no hits"
 ```
+
+## 10. Implementation extraction record (2026-10-27)
+
+This repository returned to specification-first ownership and is
+pre-release. On 2026-10-27, the in-tree language implementations were
+extracted from source snapshot
+`2a91da7fdb96f3e75badf07614c14e4f85c9ba1c` (the PR #12 merge) into separate
+language implementation projects, out of scope for this repository:
+
+| Source path in this repository | Disposition |
+|---|---|
+| `crates/` (five Rust crates, committed prost output, C headers, FFI contract) | Extracted; removed here |
+| `bindings/go/` (Go module: protobuf types, pure-Go core, native adapter) | Extracted; removed here |
+| `tests/integration/`, `tests/interoperability/` (Rust test fixtures) | Extracted; removed here |
+| `tests/schema/rust/`, `tests/schema/go/` (language smoke suites) | Extracted; removed here |
+| `conformance/runner/` (four-leg harness driving in-repo code) | Extracted; removed here (conformance definitions, manifests, and vectors stay) |
+| `Cargo.toml`, `Cargo.lock`, `release-plz.toml`, `buf.gen.yaml` | Removed (downstream-owned) |
+| `.github/workflows/release-plz.yml`, `release.yml`, and the rust/go/wasm/generated-freshness jobs in `repo-validation.yml` | Removed/replaced |
+| `docs/production-runtime.md` (implementation-era build/native doc) | Extracted; removed here |
+| `tests/test_release_workflow.py`, `tests/test_schema_drift.py`, `tests/test_conformance_runner.py` | Removed (coupled to removed artifacts) |
+
+Kept here: `proto/` (sole IDL), `buf.yaml`, the
+`compatibility/v1-initial/` baseline and historical archive,
+`specifications/`, `rfcs/`, conformance definitions/manifests/test
+vectors (minus the implementation harness), the repository validators
+(`scripts/validate-repo.py`, `scripts/validate-schema.py` — now Buf-only),
+`tests/schema/test_schema.py` with its fixture, and `tests/test_license.py`.
+
+Forward policy: release-please maintains document releases (`vX.Y.Z`
+tags, GitHub Releases) bundling `CHANGELOG.md`; schema provenance rides
+those tags. Language implementations pin schema revisions from here; no
+language artifacts are published from this repository. The frozen
+`go_package` option bytes in `proto/syntra/v1/*.proto` remain historical
+module metadata (FILE-breaking to change against the initial baseline).
+
+This record changes no wire format, requirement, capability, or normative
+behavior. Executable conformance runs against any implementation remain
+pending verification goals, not this repository's claims.

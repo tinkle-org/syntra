@@ -273,7 +273,7 @@ informative for that concern.
 | Network mappings (framing, TLS profile, HTTP/WS binding, limits on the wire) | `specifications/transports/*.md` — transport specifications (forthcoming) | Core specs, code |
 | Security requirements (threat model, auth interfaces, transport policy, limits) | `specifications/security/*.md` — security specifications (forthcoming) | Architecture overview, code |
 | Executable verification (what "conformant" means) | Conformance and interoperability suite (forthcoming) | Manual test notes |
-| Implementation (one way to satisfy the above) | Rust reference implementation (present, non-normative) | Any other language implementation |
+| Implementation (one way to satisfy the above) | Separate language implementation projects, out of scope for this repository (non-normative) | Any conforming implementation |
 
 For RFC 0007, the proposed security owners are `security/secure-channel.md`
 and `security/device-authorization.md`; the proposed network-mapping owner
