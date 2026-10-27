@@ -135,11 +135,15 @@ class SchemaTests(unittest.TestCase):
         files = {file["name"]: file for file in self.new["file"]}
         self.assertEqual(set(files), {
             f"syntra/v1/{name}.proto" for name in
-            ("envelope", "handshake", "session", "rpc", "events", "capabilities", "errors")
+            ("envelope", "handshake", "session", "rpc", "events", "capabilities",
+             "errors", "recovery_profile")
         })
         for file in files.values():
             self.assertEqual(file["syntax"], "proto3")
             self.assertEqual(file["package"], "syntra.v1")
+            # Historical module metadata, kept frozen: the committed Go module
+            # moved to tinkle-org/syntra-go (see MIGRATION.md §10). Changing
+            # this option is FILE-breaking against the initial baseline.
             self.assertEqual(file["options"]["goPackage"],
                              "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1")
             self.assertFalse(file.get("publicDependency"))
@@ -148,7 +152,7 @@ class SchemaTests(unittest.TestCase):
             file = files[f"syntra/v1/{name}.proto"]
             self.assertFalse(file.get("messageType"))
             self.assertFalse(file.get("enumType"))
-        self.assertEqual(len(symbols(self.new, "messageType")), 8)
+        self.assertEqual(len(symbols(self.new, "messageType")), 31)
         self.assertEqual(len(symbols(self.new, "enumType")), 1)
         self.assertFalse(symbols(self.new, "service"))
 
