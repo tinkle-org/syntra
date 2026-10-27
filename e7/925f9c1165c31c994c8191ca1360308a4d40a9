@@ -1,0 +1,43 @@
+release-please-config.json
+  s_5c4abee0a91914::t_d3af0bd724dd46 5,9-11
+.github/workflows/release-please.yml
+  s_5c4abee0a91914::t_6a6b0647bf6c5a 18-44,46,49
+RELEASE.md
+  s_5c4abee0a91914::t_7a6aaddc9c3310 217-219
+  s_5c4abee0a91914::t_c7389cdcadc479 202-207
+docs/schema-release-checklist.md
+  s_5c4abee0a91914::t_912356a9f81f7f 32
+specifications/schema/generation.md
+  s_5c4abee0a91914::t_c59dab5fcf11a8 48-51
+.github/workflows/schema-validation.yml
+  s_5c4abee0a91914::t_50ee370d3b0989 57-62
+  s_5c4abee0a91914::t_b36f9acbe616a3 37-40
+README.md
+  s_5c4abee0a91914::t_c11cff3fa7284d 268-270
+MIGRATION.md
+  s_5c4abee0a91914::t_53337b8dfc6ad3 332-333
+GOVERNANCE.md
+  s_5c4abee0a91914::t_3175151921bd19 49,79-80
+specifications/decisions/ADR-010-rust-reference-status.md
+  s_5c4abee0a91914::t_f798b6dcbcc54f 68-69
+  s_5c4abee0a91914::t_5c0a953b2d6ccd 70
+docs/schema-registry.md
+  s_5c4abee0a91914::t_a201710b616dde 187
+  s_5c4abee0a91914::t_be8eb21f996af1 170-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e7925f9c1165c31c994c8191ca1360308a4d40a9",
+  "prompts": {},
+  "sessions": {
+    "s_5c4abee0a91914": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e822dc2c8ffeuoSnmey9d4Bf5l",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
