@@ -51,7 +51,8 @@ carrying **opaque** application bytes:
 - No application-level encryption, ratchet, or custom cipher. Applications
   needing end-to-end encryption implement it **above** Syntra with
   established libraries; Syntra carries the ciphertext opaquely (see
-  [`docs/building-on-syntra.md`](docs/building-on-syntra.md)).
+  [`docs/building-on-syntra.md`](docs/building-on-syntra.md)). The proposed
+  SC1 peer-to-host secure channel below is separate from application E2EE.
 - Not a transport: Syntra runs *over* TCP, TLS, HTTP, and WebSocket via
   adapter profiles (see [Transport profiles](#supported-v1-transports)).
 - Not an RPC framework: Syntra defines correlation, deadlines,
@@ -66,6 +67,8 @@ carrying **opaque** application bytes:
 See `SYN-ARCH-001/002` in `specifications/architecture.md`.
 
 ## Architecture
+
+Current baseline layering (the selected SC1 proposal is described below):
 
 ```text
 Application Protocol          (methods, payload schemas, auth policy — yours)
@@ -103,11 +106,18 @@ responsibilities (`SYN-ARCH-010`–`013`).
 
 Each item is accepted via the RFC process in `rfcs/README.md`.
 Release-blocking open questions are tracked in `SESSION-OPEN-QUESTIONS.md`
-and the RFC set (`rfcs/0001`–`0005`); no `v1` release exists yet. Draft
+and the RFC set; no stable `v1` release exists yet. Draft
 status means: implementable for interop experiments, not yet stable —
 check the referenced RFCs before freezing a production dependency.
 
+The selected SC1 design is recorded in new **Draft, not Accepted**
+[RFC 0007](rfcs/0007-secure-channel-device-authorization.md). Selection is
+design direction, not RFC acceptance or shipped cryptography. Baseline TLS
+requirements and all existing executable conformance profiles are unchanged.
+
 ## Supported v1 transports
+
+These are the current baseline profiles, not the proposed SC1 bindings.
 
 **Production-capable (secure):** TLS 1.3 over TCP (`SNTR-TLS-TCP-V1`),
 HTTPS via HTTP/1.1 (`SNTR-HTTPS-H1-V1`), HTTPS via HTTP/2
@@ -126,6 +136,53 @@ Insecure transports MUST NOT be used for public production traffic
 [`docs/transport-selection.md`](docs/transport-selection.md) for neutral
 selection guidance and the per-profile specifications for bindings.
 
+## Selected proposed design: Syntra Secure Channel v1 (SC1)
+
+SC1 is a transport-independent secure-channel state machine beneath Syntra
+envelopes. The selected proposal uses:
+
+- **Initial enrollment:** `Noise_NK_25519_ChaChaPoly_SHA256`, with a trusted
+  host static key. NK authenticates the host; device enrollment remains a
+  separate host-authorized action over the established channel.
+- **Returning device:** `Noise_NKpsk0_25519_ChaChaPoly_SHA256`, using a
+  unique, random shared **32-byte authorization key (AK)** per device and
+  an opaque **8-byte `auth_id`** for host-side key lookup. The AK is not
+  sent on reconnect. `auth_id` is a lookup handle, not proof of authority;
+  neither value is `ServerReady.connection_id`, which remains diagnostic.
+- **Every channel:** fresh ephemeral key material and fresh directional
+  traffic keys. Noise handshake messages M1 and M2 have empty payloads:
+  no 0-RTT application data or credentials. Before any protected action,
+  the host first verifies an authenticated client transport record. Syntra
+  `ClientHello`/`ServerReady` and readiness checks are still required.
+
+Enrollment, AK storage, authorization, and revocation are host-owned;
+human accounts are not mandatory. The AK is a shared symmetric secret,
+not a device signing keypair. Returning-device authentication creates a
+new channel; it does not resume a Syntra session, restore subscriptions,
+or authorize automatic RPC retries.
+
+The proposed carrier bindings cover TCP, UDP, and WebSocket. The core
+does not dial sockets or require WebSocket or gRPC. Existing HTTPS/WSS TLS
+compatibility remains; browser `wss://` still requires outer TLS.
+Noise-in-WebSocket is a distinct wire binding, not a reinterpretation of
+`SNTR-WS-V1`, `SNTR-WSS-H1-V1`, or the existing `syntra.v1` mapping. UDP
+is a proposed binding, not current transport support.
+
+With empty M1/M2 payloads, NK handshake bodies total **96 bytes**; the
+returning path totals **104 = 96 + 8 bytes** including the lookup handle.
+Those counts exclude framing and additional epoch/version fields and do
+not measure full channel establishment or the Syntra hello/ready RTT.
+
+Read the proposed [secure channel](specifications/security/secure-channel.md),
+[device authorization](specifications/security/device-authorization.md),
+[carrier bindings](specifications/transports/noise-bindings.md), and
+[ADR-011 rationale](specifications/decisions/ADR-011-noise-device-authorization.md).
+The [SC1 conformance plan](conformance/plans/secure-channel.md) describes
+future verification, not executable coverage or a passing claim. See
+[migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
+for the compatibility boundary. This documentation adds no SC1 runtime,
+support, benchmark, or conformance claim.
+
 ## Specification structure
 
 ```text
@@ -141,7 +198,7 @@ specifications/security/       — threat model, transport/auth/replay/opaque
   rules, test plan, review checklist
 specifications/schema/         — IDL reference, generation, compatibility,
   validation records
-specifications/decisions/      — ADRs 001–010 (each with an owner)
+specifications/decisions/      — baseline ADRs 001–010; proposed ADR-011 for SC1
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
@@ -151,7 +208,7 @@ tests/schema/                  — descriptor and codec validation (committed ge
 conformance/                   — executable conformance suite (manifests,
   profiles, test vectors, claims, declarations)
 docs/                          — implementer guides, glossary, FAQ, registry docs
-rfcs/                          — public RFC process, template, RFCs 0001–0005
+rfcs/                          — public RFC process, template, proposals (including Draft RFC 0007)
 audits/                        — independent consistency review (findings + RFC path)
 ```
 
@@ -340,9 +397,9 @@ SECURITY.md                    — how to report vulnerabilities privately
 SUPPORT.md                     — where to get help
 GOVERNANCE.md                  — who decides what, releases, breaking changes
 CHANGELOG.md                   — release history (Keep a Changelog)
-MIGRATION.md                   — historical audit + implemented layout migration
+MIGRATION.md                   — historical audit, layout migration, selected SC1 design record
 SESSION-OPEN-QUESTIONS.md      — release-blocking open questions
-rfcs/                          — public RFC process, template, RFCs 0001–0005
+rfcs/                          — public RFC process, template, proposals (including Draft RFC 0007)
 proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 crates/                        — Rust workspace (protocol cores; `syntra-ffi` with test-fixture and production ABIs; committed generation)

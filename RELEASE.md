@@ -18,6 +18,24 @@ conformance green (that is the stable-release bar per `GOVERNANCE.md`
 Sec. 5). Known unresolved blockers MUST be listed in
 `audits/v1-release-readiness.md` and MUST block promotion to stable.
 
+### SC1 proposal and release scope
+
+The selected Syntra Secure Channel v1 (SC1) design is recorded in
+[Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md), not an
+Accepted RFC. It does not change the baseline TLS requirements, the seven
+existing transport profiles, or their executable conformance checks below.
+The [migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
+describes the proposed NK enrollment/NKpsk0 returning-device model and
+the compatibility boundary, including the distinct Noise-in-WS wire.
+
+Release notes should distinguish current implementation artifacts from
+this selected proposal. The [SC1 conformance plan](conformance/plans/secure-channel.md)
+is planned verification, not a release verdict. Documentation, generation,
+existing profile passes, or a package tag do not establish SC1 crypto,
+TCP/UDP/WS binding support, or performance. Any future SC1 release scope
+follows the acceptance and evidence rules above; this record adds no
+current SC1 implementation or executable-profile release gate.
+
 ## 1. Release checklist (v1 RC)
 
 Check each box with evidence (command output, PR link, or reviewer sign-off).

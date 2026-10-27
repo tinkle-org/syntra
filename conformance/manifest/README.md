@@ -101,6 +101,14 @@ capability-free cases; see `conformance/README.md` §2.1).
 
 ## Manifest index
 
+Draft RFC 0007 coverage is documented in
+[`../plans/secure-channel.md`](../plans/secure-channel.md). The 25 proposed
+`SNTR-SC-*` / `SNTR-DAUTH-*` rows in `requirements.yaml` use the existing
+`manual` disposition with empty `test_ids` and explicit planned-case references
+in `notes`. This is a coverage-status record, not a completed manual review or
+executable manifest: no automated case or executed conformance evidence is
+claimed, and no active profile selects the plan.
+
 | File | Cases | Section |
 |---|---|---|
 | `core.yaml` | CONF-CORE-001…010 | §E valid/invalid envelope, unknown field/enum, version, capability, ordering, protocol error, close |

@@ -920,3 +920,157 @@ requirements:
     test_ids: []
     automation_status: manual
     notes: "No private-product/company/infrastructure dependency: attested by review (see independence verification; F-05 tracks the go_package exception)."
+
+  # ---- Draft RFC 0007: proposed secure-channel requirements; manual/planned only ----
+  - requirement_id: SNTR-SC-001
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-001"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-002
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-002"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-002, PLAN-WS-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-003
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-003"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-003, PLAN-DAUTH-003, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-004
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-004"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-005
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-005"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-006
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-006"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-007
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-007"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-007, PLAN-TCP-001, PLAN-WS-001, PLAN-UDP-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-008
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-008"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-008, PLAN-TCP-001, PLAN-TCP-002, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-009
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-009"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-009, PLAN-TCP-003, PLAN-UDP-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-010
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-010"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-010, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-011
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-011"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-011, PLAN-TCP-001, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-001, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-012
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-012"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-012, PLAN-TCP-002, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-013
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-013"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-013, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-014
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-014"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-014, PLAN-DAUTH-009, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-SC-015
+    specification: specifications/security/secure-channel.md
+    section: "Proposed requirement SNTR-SC-015"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-015] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+
+  # ---- Draft RFC 0007: proposed device-authorization requirements; manual/planned only ----
+  - requirement_id: SNTR-DAUTH-001
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-001"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-002
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-002"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-003
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-003"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-003, PLAN-SC-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-004
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-004"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-005
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-005"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-006
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-006"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-007
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-007"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-007, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-008
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-008"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-008, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-009
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-009"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-009, PLAN-SC-014, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+  - requirement_id: SNTR-DAUTH-010
+    specification: specifications/security/device-authorization.md
+    section: "Proposed requirement SNTR-DAUTH-010"
+    test_ids: []
+    automation_status: manual
+    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-010, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"

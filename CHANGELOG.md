@@ -75,6 +75,20 @@ the crates.io model governs.
 
 ### Added
 
+- Documentation of the selected transport-independent Syntra Secure Channel
+  v1 (SC1) proposal in new [Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md):
+  initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment and returning
+  `Noise_NKpsk0_25519_ChaChaPoly_SHA256` authentication with a unique random
+  shared 32-byte AK and opaque 8-byte `auth_id` per device, fresh ephemeral
+  material and directional traffic keys per channel, empty M1/M2 payloads,
+  and client transport-record confirmation before protected actions.
+  Guides describe host-owned enrollment/storage/authorization/revocation,
+  proposed TCP/UDP/WS bindings, browser outer TLS, and the distinct
+  Noise-in-WS wire boundary. [Migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
+  records the selected direction. RFC 0007 is not Accepted; baseline TLS
+  requirements and existing executable conformance profiles are unchanged.
+  No implementation, support, benchmark, conformance, session-resumption,
+  or automatic RPC retry claim is introduced.
 - Production native ABI in `crates/syntra-ffi` (`production` feature) with
   `crates/syntra-ffi/include/syntra_production.h`: transport-agnostic
   initiator/responder cores, stable handles, version checks, buffer

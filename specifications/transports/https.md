@@ -25,6 +25,18 @@ never implies a session. Ordering, push, and cross-stream state from
 HTTP/2 are transport artifacts the adapter hides; Syntra sees only
 independent RPCs correlated by echoed `request_id`.
 
+The [shared-channel proposal](../security/secure-channel.md) in
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+does not redefine either HTTPS profile. Its [carrier candidates](noise-bindings.md)
+are separate TCP/UDP/WebSocket work, not HTTPS/H1 or HTTPS/H2 negotiation
+options. No Noise preface, new ALPN token, AK header or ambient device binding
+is added here. Certificate/hostname validation, per-exchange credentials,
+stream independence, current test IDs and the TLS production policy remain
+in force until an accepted change defines otherwise. Proposed persistent
+authorization on another permitted carrier would establish fresh channel
+keys and principal checks, without resuming an HTTPS session or authorizing
+other H2 streams.
+
 ## 1. Protocol requirements
 
 ### 1A. Profiles and negotiation

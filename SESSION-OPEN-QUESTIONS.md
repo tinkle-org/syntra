@@ -2,6 +2,35 @@
 
 Status: Draft 2026-10-19. Produced because unresolved release-blocking questions remain for authentication, session lifecycle, and resumption. None of these is resolved by implementation choice. Normative clarifications landed in `specifications/core/handshake.md` (§1A–§1B/§2A), `authentication.md` (§1A–§1D), `sessions.md` (§1A–§1G), and `conformance/auth-session/`; the items below still need RFC decisions before stable v1.
 
+## Selected SC1 direction (2026-10-27; proposal only)
+
+New [RFC 0007](rfcs/0007-secure-channel-device-authorization.md) is
+**Draft, not Accepted**. The selected target is transport-independent SC1:
+initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment, then returning
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels using a unique random shared
+32-byte AK and opaque 8-byte `auth_id` per device. The AK is not sent on
+reconnect and is not a signing keypair or `connection_id`. Every channel
+has fresh ephemeral material and directional traffic keys; M1/M2 payloads
+are empty, with no 0-RTT application data or credentials.
+
+This selects a mechanism; it does not resolve the baseline blockers below
+by RFC acceptance. Baseline TLS requirements and all existing executable
+conformance profiles remain unchanged. Returning-device authentication is
+not session resumption, restored subscriptions, or automatic RPC retry.
+
+Proposal review still needs to establish the complete bounds, failure and
+verification details in the [secure-channel draft](specifications/security/secure-channel.md),
+[device-authorization draft](specifications/security/device-authorization.md),
+and [TCP/UDP/WS binding draft](specifications/transports/noise-bindings.md),
+with the [conformance plan](conformance/plans/secure-channel.md). In
+particular, the host first verifies an authenticated client transport
+record before protected actions, and Syntra hello/ready remains required.
+Enrollment/storage/authorization/revocation are host-owned without
+mandatory human accounts; revocation enforcement still needs an explicit
+deployment policy. Browser `wss://` retains outer TLS, and Noise-in-WS is
+distinct from existing WS/WSS wire profiles. These are design constraints,
+not new implementation, transport-support, or passing-test claims.
+
 ## Blockers
 
 1. **Mechanism negotiation.** No identifier/advertisement/selection/challenge fields exist. If stable claims anything beyond opaque credential presentation with application-side agility, a capability RFC is required (see `rfcs/0002-auth-session-lifecycle.md` §10.7 and core `open-questions.md` blocker 4).

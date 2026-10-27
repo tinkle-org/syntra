@@ -15,6 +15,11 @@ executable conformance run against the Rust crates is a pending verification
 goal (CI currently validates manifests and vectors only); it is never the
 source of truth (ADR-010, SYN-ARCH-041).
 
+Planned Draft RFC 0007 coverage for secure channels and device authorization is
+recorded in [`plans/secure-channel.md`](plans/secure-channel.md). Its 25 proposed
+requirements have manual/planned traceability only: no executable cases,
+executed conformance evidence, active profiles, or production Noise authorization.
+
 > A completely separate repository (for example `syntra-rs`, `syntra-go`, or a
 > third-party implementation in any language) MUST be able to read these files
 > and build its own conformance runner. No language-specific runtime is required
@@ -201,6 +206,7 @@ conformance/
   profiles.yaml              — machine-readable profile definitions (§2)
   claims.md                  — badge / claim wording rules (§8)
   declaration.example.yaml   — implementation declaration template (§7)
+  plans/secure-channel.md    — Draft RFC 0007 manual/planned acceptance cases
   manifest/
     README.md                — manifest format + field reference (§C)
     schema.yaml              — machine-readable schema for manifests

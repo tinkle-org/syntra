@@ -41,7 +41,20 @@ Oversize payloads → `RESOURCE_EXHAUSTED` regardless of format. undecryptable o
 
 ## 5. Security considerations
 
-Opacity is a safety property (the core cannot be confused by content) but not a confidentiality property — confidentiality on the wire comes only from TLS. Metadata (method, timing, sizes, subscription existence) remains visible to observers even when payloads are encrypted; applications with sensitive flows SHOULD document padding/quantization above Syntra.
+Opacity is a safety property (the core cannot be confused by content) but not a confidentiality property — the current secure profiles obtain wire confidentiality from TLS. Application payload encryption alone does not hide method names or subscription metadata; TLS protects envelope contents on its secured leg, while timing, sizes and endpoints remain observable. Applications with sensitive flows SHOULD document padding/quantization above Syntra.
+
+### Proposed channel boundary (informative)
+
+The carrier-independent [secure-channel draft](secure-channel.md) under
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) would
+authenticate/decrypt channel records before bounded envelope reconstruction
+and core decoding. That operation is distinct from interpreting or decrypting
+`payload` bytes: applications retain ownership of any inner ciphertext and
+its keys. Candidate records may split an envelope without changing its
+opaque bytes or the default serialized-envelope limit. The proposal adds no
+application E2EE algorithm, capability or schema field. SNTR-OPQ-005's current
+secure-profile and certificate requirements remain in force pending RFC
+acceptance; opaque application encryption supplies no policy exception.
 
 ## 6. Compatibility considerations
 

@@ -5,6 +5,37 @@ plus a transport-agnostic client/host session layer built on the
 validation, codec, handshake, and correlation rules in
 `specifications/core/` and `proto/syntra/v1/`.
 
+## SC1 proposal and current module scope
+
+New [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+selects transport-independent Syntra Secure Channel v1 (SC1), not Accepted
+behavior or Go/native crypto support. This module's current TLS/profile
+baseline and all existing executable conformance profiles are unchanged;
+neither generated types nor `-tags syntranative` add SC1.
+
+The proposed [SC1 state machine](../../specifications/security/secure-channel.md)
+uses initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment and returning
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels. A unique random shared
+32-byte AK and opaque 8-byte `auth_id` belong to each device; the AK is
+not sent on reconnect and neither value is `connection_id`. Enrollment,
+protected storage, authorization, and revocation remain
+[host-owned](../../specifications/security/device-authorization.md),
+without mandatory human accounts or a device signing-keypair model.
+
+Fresh ephemeral material and directional traffic keys are derived per
+channel. M1/M2 payloads are empty, with no 0-RTT application data or
+credentials. The host verifies the first authenticated client transport
+record before protected actions; Syntra hello/ready still applies. A
+returning device gets no implicit session resumption or automatic RPC retry.
+
+The proposed [TCP/UDP/WS bindings](../../specifications/transports/noise-bindings.md)
+keep socket I/O outside the core and require neither WS nor gRPC. Existing
+HTTPS/WSS TLS compatibility remains, including outer TLS for browser
+`wss://`. Noise-in-WS is a distinct wire from current WS/WSS profile IDs;
+the `Transport.Send`/`Recv` serialized-`Frame` contract below is not a
+Noise-record API. The [SC1 conformance plan](../../conformance/plans/secure-channel.md)
+is planned verification, not module test coverage or a support claim.
+
 ## Installing
 
 ```sh

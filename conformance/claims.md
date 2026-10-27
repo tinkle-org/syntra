@@ -3,6 +3,11 @@
 These rules are normative for any public statement that cites this suite.
 A technically passing run with non-conformant wording is a non-conformant claim.
 
+Draft RFC 0007's [secure-channel acceptance plan](plans/secure-channel.md) records
+manual/planned coverage only. It supplies no executed conformance evidence,
+claimable profile, or production Noise authorization; the claim rules below
+retain their existing scope.
+
 ## Allowed forms
 
 - Single secure transport:

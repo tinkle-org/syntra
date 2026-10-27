@@ -5,6 +5,13 @@
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)
 - Relates to: `specifications/architecture.md` Sec. 7, 9; `SECURITY.md`
 
+Proposed amendment: [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and [ADR-011](ADR-011-noise-device-authorization.md) select a
+transport-independent Noise channel with persistent shared device
+authorization. This accepted decision remains in effect until the amendment
+is accepted; its historical decision and existing profile meanings are not
+rewritten by the proposal.
+
 ## Context
 
 Syntra carries opaque credentials and application bytes that may be

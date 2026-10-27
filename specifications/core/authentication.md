@@ -10,6 +10,23 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
+## Selected persistent-authorization proposal (not the v1 baseline)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and [device authorization](../security/device-authorization.md) select a
+shared per-device AK incorporated into Noise NKpsk0 on returning channels.
+The AK is not sent as `ClientHello.credential`, and a client-supplied handle
+alone is not evidence of authentication. A future host hook needs trusted
+per-channel verification context to bind the enrollment to a principal;
+the existing opaque-credential interface is not silently reinterpreted.
+
+Bootstrap uses completed Noise NK before enrollment authorization. A valid
+reconnect establishes a fresh principal binding; it does not change an old
+binding or restore a session. `hello`/`ready` and method permissions still
+apply. Enrollment responses require a separate application/provisioning
+contract, not an invented `ServerReady` issuance field. The current
+requirements below remain unchanged until RFC acceptance.
+
 ## 1. Protocol requirements
 
 **SNTR-AUTH-001** — Mechanisms MUST be pluggable. The core defines carriage and result semantics; it MUST NOT define credential syntax, cryptography, or any private identity service. Applications register mechanisms out of band.

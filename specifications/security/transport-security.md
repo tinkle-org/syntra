@@ -69,6 +69,27 @@ TLS protects the channel, not application semantics: it does not provide idempot
 
 Tightening (e.g., removing a weak configuration) is a minor clarification; permitting a weaker TLS version or new plaintext public use is major and FORBIDDEN for v1 public deployments. New secure transports REQUIRE transport-profile RFCs that cite this document.
 
+### Proposed policy interaction (informative)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) and
+[proposed ADR-011](../decisions/ADR-011-noise-device-authorization.md) select
+a carrier-independent [Noise channel](secure-channel.md) for evaluation.
+This would require an accepted amendment to the exclusive TLS production
+policy; it grants no exception to SNTR-TSEC-001–011 today. Existing TLS/TCP,
+HTTPS and WSS certificate, hostname, rotation and downgrade rules still apply.
+
+The proposed channel authenticates a provisioned server static key, uses NK
+for authorized bootstrap and NKpsk0 with a per-enrollment shared AK on return,
+then gates Syntra readiness on current principal policy. Its mode and carrier
+would be explicitly selected and authenticated, with fresh ephemeral and
+directional traffic keys on every new channel; no failed TLS connection
+triggers a Noise or plaintext fallback. [Candidate TCP/WS mappings](../transports/noise-bindings.md)
+have separate identifiers pending freeze; UDP remains deferred until a
+complete binding is frozen, reviewed and accepted. Browser `wss://` retains
+outer TLS even with the candidate channel inside its messages. Acceptance,
+independent verification and any major-version/deprecation decision precede
+replacement of current requirements or conformance coverage.
+
 ## 7. Conformance requirements
 
 - **SNTR-TSEC-900** — Fixtures: valid chain accepted; invalid chain / wrong hostname / expired / revoked rejected before any credential is sent; TLS <1.3 refused; plaintext-to-secure auto-fallback absent; rotation (old+new valid) accepted; proxy mismatch rejected.

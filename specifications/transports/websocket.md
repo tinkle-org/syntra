@@ -59,6 +59,20 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WS-030** — Normative mapping: exactly one complete binary WebSocket message (opcode 0x2, assembled across all its constituent frames) contains exactly one serialized Syntra `Frame` (envelope). Peers MUST send each `Frame` as a single binary message and MUST decode each received binary message as exactly one `Frame`. One WebSocket frame is not one Syntra envelope; one complete binary message is one Syntra envelope.
 
+The [WebSocket Noise candidate](noise-bindings.md#3-websocket-message-candidate)
+under [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+would instead carry a channel handshake wrapper/message, then one bounded
+ciphertext per complete binary message. Authenticated plaintext would feed
+an inner length-prefixed envelope stream, potentially spanning messages.
+That is a distinct binding requiring a different profile identifier and
+explicit endpoint/subprotocol selection, not `SNTR-WS-V1` or `syntra.v1`.
+This profile's binary-message-to-`Frame`, no-prefix, close and test rules
+remain unchanged; it stays restricted-development under current TLS policy.
+The proposed shared channel uses fresh ephemeral/directional keys on every
+new carrier connection, even with a persistent enrollment AK; it restores no
+logical session, subscriptions or in-flight RPCs. Identifiers, exact context
+bytes and binding details await freeze and acceptance.
+
 **SNTR-WS-031** — Binary required: peers MUST send only binary messages (opcode 0x2) for Syntra data. Text messages (opcode 0x1) are invalid and MUST be rejected per §1D/§4 (close code 1003, `UNIMPLEMENTED` context). No Syntra envelope is ever encoded as UTF-8 text, JSON, or base64 inside a text message.
 
 **SNTR-WS-032** — Empty binary message: a zero-length binary message is invalid. It contains no protobuf bytes and therefore no valid `Frame`. Recipients MUST reject it as a protocol error (`INVALID_ARGUMENT` context) and close per §1J. It MUST NOT be treated as a keepalive, an empty payload invocation, or a successful no-op. (Empty *payloads inside a valid envelope* remain meaningful per SNTR-WIRE-007; this rule concerns empty *messages*.)

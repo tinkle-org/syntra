@@ -14,6 +14,24 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-TCP-001** — The stable identifiers are `SNTR-TCP-V1` (this profile: plaintext TCP carrying length-prefixed Syntra v1 envelopes) and `SNTR-TLS-TCP-V1` (defined in `tls-tcp.md`: the same framing over a TLS 1.3 session). The `-V1` suffix marks profile identifiers and distinguishes them from requirement IDs (`SNTR-TCP-###`). Implementations MUST document which identifiers they support per SYN-ARCH-050; insecure-only implementations MUST NOT claim production conformance.
 
+### Candidate secure-channel binding (informative)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+selects a [shared Noise channel](../security/secure-channel.md) independent
+of socket I/O, with a separate [TCP carrier candidate](noise-bindings.md#2-tcp-stream-candidate).
+That candidate precedes Syntra `hello` with channel establishment and carries
+an encrypted inner `u32BE length || Frame` stream across bounded ciphertext
+records delimited by `u16BE` lengths. It is not the plaintext mapping here:
+SNTR-TCP-V1 still begins directly with the four-byte `hello` length prefix,
+and its vectors, restrictions and tests retain that meaning.
+
+The new binding identifier and context encoding are freeze blockers. Returning
+authorization would reuse a scoped enrollment AK, but each new channel uses
+fresh ephemeral/directional keys and a new Syntra handshake, without migrating
+traffic state from TCP, WebSocket or any future UDP binding. UDP remains
+deferred until its complete binding is frozen, reviewed and accepted. Current
+public deployments still follow the TLS policy pending RFC acceptance.
+
 ## 2. TCP connection (clarifies SYN-ARCH-010/012, SNTR-HS-002)
 
 **SNTR-TCP-002** — The client initiates the transport connection (TCP active open); the server accepts it (passive open). Each accepted socket carries exactly one Syntra connection (one handshake-to-teardown state machine); multiplexing multiple Syntra connections over one socket is forbidden, and sharing one Syntra connection across sockets is impossible.

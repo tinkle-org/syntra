@@ -37,6 +37,36 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-ASEC-011** — Authentication error disclosure: handshake denials MUST use `UNAUTHENTICATED` (credential invalid/expired/revoked) or `PERMISSION_DENIED` (valid credential, insufficient access) without distinguishing sub-reasons (unknown principal vs wrong secret vs expired vs revoked) unless the deployment documents the oracle as intentional. `RpcError.message` MUST be generic and MUST NOT contain credential material, token values, principal enumerations, or backend diagnostics. Timing behavior SHOULD minimize user-enumeration oracles (constant-time credential comparison where applicable).
 
+### Proposed persistent authorization interaction (informative)
+
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) separates
+[channel verification](secure-channel.md) from [enrollment and authorization](device-authorization.md).
+The selected bootstrap is `Noise_NK_25519_ChaChaPoly_SHA256`, followed by
+application-authorized enrollment: the host issues a unique random 32-byte
+shared AK through the protected provisioning contract. Returning devices use
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256`; the AK enters standard `psk0` and is
+not sent as a reconnect bearer credential. No device signing key pair is
+selected. Principals remain generic devices, services or other identities,
+without a human-account requirement.
+
+The proposed independent eight-byte `auth_id` is a collision-checked scoped
+lookup handle, not authority, a session ID, or proof of freshness. Clear stable
+handles can correlate reconnects; bounded lookups, oracle-resistant failures,
+restricted diagnostics and rotation privacy need review. Hosts would store
+usable AKs under controlled wrapping, with expiry, revocation and rotation
+policies; a one-way hash alone cannot supply a Noise PSK. This host-owned
+store does not authorize credential persistence in the core or adapters.
+
+Fresh client transport-record confirmation, current enrollment validity and
+principal policy would precede `ready`, with per-method authorization still
+required. Persisting an AK does not resume a logical session or preserve old
+traffic keys. The trusted connection-scoped authentication hook and bounded
+enrollment/rotation RPC contracts are blockers: the current credential-only
+interface does not establish that context. `ClientHello.credential` stays
+opaque, empty credentials still follow anonymous policy, and `connection_id`
+remains diagnostic. These proposed SC/DAUTH requirements do not amend the
+current ASEC carriage, TLS or lifecycle rules before RFC acceptance.
+
 ## 2. Request-security hooks (per-connection/session limits)
 
 **SNTR-ASEC-020** — Hosts MUST enforce, per connection AND per session/principal: maximum envelope size (default 1 MiB per `framing.md`), maximum concurrent RPCs, maximum handshake attempts per unit time, maximum subscriptions/events per principal, and call deadlines. Limits MUST be documented; exceeding them MUST yield `RESOURCE_EXHAUSTED` (RPC context) or handshake/connection closure, and MUST trigger rate-limiting or temporary blocking of the offending source before affecting conformant principals (see `reliability.md`).

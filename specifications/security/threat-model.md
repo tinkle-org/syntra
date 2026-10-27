@@ -95,6 +95,32 @@ flowchart LR
 | T9 | Unauthorized RPC/subscription/event leak | Auth-before-dispatch; per-subscription authorization; post-revocation termination (`authentication-security.md`, `events.md`) | STEST-AUTHZ |
 | T10 | Proxy-induced identity/binding break | Explicit termination config; backend-leg security; hostname/SNI consistency (`transport-security.md`) | STEST-PROXY |
 
+### RFC 0007 review scope (informative; proposed coverage)
+
+The [shared-channel proposal](secure-channel.md) and
+[device-authorization proposal](device-authorization.md), owned by
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md), add
+review targets below without changing T1–T10, their current TLS mitigations,
+or STEST mappings. The proposed security layer stays independent of carrier
+I/O, the core and host-owned credential storage.
+
+| Proposed asset/boundary | Threat and review obligation |
+|---|---|
+| Provisioned server static key and bootstrap enrollment authority | Wrong-key provisioning, unauthorized issuance and rotation failure; NK server authentication alone grants no enrollment permission |
+| Unique shared 32-byte AK and usable host store | Stolen AKs allow affected-device impersonation until revocation; wrapping at rest does not protect an already authorized compromised process |
+| Scoped eight-byte `auth_id`, epoch and endpoint context | Handle collision, enumeration, reconnect correlation and cross-scope/carrier confusion; lookup success is not authority |
+| Fresh ephemeral/directional keys and client confirmation | Replayed first flights, copied cipher state, nonce reuse and premature effects; empty handshake payloads and a fresh client record gate protected work |
+| Carrier → authenticated record → bounded envelope → core | Invalid tags, truncation, slow assembly and crypto/store exhaustion; no partial or unauthenticated plaintext reaches dispatch |
+| Trusted channel context → host principal policy | Forged metadata, stale permissions and cross-principal use; the proposed hook needs explicit trust and revocation semantics |
+
+TCP, UDP and WebSocket candidates share channel security but require their
+own [carrier analysis](../transports/noise-bindings.md). UDP replay windows,
+return-path validation and anti-amplification remain binding blockers; a valid
+tag alone does not establish source-address reachability. Fresh-channel
+forward secrecy depends on uncompromised fresh ephemerals and disposal;
+neither live-endpoint protection, automatic compromise recovery, application
+E2EE, anonymity nor post-quantum security follows from this proposal.
+
 ## 6. Out-of-scope threats
 
 **SNTR-TMOD-040** — The following are explicitly out of scope for the Syntra core and MUST NOT be claimed as mitigated by Syntra conformance:

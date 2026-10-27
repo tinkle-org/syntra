@@ -87,6 +87,21 @@ are never tracked. Do not hand-edit committed generated code. No server,
 client transport, HTTP status mapping, gRPC service, authentication
 validator, or cryptographic implementation is generated.
 
+### RFC 0007 boundary (informative)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+adds no `.proto` fields or generation step. Regenerating these message types
+does not implement the proposed [Noise channel](../security/secure-channel.md),
+[shared-AK enrollment/lifecycle](../security/device-authorization.md), or
+[carrier record mappings](../transports/noise-bindings.md). The selected
+NK/NKpsk0 suites require separate channel code, trusted host authentication
+context and reviewed bindings; no generator supplies those contracts.
+`ClientHello.credential` stays opaque and `ServerReady.connection_id` stays
+diagnostic, with no AK/handle issuance field. Current generator pins, output
+paths, compatibility gates and codec fixtures keep their existing meaning;
+the [planned channel acceptance cases](../../conformance/plans/secure-channel.md)
+are separate from schema-generation evidence.
+
 ## Complete validation
 
 ```sh

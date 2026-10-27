@@ -26,6 +26,16 @@ sequenceDiagram
 
 **SNTR-TLS-001** — The stable identifier is `SNTR-TLS-TCP-V1`: TCP, then a TLS 1.3 session, then the exact unit framing of `tcp.md` §3 (4-byte big-endian length + serialized `Frame`; default maximum 1,048,576 bytes; strict stream loop; no magic bytes). TLS records are transport segmentation only and MUST NOT be treated as Syntra frames: one TLS record may carry part of a unit, one unit, or several units, and receivers MUST reassemble the byte stream before applying `tcp.md` §3–§5.
 
+The [TCP Noise candidate](noise-bindings.md#2-tcp-stream-candidate) under
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) is
+a separately selected binding, not a replacement interpretation of
+`SNTR-TLS-TCP-V1`. Its shared channel would have fresh ephemeral and
+directional traffic keys per connection and different outer record framing.
+It neither inserts a handshake into this profile nor permits fallback after
+TLS failure. This profile's framing, TLS/certificate requirements and
+SNTR-TLS-900/901 tests remain current pending RFC acceptance and an explicit
+compatibility decision.
+
 ## 2. TLS version and implementations (clarifies SNTR-TSEC-002, SYN-ARCH-031)
 
 **SNTR-TLS-002** — Secure profiles MUST use TLS 1.3 (RFC 8446) via an established implementation. TLS 1.2 or lower MUST NOT be negotiated; if offered by the peer, negotiation MUST fail and no Syntra bytes are sent. No custom TLS, cipher, or handshake implementation SHALL be introduced; cipher suites follow the implementation's secure defaults (SNTR-TSEC-011).

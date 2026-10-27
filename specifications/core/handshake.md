@@ -10,6 +10,18 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
+## Proposed channel-establishment boundary
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+adds a proposed Noise channel phase before Syntra `CONNECTED`, with its own
+absolute establishment and total-attempt budgets. Both Noise payloads are
+empty. The client verifies the second message before sending an encrypted
+`hello`; the host verifies fresh client transport traffic and current
+enrollment policy before `ready` or protected effects. No early RPCs or new
+core state/variant are implied. The existing state machine below is unchanged;
+numeric channel budgets and the trusted authentication-context API remain
+acceptance blockers in the RFC.
+
 ## 1. State machine
 
 ```mermaid

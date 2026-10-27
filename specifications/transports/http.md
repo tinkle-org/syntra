@@ -30,6 +30,18 @@ failure of the HTTP binding itself travels as a non-2xx status with no
 Syntra body. HTTP semantics stay a transport mapping and never redefine
 RPC semantics (SYN-ARCH-042, ADR-003).
 
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+proposes a carrier-independent channel with [TCP/UDP/WebSocket candidates](noise-bindings.md),
+not a Noise-over-HTTP request/response mapping. This profile's endpoint,
+one-`Frame` body, `Authorization: Syntra` carriage, status layering and
+per-request independence remain unchanged. Neither a proposed `auth_id` nor
+an AK becomes an HTTP header, cookie, session authority or replacement
+credential here. A future HTTP channel integration would need its own
+explicit mapping and trusted authentication contract; connection reuse
+cannot infer authorization. Existing HTTP tests and restricted-plaintext
+policy continue to apply, with HTTPS required for public traffic under the
+current TLS policy.
+
 ## 1. Protocol requirements
 
 ### 1A. Canonical RPC endpoint

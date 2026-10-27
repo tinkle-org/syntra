@@ -21,9 +21,26 @@
 
 Total: 5 defining security documents + test plan, ~70 normative IDs + conformance/test IDs.
 
+## Proposed families — RFC 0007 only
+
+These entries index selected design work under
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md), not
+current profile obligations. The baseline above, its test IDs and ADR-008 TLS
+policy remain in effect until acceptance; this index grants no normative
+approval or implementation/conformance claim.
+
+| Proposed ID family | Defining proposal | Concern | Status |
+|---|---|---|---|
+| `SNTR-SC-001`–`SNTR-SC-015` | [secure-channel.md](secure-channel.md) | Carrier-independent NK/NKpsk0 channel, authenticated context, fresh keys/confirmation, bounded records/lifecycle and claim limits | Proposal only |
+| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Proposal only |
+
+[Carrier candidates](../transports/noise-bindings.md) reference these families
+without registering new profiles. Their [acceptance plan](../../conformance/plans/secure-channel.md)
+contains planned/manual traceability, not executable test IDs or pass results.
+
 ## Uniqueness and ownership rules
 
-- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`).
+- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`; proposed `SC`, `DAUTH` under RFC 0007).
 - No ID is defined twice; companions cite, never duplicate (single-definition rule shared with core).
 - `SNTR-SEC-*` is intentionally unused to keep per-document traceability; the family prefix `SNTR-*SEC*` collectively denotes security scope.
 - Charter `SYN-ARCH-030–035` and core `SNTR-*` remain distinct namespaces; where this suite tightens a core rule (e.g., disclosure), the stricter security rule governs for security claims (SYN-ARCH-043) and MUST be cited in the implementation's conformance report.
@@ -31,6 +48,6 @@ Total: 5 defining security documents + test plan, ~70 normative IDs + conformanc
 ## Verification
 
 ```sh
-grep -rhoE "\*\*SNTR-(TMOD|TSEC|ASEC|RPL|OPQ|STEST)-[0-9]+\*\*" specifications/security/*.md | sort | uniq -c | awk '$1>1{print "DUP: "$0}'
+grep -rhoE "\*\*SNTR-(TMOD|TSEC|ASEC|RPL|OPQ|STEST|SC|DAUTH)-[0-9]+\*\*" specifications/security/*.md | sort | uniq -c | awk '$1>1{print "DUP: "$0}'
 # empty output = definitions unique
 ```
