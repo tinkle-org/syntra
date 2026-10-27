@@ -1,0 +1,166 @@
+docs/production-runtime.md
+  s_36a9b98eb4e697::t_50bbb4f91060db 38-68
+specifications/security/test-plan.md
+  s_20550fae984b10::t_e6a0314d8078bd 75-94
+specifications/schema/reference.md
+  s_20550fae984b10::t_968225383eb1ba 90-100,109-114,210-216
+  s_20550fae984b10::t_d21b447441112e 217
+specifications/decisions/ADR-003-transport-independent-core.md
+  s_5c4abee0a91914::t_81160a46154897 8-15
+CHANGELOG.md
+  s_36a9b98eb4e697::t_87ea432c1b100b 78-91
+rfcs/0007-secure-channel-device-authorization.md
+  s_5c4abee0a91914::t_a0e32d1cca35a7 1-287
+specifications/decisions/ADR-011-noise-device-authorization.md
+  s_5c4abee0a91914::t_a0e32d1cca35a7 1-58
+specifications/transports/https.md
+  s_20550fae984b10::t_968225383eb1ba 28-39
+specifications/core/framing.md
+  s_5c4abee0a91914::t_81160a46154897 13-22
+docs/transport-selection.md
+  s_36a9b98eb4e697::t_d4479e844cb19d 13-19,27,43,52,74-102
+specifications/security/requirements.md
+  s_20550fae984b10::t_e6a0314d8078bd 24-40,43,51
+specifications/schema/generation.md
+  s_20550fae984b10::t_968225383eb1ba 90-104
+conformance/manifest/README.md
+  s_66b7b80b1056cf::t_a70a48a6d2c996 104-111
+specifications/security/authentication-security.md
+  s_20550fae984b10::t_e6a0314d8078bd 40-68
+  s_20550fae984b10::t_968225383eb1ba 69
+specifications/transports/websocket.md
+  s_20550fae984b10::t_968225383eb1ba 62-75
+conformance/README.md
+  s_66b7b80b1056cf::t_a70a48a6d2c996 18-22,209
+specifications/transports/noise-bindings.md
+  s_5c4abee0a91914::t_a0e32d1cca35a7 1-155
+docs/implementer-guide.md
+  s_36a9b98eb4e697::t_c41a8b2de7ed3c 13-47
+specifications/transports/secure-websocket.md
+  s_20550fae984b10::t_968225383eb1ba 55-71
+specifications/security/README.md
+  s_20550fae984b10::t_e6a0314d8078bd 26-48
+specifications/security/secure-channel.md
+  s_5c4abee0a91914::t_a0e32d1cca35a7 1-96,98-175
+  s_5c4abee0a91914::t_81160a46154897 97
+specifications/security/replay-protection.md
+  s_20550fae984b10::t_e6a0314d8078bd 40-64
+  s_20550fae984b10::t_968225383eb1ba 65
+specifications/transports/tcp.md
+  s_20550fae984b10::t_968225383eb1ba 17-34
+specifications/architecture.md
+  s_5c4abee0a91914::t_81160a46154897 53-86,278-281
+  s_5c4abee0a91914::t_c43f83a3640e0d 282
+specifications/security/review-checklist.md
+  s_20550fae984b10::t_e6a0314d8078bd 42-59
+specifications/decisions/ADR-008-transport-security.md
+  s_5c4abee0a91914::t_81160a46154897 8-14
+specifications/core/sessions.md
+  s_5c4abee0a91914::t_81160a46154897 13-23
+specifications/transports/http.md
+  s_20550fae984b10::t_968225383eb1ba 33-44
+README.md
+  s_36a9b98eb4e697::t_c6e2e510cf0f67 71-72,117,120,201,211,400,402
+  s_36a9b98eb4e697::t_87ea432c1b100b 54-55,109,113-116,121,139-184
+  s_36a9b98eb4e697::t_17dfd9ac3a4dcb 185
+docs/server-implementation.md
+  s_36a9b98eb4e697::t_c41a8b2de7ed3c 10-14,50-77
+  s_36a9b98eb4e697::t_f32512ad597a85 78
+SECURITY.md
+  s_36a9b98eb4e697::t_87ea432c1b100b 8-11,58,76-107
+docs/glossary.md
+  s_36a9b98eb4e697::t_c6673a6d12f34c 6-9,35-36,71-111
+conformance/profiles.yaml
+  s_66b7b80b1056cf::t_a70a48a6d2c996 5-6
+specifications/decisions/README.md
+  s_5c4abee0a91914::t_81160a46154897 20-24
+docs/client-implementation.md
+  s_36a9b98eb4e697::t_c41a8b2de7ed3c 9-13,48-73
+  s_36a9b98eb4e697::t_55c70e494b69c9 74
+specifications/README.md
+  s_5c4abee0a91914::t_81160a46154897 12-31,104-106
+conformance/manifest/requirements.yaml
+  s_66b7b80b1056cf::t_a70a48a6d2c996 923-1076
+SUPPORT.md
+  s_36a9b98eb4e697::t_87ea432c1b100b 36-52
+MIGRATION.md
+  s_36a9b98eb4e697::t_a7c39d87b26b0d 1,21-23,234-295
+  s_36a9b98eb4e697::t_c5f6c1dd990fd1 296
+SESSION-OPEN-QUESTIONS.md
+  s_36a9b98eb4e697::t_a7c39d87b26b0d 5-33
+conformance/plans/secure-channel.md
+  s_5c4abee0a91914::t_77c335efa99f15 132-136,138-140,149-150,155-159,438-444
+  s_66b7b80b1056cf::t_a70a48a6d2c996 1-131,137,141-148,151-154,160-437,445-527
+docs/faq.md
+  s_36a9b98eb4e697::t_50bbb4f91060db 48-87
+specifications/decisions/ADR-004-layer-boundaries.md
+  s_5c4abee0a91914::t_81160a46154897 8-16
+specifications/security/threat-model.md
+  s_20550fae984b10::t_e6a0314d8078bd 98-122
+  s_20550fae984b10::t_968225383eb1ba 123
+RELEASE.md
+  s_36a9b98eb4e697::t_a7c39d87b26b0d 21-38
+specifications/security/transport-security.md
+  s_20550fae984b10::t_e6a0314d8078bd 72-92
+specifications/security/device-authorization.md
+  s_5c4abee0a91914::t_a0e32d1cca35a7 1-143
+conformance/claims.md
+  s_66b7b80b1056cf::t_a70a48a6d2c996 6-10
+specifications/core/handshake.md
+  s_5c4abee0a91914::t_81160a46154897 13-24
+specifications/transports/tls-tcp.md
+  s_20550fae984b10::t_968225383eb1ba 29-38
+specifications/core/authentication.md
+  s_5c4abee0a91914::t_81160a46154897 13-29
+bindings/go/README.md
+  s_36a9b98eb4e697::t_c6673a6d12f34c 8-38
+docs/building-on-syntra.md
+  s_36a9b98eb4e697::t_c6e2e510cf0f67 123-124
+  s_36a9b98eb4e697::t_50bbb4f91060db 81-108,113-118
+specifications/security/opaque-payloads.md
+  s_20550fae984b10::t_e6a0314d8078bd 44-57
+docs/perf-tradeoffs.md
+  s_36a9b98eb4e697::t_c6673a6d12f34c 89-121
+specifications/security/open-questions.md
+  s_20550fae984b10::t_e6a0314d8078bd 22,28-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5fe422248f527c4ec9be783d94e1856a638f14c",
+  "prompts": {},
+  "sessions": {
+    "s_20550fae984b10": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e817084efffer96b3VcbmJ2t6i",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_36a9b98eb4e697": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e817bcdedffe3LmqdogbO2iXsQ",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_5c4abee0a91914": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e822dc2c8ffeuoSnmey9d4Bf5l",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_66b7b80b1056cf": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e817bcddcffeIEXG69muYQgBbk",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
