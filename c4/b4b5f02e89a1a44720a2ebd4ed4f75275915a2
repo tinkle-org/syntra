@@ -1,0 +1,25 @@
+CHANGELOG.md
+  s_5c4abee0a91914::t_98f2194537ed85 237-249
+docs/schema-registry.md
+  s_5c4abee0a91914::t_a915050f125b01 271-273,275
+.github/workflows/schema-validation.yml
+  s_5c4abee0a91914::t_8dd842eed5b89f 14-15,24-25
+.github/workflows/release-please.yml
+  s_5c4abee0a91914::t_d2dd14bfb4e188 14,22-23,27-28,48-55,58-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4b4b5f02e89a1a44720a2ebd4ed4f75275915a2",
+  "prompts": {},
+  "sessions": {
+    "s_5c4abee0a91914": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e822dc2c8ffeuoSnmey9d4Bf5l",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
