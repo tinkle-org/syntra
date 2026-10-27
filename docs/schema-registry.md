@@ -268,7 +268,8 @@ version the protocol (ADR-010).
 
 ## 16. What GitHub Releases provide — and do not
 
-Provides: release notes at the tagged revision. Tags must never be moved.
-detect corruption but are not signatures or an immutability mechanism.
+Provides: release notes at the tagged revision. Tags must never be moved;
+tag identity is the release identity — there is no mutable asset to
+re-verify.
 
-Does not provide: protocol behavior, state machines, transport implementations, authentication, RPC runtime semantics, conformance verdicts, security review, or any guarantee beyond "these bytes are the tagged revision." A green release workflow means the tag validated and assets attached — it says nothing about whether an implementation conforms (only `conformance/` says that).
+Does not provide: protocol behavior, state machines, transport implementations, authentication, RPC runtime semantics, conformance verdicts, security review, or any guarantee beyond "these bytes are the tagged revision." A green validation run says nothing about whether an implementation conforms (only `conformance/` says that).

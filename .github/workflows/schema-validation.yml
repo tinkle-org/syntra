@@ -11,6 +11,8 @@ on:
       - "buf.yaml"
       - "buf.lock"
       - "compatibility/v1-initial/**"
+      - "scripts/validate-schema.py"
+      - "tests/schema/**"
       - ".github/workflows/schema-validation.yml"
   push:
     branches: [main]
@@ -19,6 +21,8 @@ on:
       - "buf.yaml"
       - "buf.lock"
       - "compatibility/v1-initial/**"
+      - "scripts/validate-schema.py"
+      - "tests/schema/**"
 
 permissions:
   contents: read  # no secrets, no write, no publish
