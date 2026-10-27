@@ -52,6 +52,23 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WSS-030** — Exactly one complete binary WebSocket message contains exactly one serialized Syntra `Frame`. Binary-only (opcode 0x2); text (0x1) is invalid and closes with 1003; empty binary messages are protocol errors; fragmentation with reassembly-before-decode is REQUIRED; frame boundaries are irrelevant; decode runs on assembled bytes; the maximum assembled size is the effective maximum envelope size (default 1 MiB) enforced during assembly with code 1009 on exceedance. All per SNTR-WS-030…035, incorporated without change.
 
+### Separate proposed ciphertext binding (informative)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and its [WebSocket carrier candidate](noise-bindings.md#3-websocket-message-candidate)
+place channel handshake messages/ciphertexts in binary messages rather than
+serialized `Frame`s. That candidate needs a distinct profile identifier and
+explicit endpoint/subprotocol selection; it cannot reuse `SNTR-WSS-H1-V1`
+or `syntra.v1` for different bytes. Its fresh channel keys and subsequent
+Syntra authorization would not replace Origin/admission policy or resume
+an old session.
+
+Browser `wss://` still establishes outer TLS before the Upgrade even if a
+new selected binding protects binary messages inside it. This profile keeps
+its current one-message-one-`Frame` mapping, certificate/hostname checks,
+no-prefix rule and SNTR-WSS-900/901 coverage. RFC 0007 and proposed ADR-011
+do not waive the existing TLS production policy before acceptance.
+
 ### 1E. No TCP length prefix
 
 **SNTR-WSS-031** — Identical to WS: the binary message payload MUST be exactly the protobuf-serialized `Frame` bytes (`WS-Binary-Message [protobuf]`), never `[length][protobuf]` (SNTR-WS-036). Receivers MUST decode directly and reject trailing garbage or embedded prefixes as `INVALID_ARGUMENT`.

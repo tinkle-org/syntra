@@ -78,20 +78,50 @@ if allowed, gets least privilege. Document expiry/revocation propagation
 windows — clients treat post-expiry RPCs as `UNAUTHENTICATED` and
 reconnect with fresh credentials.
 
+### Selected SC1 device policy (proposal)
+
+[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md), not
+an Accepted RFC, selects transport-independent SC1 with initial
+`Noise_NK_25519_ChaChaPoly_SHA256` enrollment and returning
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels. The selected
+[device model](../specifications/security/device-authorization.md) gives
+each device a unique random shared 32-byte AK and opaque 8-byte `auth_id`
+lookup handle. Hosts own enrollment permission, protected storage,
+authorization, and revocation; no human account model or signing keypair
+is required. A device's channel authentication does not decide which
+methods or subscriptions it may use.
+
+The AK stays off the reconnect wire; `auth_id` is not proof of authority,
+and neither value is `connection_id`. Every channel uses fresh ephemeral
+material and directional traffic keys. Empty M1/M2 payloads exclude 0-RTT
+application data and credentials; the host verifies the first authenticated
+client transport record before protected actions. Syntra hello/ready
+remains necessary. Returning authentication does not resume a Syntra
+session, restore subscriptions, or make an RPC safe to retry.
+
+The proposed [secure channel](../specifications/security/secure-channel.md)
+protects the peer-to-host path, not application E2EE. Its
+[TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md) do
+not change current TLS requirements or executable profiles. Existing
+HTTPS/WSS TLS compatibility remains; browser `wss://` retains outer TLS,
+and Noise-in-WS is distinct from current WS/WSS wire mappings.
+
 ## Opaque encrypted payloads
 
 Applications MAY transport encrypted bytes through Syntra. The contract is:
 
-- Syntra **does not decrypt** payloads, event bytes, or follow-up auth
-  bytes — it routes and bounds opaque bytes bit-preserved.
-- Syntra **does not define** ratchets, key exchange, algorithm identifiers,
-  or any application E2EE handshake; no key material may appear in
+- The Syntra RPC core **does not decrypt application ciphertext** in
+  payloads, event bytes, or follow-up auth bytes — it routes and bounds
+  opaque bytes bit-preserved. Channel encryption/decryption is a separate
+  layer; this remains true for the proposed SC1 record layer.
+- Syntra **does not define application E2EE** ratchets, key exchange,
+  algorithm identifiers, or handshakes; no E2EE key material may appear in
   envelope fields. Use established libraries above Syntra.
 - Syntra **does not know** the encryption format: plaintext, serialized
   structures, and ciphertext behave identically for routing, correlation,
   bounds, and error mapping — and ciphertext gets no larger allowance.
-- Transport security is **still required**: encrypted content MUST still
-  traverse secure profiles in public deployments, because TLS protects
+- Current baseline transport security is **still required**: encrypted
+  content MUST still traverse secure profiles in public deployments, because TLS protects
   endpoints, metadata, handshake, errors, and availability — none of which
   application encryption covers. Application encryption MUST NOT justify
   plaintext transport, skipped certificate validation, or missing

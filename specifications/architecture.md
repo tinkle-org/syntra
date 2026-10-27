@@ -50,6 +50,40 @@ Neutral examples used throughout this project: `echo`, `get`/`put` on a
 generic key/value service, and subscription to a generic event topic.
 These examples illustrate mechanics only and impose no data model.
 
+### Selected secure-channel direction (proposal, not current authority)
+
+[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) records
+Syntra Secure Channel v1 (SC1): Noise NK for authenticated bootstrap and
+Noise NKpsk0 for returning devices sharing a unique random 32-byte
+authorization key (AK). AKs persist across reconnects; ephemeral keys,
+directional traffic keys and channel state do not. A lookup handle is not
+an authenticator. Enrollment, credential storage and permissions stay
+host-owned; no particular account model is required.
+
+The proposal adds a transport-independent channel layer below Syntra frames,
+with separate TCP, UDP and WebSocket mappings. It does not make the core
+open sockets, require a carrier library or implement application E2EE.
+Existing adapters remain optional implementations, not the definition of
+the protocol. No first-flight application effects or automatic security
+fallback are proposed.
+
+```text
+Application: enrollment authority, stores, permissions, opaque payloads
+Syntra core: Frame, hello/ready, sessions, RPC and correlation
+SC1: established Noise implementation, channel state, protected records
+Carrier binding: TCP stream | UDP datagrams | WebSocket binary messages
+External carrier I/O supplied by the embedding application
+```
+
+See the proposed [shared channel](security/secure-channel.md),
+[device authorization](security/device-authorization.md),
+[carrier bindings](transports/noise-bindings.md), and [ADR-011](decisions/ADR-011-noise-device-authorization.md).
+These do not yet amend the baseline requirements in §§3/7/9 or ADR-008.
+Raw UDP is still deferred; existing HTTPS/WSS retain TLS, and a new
+Noise-in-WebSocket binding would not change existing WS/WSS wire formats.
+Persistent authorization is separate from logical-session recovery and RPC
+replay. Acceptance and independent verification are outstanding.
+
 ## 2. What Syntra is not
 
 Syntra is **not**:
@@ -240,6 +274,11 @@ informative for that concern.
 | Security requirements (threat model, auth interfaces, transport policy, limits) | `specifications/security/*.md` — security specifications (forthcoming) | Architecture overview, code |
 | Executable verification (what "conformant" means) | Conformance and interoperability suite (forthcoming) | Manual test notes |
 | Implementation (one way to satisfy the above) | Rust reference implementation (present, non-normative) | Any other language implementation |
+
+For RFC 0007, the proposed security owners are `security/secure-channel.md`
+and `security/device-authorization.md`; the proposed network-mapping owner
+is `transports/noise-bindings.md`. They remain proposals until acceptance,
+not exceptions silently granted by this ownership matrix.
 
 **SYN-ARCH-040** — Protobuf schemas are the sole authority for data
 representation. Specification prose MUST NOT redefine field numbers or

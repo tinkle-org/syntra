@@ -9,7 +9,26 @@ conformance test. In case of conflict, the ownership matrix
 
 All core, transport, and security specifications are **drafts pending
 maintainer approval via RFC**. Release-blocking open questions are tracked
-in `SESSION-OPEN-QUESTIONS.md` and RFCs 0001–0005.
+in `SESSION-OPEN-QUESTIONS.md` and the RFC set.
+
+## Selected secure-channel proposal
+
+[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) proposes
+Syntra Secure Channel v1 (SC1): `Noise_NK_25519_ChaChaPoly_SHA256` for
+authorized bootstrap enrollment and `Noise_NKpsk0_25519_ChaChaPoly_SHA256`
+for returning devices sharing a persistent random 32-byte AK. Every new
+channel derives fresh traffic keys. This selected direction is not accepted
+production policy, shipping implementation or a conformance claim; current
+TLS requirements and existing profile identifiers remain unchanged.
+
+Read the [shared channel](security/secure-channel.md),
+[device authorization](security/device-authorization.md),
+[carrier mappings](transports/noise-bindings.md),
+[proposed ADR-011](decisions/ADR-011-noise-device-authorization.md), and
+[acceptance plan](../conformance/plans/secure-channel.md) together. The core
+remains independent of sockets and carrier libraries; TCP/UDP/WebSocket are
+separate bindings, with UDP still deferred until its complete binding is
+accepted. Persistent device authorization does not resume logical sessions.
 
 ## Reading order
 
@@ -82,6 +101,9 @@ mechanics live in [`schema/`](schema/README.md); design rationale in
 | Security | `security/threat-model.md`, `transport-security.md`, `authentication-security.md`, `replay-protection.md`, `opaque-payloads.md`, `test-plan.md` | `SNTR-TMOD/TSEC/ASEC/RPL/OPQ/STEST-*` |
 | Schema | `schema/reference.md`, `generation.md`, `compatibility.md`, `validation.md` + `proto/syntra/v1/*.proto` | references `SNTR-*` |
 | Decisions | `decisions/ADR-001`–`ADR-010` | rationale, no new normative force |
+| Proposed SC1 security | `security/secure-channel.md`, `device-authorization.md` | `SNTR-SC-*`, `SNTR-DAUTH-*` (Draft RFC 0007 only) |
+| Proposed SC1 mappings | `transports/noise-bindings.md` | informative candidates; not registered profiles |
+| Proposed decision | `decisions/ADR-011-noise-device-authorization.md` | Proposed, not a supersession of ADR-008 yet |
 
 All specification examples use neutral applications: `echo`, generic
 key/value, generic event subscription. No domain-specific concepts appear.

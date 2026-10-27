@@ -33,6 +33,23 @@ reporting for this repository are the authoritative channels.
   reference implementation — support scope for each is stated in its
   README and `CHANGELOG.md`.
 
+## SC1 design discussion
+
+The selected transport-independent secure-channel proposal is
+[Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md), not an
+Accepted RFC or supported runtime feature. For design questions, cite the
+proposed [secure channel](specifications/security/secure-channel.md),
+[device authorization](specifications/security/device-authorization.md), or
+[TCP/UDP/WS bindings](specifications/transports/noise-bindings.md), and
+identify whether the report concerns that proposal or the current profile.
+The TLS baseline and existing executable conformance profiles remain current.
+
+Enrollment, per-device AK storage, authorization, and revocation are
+host-owned integration policy; no mandatory human account system is
+provided. The [SC1 conformance plan](conformance/plans/secure-channel.md)
+does not establish implementation support, test results, or benchmarks.
+Continue to report vulnerabilities privately through `SECURITY.md`.
+
 ## What is not supported
 
 - Private products, proprietary servers, databases, cloud deployments,

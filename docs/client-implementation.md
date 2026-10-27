@@ -6,6 +6,11 @@ events. Normative requirements: `SNTR-CORE-010/011/012`, handshake
 `SNTR-HS-001` table + §3, `SNTR-RPC-020/021`, errors `SNTR-ERR-010/011`,
 reliability `SNTR-REL-020/021`, transport client sections.
 
+The steps below describe the current TLS/profile baseline. The selected
+SC1 path in [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+is not Accepted or implemented by these instructions; its client-side
+implications are recorded separately below.
+
 ## Transport establishment
 
 Open the transport per the chosen profile *before* any Syntra bytes:
@@ -39,6 +44,33 @@ identical bytes only with bounded backoff, never in a tight loop. Treat
 `UNAUTHENTICATED` as "present a different/fresh credential" and
 `PERMISSION_DENIED` as "valid credential, access refused — do not retry
 identically" (`SNTR-AUTH-021`).
+
+## Selected SC1 proposal: client enrollment and returning channels
+
+For the proposed [SC1 state machine](../specifications/security/secure-channel.md),
+the initiator trusts the host static key before initial
+`Noise_NK_25519_ChaChaPoly_SHA256` enrollment. Enrollment permission and
+issuance/storage of a unique random shared 32-byte AK plus opaque 8-byte
+`auth_id` are defined by [host device policy](../specifications/security/device-authorization.md).
+The client protects its stored AK; no signing keypair or human account is
+required by this model.
+
+A returning initiator supplies the lookup handle and uses
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256`, without transmitting the AK.
+Use fresh ephemeral material and derive fresh directional traffic keys on
+every channel. M1/M2 payloads stay empty: no 0-RTT credentials or
+application data. The host verifies the first authenticated client
+transport record before protected actions. Syntra `ClientHello` and
+`ServerReady` still gate RPCs; Noise completion alone is not readiness.
+Neither AK nor `auth_id` is `connection_id`.
+
+The proposed [TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md)
+do not change baseline TLS validation or existing HTTPS/WSS compatibility.
+Browser `wss://` retains outer TLS; Noise-in-WS uses a distinct wire from
+current WS/WSS profiles. Reconnect still needs explicit application
+recovery and retry decisions; returning-device authentication supplies no
+session resumption, subscription restoration, or proof that a lost RPC did
+not execute.
 
 ## Request IDs
 

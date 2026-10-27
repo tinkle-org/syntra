@@ -39,3 +39,21 @@
 - [ ] No private product, infrastructure, or domain-type leakage (SYN-ARCH-001/002)?
 
 Approval REQUIRES all applicable boxes checked with requirement-ID citations on the RFC.
+
+## E. RFC 0007 proposal review (separate from current baseline checks)
+
+These unchecked items review [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and its proposed [SC](secure-channel.md), [DAUTH](device-authorization.md)
+and [carrier](../transports/noise-bindings.md) contracts. Completing this list
+is not RFC acceptance; sections A–D and current TLS/certificate tests continue
+to apply to existing profiles.
+
+- [ ] Policy/status: ADR-011 remains proposed; accepted authority and an explicit version/deprecation decision precede replacing ADR-008 or current requirements/tests?
+- [ ] Construction: exact NK bootstrap and NKpsk0 returning suites, authenticated server-key provisioning, canonical context, fresh ephemerals/directional keys, no automatic fallback or reused channel state (SC-001–005/009/013)?
+- [ ] Enrollment: host-issued unique random shared 32-byte AK only after authorized bootstrap; durable issuance/acknowledgment/retry contract; no selected signing-key-pair or required human-account model (DAUTH-001/002/005)?
+- [ ] Handle: independent eight-byte `auth_id`, collision-checked scoped lookup with no authority; epoch binding, bounded unknown-handle work, enumeration/correlation and rotation privacy addressed (DAUTH-003/008)?
+- [ ] Freshness: replayed first flights grant no binding/effects; empty handshake payloads, no 0-RTT effects, fresh client transport-record confirmation and current authorization before `ready`/dispatch (SC-004/006, DAUTH-005/008)?
+- [ ] Lifecycle/integration: wrapped usable-AK storage, impersonation exposure, expiry, active-binding revocation and crash-safe rotation; trusted connection-scoped hook preserves opaque credentials, diagnostic IDs and generic principals (DAUTH-004–010)?
+- [ ] Bounds/close: numeric channel and total-attempt budgets, authenticated complete records, bounded envelope reconstruction, partial writes/cancellation, nonce ceilings and truncation/unknown outcomes covered (SC-007–012/014)?
+- [ ] Carriers: separate identifiers; existing WS binary-message-to-`Frame` and `syntra.v1` unchanged; candidate WS ciphertext distinct, browser outer WSS TLS retained, and UDP deferred until its complete binding is frozen/reviewed/accepted?
+- [ ] Evidence: independent vectors/interop and negative cases in the [planned acceptance work](../../conformance/plans/secure-channel.md); no shipping, conformance, audit, measured-performance or post-quantum claims inferred from the proposal (SC-015)?

@@ -87,6 +87,17 @@ Sources: [framing `SNTR-WIRE-002…005/010/011`](../core/framing.md), [handshake
 
 Validate range, envelope size and resource bounds before credential policy (`SNTR-HS-030`, `SNTR-SER-020`, `SNTR-ASEC-040`). Credential format and principal type are application-owned. `credential` has no schema redaction or field-specific maximum; deployments still need documented bounds (RFC B7). No mechanism selector, auth-round field, capability list, resume token or requested-limit record is declared.
 
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+would establish a [shared Noise channel](../security/secure-channel.md)
+before the Syntra handshake and supply separately trusted channel context to
+host authentication. Its [device-authorization proposal](../security/device-authorization.md)
+uses an enrolled shared AK and scoped eight-byte lookup handle; neither is a
+new `ClientHello` field or an implicit interpretation of `credential`.
+Empty credentials remain anonymous attempts under current policy, not proof
+of a returning-device handshake. The proposed context hook and authorized
+enrollment RPC/out-of-band contract remain blockers. No `.proto` or generated
+type change is introduced by that proposal.
+
 ### `ServerReady` — handshake.proto
 
 | Field | Tag | Protobuf type | Presence/default | Protocol meaning / defining requirement |
@@ -94,6 +105,12 @@ Validate range, envelope size and resource bounds before credential policy (`SNT
 | `connection_id` | 1 | `string` | Implicit; empty string | Opaque UTF-8 diagnostic ID for one connection, fresh and unguessable (at least 128-bit entropy); never a credential/session handle/resume token. [Sessions `SNTR-SESS-002/020`](../core/sessions.md), [authentication security `SNTR-ASEC-010`](../security/authentication-security.md#1-protocol-requirements) |
 
 Selected wire version belongs to `Frame.version`, not a missing ready field. Acceptance establishes the principal binding, not synchronized or durable application state ([handshake `SNTR-HS-004`](../core/handshake.md#1-state-machine), [authentication `SNTR-AUTH-005/007`](../core/authentication.md#1-protocol-requirements)). The schema can decode an empty ID; entropy/freshness/length policy is runtime behavior. No `ServerHello`, rejection outcome, principal record, capability selection or resume handle is declared.
+
+RFC 0007 does not add an AK/handle issuance field to `ServerReady` or repurpose
+`connection_id`. Its first bootstrap `ready` would bind only the principal
+authorized by bootstrap policy; using a newly enrolled AK would require a
+fresh channel and Syntra handshake. Persistent authorization does not make
+this message a session-resumption or traffic-key recovery mechanism.
 
 ### `RpcRequest` — rpc.proto
 
@@ -189,6 +206,14 @@ The existing schema has no legal typed handshake rejection: `RpcResult` needs a 
 ## Runtime validation and security obligations
 
 This section traces obligations in the defining drafts; it does not claim generated code implements them or choose between conflicting requirements.
+
+Generated Rust/Go message types do not implement Noise handshakes, PSK lookup,
+record encryption, fresh-key confirmation or device lifecycle policy. RFC
+0007's [carrier candidates](../transports/noise-bindings.md) would authenticate
+records and reconstruct bounded envelopes before decoding these same types;
+record counters/context are not `Frame` fields. Proposed `SNTR-SC-*` and
+`SNTR-DAUTH-*` acceptance work stays separate from the current TLS/core
+requirements and schema tests below.
 
 | Runtime responsibility | Defining requirements | Schema/codec boundary |
 |---|---|---|

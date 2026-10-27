@@ -5,8 +5,10 @@
 
 ## Supported versions
 
-Syntra v1 is in development (charter + ADRs accepted; normative core,
-transport, and security specifications forthcoming).
+Syntra v1 is in development. Core, transport, and security specifications
+are drafts pending the RFC process; package prereleases do not establish
+protocol stability. SC1 in Draft RFC 0007 is selected design work, not a
+supported cryptographic implementation or an Accepted RFC.
 
 | Version | Status | Security support |
 |---------|--------|------------------|
@@ -53,7 +55,7 @@ publishing an unapproved contact.
    may land as direct PRs.
 4. Reporters are credited only with consent.
 
-## Threat assumptions (summary)
+## Current baseline threat assumptions (summary)
 
 Syntra assumes a hostile network: observation, delay, reorder, replay,
 truncation, and injection on insecure transports. See
@@ -71,8 +73,38 @@ truncation, and injection on insecure transports. See
   no panics on untrusted input; no unbounded allocation.
 - Transport receipt proves nothing about application processing.
 
-The forthcoming `specifications/security/*.md` owns normative security
-requirements. This file states process, not protocol behavior.
+The baseline [transport-security specification](specifications/security/transport-security.md)
+owns these requirements. This file states process, not protocol behavior.
+
+## Selected SC1 proposal: security boundary
+
+[Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md) proposes
+transport-independent Syntra Secure Channel v1 (SC1). It is not Accepted
+and does not replace the TLS baseline above or alter existing executable
+conformance profiles. The proposed [secure-channel state machine](specifications/security/secure-channel.md)
+uses `Noise_NK_25519_ChaChaPoly_SHA256` for initial enrollment and
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices.
+
+The selected [device authorization model](specifications/security/device-authorization.md)
+uses a unique, random shared 32-byte AK per device and an opaque 8-byte
+`auth_id` lookup handle. Hosts own enrollment permission, protected AK
+storage, authorization, and revocation; no human account model is required.
+The shared AK is not a signing keypair, is not transmitted on reconnect,
+and is never a `connection_id`. A supplied `auth_id` alone grants nothing.
+
+M1/M2 payloads are empty: no credentials or application data in 0-RTT.
+Fresh ephemeral material and directional traffic keys are derived for each
+channel. The host verifies the first authenticated client transport record
+before protected actions; successful Noise exchange alone does not grant
+enrollment or method authority. Syntra hello/ready remains a separate gate.
+Fresh channels do not imply session resumption or safe automatic RPC retry.
+
+The proposed TCP/UDP/WS bindings are described in
+[noise-bindings.md](specifications/transports/noise-bindings.md). Existing
+HTTPS/WSS TLS compatibility remains, including outer TLS for browser
+`wss://`; Noise-in-WS has a distinct wire binding from current WS profiles.
+The [SC1 verification plan](conformance/plans/secure-channel.md) is planned
+coverage, not evidence of implementation or security testing.
 
 ## Scope
 

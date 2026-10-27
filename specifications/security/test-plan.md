@@ -72,3 +72,23 @@ flowchart LR
   R --> S[STEST-001..011 fixtures]
   S --> V[Verdict: pass/fail + logs]
 ```
+
+## 4. RFC 0007 acceptance work (proposed; separate from current groups)
+
+The [planned secure-channel acceptance cases](../../conformance/plans/secure-channel.md)
+trace [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+to proposed `SNTR-SC-001`–`SNTR-SC-015` and
+`SNTR-DAUTH-001`–`SNTR-DAUTH-010`. They are manual/planned work, not
+executable IDs or results. SNTR-STEST-001–011/900, certificate fixtures and
+current core/profile expectations retain their existing meaning and coverage.
+
+The additional review includes independently derived NK/NKpsk0 vectors,
+wrong server keys/AKs, unauthorized or interrupted enrollment, handle
+collision/scope/correlation, expiry/revocation/rotation races, replayed first
+flights with no protected effects before fresh client confirmation, and no
+0-RTT application data. It also includes cross-carrier fresh-key separation,
+invalid tags, nonce/lifetime limits, record versus envelope size bounds,
+partial I/O, assembly/write/close deadlines and aggregate resource budgets.
+TCP/WS candidates need independent interoperability evidence; UDP acceptance
+also requires a frozen complete datagram binding, replay/path/DoS tests and
+review. Generated-type round trips establish none of these channel properties.

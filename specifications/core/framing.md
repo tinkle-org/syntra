@@ -10,6 +10,16 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
+## Proposed secure-record mapping
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+keeps the `Frame` schema, validation and 1 MiB default envelope bound.
+[Proposed carrier bindings](../transports/noise-bindings.md) separate Noise
+records from envelopes: the 65,535-byte ciphertext cap requires bounded
+segmentation for large frames. Only complete reconstructed envelopes reach
+the core. TCP lengths, WebSocket message boundaries and future UDP headers
+are mapping concerns, not universal Protobuf fields or current support claims.
+
 ## 1. Protocol requirements (envelope)
 
 **SNTR-WIRE-001** — Every Syntra unit on every transport MUST be exactly one serialized `Frame`. Implementations MUST NOT send bare `RpcRequest`/`RpcResult`/`Notification` without the envelope, and MUST NOT batch multiple `Frame`s inside one Protobuf message. Batching at the transport layer (e.g., multiple length-prefixed frames in one TCP segment) is framing, not envelope batching, and is governed by transport specs.

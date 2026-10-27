@@ -10,6 +10,41 @@ The sequence below is ordered so each step is testable before the next
 begins. After every step, run the corresponding conformance cases; do not
 proceed on failing cases.
 
+## Baseline and selected SC1 work
+
+The numbered steps implement the current baseline: its TLS requirements
+and all existing executable conformance profiles remain unchanged.
+[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+records the selected transport-independent SC1 proposal, not Accepted
+behavior or an available implementation. Reading draft design material
+does not add SC1 coverage to the suite used in step 10.
+
+For SC1 design work, keep three separate gates: carrier establishment,
+secure-channel authentication/confirmation, then Syntra hello/ready and
+host authorization. Initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment
+and returning `Noise_NKpsk0_25519_ChaChaPoly_SHA256` use empty M1/M2
+payloads, never 0-RTT application data or credentials. Protected actions
+wait for verification of the first authenticated client transport record;
+Noise completion does not replace Syntra `ACTIVE` or host policy.
+
+The proposed [device model](../specifications/security/device-authorization.md)
+uses a unique random shared 32-byte AK and opaque 8-byte `auth_id` per
+device, not a signing keypair. The AK is not sent on reconnect; the handle
+is a lookup hint, not authentication proof or `connection_id`. Enrollment,
+storage, authorization, and revocation remain host-owned without mandatory
+human accounts. Every channel has fresh ephemeral material and directional
+traffic keys; returning-device authentication adds no session resumption
+or automatic RPC retry.
+
+Use the proposed [secure-channel state machine](../specifications/security/secure-channel.md)
+across [TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md)
+without putting socket dialing or WS/gRPC dependencies into the core.
+Existing HTTPS/WSS TLS compatibility remains, including browser `wss://`
+outer TLS. Noise-in-WS is a distinct wire, not a reinterpretation of
+current WS/WSS profile IDs. [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+records rationale; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
+is proposed verification, not a passing executable profile.
+
 ## 1. Obtain the schema from Git
 
 Fetch the versioned schema from the Git tree, not a copy pasted from

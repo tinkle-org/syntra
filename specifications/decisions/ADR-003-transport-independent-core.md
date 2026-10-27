@@ -5,6 +5,14 @@
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)
 - Relates to: `specifications/architecture.md` Sec. 5, 9; ADR-004; ADR-008
 
+## Selected direction under review
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+preserves this separation while proposing a carrier-independent Noise
+secure channel below Syntra frames. TCP, UDP and WebSocket byte mappings
+remain separate; protocol state does not dial sockets or require a carrier
+library. This is not current UDP support or an accepted policy amendment.
+
 ## Context
 
 Syntra must run over TCP, TLS 1.3/TCP, HTTP/1.1, HTTPS (HTTP/1.1 and

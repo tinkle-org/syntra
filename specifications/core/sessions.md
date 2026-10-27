@@ -10,6 +10,17 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
+## Persistent device authorization is not session resumption
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+proposes persistent shared device authorization with fresh Noise keys for
+each new channel. Reusing a valid enrollment can avoid another interactive
+login, but does not attach a previous session, restore pending RPCs or
+subscriptions, or transfer cipher/counter state between carriers. The host
+re-evaluates scope, expiry and revocation before a new binding. The existing
+session rules below and separately proposed recovery mechanisms retain their
+own authority and acceptance status.
+
 ## 1. Protocol requirements
 
 **SNTR-SESS-001** — Session establishment: a session is established implicitly when a connection reaches ACTIVE (principal bound). No separate session handshake exists in v1. Applications MAY layer session tokens above ACTIVE via generic RPC; the core MUST NOT interpret them.

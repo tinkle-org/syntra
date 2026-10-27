@@ -35,6 +35,37 @@ The production protocol engine is Rust:
 
 The core never parses application payloads and never performs network I/O.
 
+## SC1 design boundary (not runtime support)
+
+The embedding paths and native ABI in this guide describe the current
+runtime. [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+selects transport-independent SC1 but is not Accepted and adds no Rust,
+Go, or FFI crypto/binding support. Baseline TLS requirements and existing
+executable conformance profiles remain unchanged.
+
+In the proposed [SC1 design](../specifications/security/secure-channel.md),
+carrier I/O stays outside the core; one channel state machine serves
+[TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md).
+The core does not dial sockets or require WS or gRPC. Existing HTTPS/WSS
+TLS compatibility remains, with outer TLS still required for browser
+`wss://`. Noise-in-WS is a distinct wire binding from current WS/WSS
+profile IDs and their serialized-`Frame` mapping; existing frame-pump
+calls are not Noise-record APIs.
+
+Host policy would still own [enrollment, AK storage, authorization, and
+revocation](../specifications/security/device-authorization.md), without
+mandatory human accounts. Selected NK enrollment and NKpsk0 returning
+channels use empty M1/M2 payloads, a unique random shared 32-byte AK plus
+opaque 8-byte `auth_id` per device, and fresh ephemeral material/directional
+traffic keys per channel. The AK is not sent on reconnect or carried as
+`connection_id`. Verification of the first authenticated client transport
+record precedes protected actions, and Syntra hello/ready still applies.
+
+Returning-device authentication adds no session resumption or automatic
+RPC retry to the recovery contract below. The
+[SC1 conformance plan](../conformance/plans/secure-channel.md) is future
+verification; native linking or existing runtime tests do not prove SC1.
+
 ## Native ABI
 
 Authoritative header: `crates/syntra-ffi/include/syntra_production.h`.

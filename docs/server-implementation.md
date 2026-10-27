@@ -7,6 +7,11 @@ Normative requirements: `SNTR-CORE-020/021/022`, handshake `SNTR-HS-004`
 table + §4, `SNTR-RPC-030/031/032`, errors `SNTR-ERR-020/021`, reliability
 `SNTR-REL-030/031`, transport server sections, security `SNTR-ASEC-*`.
 
+Current listener and handshake instructions below retain the baseline TLS
+requirements and existing executable profiles. The selected SC1 proposal
+in [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is
+not Accepted; the separate integration section records proposed host duties.
+
 ## Listener profiles
 
 Serve each claimed profile on its binding with its documented identifier
@@ -41,6 +46,35 @@ without leaking sub-reasons unless the oracle is intentional and
 documented. Never log, persist, echo, or metric-label credential material.
 Bind exactly one principal at `ServerReady` for the connection lifetime;
 principal change requires a new connection.
+
+## Selected SC1 proposal: host authorization boundary
+
+The proposed [secure-channel state machine](../specifications/security/secure-channel.md)
+uses `Noise_NK_25519_ChaChaPoly_SHA256` for initial enrollment. Host
+authentication by NK does not authenticate an enrolled device or authorize
+enrollment. The host verifies the first authenticated client transport
+record before protected actions, completes Syntra hello/ready, and applies
+its enrollment policy before granting device authority. M1/M2 payloads
+are empty, with no 0-RTT credentials or application data.
+
+Under the selected [device-authorization model](../specifications/security/device-authorization.md),
+the host owns enrollment, protected storage, method/subscription policy,
+and revocation. Each device gets a unique random shared 32-byte AK and an
+opaque 8-byte `auth_id`; human accounts are optional. Resolve returning
+handles to device records for `Noise_NKpsk0_25519_ChaChaPoly_SHA256`, but
+do not treat lookup success or M1 alone as authority. The AK is not sent
+on reconnect and is not a signing keypair or `connection_id`. Fresh
+ephemeral material and directional traffic keys belong to every channel;
+reusing a device AK does not restore the old Syntra session or RPCs.
+
+Keep the carrier adapter separate from host policy. Proposed
+[TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md) share
+SC1's state machine; the core does not dial sockets or require WS or gRPC.
+Existing HTTPS/WSS TLS compatibility remains. Browser `wss://` still uses
+outer TLS, and Noise-in-WS is a distinct wire binding rather than a new
+interpretation of existing WS/WSS profile IDs. The
+[SC1 conformance plan](../conformance/plans/secure-channel.md) supplies no
+current implementation or executable-profile verdict.
 
 ## Session tracking
 

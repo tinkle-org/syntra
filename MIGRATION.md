@@ -1,4 +1,4 @@
-# Migration Record — From Historical Schema to Sole-Source Public IDL
+# Migration Records — Public IDL and Secure-Channel Design
 
 - Date: 2026-10-19
 - Scope: Historical Phase A audit + subsequent user-directed layout migration
@@ -17,6 +17,9 @@ Sections 1–7 preserve the Phase A inventory, classification and plan as
 historical context. Section 8 records the subsequent migration. No new
 wire types or protocol semantics are introduced by the layout change;
 remaining protocol blockers are pending.
+
+Section 9 records the selected SC1 proposal as of 2026-10-27. It is a
+documentation/design record, not an implemented security migration.
 
 ## 1. Inventory (as found)
 
@@ -227,6 +230,69 @@ no missing capability/session/error binding or runtime conformance result.
 - [ ] No invented contact addresses in any file.
 - [ ] Remote `tinklehq/syntra` created as public; `main` protected;
       private vulnerability reporting enabled.
+
+## 9. Selected SC1 design record (2026-10-27)
+
+### Inventory and status
+
+The current baseline retains TLS 1.3/TCP, HTTPS/H1, HTTPS/H2, and WSS/H1
+for public deployments, with restricted-development plaintext profiles.
+Existing schemas, executable conformance profiles, and implementations
+are unchanged by this record. The historical layout migration above is
+independent of this proposed secure-channel work.
+
+New [RFC 0007](rfcs/0007-secure-channel-device-authorization.md) is
+**Draft, not Accepted**. The selected direction is transport-independent
+Syntra Secure Channel v1 (SC1), with proposed
+[secure-channel behavior](specifications/security/secure-channel.md),
+[device authorization](specifications/security/device-authorization.md),
+[TCP/UDP/WS bindings](specifications/transports/noise-bindings.md), and
+[ADR-011 rationale](specifications/decisions/ADR-011-noise-device-authorization.md).
+Selection does not amend the normative baseline or establish support.
+
+### Selected target
+
+- Initial enrollment uses `Noise_NK_25519_ChaChaPoly_SHA256`; host policy
+  authorizes enrollment over the resulting protected channel.
+- Each device has its own unique random shared 32-byte AK and opaque
+  8-byte `auth_id` lookup handle. Returning channels use
+  `Noise_NKpsk0_25519_ChaChaPoly_SHA256`. The AK is not a signing keypair,
+  is not sent on reconnect, and is not `connection_id`; the handle is not
+  authentication proof.
+- Every channel uses fresh ephemeral material and directional traffic
+  keys. M1/M2 payloads are empty, with no 0-RTT application data or
+  credentials. The host verifies the first authenticated client transport
+  record before protected actions; Syntra hello/ready remains required.
+- Enrollment, storage, authorization, and revocation are host-owned. A
+  deployment need not have human accounts.
+
+### Compatibility and migration boundary
+
+The proposed channel state machine is carrier-independent; the core does
+not dial sockets or require WebSocket or gRPC. Existing HTTPS/WSS TLS
+compatibility remains, and browser `wss://` still requires outer TLS.
+Noise-in-WS is a distinct wire binding: existing WS/WSS profile IDs and
+their one-binary-message/one-`Frame` mapping are not reinterpreted. The
+UDP binding remains proposed, not newly supported by the runtime.
+
+Returning-device authentication is a fresh channel, not Syntra session
+resumption. It restores neither in-flight RPC outcomes nor subscriptions
+and provides no basis for automatic retries. `connection_id` remains a
+diagnostic value. AK provisioning/storage is separate from baseline
+opaque `ClientHello.credential` carriage; no existing field is silently
+reassigned to carry AK or `auth_id`.
+
+Empty NK handshake bodies total 96 bytes; returning-device handshake
+bodies plus the lookup handle total 104 = 96 + 8 bytes. Framing and extra
+epoch/version fields are excluded, as are client transport-record
+confirmation, Syntra hello/ready, and carrier establishment. These are
+byte counts, not a complete establishment RTT or benchmark.
+
+Acceptance, any eventual implementation migration, and executable
+verification remain future work. The [SC1 conformance plan](conformance/plans/secure-channel.md)
+is a plan only; no new conformance result or implementation claim is
+recorded here. Existing baseline TLS requirements and executable profiles
+continue to govern their current scope.
 
 ## Appendix: inventory and independence commands (current source root)
 

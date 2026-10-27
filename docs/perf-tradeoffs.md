@@ -86,3 +86,36 @@ one-Frame-per-Send with transport coalescing; compression stays default-off.
 No premature optimization. The reference path stays: one Frame per Send,
 identity encoding, no heartbeat. All three options remain deployment opt-ins
 behind documented bounds and capability negotiation, never silent defaults.
+
+## 5. SC1 handshake size accounting (proposal only)
+
+The historical evaluation above measures the existing runtime, not SC1.
+New [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+selects transport-independent SC1 but is not Accepted. No SC1
+implementation, throughput/latency benchmark, or passing conformance
+result is asserted here; baseline TLS requirements and executable
+profiles remain unchanged.
+
+For the selected [channel design](../specifications/security/secure-channel.md),
+empty Noise M1/M2 payloads give these handshake-body sizes:
+
+| Path | M1 body | M2 body | Lookup handle | Total counted bytes |
+|---|---|---|---|---|
+| Initial `Noise_NK_25519_ChaChaPoly_SHA256` | 48 | 48 | None | 96 |
+| Returning `Noise_NKpsk0_25519_ChaChaPoly_SHA256` | 48 | 48 | 8-byte `auth_id` | 104 = 96 + 8 |
+
+Each body includes a 32-byte ephemeral public key and a 16-byte tag for
+the empty encrypted payload. The returning total adds only the opaque
+lookup handle; the unique random shared 32-byte AK is not sent on
+reconnect. Every channel still uses fresh ephemeral material and
+directional traffic keys.
+
+These totals exclude carrier/record framing and additional epoch/version
+fields. They also exclude carrier establishment, the first authenticated
+client transport record verified before protected actions, Syntra
+hello/ready, and host enrollment/authorization work. They are not the byte
+cost or RTT of full establishment, and empty M1/M2 does not permit 0-RTT
+application data or credentials. Per-carrier costs belong to the proposed
+[TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md);
+browser `wss://` still requires outer TLS. Reusing device authority does
+not imply session resumption or automatic RPC retries.

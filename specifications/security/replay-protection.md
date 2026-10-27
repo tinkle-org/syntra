@@ -37,6 +37,32 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-RPL-014** — Class 5 (duplicate events): initiators MUST tolerate duplicates (see `events.md` SNTR-EVENT-007/008, `reliability.md` SNTR-REL-005); hosts SHOULD minimize them but MAY emit them under replay/recovery/reconnect. Duplicates MUST NOT be treated as protocol violations and MUST NOT trigger error storms.
 
+### Proposed channel replay defenses (informative)
+
+[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+adds a [channel-record and handshake replay review](secure-channel.md),
+separate from the five application replay classes above. Returning NKpsk0
+uses a persistent shared AK, but each attempt has fresh ephemeral keys,
+directional traffic keys, counters and channel state. The scoped eight-byte
+`auth_id` only selects a candidate enrollment; neither it nor a valid first
+flight proves fresh client participation. The host would wait for an
+authenticated client transport record under the new keys (potentially the
+encrypted `hello`) and current principal checks before protected effects.
+
+Both proposed handshake payloads are empty: no 0-RTT RPC, enrollment or other
+application effects are permitted by the proposal. Ordered carriers fail on
+record authentication errors; a future UDP binding needs explicit counters,
+a bounded replay window and authenticate-before-state-update rules, plus
+independent path/DoS controls. UDP remains deferred pending that frozen,
+reviewed and accepted binding.
+
+[Persistent device authorization](device-authorization.md) is fresh
+authentication on reconnect, not a resume token, restored subscription or
+permission to replay an RPC. Record anti-replay cannot deduplicate application
+operation keys or events; unknown outcomes and the five current RPL classes
+remain separate. These proposed cases supplement, rather than replace,
+SNTR-RPL-900/901 and the existing TLS-based tests after acceptance.
+
 ## 3. Client behavior
 
 - **SNTR-RPL-020** — Initiators MUST NOT retry with the same `request_id` across connections, MUST generate fresh correlation IDs per attempt, MUST carry the same application operation key across retries when safe-retry is intended, and MUST deduplicate received events where the application defines identity.
