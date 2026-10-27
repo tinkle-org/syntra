@@ -46,7 +46,7 @@ for:
   Language artifact publishing is out of scope for this repository; its
   document and schema-provenance releases are maintained by release-please
   release PRs (see `RELEASE.md` §4). Maintainers alone may create recovery
-  releases. `syntra-*-v*` tag namespaces require ruleset restriction to
+  releases. `v*` tag namespaces require ruleset restriction to
   maintainers plus the release automation identity; `main` requires pull
   requests for all updates.
 - Custody of release and reporting credentials (automatic `github.token`
@@ -76,8 +76,8 @@ for:
     - Schema changes (field addition/deprecation/option change, `buf.yaml`
       rule changes) follow this same bar, plus a clean `buf lint`,
       `buf build`, and `buf breaking` gate. Wire-incompatible schema
-      changes are breaking (Sec. 4). GitHub Release assets attach only on
-       reviewed per-crate version tags via the gated release workflow.
+      changes are breaking (Sec. 4). GitHub Releases attach release notes
+      only, on reviewed release-please tags via the gated release workflow.
    - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
      to conformance tests (or tracked placeholders).
 - **Governance / process changes** (this file, `CONTRIBUTING.md`,

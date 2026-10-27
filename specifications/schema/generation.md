@@ -45,12 +45,10 @@ lockfile is required. Schema imports are all `syntra/v1/*.proto`.
 
 Install the exact Buf CLI release using the official
 [installation guide](https://buf.build/docs/cli/installation/), and check
-`buf --version` prints `1.59.0`. Install Rust 1.88 for the workspace
-through rustup and keep Rust 1.85.1 available for the isolated
-`tests/schema/rust` suite via its `rust-toolchain.toml` override, and use
-Go 1.26.4 (or `GOTOOLCHAIN=go1.26.4`). Do not set a global Rust default just
-for this repository: CI pins the toolchain per job and the schema suite
-pins its own override.
+`buf --version` prints `1.59.0`. Python 3.14 runs the validator tooling.
+No Rust or Go toolchain is needed in this repository: language generation
+and implementation tests are downstream-owned (see the recorded pins
+above).
 
 ## Generate for validation
 

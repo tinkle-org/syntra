@@ -29,7 +29,7 @@ releases (no BSR or GHCR).
 - [ ] Version recorded: `vX.Y.Z` document release tag, Core wire version, schema package (`syntra.v1`), and profiles covered.
 - [ ] No BSR identity/publication configured (`buf.yaml` has no `name:`, no `BUF_TOKEN` or BSR environment). No language-artifact publishing from this repository.
 - [ ] Maintainer-reviewed release PR (release-please) authorizes the release.
-- [ ] Tag protection covers `syntra-*-v*`, with the release automation identity allowed.
+- [ ] Tag protection covers `v*` (historical crate-era `syntra-*-v*` tags keep their protection), with the release automation identity allowed.
 - [ ] Full Apache-2.0 license present.
 - [ ] Release notes describe wire contracts, migration notes, and the schema provenance. No browser-WASM assets are promised.
 

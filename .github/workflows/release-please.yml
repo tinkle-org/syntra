@@ -15,10 +15,38 @@ permissions:
   pull-requests: write
 
 jobs:
-  release-please:
+  validate:
+    # Schema, boundary, link, and test gates required by
+    # docs/schema-release-checklist.md. The release-please step below only
+    # runs after these complete successfully, so no tag or release is cut
+    # from a revision that fails validation.
     runs-on: ubuntu-24.04
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install validator dependencies
+        run: pip install pyyaml
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+          github_token: ${{ github.token }}
+
+      - name: Repository gates
+        run: python3 scripts/validate-repo.py all
+
+      - name: Schema gates
+        run: python3 scripts/validate-schema.py
+
+  release-please:
+    needs: validate
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           token: ${{ github.token }}
           config-file: release-please-config.json

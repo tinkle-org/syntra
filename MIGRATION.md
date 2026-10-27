@@ -329,7 +329,8 @@ Kept here: `proto/` (sole IDL), `buf.yaml`, the
 `compatibility/v1-initial/` baseline and historical archive,
 `specifications/`, `rfcs/`, conformance definitions/manifests/test
 vectors (minus the implementation harness), the repository validators
-(`scripts/validate-repo.py`, `scripts/validate-schema.py` — now Buf-only),
+(`scripts/validate-repo.py` and `scripts/validate-schema.py`, which runs
+the Buf checks and `tests/schema/test_schema.py`),
 `tests/schema/test_schema.py` with its fixture, and `tests/test_license.py`.
 
 Forward policy: release-please maintains document releases (`vX.Y.Z`

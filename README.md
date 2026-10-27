@@ -265,7 +265,9 @@ Distribution:
   for this repository (documents and schema provenance, no language
   artifacts).
 - Language artifact distribution is out of scope for this repository;
-  implementations pin schema revisions from here.External and non-normative (never in this repository):
+  implementations pin schema revisions from here.
+
+External and non-normative (never in this repository):
 
 - Syntra implementations (separate projects)
 - Generated SDK consumers

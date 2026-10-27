@@ -199,9 +199,12 @@ GitHub requires it before merging.
 
 On merge, release-please tags `vX.Y.Z` (or increments the current
 prerelease, e.g. `1.0.0-rc.1` → the next version per conventional commits)
-and creates the GitHub Release with the CHANGELOG section as notes. This
-repository publishes no language artifacts; language implementations pin
-schema revisions from here.
+and creates the GitHub Release with the CHANGELOG section as notes. Before
+merging, reviewers must confirm every existing `[Unreleased]` entry has
+been moved under the generated release entry (release-please proposes
+this move in the release PR; do not merge while entries remain stranded
+under `[Unreleased]`). This repository publishes no language artifacts;
+language implementations pin schema revisions from here.
 
 Recovery: rerun failed jobs. A maintainer may recreate a missing release
 path using a new signed tag at an approved, merged commit:
@@ -211,8 +214,9 @@ git tag -s v1.0.0 -m "Syntra schema v1.0.0"
 git push origin v1.0.0
 ```
 
-Restrict `syntra-*-v*` tag creation to maintainers and the release
-automation identity. Deleting or moving a published tag is forbidden; fix
+Restrict `v*` tag creation to maintainers and the release
+automation identity (historical `syntra-*-v*` crate-era tags keep their
+existing protection). Deleting or moving a published tag is forbidden; fix
 forward. The RC-1-era mechanics that follow in §§5–6 describe the retired
 crate/Go release model and are retained as process history for that
 release only.
