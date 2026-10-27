@@ -58,6 +58,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: write
     runs-on: ubuntu-24.04
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
