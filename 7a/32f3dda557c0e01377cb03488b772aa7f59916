@@ -1,0 +1,153 @@
+rfcs/0007-secure-channel-device-authorization.md
+  s_969d7484940617::t_611c28c94dca0f 26-30,42-44,58,132-137,141-148,153-160,174,182-188,192-198,203-207,211-214,272-280,311-354
+  s_969d7484940617::t_ab304c34112f16 21-22,111-113,189-191,284-285
+  s_969d7484940617::t_3704f6be02b7d3 281-282,305-306
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 138-140,208-210
+  s_969d7484940617::t_600bf932e67d06 283
+SESSION-OPEN-QUESTIONS.md
+  s_458f89d76c7d26::t_a391398764534a 41-42
+  s_458f89d76c7d26::t_c08e585d977ba7 5,7,21-30,38-40,43-63
+specifications/security/open-questions.md
+  s_969d7484940617::t_a27e97fed2529a 37-101
+specifications/transports/secure-websocket.md
+  s_cb6a69a7bb1ec8::t_94d91a356b16f8 55,60-62,64,72-73
+specifications/security/device-authorization.md
+  s_969d7484940617::t_611c28c94dca0f 3,14,16-17,46-49,78-83,95-99,139-144,148-159,174-179
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 145-147
+  s_cb6a69a7bb1ec8::t_03774da54e6175 100-103
+  s_969d7484940617::t_3704f6be02b7d3 15,50-51
+  s_cb6a69a7bb1ec8::t_40e746d170a933 104
+specifications/security/authentication-security.md
+  s_969d7484940617::t_a27e97fed2529a 61-63,67-94
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 64-66
+SECURITY.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 151-155
+  s_458f89d76c7d26::t_a391398764534a 119-120
+  s_458f89d76c7d26::t_c08e585d977ba7 10-13,81,86-87,105-117,121-150,156-187,192-195
+  s_458f89d76c7d26::t_1ae712022394b2 118
+docs/perf-tradeoffs.md
+  s_6212a06c8fd1ac::t_719df424f9005d 3,6-9,18,93-144,146-148,150-161,165-271
+  s_cb6a69a7bb1ec8::t_94d91a356b16f8 145,149,162-164
+docs/implementer-guide.md
+  s_458f89d76c7d26::t_1ae712022394b2 25,27
+  s_458f89d76c7d26::t_8bc107ab828f90 18-23,42-58,137-139,153-154,157-161,201-216,221-225,249-257
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 217-220
+  s_458f89d76c7d26::t_a391398764534a 155-156
+  s_458f89d76c7d26::t_dbbf27499bff51 24
+conformance/plans/secure-channel.md
+  s_cb6a69a7bb1ec8::t_bc0a103a5d1a7d 3,11-13,20,28-48,53-55,58-59,62-64,68-69,96-100,139,179-180,430,553-554
+specifications/security/transport-security.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 84,87-89,91-92
+docs/server-implementation.md
+  s_458f89d76c7d26::t_1ae712022394b2 39-44,49,77,95
+  s_458f89d76c7d26::t_a391398764534a 50-51,78-80,96-97,208-215,244-249
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 141-145
+  s_458f89d76c7d26::t_8bc107ab828f90 11-14,47-48,58-76,81-94,98-140,146-153,192-193,223-243
+docs/transport-selection.md
+  s_458f89d76c7d26::t_94e8b918a089cb 16-17,75,78-82,84,86-124
+specifications/core/authentication.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 25-27
+  s_969d7484940617::t_a27e97fed2529a 19-23,28-34,40-44
+SUPPORT.md
+  s_458f89d76c7d26::t_c08e585d977ba7 34-37,39,43-46,49-52,55,58-72
+  s_458f89d76c7d26::t_a391398764534a 56-57
+MIGRATION.md
+  s_458f89d76c7d26::t_dd7389f561f17b 21-24,145,238-241,351-376,379-413
+  s_458f89d76c7d26::t_a391398764534a 377-378
+README.md
+  s_458f89d76c7d26::t_94e8b918a089cb 21-23,109-113,121-124,148,151,153-156,168-170,173-196,202-211,278-279,444
+  s_458f89d76c7d26::t_a391398764534a 171-172
+specifications/README.md
+  s_458f89d76c7d26::t_c08e585d977ba7 14,20-24,33-39,42-54,130
+  s_458f89d76c7d26::t_a391398764534a 40-41
+specifications/security/secure-channel.md
+  s_969d7484940617::t_611c28c94dca0f 9-13,18-19,41-46,74,77-84,121-123,140-148,161-165,170-171,207-213
+  s_969d7484940617::t_ab304c34112f16 199-202
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 75-76
+  s_cb6a69a7bb1ec8::t_03774da54e6175 166-169
+  s_969d7484940617::t_9ff14161903d3f 172
+specifications/security/requirements.md
+  s_969d7484940617::t_a27e97fed2529a 35-48
+conformance/manifest/README.md
+  s_cb6a69a7bb1ec8::t_94d91a356b16f8 107-113
+docs/client-implementation.md
+  s_458f89d76c7d26::t_1ae712022394b2 37-41
+  s_458f89d76c7d26::t_94e8b918a089cb 11-12,53-89,92-102
+  s_458f89d76c7d26::t_a391398764534a 90-91,127-132
+  s_458f89d76c7d26::t_9f3210e11bdb0d 133
+conformance/manifest/requirements.yaml
+  s_cb6a69a7bb1ec8::t_1c10eb27073489 924,930,936,942,948,954,960,966,972,978,984,990,996,1002,1008,1014,1016,1022,1028,1034,1040,1046,1052,1058,1064,1070,1076
+specifications/decisions/ADR-011-noise-device-authorization.md
+  s_969d7484940617::t_a27e97fed2529a 42-60,73-74
+CHANGELOG.md
+  s_458f89d76c7d26::t_dd7389f561f17b 76-87,90-108,123-126
+  s_458f89d76c7d26::t_a391398764534a 88-89
+conformance/README.md
+  s_cb6a69a7bb1ec8::t_bc0a103a5d1a7d 14-17,22-28
+docs/sc1-implementation.md
+  s_cb6a69a7bb1ec8::t_bc0a103a5d1a7d 1-248
+conformance/profiles.yaml
+  s_cb6a69a7bb1ec8::t_bc0a103a5d1a7d 5-7
+specifications/transports/websocket.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 64-65,73-76
+specifications/security/README.md
+  s_969d7484940617::t_a27e97fed2529a 38,47-66
+specifications/security/test-plan.md
+  s_cb6a69a7bb1ec8::t_94d91a356b16f8 81-87
+specifications/transports/noise-bindings.md
+  s_969d7484940617::t_ab304c34112f16 179
+  s_969d7484940617::t_611c28c94dca0f 9-13,15-18,22-25,27-52,56-58,66,75-76,105-111,113,120-123,129-130,171-178,182-184,188-194
+  s_969d7484940617::t_3704f6be02b7d3 180-181
+specifications/transports/tcp.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 28-33
+docs/faq.md
+  s_458f89d76c7d26::t_8bc107ab828f90 49-56,68-72,82-85,89-98,101-122
+  s_458f89d76c7d26::t_a391398764534a 99-100
+  s_458f89d76c7d26::t_1ae712022394b2 59
+RELEASE.md
+  s_458f89d76c7d26::t_dd7389f561f17b 30,36-42,44-46,49-84
+  s_458f89d76c7d26::t_a391398764534a 47-48
+docs/building-on-syntra.md
+  s_cb6a69a7bb1ec8::t_9a76dd0b6240f9 82,106-108,112-118
+  s_cb6a69a7bb1ec8::t_f070de18511606 119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7a32f3dda557c0e01377cb03488b772aa7f59916",
+  "prompts": {},
+  "sessions": {
+    "s_458f89d76c7d26": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7b752f6dffeIQ3loojDdYMgW0",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_6212a06c8fd1ac": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7b68a92dffeQS3teSsC0edArP",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_969d7484940617": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7b752f7effeiRvpcv1JThVasM",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_cb6a69a7bb1ec8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7fa23e94ffetYfxSQCKYmNndW",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
