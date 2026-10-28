@@ -15,11 +15,14 @@ data model, or internal architecture.
 - Protocol version: Syntra v1 (in development — core/security drafts and
   public IDL tooling present; behavioral acceptance pending, see
   [Status](#current-protocol-status) and `SESSION-OPEN-QUESTIONS.md`)
-- IDL: Protocol Buffers (proto3), governed by Buf v2, distributed via
-  crates.io, nested Go module tags, and GitHub Releases (see [Schema distribution](#schema-distribution))
-- Reference implementation: Rust (non-normative, with production native ABI)
+- IDL: Protocol Buffers (proto3), governed by Buf v2; document releases are
+  managed by release-please through this repository's Git tags and GitHub
+  Releases (see [Schema distribution](#schema-distribution))
+- Implementations: separate, non-normative, and out of scope for this
+  repository (see [Repository boundary](#repository-boundary))
 - Methodology: Specification-Driven Development — specifications first,
-  code second
+  code second (this repository hosts specifications, schemas, and
+  conformance definitions only)
 
 > **New here?** Read this page for the architecture, then follow
 > [`specifications/README.md`](specifications/README.md) (reading order),
@@ -62,7 +65,7 @@ carrying **opaque** application bytes:
   protocol (state machines, negotiation, errors, profiles) around it.
 - Transport receipt does not prove application processing. Only an
   application-level `RpcResult` proves an application outcome.
-- The Rust implementation conforms to the spec; it is not the spec.
+- Implementations conform to the spec; they are not the spec.
 
 See `SYN-ARCH-001/002` in `specifications/architecture.md`.
 
@@ -102,7 +105,9 @@ responsibilities (`SYN-ARCH-010`–`013`).
   **drafts, acceptance pending**)
 - [x] Conformance + interop suite (`conformance/`, executable manifests
   and test vectors)
-- Available: Rust runtime with production native ABI (`syntra-core`, `syntra-runtime`, `syntra-ws`, `syntra-ffi` production feature, Go `syntranative` adapter; see `docs/production-runtime.md`) — available for embedding, not an RFC-accepted completion claim
+- Implementation status is out of scope for this repository; executable
+  conformance runs remain a pending verification goal, not an RFC-accepted
+  completion claim
 
 Each item is accepted via the RFC process in `rfcs/README.md`.
 Release-blocking open questions are tracked in `SESSION-OPEN-QUESTIONS.md`
@@ -199,17 +204,18 @@ specifications/security/       — threat model, transport/auth/replay/opaque
 specifications/schema/         — IDL reference, generation, compatibility,
   validation records
 specifications/decisions/      — baseline ADRs 001–010; proposed ADR-011 for SC1
-proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
+proto/syntra/v1/               — sole authoritative Protobuf source (eight files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
-crates/                        — Rust workspace (protocol cores plus `syntra-ffi` with test-fixture and production ABIs; WASM unsupported; committed prost output, drift-checked)
-bindings/go/                   — committed Go protobuf types + supported pure-Go core + production native adapter under `-tags syntranative` (drift-checked; default and `syntranative` tags; see `bindings/go/README.md`)
-tests/schema/                  — descriptor and codec validation (committed generation drift-checked; .tmp/ holds disposable repro only)
+tests/schema/                  — descriptor and codec validation (Buf gates; no committed generation)
 conformance/                   — executable conformance suite (manifests,
   profiles, test vectors, claims, declarations)
 docs/                          — implementer guides, glossary, FAQ, registry docs
 rfcs/                          — public RFC process, template, proposals (including Draft RFC 0007)
 audits/                        — independent consistency review (findings + RFC path)
+
+Language implementations are separate projects, out of scope for this
+repository.
 ```
 
 Core/security drafts live in `specifications/core/*.md` and
@@ -220,26 +226,21 @@ ordered reading path.
 ## Repository boundary
 
 This repository is the authoring authority for the Syntra protocol: normative
-sources plus the Rust/Go generated types and the tooling that validates them.
-Rust crates are published to crates.io by release-plz after a reviewed Release
-PR merges. Go modules are fetched through the Go proxy using nested module
-tags. There is no Buf Schema Registry publication or GHCR image.
+sources, schemas, and the conformance/validation tooling. It contains no
+implementation code; language implementations are separate projects, out of
+scope for this repository and non-normative. There is no Buf Schema Registry
+publication or GHCR image, and no language-artifact publishing from this
+repository.
 
 ```text
-Syntra Git repository
+Syntra Git repository (spec-first)
         │
-        │ contains source schemas + committed generated types
+        │ contains source schemas + validation tooling
         ▼
-Per-crate tags (<crate>-vX.Y.Z) + crates.io + GitHub Releases
+release-please document releases (vX.Y.Z tags + GitHub Releases)
         │
-        ├── Rust source / crate archives + SHA256SUMS (syntra-core release)
-        ├── descriptor (image.json) + manifests + test vectors
-        │       │
-        │       ▼
-        │   Rust consumers pin crates.io versions or exact Git revisions
-        │
-        └── Go consumers use bindings/go/vX.Y.Z at the syntra-core revision
-            (default pure-Go mode; native mode via the production library)
+        └── protocol consumers and implementations pin schemas by
+            exact Git revision or release tag
 ```
 
 Normative (the specification):
@@ -254,65 +255,54 @@ Supporting (validation, process, explanation):
 - `docs/`, `rfcs/`, `audits/`
 - `scripts/`, `tests/` — repository validation tooling only (requirement
   linter, manifest and vector validators, descriptor and codec checks;
-  never a Syntra client/server implementation). Committed generation is
-  drift-checked (`scripts/validate-schema.py --drift-only`, CI-enforced);
-  `.tmp/` holds only disposable reproducibility output and must never be
-  committed
+  never a Syntra client/server implementation). `.tmp/` holds only
+  disposable reproducibility output and must never be committed
 
 Distribution:
 
-- release-plz creates `<crate>-vX.Y.Z` tags and crates.io releases. The
-  `syntra-core-vX.Y.Z` tag anchors schema assets and the nested Go module tag
-  `bindings/go/vX.Y.Z` at the same commit. Global `vX.Y.Z` tags are not used.
-- The syntra-core GitHub Release carries source/crate archives,
-  descriptor/manifests/vectors, and SHA256SUMS (see `RELEASE.md` §5).
-- `release-plz.yml` calls `release.yml` directly after publishing syntra-core;
-  `release.yml` creates or verifies the nested Go tag and warms the Go proxy.
-  Maintainers authorize releases through reviewed Release PRs.
+- release-please maintains a release PR bundling document changes into
+  `CHANGELOG.md`; merging it tags `vX.Y.Z` and creates the GitHub Release
+  for this repository (documents and schema provenance, no language
+  artifacts).
+- Language artifact distribution is out of scope for this repository;
+  implementations pin schema revisions from here.
 
 External and non-normative (never in this repository):
 
-- Syntra implementations (separate client/server projects)
+- Syntra implementations (separate projects)
 - Generated SDK consumers
 - Applications using Syntra
 
-Generated Go/Rust types ARE committed here under `crates/` (Rust prost
-output) and `bindings/go/` (Go protobuf output, incl. `*.pb.go`): there is
-no `gen/` or `generated/` directory and no `bindings/` root outside
-`bindings/go/`, and CI fails if legacy trees return, if `.tmp/` output is
-tracked, or if committed types drift from a pinned regeneration. Generated
-packages provide message types only — they do not implement the handshake,
-session lifecycle, authentication, RPC correlation, idempotency, retries,
-event streams, TCP framing, HTTP transport, or WebSocket transport (see
+No generated language types are committed in this repository: there is no
+`gen/` or `generated/` directory, no `bindings/` or `crates/` tree, no root
+Cargo manifest, and CI fails if any of those return, if `.tmp/` output is
+tracked, or if stray generated-code files appear. Consumers generate types
+with the pinned toolchain (see [`specifications/schema/generation.md`](specifications/schema/generation.md))
+or take them from the implementation repositories. Generated packages
+provide message types only — they do not implement the handshake, session
+lifecycle, authentication, RPC correlation, idempotency, retries, event
+streams, TCP framing, HTTP transport, or WebSocket transport (see
 [`docs/schema-registry.md`](docs/schema-registry.md) §6).
 
 ## Schema distribution
 
-Schemas and generated types ship via crates.io, Git-backed Go modules, and
-GitHub Releases — there is no Buf Schema Registry module and no
+Schema assets are released from this repository via release-please Git tags
+(`vX.Y.Z`) and GitHub Releases; there is no Buf Schema Registry module and no
 `buf push` (see `buf.yaml`: no registry `name:` by design):
 
-- Schema tag consumed: `syntra-core-vX.Y.Z` (and `-rc.N` prereleases) plus nested Go
-  module tag `bindings/go/vX.Y.Z` at the same revision
+- Release tag: `vX.Y.Z` (release-please, document releases)
 - Package defined: `syntra.v1` (`proto/syntra/v1/*.proto`)
 - Consumer contract, pinning, version mapping, and release policy:
   [`docs/schema-registry.md`](docs/schema-registry.md)
 
-Committed generated packages contain **data structures only**. They do not
-implement the handshake, session lifecycle, authentication behavior, RPC
-correlation, idempotency, retries, event streams, TCP framing, HTTP
-transport, or WebSocket transport — that is your implementation's job
-(see [`docs/implementer-guide.md`](docs/implementer-guide.md) and the
-[FAQ](docs/faq.md)). See [Repository boundary](#repository-boundary)
-for what lives where. Pin Rust crate versions or exact Git revisions; Go consumers use the
-default pure-Go module or link the production library with
-`-tags syntranative` from `bindings/go` with
-`CGO_LDFLAGS="-L../../target/debug -lsyntra_ffi"` and
-`LD_LIBRARY_PATH="../../target/debug"` (per CI; see `docs/production-runtime.md` and
-`bindings/go/README.md`; `-tags` alone does not link the library). No browser WASM release asset is currently
-promised. Native distribution requires the matching header and
-cross-language link/runtime tests; a Rust compile check alone is
-insufficient.
+No generated language packages are committed or published here. Consumers
+generate types with the pinned toolchain documented in
+[`specifications/schema/generation.md`](specifications/schema/generation.md)
+or take them from your implementation's pinned tree. Generated
+packages provide message types only — they do not implement the handshake,
+session lifecycle, authentication, RPC correlation, idempotency, retries,
+event streams, TCP framing, HTTP transport, or WebSocket transport (see
+[`docs/schema-registry.md`](docs/schema-registry.md) §6).
 
 ## Conformance model
 
@@ -400,10 +390,8 @@ CHANGELOG.md                   — release history (Keep a Changelog)
 MIGRATION.md                   — historical audit, layout migration, selected SC1 design record
 SESSION-OPEN-QUESTIONS.md      — release-blocking open questions
 rfcs/                          — public RFC process, template, proposals (including Draft RFC 0007)
-proto/syntra/v1/               — sole authoritative Protobuf source (seven files)
+proto/syntra/v1/               — sole authoritative Protobuf source (eight files)
 buf.yaml                         — Buf v2 validation (STANDARD lint, FILE breaking; no registry identity)
-crates/                        — Rust workspace (protocol cores; `syntra-ffi` with test-fixture and production ABIs; committed generation)
-bindings/go/                   — committed Go protobuf types + supported pure-Go core + production native adapter under `-tags syntranative`
 specifications/                — charter, core, transports, security, schema, ADRs
 specifications/schema/         — IDL reference, generation and compatibility docs
 compatibility/v1-initial/      — initial baseline + archived historical descriptors
@@ -429,7 +417,7 @@ of the remaining behavioral RFC questions.
 | Network mappings | `specifications/transports/*.md` (drafts, acceptance pending) |
 | Security requirements | `specifications/security/*.md` (drafts, acceptance pending) |
 | Executable verification | Conformance suite (`conformance/`) |
-| Implementation | Rust reference in `crates/` (**non-normative**; see `docs/production-runtime.md`) |
+| Implementation | Separate projects, out of scope for this repository (**non-normative**) |
 
 In case of conflict, the listed owner prevails. See
 `specifications/architecture.md` Sec. 8 for the full matrix
@@ -438,9 +426,10 @@ In case of conflict, the listed owner prevails. See
 ### Public IDL tooling
 
 See the [schema documentation](specifications/schema/README.md) for pinned
-toolchains and `python3 scripts/validate-schema.py` (committed generation
-into `crates/` + `bindings/go/`, drift-checked; `.tmp/` holds only
-disposable reproducibility output).
+toolchains and `python3 scripts/validate-schema.py` (Buf format, lint,
+build, and breaking checks against the initial baseline; this repository
+commits no generated language types — generation is downstream-owned by the
+implementation repositories).
 [RFC 0001](rfcs/0001-public-idl-layout.md) records the implemented layout
 decision, known FILE/source break, and missing capability/session/error
 bindings. Tests use the immutable archived historical descriptor, without a
@@ -464,6 +453,4 @@ vulnerability reporting for this repository as described in
 
 ## License
 
-Apache-2.0 — see [`LICENSE`](LICENSE). Rust packages inherit
-`license = "Apache-2.0"` and are eligible for crates.io publication through
-release-plz. See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7.
+Apache-2.0 — see [`LICENSE`](LICENSE). See [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 7.

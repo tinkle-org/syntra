@@ -259,9 +259,8 @@ suite are pending. They do not establish runtime conformance:
 
 | Test location | Schema/codec checks | Runtime coverage not established by those checks |
 |---|---|---|
-| [tests/schema/test_schema.py](../../tests/schema/test_schema.py) | All seven files, symbols, field numbers/types/presence, reservations, exact enum names/numbers, local import graph, archived descriptor hash and historical declarations, sole-source regression | Formal RFC acceptance, state validation, raw reserved-tag rejection, security policy enforcement |
-| [tests/schema/go/codec_test.go](../../tests/schema/go/codec_test.go) | Go logical round trips, all body/outcome cases, selected empty success, arbitrary bytes, defaults, unknown numeric enum/raw-oneof behavior | TLS, auth, replay windows, deadline/cancel scheduling, resource isolation, sanitized application reporting |
-| [tests/schema/rust/src/lib.rs](../../tests/schema/rust/src/lib.rs) | Rust equivalents and Go/Rust/historical-layout fixture interchange, non-canonical logical equality, exact payload bytes | Complete protocol/security conformance or guarantees inferred from generated Rust APIs |
+| [tests/schema/test_schema.py](../../tests/schema/test_schema.py) | All eight files, symbols, field numbers/types/presence, reservations, exact enum names/numbers, local import graph, archived descriptor hash and historical declarations, sole-source regression | Formal RFC acceptance, state validation, raw reserved-tag rejection, security policy enforcement |
+| Separate language implementation projects (out of scope for this repository; see [MIGRATION.md §10](../../MIGRATION.md)) | Language codec suites (Go/Rust round trips, body/outcome cases, unknown-field and enum behavior, historical-layout fixture interchange) moved with the implementations | TLS, auth, replay windows, deadline/cancel scheduling, resource isolation, sanitized application reporting |
 
 Trace codec fixtures to `SNTR-SER-900/901`, `SNTR-WIRE-007/900`, `SNTR-ERR-900`, and `SNTR-OPQ-900`; keep runtime assertions distinct. Unknown-enum tests need separate raw-decoder and reporting-policy assertions. Reserved declarations can be checked statically; reserved-tag rejection needs raw-byte runtime tests. A no-body/missing-outcome decode test demonstrates representability, not semantic rejection by a codec.
 

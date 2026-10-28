@@ -118,8 +118,8 @@ enrollment RPC contract require explicit specification/review; new wire
 fields require the schema RFC/generation workflow. Before that contract
 exists, no binding or credential-issuance conformance claim is permitted.
 
-The current Rust authenticator receives credential bytes only; the Go and
-FFI paths similarly require explicit integration design. A completed
+Current implementations receive credential bytes only and require explicit
+integration design for any proposed secure-channel hook. A completed
 NKpsk0 handshake cannot silently authorize an empty `credential` using the
 existing anonymous policy. The proposed hook must distinguish verified
 enrollment context from bootstrap/anonymous attempts while leaving ordinary

@@ -100,11 +100,26 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("deleted", (result.stdout + result.stderr).lower())
 
     def test_all_declarations_preserved_exactly(self):
-        # File relocation is intentional; compare the entire declaration trees,
-        # not just wire types. Detects names, enum values, oneofs, JSON names,
-        # optional presence, nested types, reservations and field numbers.
+        # File relocation is intentional (old tree → proto/syntra/v1); the
+        # historical FILE/source break is recorded (RFC 0001 B9,
+        # MIGRATION.md §8) and recovery_profile.proto is the one documented
+        # post-baseline addition. Compare declaration trees, not file paths:
+        # every historical declaration must survive byte-identical, and every
+        # declaration absent from the historical image must come from the
+        # documented addition. Anything else is an undocumented schema change.
         for kind in ("messageType", "enumType", "service", "extension"):
-            self.assertEqual(symbols(self.old, kind), symbols(self.new, kind))
+            old, new = symbols(self.old, kind), symbols(self.new, kind)
+            for name, item in old.items():
+                self.assertIn(name, new, f"historical declaration removed: {name}")
+                self.assertEqual(item, new[name], f"historical declaration changed: {name}")
+        added_files = set()
+        for file in self.new["file"]:
+            for kind in ("messageType", "enumType", "service", "extension"):
+                old_names = set(symbols(self.old, kind))
+                for item in file.get(kind, []):
+                    if file["package"] + "." + item["name"] not in old_names:
+                        added_files.add(file["name"])
+        self.assertEqual(added_files, {"syntra/v1/recovery_profile.proto"})
 
     def test_historical_and_new_fixture_interpretations_match(self):
         fixtures = json.loads((ROOT / "tests/schema/fixtures/frames.json").read_text())
@@ -135,11 +150,16 @@ class SchemaTests(unittest.TestCase):
         files = {file["name"]: file for file in self.new["file"]}
         self.assertEqual(set(files), {
             f"syntra/v1/{name}.proto" for name in
-            ("envelope", "handshake", "session", "rpc", "events", "capabilities", "errors")
+            ("envelope", "handshake", "session", "rpc", "events", "capabilities",
+             "errors", "recovery_profile")
         })
         for file in files.values():
             self.assertEqual(file["syntax"], "proto3")
             self.assertEqual(file["package"], "syntra.v1")
+            # Historical module metadata, kept frozen: language modules are
+            # no longer committed in this repository (see MIGRATION.md §10).
+            # Changing this option is FILE-breaking against the initial
+            # baseline.
             self.assertEqual(file["options"]["goPackage"],
                              "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1")
             self.assertFalse(file.get("publicDependency"))
@@ -148,7 +168,7 @@ class SchemaTests(unittest.TestCase):
             file = files[f"syntra/v1/{name}.proto"]
             self.assertFalse(file.get("messageType"))
             self.assertFalse(file.get("enumType"))
-        self.assertEqual(len(symbols(self.new, "messageType")), 8)
+        self.assertEqual(len(symbols(self.new, "messageType")), 31)
         self.assertEqual(len(symbols(self.new, "enumType")), 1)
         self.assertFalse(symbols(self.new, "service"))
 
@@ -163,7 +183,11 @@ class SchemaTests(unittest.TestCase):
 
     def test_no_domain_types_or_transport_dependencies(self):
         source = "\n".join(path.read_text() for path in (ROOT / "proto").rglob("*.proto"))
-        self.assertNotRegex(source, r"(?i)\b(chat|conversation|contact|receipt|payment|messenger)\b")
+        self.assertNotRegex(source, r"(?i)\b(chat|conversation|contact|payment|messenger)\b")
+        # "receipt" alone is a messenger-domain term (message receipts), but
+        # the generic English phrase "on receipt" (upon receipt) is legitimate
+        # protocol prose and must not trip the domain guard.
+        self.assertNotRegex(source, r"(?i)(?<!\bon\s)\breceipt\b")
         self.assertNotIn("google.protobuf.Any", source)
         self.assertNotRegex(source, r"(?i)\bhttp_status\b|\bgrpc\b|^service\s")
 

@@ -1,0 +1,68 @@
+# Document-only releases. release-please maintains a release PR that bundles
+# specification/schema/conformance document changes into CHANGELOG.md and,
+# on merge, tags vX.Y.Z and creates the GitHub Release. This repository
+# publishes no language artifacts; language implementations are separate
+# projects, out of scope for this repository (see MIGRATION.md §10).
+# Tags are never moved; historical release tags keep their names.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read  # read-only default; write granted per-job below
+
+jobs:
+  validate:
+    # Schema, boundary, link, and test gates required by
+    # docs/schema-release-checklist.md. The release-please step below only
+    # runs after these complete successfully, so no tag or release is cut
+    # from a revision that fails validation.
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install validator dependencies
+        run: pip install pyyaml
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+          github_token: ${{ github.token }}
+
+      - name: Repository gates
+        run: python3 scripts/validate-repo.py all
+
+      - name: Schema gates
+        run: python3 scripts/validate-schema.py
+
+      - name: Release tooling regression tests (offline)
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Validate GitHub Actions workflows
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
+  release-please:
+    needs: validate
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          token: ${{ github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -35,8 +35,9 @@ with logs from both sides.
   support every transport (`../profiles.yaml`). A single secure profile can
   satisfy the independent-implementation bar below in both role assignments.
 - One secure transport leg (TLS-TCP, HTTPS/H1, HTTPS/H2, or WSS/H1) against a
-  **second, independent implementation** (different codebase; `syntra-rs`
-  vs `syntra-go` counts, two checkouts of the same code do not).
+  **second, independent implementation** (a genuinely different codebase;
+  implementations in two different languages count, two checkouts of the
+  same code do not).
 
 ## Additional transport-independence goal
 

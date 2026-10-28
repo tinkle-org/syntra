@@ -109,8 +109,9 @@ coverage, not evidence of implementation or security testing.
 ## Scope
 
 In scope: wire schemas, framing, handshake, RPC, errors, streams,
-transport profiles, conformance suite, and the Rust reference
-implementation (when present).
+transport profiles, and the conformance suite. This repository publishes
+specifications and schemas only; language implementations are separate
+projects with their own security processes.
 
 Out of scope: application payload semantics, credential formats, host
 authorization policy, and third-party deployments — though Syntra

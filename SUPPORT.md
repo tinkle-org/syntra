@@ -29,9 +29,10 @@ reporting for this repository are the authoritative channels.
   only as historical provenance and an archived descriptor in
   [`compatibility/v1-initial`](compatibility/v1-initial/README.md); the
   FILE/source migration is a known breaking difference.
-- Draft specifications, transport profiles, conformance suite, and Rust
-  reference implementation — support scope for each is stated in its
-  README and `CHANGELOG.md`.
+- Draft specifications, transport profiles, and the conformance suite —
+  support scope for each is stated in its README and `CHANGELOG.md`.
+  Language implementations are separate projects with their own support
+  channels.
 
 ## SC1 design discussion
 

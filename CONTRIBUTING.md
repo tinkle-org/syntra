@@ -43,16 +43,13 @@ Related: [`GOVERNANCE.md`](GOVERNANCE.md) (who approves what),
   changes go under `specifications/`; conformance changes go under
   `conformance/`.
 - **Docs and examples**: welcome; must stay generic per Sec. 1.
-- **Generated language types**: committed under `crates/` (Rust prost
-  output) and `bindings/go/` (Go protobuf output, incl. `*.pb.go`) — no
-  `gen/`, `generated/`, or `bindings/` roots outside `bindings/go/`, no
-  tracked `.tmp/` output. Regenerate with the pinned template and commit
-  the result in the same PR (`scripts/validate-schema.py --drift-only`
-  must stay green; the repository-boundary check,
-  `scripts/validate-repo.py boundary`, fails on legacy trees, tracked
-  `.tmp/`, or drift). Consumers use the committed tree or the GitHub
-  Release assets (see `docs/schema-registry.md`); there is no registry
-  publication.
+- **Generated language types**: not committed in this repository.
+  Language implementations are separate projects that own their generated
+  output, generated with the pinned template
+  (`specifications/schema/generation.md`). This repository's negative
+  boundaries still apply: no `gen/`, `generated/`, `crates/`, `bindings/`,
+  or `bindings/go/` roots, and no tracked `.tmp/` output (CI boundary
+  check fails on any of these).
 
 ## 3. Proposing a change
 
@@ -104,14 +101,11 @@ Before requesting review:
       the user-directed layout decision and separate, known historical
       FILE/source break. Historical comparisons read the hash-verified
       `compatibility/v1-initial/historical.json` archive, without a Git
-      checkout or duplicate schema tree. Regenerate committed types in the
-       same PR (`--drift-only` must pass); `cargo test` (`--workspace`
-       plus `-p syntra-ffi --features test-fixture`, `-p syntra-ffi
-       --features production`, and `build_contract.py`), `go test`
-       (default tags plus `-tags syntranative` against the production
-       library), and WASM checks (non-FFI success plus expected
-       `syntra-ffi does not support WASM` failure; no browser WASM
-       archive) run in CI (see `repo-validation.yml`).
+      checkout or duplicate schema tree. This repository validates
+      specifications, schemas, and conformance definitions only:
+      `python3 scripts/validate-repo.py all` and `python3
+      scripts/validate-schema.py` are the gates; implementation tests are
+      out of scope for this repository (see `MIGRATION.md` §10).
 - [ ] Markdown uses BCP 14 keywords correctly (capitalized only for
       normative force).
 - [ ] No private dependency or domain-specific term introduced
@@ -121,15 +115,16 @@ Before requesting review:
 - [ ] Tests or fixtures added/updated; negative tests included for
       failures, timeouts, cancellation, oversized frames, unknown
       fields/messages, unauthenticated access.
-- [ ] No `unsafe` (Rust, when present) without documented, reviewed
-      justification; no panics on untrusted input; bounds checked.
+- [ ] No implementation code in this repository; no panics on untrusted
+      input in any implementation is a bar owned by the separate language
+      implementation projects; bounds checked in schemas and conformance
+      fixtures.
 - [ ] `CHANGELOG.md` updated under `Unreleased` for user-visible changes.
 
 Schema/codec commands and pins are in `specifications/schema/generation.md`;
 `proto/syntra/v1` is the sole source of truth; the old schema tree is removed.
 The runtime conformance harness is still forthcoming. Never report tests as passed unless executed;
 paste command + result summary in the PR.
-
 ## 6. Sign-off (DCO)
 
 All commits REQUIRE a `Signed-off-by` trailer to certify the Developer
@@ -150,8 +145,9 @@ follows this guide.
   client/server obligations separated, diagrams in fenced `text` blocks.
 - Protobuf: `proto3`, `package syntra.v1`, explicit field numbers,
   `reserved` preserved, comments starting with the field's contract.
-- Rust (when present): `cargo fmt`, `cargo clippy -D warnings`, minimal
-  dependencies, no private registries.
+- Repository tooling (Python/Shell): minimal dependencies, standard
+  library preferred, no private registries. Language implementation style
+  bars are owned by the separate implementation projects.
 
 ## 8. What not to do
 
