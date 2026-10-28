@@ -32,11 +32,20 @@ approval or implementation/conformance claim.
 | Proposed ID family | Defining proposal | Concern | Status |
 |---|---|---|---|
 | `SNTR-SC-001`–`SNTR-SC-015` | [secure-channel.md](secure-channel.md) | Carrier-independent NK/NKpsk0 channel, authenticated context, fresh keys/confirmation, bounded records/lifecycle and claim limits | Proposal only |
-| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Proposal only |
+| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Proposal only; partial experimental integration exists |
 
-[Carrier candidates](../transports/noise-bindings.md) reference these families
-without registering new profiles. Their [acceptance plan](../../conformance/plans/secure-channel.md)
-contains planned/manual traceability, not executable test IDs or pass results.
+[Carrier mappings](../transports/noise-bindings.md) specify concrete experimental
+draft-1 TCP/WS/WSS context and bytes without registering new profiles. Their
+[acceptance plan](../../conformance/plans/secure-channel.md) contains planned/manual
+traceability, not executable test IDs or pass results. Separately, the
+[implementation evidence ledger](../../docs/sc1-implementation.md) records scoped
+local unit/race/native-core and same-implementation integration execution,
+authentication/async-writer behavior and numeric operational limits. Those
+results do not imply coverage of every SC/DAUTH obligation, RFC acceptance or
+independent interoperability/security review. Enrollment issuance, protected
+storage/transactions and rotation flows remain absent; UDP remains deferred
+and HTTP/HTTPS request-response is excluded from SC1 scope. No formal SC1
+`CONF-*` cases or profiles are registered.
 
 ## Uniqueness and ownership rules
 

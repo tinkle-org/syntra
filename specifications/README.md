@@ -11,15 +11,17 @@ All core, transport, and security specifications are **drafts pending
 maintainer approval via RFC**. Release-blocking open questions are tracked
 in `SESSION-OPEN-QUESTIONS.md` and the RFC set.
 
-## Selected secure-channel proposal
+## Secure-channel proposal and experimental implementation
 
 [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) proposes
 Syntra Secure Channel v1 (SC1): `Noise_NK_25519_ChaChaPoly_SHA256` for
 authorized bootstrap enrollment and `Noise_NKpsk0_25519_ChaChaPoly_SHA256`
 for returning devices sharing a persistent random 32-byte AK. Every new
-channel derives fresh traffic keys. This selected direction is not accepted
-production policy, shipping implementation or a conformance claim; current
-TLS requirements and existing profile identifiers remain unchanged.
+channel derives fresh traffic keys. A bounded experimental Go SC1 draft-1
+implementation is delivered over TCP/WS/WSS in both modes, with high-level
+connection orchestration and channel-aware host policy. That evidence does
+not accept the RFC or Proposed ADR-011, register conformance profiles or
+change current production TLS requirements and baseline profile identifiers.
 
 Read the [shared channel](security/secure-channel.md),
 [device authorization](security/device-authorization.md),
@@ -28,7 +30,28 @@ Read the [shared channel](security/secure-channel.md),
 [acceptance plan](../conformance/plans/secure-channel.md) together. The core
 remains independent of sockets and carrier libraries; TCP/UDP/WebSocket are
 separate bindings, with UDP still deferred until its complete binding is
-accepted. Persistent device authorization does not resume logical sessions.
+accepted. HTTP/HTTPS request-response is excluded from this implementation;
+WSS retains verified outer TLS ≥1.3 without automatic downgrade. Persistent
+device authorization does not resume logical sessions.
+
+The informative [implementation ledger](../docs/sc1-implementation.md#implementation-status)
+records the exact draft-1 contract. Its [authentication boundary](../docs/sc1-implementation.md#authentication-boundary)
+requires host policy to independently verify root identity, current enrollment
+and admission before ready and enforce the intended returning-mode same-principal
+binding; the library does not compare principals automatically. Nil method authorization
+denies effects. [Operational limits](../docs/sc1-implementation.md#operational-limits)
+document admission, transport ownership and the separate callback/writer/
+connection shutdown budgets.
+
+[Verification evidence](../docs/sc1-implementation.md#verification-evidence)
+distinguishes local high-level connection tests from six-group same-implementation
+Docker adapter/core tests, native-core checks and formal conformance. Neither
+test layer establishes independent SC1 wire interoperability. See
+[performance measurements](../docs/perf-tradeoffs.md) for report-only in-memory
+samples, and [remaining work](../docs/sc1-implementation.md#remaining-work) for
+independent review/vectors/interoperability, complete provisioning/storage/
+rotation and native ABI completion-time/credential-release gaps. No enrollment
+RPC or complete credential-lifecycle workflow is supplied.
 
 ## Reading order
 
@@ -104,6 +127,7 @@ mechanics live in [`schema/`](schema/README.md); design rationale in
 | Proposed SC1 security | `security/secure-channel.md`, `device-authorization.md` | `SNTR-SC-*`, `SNTR-DAUTH-*` (Draft RFC 0007 only) |
 | Proposed SC1 mappings | `transports/noise-bindings.md` | informative candidates; not registered profiles |
 | Proposed decision | `decisions/ADR-011-noise-device-authorization.md` | Proposed, not a supersession of ADR-008 yet |
+| Experimental SC1 evidence | `../docs/sc1-implementation.md`, `../docs/perf-tradeoffs.md` | informative implementation contract/results; no new normative IDs or conformance verdicts |
 
 All specification examples use neutral applications: `echo`, generic
 key/value, generic event subscription. No domain-specific concepts appear.

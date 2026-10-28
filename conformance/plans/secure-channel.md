@@ -1,6 +1,6 @@
 # Secure channel and device authorization acceptance plan
 
-- Status: manual / planned; Draft RFC 0007 proposal, not executable coverage.
+- Status: manual acceptance plan for Draft RFC 0007; executed implementation evidence mapped below, no registered SC1 conformance cases.
 - Proposal: `rfcs/0007-secure-channel-device-authorization.md`.
 - Requirement owners: `specifications/security/secure-channel.md`
   (`SNTR-SC-001` through `SNTR-SC-015`) and
@@ -8,15 +8,16 @@
   (`SNTR-DAUTH-001` through `SNTR-DAUTH-010`).
 - Informative carrier mapping: `specifications/transports/noise-bindings.md`;
   it contributes no additional requirement IDs.
-- Evidence: no automated case or executed conformance evidence. Independent
-  Rust–Go interoperability is planned, not executed.
+- Evidence: executed local and same-implementation integration checks are retained
+  in [the implementation ledger](../../docs/sc1-implementation.md). Independent
+  Rust–Go interoperability and formal SC1 conformance remain unverified.
 
 ## 1. Scope, authority, and prerequisites
 
 This document records proposed acceptance observations for RFC review. All
 33 `PLAN-*` references below are local planning references, not registered
 `CONF-*` tests, profiles, capabilities, or results. Their `manual` dispositions
-in `../manifest/requirements.yaml` identify work awaiting review and execution;
+in `../manifest/requirements.yaml` identify formal acceptance work awaiting review and execution;
 they do not assert that a manual check has passed. The existing schema permits
 `automation_status: manual`, empty `test_ids`, and explanatory `notes`.
 
@@ -24,23 +25,48 @@ Draft RFC 0007 is not shipping authority. This plan neither authorizes productio
 Noise nor establishes secure-channel, device-authorization, or UDP conformance.
 The existing profiles and claim rules continue to define their own boundaries.
 
-Before converting any planned case to an executable manifest, record the accepted
-RFC revision and resolve these blockers in the owning documents:
+### Implementation evidence versus acceptance
+
+The following observations have been executed for experimental draft-1. The
+ledger records environment, scope and limitations. This mapping is not a
+per-`CONF-*` result declaration and does not turn `PLAN-*` into test IDs.
+
+| Plan references | Executed implementation evidence | Still required for complete acceptance |
+|---|---|---|
+| `PLAN-SC-001`–`PLAN-SC-005` | Both suites, canonical context, empty payloads, key/context rejection, fresh ephemerals and injected entropy failure | Independent vectors and dependency/composition review |
+| `PLAN-SC-006`, `PLAN-DAUTH-005`, `PLAN-DAUTH-010` | Fresh-client-record gate, explicit channel policy, deny-by-default methods, hello/ready and no implicit empty-credential authorization | Host root-identity/current-enrollment policy validation; the bridge does not enforce principal equality |
+| `PLAN-SC-007`–`PLAN-SC-010`, `PLAN-TCP-001`, `PLAN-WS-001` | Record/frame bounds, split/coalesced reconstruction, invalid records, ordered failure and key-use/lifetime tests | Independent record/cross-carrier exchange and remaining security cases |
+| `PLAN-SC-011`, `PLAN-SC-012`, `PLAN-TCP-002`, `PLAN-TCP-003` | Absolute clocks, admission/caps, stalled writer progress, nonce-safe cancellation, bounded drain and shutdown regressions | Aggregate deployment budgets and assumptions for cancellation-compliant I/O/store callbacks |
+| `PLAN-SC-013`, `PLAN-SC-014`, `PLAN-DAUTH-009` | Explicit mode/carrier, no fallback, fresh sessions after restart and faults | Accepted renewal/recovery semantics; no automatic replay or complete recovery service |
+| `PLAN-SC-015` | Measured benchmarks and scoped verification results documented without superiority/audit/conformance claims | Independent review and normal acceptance/claim process |
+| `PLAN-DAUTH-001`, `PLAN-DAUTH-003`, `PLAN-DAUTH-004`, `PLAN-DAUTH-008` | Nonzero key/context validation, preprovisioned lookup, generic denial and no raw-key formatting | Issuance entropy/collision discipline, protected storage, store timing/privacy and deployment rate limits |
+| `PLAN-DAUTH-006` | Local expiry, idle revocation and principal-disconnect regressions | Deployment propagation guarantee; no container revocation case |
+| `PLAN-DAUTH-002`, `PLAN-DAUTH-007` | Only preprovisioned bootstrap/returning fixtures | Enrollment transaction, protected delivery/ack recovery and complete rotation workflow |
+| `PLAN-UDP-*`, `PLAN-INTEROP-001` | Not executed | Complete UDP design and independent both-role interoperability respectively |
+
+Before converting a planned case to a formal executable manifest, record the
+accepted RFC revision. The implementation resolves several former design TBDs:
 
 1. Exact suite names, authenticated context serialization (field order, lengths,
    encodings, domains, and versioning), trusted server-key provisioning, and
    handshake/carrier selection. Context equality means exact bytes, not equality
-   after parsing or normalization. No context bytes are invented here.
+   after parsing or normalization. The exact experimental bytes now exist in the
+   [carrier contract](../../specifications/transports/noise-bindings.md); their
+   acceptance and independent validation remain open.
 2. Carrier record headers, lengths, segmentation/reassembly rules, error/close
    mapping, and which bounds count headers, ciphertext, tags, and plaintext.
-   TCP, WS, and UDP proposals remain informative until their mappings are accepted.
+   TCP/WS/WSS draft-1 mappings are implemented and documented; UDP remains deferred.
+   Existing baseline profiles are not redefined by experimental execution.
 3. Fresh client traffic confirmation, the channel-context host authentication API,
    enrollment extension/RPC approval, credential lifecycle policy, and ordering
-   relative to Syntra readiness and protected method dispatch. No new
+   relative to Syntra readiness and protected method dispatch. The channel hook
+   and fresh-record sequencing are implemented; enrollment lifecycle remains
+   incomplete. No new
    `ServerReady` field or enrollment RPC is allocated by this plan.
 4. Concrete timeout, queue, lookup, aggregate-memory, key-lifetime, revocation,
    and rotation-overlap limits, with deterministic clocks/fault injection and
-   observable accounting. Unspecified limits remain blockers, not test defaults.
+   observable accounting. Concrete adapter/server/writer limits are recorded in
+   the ledger. Rotation overlap and deployment-wide guarantees remain open.
 5. UDP counter encoding/window rules, authenticated path validation and
    anti-amplification accounting, and any reliability, retransmission, or
    fragmentation contract. Those features are unsupported before an accepted RFC.
@@ -67,12 +93,11 @@ need independently checked provenance and complete inputs after context bytes ar
 fixed. This plan supplies no fabricated golden ciphertext. Statistical samples
 alone do not prove entropy quality or the absence of timing oracles.
 
-The empty-payload raw NK handshake total is **96 bytes**: two 48-byte messages
-(32-byte ephemeral public key plus 16-byte authentication tag each). A returning
-NKpsk0 exchange is **104 bytes only when adding one 8-byte lookup handle** to its
-96 raw handshake bytes. These totals exclude epochs, suite selectors, lengths,
-carrier headers, Syntra messages, and traffic confirmation; they are not complete
-connection-establishment byte counts.
+The empty-payload Noise bodies total **96 bytes** in either mode. Experimental
+draft-1 additionally carries the full `41 + S`-byte context, where scope byte
+length `S` is 1–255: **138–392 bytes before carrier framing**, or **142–396 bytes
+over TCP** including the two length prefixes. These exclude carrier establishment,
+Syntra hello/ready and traffic confirmation; they are not total readiness costs.
 
 ## 3. Secure-channel requirement cases (all manual / planned)
 
@@ -111,7 +136,7 @@ Maps `SNTR-SC-003`.
   specified by that contract.
 - Negatives: alter one byte of each bound component, swap roles/carriers, omit
   or reorder fields, or use an ambiguously encoded length; authentication fails
-  without dispatch. Exact bytes and field inventory remain blockers until fixed;
+   without dispatch. Use the concrete draft-1 field inventory for experimental checks;
   semantic equivalence is not a substitute for transcript binding.
 
 ### PLAN-SC-004 — empty handshake payloads and no early effects
@@ -151,7 +176,8 @@ Maps `SNTR-SC-006`.
 - Negatives: replay the first NKpsk0 flight, stop after the host reply, replay
   old transport ciphertext, inject a pre-ready request, or deny host policy.
   None grants protected access. Handshake completion alone is insufficient;
-  exact confirmation/API sequencing remains a blocker where unspecified.
+   verify the documented confirmation/API sequencing rather than assuming that
+   handshake completion or the asynchronous validity checker performs host policy.
 - Initiator negatives: delay or omit M2, then corrupt its tag/body or use an
   inconsistent authenticated context. Before successful M2 verification,
   assert zero emitted `hello` or credential bytes, not merely zero host handler
@@ -401,7 +427,7 @@ they add no requirement IDs and establish no transport profile.
 
 Maps `SNTR-SC-007`, `SNTR-SC-008`, `SNTR-SC-011`.
 
-- Success: after header formats are fixed, split every record prefix byte,
+- Success: using the concrete draft-1 header formats, split every record prefix byte,
   encrypted body, and tag across reads (including one-byte reads); coalesce
   multiple records into a read and several logical frames into a stream. Use
   accepted segmentation for a frame larger than one Noise plaintext record,
@@ -524,4 +550,5 @@ Maps `SNTR-SC-001` through `SNTR-SC-014` and `SNTR-DAUTH-001` through
 After RFC acceptance and blocker resolution, register reviewed executable cases
 and any separately approved profiles through the normal conformance process.
 Only actual executions can populate verdicts and evidence references. Until then,
-all 25 requirement rows retain empty `test_ids` and manual/planned dispositions.
+all 25 requirement rows retain empty `test_ids` and manual acceptance dispositions,
+with scoped implementation evidence recorded in their notes and the ledger.

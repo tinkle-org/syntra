@@ -15,13 +15,16 @@ proceed on failing cases.
 The numbered steps implement the current baseline: its TLS requirements
 and all existing executable conformance profiles remain unchanged.
 [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-records the selected transport-independent SC1 proposal, not Accepted
-behavior or an available implementation. Reading draft design material
-does not add SC1 coverage to the suite used in step 10.
+records the selected transport-independent SC1 proposal. A bounded Go draft-1
+implementation is delivered over TCP/WS/WSS, with high-level connection
+orchestration and channel-aware host policy. This is experimental behavior,
+not Accepted policy. Local tests do not add formal SC1 conformance verdicts
+to the suite used in step 10. Read the self-contained
+[implementation contract](sc1-implementation.md#implementation-status).
 
-For SC1 design work, keep three separate gates: carrier establishment,
+For SC1 integration, keep three separate gates: carrier establishment,
 secure-channel authentication/confirmation, then Syntra hello/ready and
-host authorization. Initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment
+host authorization. Bootstrap `Noise_NK_25519_ChaChaPoly_SHA256`
 and returning `Noise_NKpsk0_25519_ChaChaPoly_SHA256` use empty M1/M2
 payloads, never 0-RTT application data or credentials. Protected actions
 wait for verification of the first authenticated client transport record;
@@ -36,14 +39,23 @@ human accounts. Every channel has fresh ephemeral material and directional
 traffic keys; returning-device authentication adds no session resumption
 or automatic RPC retry.
 
-Use the proposed [secure-channel state machine](../specifications/security/secure-channel.md)
-across [TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md)
-without putting socket dialing or WS/gRPC dependencies into the core.
-Existing HTTPS/WSS TLS compatibility remains, including browser `wss://`
-outer TLS. Noise-in-WS is a distinct wire, not a reinterpretation of
-current WS/WSS profile IDs. [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
-records rationale; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
-is proposed verification, not a passing executable profile.
+Delivered draft-1 binds TCP messages with u16BE lengths, and WS/WSS binary
+messages without that prefix. Both protect an inner u32BE-length-prefixed
+frame stream. The exact domain/subprotocol is `syntra.sc1.draft1`; ciphertext
+is at most 65,535 bytes and serialized frames at most 1 MiB. UDP remains
+deferred and HTTP/HTTPS request-response is excluded from this implementation.
+The core remains independent of socket dialing and carrier libraries. WSS
+keeps verified outer TLS ≥1.3 and an independent Noise pin, without automatic
+downgrade. These bytes do not redefine baseline WS/WSS profiles or production
+TLS policy. [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+remains Proposed; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
+distinguishes planned acceptance from implementation tests.
+
+Only authenticated out-of-band provisioning is supported. Enrollment RPCs,
+complete issuance/delivery/ack recovery, secure storage and rotation are open
+integration work. Independent review, independent vectors/wire interoperability
+and native ABI completion-time/credential-release gaps remain
+[unresolved](sc1-implementation.md#remaining-work).
 
 ## 1. Obtain the schema from Git
 
@@ -122,8 +134,9 @@ capability: any resumption attempt without one MUST be rejected
 
 ## 6. Implement the authentication adapter
 
-The core hands you opaque credential bytes and a policy hook; everything
-else is yours:
+The ordinary authentication boundary hands you opaque credential bytes and
+a policy hook. The experimental SC1 boundary additionally provides confirmed
+channel evidence through `ChannelIdentityProvider` and `ChannelPolicy`:
 
 - Present credentials only in `ClientHello.credential` (frame-carrying
   profiles) or the profile-defined binding (`Authorization: Syntra
@@ -136,6 +149,15 @@ else is yours:
   `UNAUTHENTICATED`/`PERMISSION_DENIED` and generic text.
 - Enforce expiry/revocation; re-authentication on the same connection is
   forbidden by default (new handshake instead).
+
+In the delivered SC1 host, `ChannelPolicy` replaces ordinary credential policy
+and must independently verify the root credential, current enrollment and
+admission before ready. For returning mode it must enforce the intended
+same-principal binding; the library does not automatically compare the callback's principal with the
+channel principal. An empty credential is passed explicitly, never implicitly
+authorized. Nil method `Authorize` denies every method. The asynchronous
+confirmed-peer check (1s ticker, 1s lookup context) does not replace admission
+checking. See [authentication boundary](sc1-implementation.md#authentication-boundary).
 
 See `docs/server-implementation.md` for the host side and
 `docs/client-implementation.md` for the initiator side. Test with
@@ -176,6 +198,31 @@ See `docs/transport-selection.md` for choosing, and the profile spec for
 binding details. Test with the matching `CONF-TCP/TLS/HTTP/HTTPS/WS/WSS-*`
 manifests plus the shared `test-vectors/` fixtures.
 
+For experimental SC1, high-level `DialTCP`/`DialWebSocket` return after validated
+core ready within a 10s total establishment budget, shortened by the caller.
+Successful client lifetime is independent of the dial context. `Connect` owns
+an established transport even on failure; core `Run`/`Serve` own terminal
+transport closure. The server owns raw half-handshake sockets and listeners;
+the application also closes its HTTP server and the connection server for WS.
+
+Document separate resource budgets: adapter handshake/write/frame/record
+timeouts default/max at 5s; lifetime at most 24h and 2^32 records/direction;
+32 pending operations/direction (maximum 1,024). Server admission defaults to
+128 connections/16 handshakes (maxima 4,096/256), retaining handshake slots
+through ready write. These are concurrent admission limits, not rate limits.
+
+Post-ready host output has one owned FIFO snapshot writer, with queued-plus-active
+limits of 256 frames/8 MiB and a 5s default per-send timeout. Saturation is
+terminal; dispatch/cancel/deadline work continues during socket stalls.
+Method authorization returning `UNAUTHENTICATED` attempts actual-send denial
+drain for up to 200ms, with no delivery guarantee. Enrollment-watchdog failure
+and principal disconnect close directly. The core's shared 1s callback grace,
+the writer's 1s join **after
+transport Close**, and the high-level default/max 5s server shutdown budget
+are distinct. Uncooperative callbacks cannot be killed; `Lookup`, I/O and
+`Close` must honor cancellation, and low-level close may otherwise remain
+blocked. See [operational limits](sc1-implementation.md#operational-limits).
+
 ## 9. Implement optional events (only if claimed)
 
 Events are never required for Core conformance. If claimed: subscriptions
@@ -199,3 +246,12 @@ Core v1 and WSS/H1 v1"). `PASS` MUST NOT be reported unless executed with
 logs. Green on your implementation plus interop proof against a second
 implementation (or fixture verification during bootstrap) is the
 `GOVERNANCE.md` Sec. 5 stability bar.
+
+The delivered SC1 [verification record](sc1-implementation.md#verification-evidence)
+covers local connection orchestration tests and same-implementation Docker
+adapter/core RPC tests across TCP/WS/WSS × bootstrap/returning. Containers do
+not exercise the high-level connection helpers. Native-core tests still use
+the same Go SC1 carriers; neither level establishes independent wire
+interoperability or a formal `CONF-*` verdict. In-memory benchmark execution
+is report-only, full RPCs are not zero-allocation, and measurements do not
+establish deployment performance; see [performance evidence](perf-tradeoffs.md).

@@ -6,13 +6,17 @@
 - Scope: Channel establishment and record security, independent of carrier I/O
 - Proposed requirements: `SNTR-SC-001`–`SNTR-SC-015`
 
-This is the selected design direction, not shipping support or a security
-certification. BCP 14 keywords below describe proposed obligations only.
+Experimental draft-1 channel and TCP/WS/WSS implementations have been exercised;
+their exact scope, tests and limitations are recorded in the
+[implementation evidence ledger](../../docs/sc1-implementation.md). This is not
+RFC acceptance, an accepted production profile or a security certification.
+BCP 14 keywords below describe proposed obligations only.
 Existing [transport-security.md](transport-security.md) and ADR-008 remain
 the baseline until the RFC is accepted. The [device authorization draft](device-authorization.md)
 owns enrollment/lifecycle; the [carrier draft](../transports/noise-bindings.md)
 owns byte mappings. [Planned acceptance cases](../../conformance/plans/secure-channel.md)
-are not executable conformance results.
+are not executable conformance results. HTTP/HTTPS request-response is excluded
+from SC1 draft-1, and UDP remains deferred.
 
 ## 1. Channel construction
 
@@ -34,8 +38,12 @@ through this profile. Application ciphertext remains opaque above Syntra.
 through the standard Noise prologue: selected bootstrap/returning mode,
 carrier binding, intended endpoint scope/server identity, and, for returning
 devices, authorization handle and epoch. The AK MUST enter through the Noise
-PSK input, never the prologue. Exact unambiguous byte encodings and how epoch
-and server-key selection reach both peers are RFC freeze blockers. A local
+PSK input, never the prologue. The exact implemented experimental encoding is
+defined in the [draft-1 carrier contract](../transports/noise-bindings.md):
+domain `syntra.sc1.draft1`, explicit mode/carrier/server-key selector, epoch,
+handle and length-delimited exact UTF-8 scope. The context prefixes M1 in clear
+and is supplied unchanged as the Noise prologue. Acceptance of that concrete
+encoding is pending; its design is not a TBD. A local
 configuration mismatch MUST fail rather than invoke another mode.
 
 **SNTR-SC-004** — Both Noise handshake payloads MUST be empty. Both roles
@@ -62,6 +70,17 @@ the enrollment's current principal/scope and the Syntra handshake before
 `ready`; the client MUST wait for `ready` before protected RPCs. PSK possession
 does not bypass method authorization. For bootstrap, application credentials
 or an explicitly authorized provisioning flow establish enrollment authority.
+
+The implemented bridge exposes `ChannelIdentity` (mode, carrier, scope, handle,
+epoch and principal) through a provider that separately reports fresh confirmation.
+Only confirmed evidence reaches `ChannelPolicy`, which replaces
+ordinary `Policy` and also receives opaque hello credentials, including empty
+credentials. It requires fresh confirmed client transport and a nonempty returned
+principal. It does not automatically compare the two principal values,
+independently establish trusted root identity, or synchronously check enrollment
+before `ready`; those remain explicit host-policy duties under this proposed
+ordering requirement. Empty credentials never authorize automatically, and a
+nil method `Authorize` hook denies access.
 
 ```text
 NO_CHANNEL -> HANDSHAKING -> CHANNEL_ESTABLISHED -> Syntra CONNECTED
@@ -99,7 +118,9 @@ a nonce under the same key, copy cipher state to another channel, or migrate
 it between carriers. Each new channel MUST start with a fresh handshake.
 Nonce exhaustion MUST terminate the channel. The proposed stricter SC1
 ceiling is renewal before 24 hours or `2^32` records in either direction;
-these numerical policy choices require acceptance and are not Noise limits.
+draft-1 implements these limits with stricter settings permitted. The entry
+clock includes establishment and lifetime expiry also applies while idle.
+These policy choices require acceptance and are not Noise limits.
 Renewal is a new channel, not a custom in-place rekey/resume protocol.
 
 **SNTR-SC-010** — Both roles MUST fail closed on handshake, context or
@@ -116,9 +137,15 @@ record/frame assembly, write-stall and close times; aggregate connections,
 unauthenticated handshakes/crypto workers, queued bytes/count and reassembly
 memory MUST also be bounded. Trickle input MUST NOT reset absolute deadlines.
 Deployments MUST document budgets and apply backpressure or reject admission,
-not retain unbounded work. Numeric interoperable defaults are acceptance
-blockers. The existing Syntra handshake deadline begins after channel
-establishment; a separate total-attempt budget bounds all phases.
+not retain unbounded work. Draft-1's concrete adapter defaults are 5 seconds
+each for handshake, record/frame assembly and write, shortened only to positive
+values, and 32 pending operations per direction including active work (maximum
+1,024, immediate busy refusal beyond admission). Total dial defaults to 10
+seconds across socket, Upgrade, Noise and hello/ready, or the shorter caller
+deadline; core hello remains separately bounded to 5 seconds. The
+[operational evidence ledger](../../docs/sc1-implementation.md) defines server,
+writer and shutdown budgets. These implemented settings await acceptance and
+are not new core defaults.
 
 ## 4. Failure, close, and reconnect
 
@@ -130,6 +157,18 @@ MUST stop admission, drain only within a close budget, settle pending callers,
 release buffers and terminate owned work. Truncated records/frames MUST NOT
 be dispatched. EOF at a complete boundary MUST NOT be represented as
 authenticated proof of orderly completion or application success.
+
+The implemented host writer owns FIFO output snapshots after readiness, bounded
+to 256 frames / 8 MiB including active output. Saturation terminates with
+`RESOURCE_EXHAUSTED`; the host loop continues dispatch, cancellation and deadline
+processing during stalls. Host write timeout defaults to 5 seconds but accepts
+any positive configured value; this is separate from the adapter's maximum
+5-second write deadline. Method authorization returning `UNAUTHENTICATED`
+attempts actual-send denial drain for up to 200 ms; enrollment-watchdog failure
+and explicit principal disconnect close directly. Writer join is 1 second
+after `Close` returns. Abortive close requires cancellation-compliant
+I/O/store callbacks; it cannot forcibly kill them. These are not the core's
+1-second callback grace or the server's shutdown budget.
 
 **SNTR-SC-013** — Initiators and hosts MUST select the channel mode and
 carrier explicitly. Authentication or lookup failure MUST NOT trigger an
@@ -157,15 +196,21 @@ security review of the complete composition, not just the Noise primitives.
 
 With empty payloads, each selected Noise handshake message is 48 bytes.
 Bootstrap therefore uses 96 Noise bytes. The often cited returning total of
-104 bytes is 96 plus an eight-byte handle, not the complete frozen handshake:
-context fields, carrier framing, retries and confirmation may add bytes.
+104 bytes is 96 plus an eight-byte handle, not the complete draft-1 handshake.
+The [carrier contract](../transports/noise-bindings.md) specifies the complete
+138–392-byte exchange before carrier framing, or 142–396 bytes over TCP.
+Carrier establishment, any new attempts and client confirmation are additional.
 Syntra `hello`/`ready` and enrollment exchanges are additional messages.
 
 One handshake RTT excludes carrier establishment and Syntra readiness.
 Asymmetric-operation counts do not measure CPU, energy or binary footprint.
-No backend/library is selected or certified here. The RFC's wire, lifecycle,
-resource and verification blockers prevent shipping this as a production
-replacement for the current security profiles.
+Concrete draft-1 context/carrier bytes and implemented resource defaults are
+specified, with executed implementation evidence in the ledger. In-memory
+benchmarks do not establish TLS-relative performance. No independent library
+certification or security audit is claimed. Enrollment issuance, durable
+storage/transactions and rotation flows, independent vectors/interoperability,
+security review and RFC acceptance remain open, preventing promotion to a
+production replacement for the current security profiles.
 
 ## References
 

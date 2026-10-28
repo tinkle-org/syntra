@@ -921,156 +921,156 @@ requirements:
     automation_status: manual
     notes: "No private-product/company/infrastructure dependency: attested by review (see independence verification; F-05 tracks the go_package exception)."
 
-  # ---- Draft RFC 0007: proposed secure-channel requirements; manual/planned only ----
+  # ---- Draft RFC 0007: manual formal acceptance; scoped executed implementation evidence in notes ----
   - requirement_id: SNTR-SC-001
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-001"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Both suites exercised; independent vectors/interoperability pending. Scoped execution: docs/sc1-implementation.md; no registered SC1 conformance verdict."
   - requirement_id: SNTR-SC-002
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-002"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-002, PLAN-WS-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-002, PLAN-WS-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Shared channel and TCP/WS/WSS exercised; independent exchange pending. Scoped execution: docs/sc1-implementation.md; no registered SC1 conformance verdict."
   - requirement_id: SNTR-SC-003
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-003"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-003, PLAN-DAUTH-003, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-003, PLAN-DAUTH-003, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Exact draft-1 context and mismatch tests implemented; acceptance/independent verification pending, UDP deferred. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-004
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-004"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Empty-payload and fresh-record/early-effect regressions exercised. Scoped execution: docs/sc1-implementation.md; no registered SC1 conformance verdict."
   - requirement_id: SNTR-SC-005
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-005"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Fresh ephemeral and injected entropy-failure checks exercised; not independent RNG assurance. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-006
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-006"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Fresh-record confirmation and hello/ready exercised; root identity/current enrollment before ready remain explicit host policy. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-007
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-007"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-007, PLAN-TCP-001, PLAN-WS-001, PLAN-UDP-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-007, PLAN-TCP-001, PLAN-WS-001, PLAN-UDP-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Standard ordered records and size/failure tests exercised; UDP deferred and independent exchange pending. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-008
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-008"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-008, PLAN-TCP-001, PLAN-TCP-002, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-008, PLAN-TCP-001, PLAN-TCP-002, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Split/coalesced and bounded ordered reassembly exercised, including near-1MiB RPC payloads; UDP deferred. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-009
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-009"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-009, PLAN-TCP-003, PLAN-UDP-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-009, PLAN-TCP-003, PLAN-UDP-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Ordered record counters, lifetime and fresh-session tests exercised; no in-place rekey/resumption. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-010
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-010"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-010, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-010, PLAN-UDP-001, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Invalid ordered records, keys and context fail closed in local tests; no constant-time store guarantee or UDP result. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-011
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-011"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-011, PLAN-TCP-001, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-001, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-011, PLAN-TCP-001, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-001, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Concrete adapter/server/writer limits exercised; cross-server budgets/rate limits remain host-owned. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-012
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-012"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-012, PLAN-TCP-002, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-012, PLAN-TCP-002, PLAN-TCP-003, PLAN-WS-001, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. FIFO ownership, stalled-write progress, cancellation/drain/close regressions exercised; bounds require cancellation-compliant I/O/store callbacks. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-013
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-013"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-013, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-013, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Explicit mode/carrier/subprotocol and no-fallback paths exercised; baseline profile IDs unchanged. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-014
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-014"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-014, PLAN-DAUTH-009, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-SC-014, PLAN-DAUTH-009, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Fresh sessions after faults/restart exercised; no automatic replay, subscription restoration or complete recovery service. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-SC-015
     specification: specifications/security/secure-channel.md
     section: "Proposed requirement SNTR-SC-015"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-SC-015] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plan [PLAN-SC-015] in conformance/plans/secure-channel.md. Scoped execution and measured in-memory results recorded in docs/sc1-implementation.md and docs/perf-tradeoffs.md; no superiority, independent audit, production approval or complete conformance claim."
 
-  # ---- Draft RFC 0007: proposed device-authorization requirements; manual/planned only ----
+  # ---- Draft RFC 0007: device authorization; manual formal acceptance, implementation evidence scoped per row ----
   - requirement_id: SNTR-DAUTH-001
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-001"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-001, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Preprovisioned nonzero AK validation and crypto-random generation/failure tests exercised; uniqueness and issuance remain provisioning duties. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-002
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-002"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Fixtures use out-of-band provisioning only; no enrollment RPC, durable issuance/delivery/ack transaction or recovery implementation. Scope: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-003
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-003"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-003, PLAN-SC-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-003, PLAN-SC-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Exact handle/epoch/scope encoding and mismatch tests exercised; independent collision-checked handle issuance and privacy remain host responsibilities. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-004
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-004"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-004, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Read-only host lookup, redacted key formatting and scratch cleanup exercised; secure-storage backend and complete secret-erasure assurance not supplied. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-005
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-005"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-005, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Confirmed channel policy and deny-by-default methods exercised; current enrollment/root identity and intended principal agreement before ready require explicit host policy. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-006
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-006"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-006, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Local expiry/idle-revocation/principal-disconnect tests exercised; no container revocation case or exact one-second propagation SLA. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-007
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-007"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-007, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-007, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Complete rotation/overlap/ack/crash workflow absent; fresh replacement fixtures do not establish that workflow. Remaining work: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-008
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-008"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-008, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-008, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. Bounded context/admission, generic denial and replayed-M1 confirmation tests exercised; store timing/privacy and rate limits remain host-owned. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-009
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-009"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-009, PLAN-SC-014, PLAN-UDP-002, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-009, PLAN-SC-014, PLAN-UDP-002, PLAN-UDP-003, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. TCP/WS/WSS modes use fresh channel state with explicit carrier binding; no migration/resumption or UDP support. Scoped execution: docs/sc1-implementation.md."
   - requirement_id: SNTR-DAUTH-010
     specification: specifications/security/device-authorization.md
     section: "Proposed requirement SNTR-DAUTH-010"
     test_ids: []
     automation_status: manual
-    notes: "Draft RFC 0007 proposed requirement; planned coverage [PLAN-DAUTH-010, PLAN-INTEROP-001] in conformance/plans/secure-channel.md; no automated case or executed conformance evidence"
+    notes: "Draft RFC 0007; formal plans [PLAN-DAUTH-010, PLAN-INTEROP-001] in conformance/plans/secure-channel.md. ChannelIdentityProvider confirmation and explicit opaque-credential policy exercised; no new Protobuf fields or automatic principal inference. Scoped execution: docs/sc1-implementation.md."

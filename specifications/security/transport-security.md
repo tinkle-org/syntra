@@ -81,12 +81,15 @@ HTTPS and WSS certificate, hostname, rotation and downgrade rules still apply.
 The proposed channel authenticates a provisioned server static key, uses NK
 for authorized bootstrap and NKpsk0 with a per-enrollment shared AK on return,
 then gates Syntra readiness on current principal policy. Its mode and carrier
-would be explicitly selected and authenticated, with fresh ephemeral and
+are explicitly selected and authenticated in experimental draft-1, with fresh ephemeral and
 directional traffic keys on every new channel; no failed TLS connection
 triggers a Noise or plaintext fallback. [Candidate TCP/WS mappings](../transports/noise-bindings.md)
-have separate identifiers pending freeze; UDP remains deferred until a
+define concrete context bytes and the `syntra.sc1.draft1` WS subprotocol, with
+[executed implementation evidence](../../docs/sc1-implementation.md). Formal
+profile registration and RFC acceptance remain pending; UDP is deferred until a
 complete binding is frozen, reviewed and accepted. Browser `wss://` retains
-outer TLS even with the candidate channel inside its messages. Acceptance,
+outer TLS even with the experimental channel inside its messages. SC1 over
+HTTP/HTTPS request-response is excluded. Acceptance,
 independent verification and any major-version/deprecation decision precede
 replacement of current requirements or conformance coverage.
 

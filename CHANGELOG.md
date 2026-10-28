@@ -73,6 +73,39 @@ the crates.io model governs.
 
 ## [Unreleased]
 
+### Implementation evidence — 2026-10-28
+
+- Recorded delivered bounded experimental Go SC1 draft-1 over TCP/WS/WSS,
+  bootstrap NK and returning NKpsk0, with high-level ready-to-call connection
+  helpers, server admission and owned transport shutdown. The
+  [implementation ledger](docs/sc1-implementation.md#implementation-status)
+  is self-contained; existing profile meanings, production TLS policy and
+  historical release scope remain unchanged. RFC 0007 is Draft and ADR-011
+  Proposed. UDP is deferred; HTTP/HTTPS request-response is excluded from
+  this implementation; WSS keeps verified outer TLS ≥1.3 with no downgrade.
+- Documented channel-aware host policy: independently verify root identity,
+  current enrollment and admission before ready and enforce the intended
+  returning-mode same-principal binding; the library does not compare principals
+  automatically.
+  Nil method authorization denies calls. The single asynchronous FIFO writer
+  owns snapshots with 256-frame/8 MiB queued-plus-active caps, 5s default writes,
+  200ms best-effort terminal drain and 1s join after transport Close. Core
+  callback grace and connection shutdown budgets remain distinct.
+- Recorded final Go 1.26.10 root race/pure-Go CGO-disabled/native-core
+  race/staticcheck and Go 1.23.12 compatibility passes; Docker integration
+  passed in 30.681s across all six carrier/mode groups with none skipped.
+  High-level connection helpers have local unit coverage, not container
+  coverage. Reachable-vulnerability scans were zero for root and integration,
+  not dependency-wide advisory-free findings. See
+  [verification evidence](docs/sc1-implementation.md#verification-evidence).
+- Recorded three passing 100ms in-memory benchmark samples at CPU settings
+  1 and 4 on darwin/arm64 Apple M4, without a hard performance threshold;
+  full RPCs are not zero-allocation. See [measurements](docs/perf-tradeoffs.md).
+  Same-implementation tests are not independent wire interoperability or formal
+  `CONF-*` conformance. Enrollment RPCs, complete issuance/storage/rotation,
+  independent review/vectors/interoperability and native ABI completion-time/
+  credential-release gaps remain [open](docs/sc1-implementation.md#remaining-work).
+
 ### Added
 
 - Documentation of the selected transport-independent Syntra Secure Channel
@@ -87,8 +120,10 @@ the crates.io model governs.
   Noise-in-WS wire boundary. [Migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
   records the selected direction. RFC 0007 is not Accepted; baseline TLS
   requirements and existing executable conformance profiles are unchanged.
-  No implementation, support, benchmark, conformance, session-resumption,
-  or automatic RPC retry claim is introduced.
+  That 2026-10-27 design step introduced no implementation or verification
+  result. The subsequent 2026-10-28 evidence entry above records delivered
+  experimental behavior; neither step accepts the RFC, establishes formal
+  conformance, or adds session resumption or automatic RPC retry.
 - Production native ABI in `crates/syntra-ffi` (`production` feature) with
   `crates/syntra-ffi/include/syntra_production.h`: transport-agnostic
   initiator/responder cores, stable handles, version checks, buffer

@@ -39,9 +39,25 @@ application E2EE is introduced.
 
 The host must protect usable shared authorization secrets. Fresh channel keys
 do not prevent stolen-AK device impersonation. Server-key provisioning,
-context binding, replay/DoS controls, credential transitions and complete
-carrier mappings require review. Binary-size/CPU benefits need measurement.
-UDP remains deferred pending its complete accepted binding.
+context binding, replay/DoS controls and credential transitions require review.
+The [carrier contract](../transports/noise-bindings.md) now specifies implemented
+experimental draft-1 context and TCP/WS/WSS bytes, including exact
+`syntra.sc1.draft1` selection. Their acceptance is pending; encoding and adapter
+defaults are no longer design TBDs. HTTP/HTTPS request-response is excluded
+from SC1 draft-1, with existing profiles unchanged. UDP remains deferred pending
+its complete accepted binding.
+
+The [implementation evidence ledger](../../docs/sc1-implementation.md) records
+channel, trusted host-policy integration and async-writer delivery, operational
+defaults, local unit/race/native-core tests and six same-implementation Docker
+groups (TCP/WS/WSS × NK/NKpsk0). In-memory benchmarks are not TLS comparisons
+or evidence of binary-size/CPU superiority. No formal SC1 conformance cases or
+profiles are registered. Only out-of-band preprovisioning is delivered;
+enrollment issuance/storage transactions and rotation flows remain absent.
+Independent vectors, cross-implementation interoperability and independent
+security review remain open. Host policy owns principal agreement, trusted root
+identity and synchronous enrollment checks before readiness; channel
+authentication does not perform those checks automatically.
 
 ## Compatibility implications
 
@@ -54,5 +70,6 @@ an explicit version/deprecation decision and migration window.
 
 ## Status
 
-Proposed. No acceptance, implementation, audit or conformance is implied.
+Proposed. Scoped implementation and execution evidence is recorded separately;
+it does not imply acceptance, an independent audit or full conformance.
 See the RFC blockers and [acceptance plan](../../conformance/plans/secure-channel.md).

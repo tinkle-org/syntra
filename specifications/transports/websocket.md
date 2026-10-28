@@ -61,8 +61,8 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 The [WebSocket Noise candidate](noise-bindings.md#3-websocket-message-candidate)
 under [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-would instead carry a channel handshake wrapper/message, then one bounded
-ciphertext per complete binary message. Authenticated plaintext would feed
+implements experimental draft-1 with one M1, M2 or bounded ciphertext per
+complete binary message. Authenticated plaintext feeds
 an inner length-prefixed envelope stream, potentially spanning messages.
 That is a distinct binding requiring a different profile identifier and
 explicit endpoint/subprotocol selection, not `SNTR-WS-V1` or `syntra.v1`.
@@ -70,8 +70,10 @@ This profile's binary-message-to-`Frame`, no-prefix, close and test rules
 remain unchanged; it stays restricted-development under current TLS policy.
 The proposed shared channel uses fresh ephemeral/directional keys on every
 new carrier connection, even with a persistent enrollment AK; it restores no
-logical session, subscriptions or in-flight RPCs. Identifiers, exact context
-bytes and binding details await freeze and acceptance.
+logical session, subscriptions or in-flight RPCs. The exact context and
+`syntra.sc1.draft1` subprotocol are defined in the carrier contract, with
+[executed implementation evidence](../../docs/sc1-implementation.md).
+RFC acceptance and formal profile registration remain pending.
 
 **SNTR-WS-031** — Binary required: peers MUST send only binary messages (opcode 0x2) for Syntra data. Text messages (opcode 0x1) are invalid and MUST be rejected per §1D/§4 (close code 1003, `UNIMPLEMENTED` context). No Syntra envelope is ever encoded as UTF-8 text, JSON, or base64 inside a text message.
 

@@ -18,8 +18,10 @@ historical context. Section 8 records the subsequent migration. No new
 wire types or protocol semantics are introduced by the layout change;
 remaining protocol blockers are pending.
 
-Section 9 records the selected SC1 proposal as of 2026-10-27. It is a
-documentation/design record, not an implemented security migration.
+Section 9 preserves the selected SC1 design record as of 2026-10-27; it
+introduced no implementation at that date. Section 11 records delivered
+experimental draft-1 behavior and verification on 2026-10-28, without
+amending that historical scope or accepting the security proposal.
 
 ## 1. Inventory (as found)
 
@@ -140,7 +142,7 @@ sources, not live files; see the pinned sources and descriptor archive in §8.
 - Conformance + interop suite
 - Rust reference implementation (non-normative)
 
-Follow-up status: Buf configuration, generation tooling and
+Follow-up status at the layout migration: Buf configuration, generation tooling and
 schema/codec tests now exist; core/security documents exist as unapproved
 drafts. Transport profiles and the runtime conformance/reference
 implementation remain forthcoming. See the follow-up migration section.
@@ -233,7 +235,10 @@ no missing capability/session/error binding or runtime conformance result.
 
 ## 9. Selected SC1 design record (2026-10-27)
 
-### Inventory and status
+### Inventory and status at the design record
+
+This section is dated 2026-10-27. Its future-work statements describe that
+design step; current experimental implementation evidence is recorded in §11.
 
 The current baseline retains TLS 1.3/TCP, HTTPS/H1, HTTPS/H2, and WSS/H1
 for public deployments, with restricted-development plaintext profiles.
@@ -343,3 +348,66 @@ module metadata (FILE-breaking to change against the initial baseline).
 This record changes no wire format, requirement, capability, or normative
 behavior. Executable conformance runs against any implementation remain
 pending verification goals, not this repository's claims.
+
+## 11. SC1 draft-1 implementation evidence (2026-10-28)
+
+This is a subsequent implementation-evidence record, not retroactive RFC
+acceptance or a change to historical release meaning. The
+[self-contained implementation ledger](docs/sc1-implementation.md#implementation-status)
+records delivered experimental Go TCP/WS/WSS bootstrap NK and returning
+NKpsk0 channels, high-level ready-to-call connection helpers, bounded server
+admission, channel-aware host policy and owned shutdown. UDP remains deferred;
+HTTP/HTTPS request-response is excluded from this implementation. Baseline
+profile definitions and production TLS policy remain unchanged. WSS retains
+verified outer TLS ≥1.3 and a separate Noise pin, without automatic downgrade.
+
+Draft-1 uses exact context domain/WS subprotocol `syntra.sc1.draft1`.
+Canonical context binds mode, carrier, server-key ID, epoch, independent
+eight-byte handle and exact UTF-8 scope. M1 is context plus 48 Noise bytes;
+M2 is 48 bytes. TCP length-prefixes each handshake/record message with u16BE;
+WS/WSS carry one binary message without that prefix. Both encrypt the inner
+u32BE-length-prefixed frame stream with empty record AD. These experimental
+bytes do not reinterpret existing WS/WSS profiles or change `Frame` fields.
+
+### Authentication and lifecycle integration
+
+The [host hook](docs/sc1-implementation.md#authentication-boundary) receives
+freshly confirmed channel evidence and explicit hello credentials. Host policy
+must independently verify root identity, current enrollment and admission
+before ready, enforcing the intended returning-mode same-principal binding;
+the library does not compare principals automatically. Nil method authorization now denies
+calls. This is a behavior change from permissive implementation defaults,
+not a new normative rule introduced by this record.
+
+Running sessions own terminal transport closure. Successful high-level clients
+outlive their dial context and must be closed explicitly. Dial establishment
+has a 10s total budget; server admission defaults to 128 connections and 16
+handshakes, retained through successful ready write. The post-ready writer
+owns FIFO snapshots with 256-frame/8 MiB queued-plus-active caps, a 5s default
+write timeout, a best-effort 200ms terminal drain and a 1s join after transport
+close. The core 1s callback grace and high-level default/max 5s server shutdown
+budget are separate; uncooperative I/O, lookup or callbacks cannot be forcibly
+terminated. See [operational limits](docs/sc1-implementation.md#operational-limits).
+
+### Evidence and remaining migration work
+
+Final working-tree verification records Go 1.26.10 pure-Go/CGO-disabled tests,
+root race/staticcheck, native-core race/staticcheck and Go 1.23.12 compatibility
+passes. Docker integration completed in 30.681s, all six carrier/mode groups
+executed with none skipped. Container cases use adapters with core sessions;
+high-level connection orchestration has local unit coverage. Root/integration
+reachable-vulnerability scans were zero, not dependency-wide advisory-free
+findings. Three 100ms in-memory benchmark samples at CPU settings 1 and 4 on
+darwin/arm64 Apple M4 passed without failed samples or a hard timing gate;
+full RPCs are not zero-allocation. Conditions and measured results belong to
+[verification evidence](docs/sc1-implementation.md#verification-evidence) and
+[performance evidence](docs/perf-tradeoffs.md).
+
+Same-implementation Docker and native-core passes are not independent SC1
+wire interoperability or formal `CONF-*` conformance. Only authenticated
+out-of-band provisioning is supported: no enrollment RPC or complete
+issuance/delivery/ack, protected-storage or rotation workflow is supplied.
+Independent security review, vectors/interoperability and RFC/ADR acceptance
+remain open, as do native ABI completion-timestamp and post-hello
+credential-release gaps. See [remaining work](docs/sc1-implementation.md#remaining-work).
+No automatic session resume, subscription restoration or RPC replay is added.
