@@ -411,3 +411,35 @@ Independent security review, vectors/interoperability and RFC/ADR acceptance
 remain open, as do native ABI completion-timestamp and post-hello
 credential-release gaps. See [remaining work](docs/sc1-implementation.md#remaining-work).
 No automatic session resume, subscription restoration or RPC replay is added.
+
+## 12. Mobile v1 decision package and pending downstream migration (2026-10-28)
+
+The selected [delivery target](docs/mobile-v1-delivery.md) requires SC1 and
+standardized recovery. RFCs 0003–0008 now provide concrete review proposals;
+they do not record maintainer/security approval or modify normative owners.
+Core/schema/conformance activation precedes downstream standardization, then
+independent execution precedes final implementation guidance and release claims.
+
+Inspection found Rust local revision 1 and Go draft-1 incompatible at the SC1
+context/prologue, mode/carrier encoding and WS subprotocol. RFC 0007 §11 pins
+the inspected commits and proposes `syntra.sc1.v1`, context-only prologue,
+explicit mode/carrier values and separate endpoint `/syntra/v1/sc1/ws`. Both
+implementations need explicit migration from experimental identifiers; none is
+silently aliased or retried after secure failure. The existing §11 ledger and
+baseline `syntra.v1` WS mapping keep their historical meanings.
+
+The proposed increasing request-ID rule, raw-body field partition, deadline
+origins and recovery snapshot/generation changes are behavioral compatibility
+changes, as are RFC 0003's fail-close behavior, version-mismatch code, peer
+reporting, WebSocket timeout mapping and timer boundaries, and RFC 0004's
+credential carriage and reauthentication changes. An explicit pre-stable
+freeze/version designation and downstream inventory remain prerequisites.
+RFC 0005 proposes the actual public Go generated
+package path; the option bytes are unchanged here because that future edit is
+FILE/source-breaking. Do not regenerate an immutable baseline or weaken Buf
+checks to hide it. This change adds no generated types, runtime or artifacts.
+
+The [mobile plan](conformance/plans/mobile-v1.md) and
+[recovery plan](conformance/plans/update-recovery.md) state expected acceptance
+coverage. Context JSON lint verifies public encoding consistency only, not
+Noise cryptography, parser rejection, socket interop or production readiness.

@@ -356,6 +356,153 @@ and the remaining-work record.
 Until these blockers are resolved, no production, interoperability, or full
 conformance claim follows from this RFC or its companion documents.
 
+## 11. Selected interoperability proposal (2026-10-28; not accepted)
+
+This section selects the target for review and takes precedence over conflicting
+experimental descriptions **within this proposal only**. It does not rewrite
+the evidence ledger, authorize shipping, or assert that either implementation
+already supports the selected bytes. [Governance](../GOVERNANCE.md) still owns
+acceptance. The mobile release target requires SC1 and the recovery profile;
+neither requirement turns a Core-only implementation into an SC1 implementation.
+
+### 11.1 Concrete mismatch and canonical context
+
+Source inspection at Rust commit `c6553185026e29ba28ae98e1b4c15f6c5100b3bd`
+and Go commit `7e2dc26aa5364839cf3177b2ce58299d9b98bc7c` found:
+
+| Concern | Rust local revision 1 | Go draft-1 | Selected proposal |
+|---|---|---|---|
+| Public prefix | `SNTRSC1L`, explicit revision | `syntra.sc1.draft1` | `syntra.sc1.v1` |
+| Mode | bootstrap 0, returning 1 | bootstrap 1, returning 2 | bootstrap 1, returning 2 |
+| Carrier | TCP 1, WebSocket 2 | TCP 1, WS 2, WSS 3 | TCP 1, WS 2, WSS 3 |
+| Field order | key, scope, handle, epoch | key, epoch, handle, scope | key, epoch, handle, scope |
+| Prologue | separate domain + context | context | context only |
+| WS subprotocol | `syntra.sc1.local1.ws` | `syntra.sc1.draft1` | `syntra.sc1.v1` |
+
+These are observable incompatibilities, not a claim from a failed live test.
+Pinned sources: [Rust context](https://github.com/tinkle-org/syntra-rs/blob/c6553185026e29ba28ae98e1b4c15f6c5100b3bd/SC1.md)
+and [Go context](https://github.com/tinkle-org/syntra-go/blob/7e2dc26aa5364839cf3177b2ce58299d9b98bc7c/SC1.md).
+
+Let `S` be scope byte length. The proposed exact concatenation, with half-open
+offsets, is:
+
+| Offset | Field | Encoding |
+|---|---|---|
+| `[0,13)` | domain | ASCII `syntra.sc1.v1`, no terminator |
+| `[13,14)` | mode | u8, 1 or 2 |
+| `[14,15)` | carrier | u8, 1, 2 or 3 |
+| `[15,19)` | server key selector | u32BE; zero permitted |
+| `[19,27)` | enrollment epoch | u64BE |
+| `[27,35)` | enrollment handle | eight opaque bytes |
+| `[35,37)` | S | u16BE |
+| `[37,37+S)` | scope | valid UTF-8, 1..255 bytes, no normalization |
+
+Bootstrap requires zero epoch/handle and no AK. Returning mode requires a
+nonzero epoch/handle and a separately provisioned uniformly random 32-byte AK.
+The responder checks the configured carrier, scope and trusted key selector;
+an input selector cannot create trust. Context is public and exactly the Noise
+prologue, without another prefix, hash or terminator. M1 is this context followed
+by exactly 48 Noise bytes; M2 is exactly 48 Noise bytes. Payloads are empty.
+Context is 38..292 bytes, M1 86..340 bytes, total handshake 134..388 bytes before
+carrier framing. Reject malformed context before credential lookup/Noise work;
+do not normalize or guess a legacy format.
+
+TCP retains u16BE lengths for every handshake/record. WS/WSS retain one binary
+message per handshake/record, without that prefix, with compression disabled.
+The proposed endpoint is `/syntra/v1/sc1/ws`, subprotocol `syntra.sc1.v1`;
+baseline `/syntra/v1/ws` and `syntra.v1` remain distinct. WSS uses carrier 3
+even behind a proxy only when the accepted proxy trust contract proves the
+external carrier. An untrusted forwarded header is insufficient. Initial public
+production acceptance uses verified TLS 1.3 WSS with the separately provisioned
+Noise pin. Raw TCP/WS remain restricted unless a separate accepted policy
+explicitly authorizes public SC1 use; this amendment grants no such exception.
+
+The encrypted stream remains u32BE serialized-frame length plus frame bytes;
+record plaintext is 1..65,519 bytes, ciphertext 17..65,535, and record AD empty.
+Frames are 1..1,048,576 serialized bytes. Authenticate before inner assembly;
+one writer preserves order and partial offsets. No resynchronization, cipher
+state persistence, early data or automatic fallback is introduced.
+
+### 11.2 Authorization, lifecycle and bounded renewal
+
+The selected ordering is verified M2 → encrypted hello → fresh client record
+confirmation → current enrollment/root-credential policy and same-principal
+check → ready → protected dispatch. A returning policy principal different
+from the trusted enrollment principal fails before ready; no privilege union
+or remapping occurs. Host-owned identity equivalence is explicit and tested.
+Empty hello credentials need an explicit authenticated host policy; they never
+implicitly select the channel principal. Replay of M1 supplies no fresh proof.
+
+Revocation uses a deployment-declared finite maximum from authoritative revoke
+commit to new-admission denial and active protected-delivery cutoff. The host
+documents cache staleness, propagation and check/close budgets whose sum fits
+that maximum. Failure to establish current validity denies admission; active
+bindings close no later than their last successful check plus the declared
+maximum. Idle channels are included. Work already committed cannot be rolled
+back; live executions remain accounted until stopped. No offline cached-allow
+claim or one-second SLA follows from a polling interval.
+
+Provisioning/rotation is a host-owned **required lifecycle contract**, not an
+invented core RPC. Before production acceptance each embedding host supplies a
+reviewed issuance transaction: authorized generator, authenticated delivery,
+immutable scoped handle/epoch, protected durable device/host storage,
+idempotent acknowledgement, lost-response reconciliation and abort/expiry.
+Successful routine rotation activates the replacement only after durable device
+installation; normal recovery-preserving retirement does not discard the only
+still-authorized usable credential merely because an acknowledgement was lost.
+Revocation, credential expiry, compromise response and the hard overlap cutoff
+do not wait for installation/acknowledgement. They can invalidate the last usable
+credential and leave the device fail-closed, requiring independently authorized
+recovery; availability never extends old-key authorization indefinitely.
+Rotation allocates a fresh independent AK/handle and increasing epoch, with a
+bounded documented overlap. Commit/ack crash cuts and concurrent reconnects
+have explicit store outcomes; revoked epochs cannot be revived. Counter/epoch
+overflow retires the enrollment rather than wrapping. Compromise recovery uses
+an independent trusted authority, not only the compromised secret. An initial
+implementation may use authenticated out-of-band provisioning, but it cannot
+claim an online issuance or seamless rotation workflow it has not implemented.
+The complete deployment contract and its execution remain acceptance gates.
+
+Host pin updates are independently authenticated, bounded sets with explicit
+activation, overlap, retirement and rollback prevention; the peer cannot teach
+the initiator a new trust anchor. Store format and distribution remain host-owned.
+
+Each direction permits at most `2^32` successfully protected records and each
+channel at most 24 hours of elapsed lifetime, including suspension. Stricter
+deployment limits are allowed. Check before record protection/delivery; when a
+limit would be exceeded, close without wrapping/reusing counters and report
+unknown outcomes for unfinished calls. A partially reconstructed frame is
+discarded. Renew only with a fresh handshake and fresh traffic keys, followed
+by explicit recovery negotiation/re-subscription; no in-place rekey or RPC
+replay is implied. Test boundary counters using test-only state injection.
+
+### 11.3 Migration, verification and owner edits
+
+Neither legacy identifier is an alias for the new bytes. Explicit legacy
+endpoints, if temporarily retained downstream, keep their exact experimental
+meaning and separate configuration. A failed v1 attempt does not trigger legacy
+or plaintext fallback. Both implementations migrate against the same accepted
+spec revision; source/API and behavioral changes receive release notes.
+
+The [context fixtures](../conformance/plans/sc1-context-v1.json) freeze public
+encoding examples only. [Acceptance scenarios](../conformance/plans/mobile-v1.md)
+require independently derived Noise vectors with test-only static/ephemeral
+inputs, both role pairings and real sockets. No ciphertext is fabricated here.
+Public context lint is neither cryptographic validation nor conformance.
+
+On acceptance synchronize `security/secure-channel.md`,
+`security/device-authorization.md`, `transports/noise-bindings.md`, ADR-011,
+requirement indexes and registered SC1 cases/profiles. Existing requirement
+traces are SNTR-SC-001 through SNTR-SC-015 and SNTR-DAUTH-001 through
+SNTR-DAUTH-010; allocate additional IDs at normative activation if necessary.
+Retain the implementation ledger as historical evidence, not the definition of
+the new bytes. No core `.proto` field or baseline replacement is made here.
+
+Acceptance remains blocked on maintainer/security approvals, full lifecycle
+contracts, independent cryptographic vectors and composition review, and
+downstream execution. Selection is not acceptance and this section closes no
+interoperability verdict by inspection alone.
+
 ## Appendix: References
 
 - [Noise Protocol Framework, revision 34](https://noiseprotocol.org/noise.html):

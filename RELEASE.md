@@ -85,6 +85,16 @@ planning; no new executable-profile release gate is implied by this record.
 
 ## 1. Release checklist (v1 RC)
 
+The subsequent [mobile v1 delivery target](docs/mobile-v1-delivery.md) requires
+SC1, standardized recovery and mobile lifecycle evidence for stable promotion.
+Its selected proposals are RFCs 0006–0008 and the core decision set, not new
+accepted profile gates. Before promotion, maintainers accept and activate the
+owning contracts/cases, then review independent pure-Go/Rust results in both
+roles, host lifecycle/security evidence, and iOS/Android lifecycle/operational
+results from the [acceptance plan](conformance/plans/mobile-v1.md). Core-only
+or same-implementation passes cannot satisfy this target. This supplement
+does not retroactively change the historical RC-1 snapshot or claim completion.
+
 Check each box with evidence (command output, PR link, or reviewer sign-off).
 An unchecked box blocks tagging.
 

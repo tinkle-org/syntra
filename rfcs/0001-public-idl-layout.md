@@ -17,7 +17,16 @@
 > are retained in the immutable compatibility archive. This records explicit
 > user direction, not formal maintainer quorum or RFC acceptance. This RFC
 > remains Draft for the remaining protocol/security blockers and review;
-> post-deletion validation results are pending.
+> current structural execution is recorded in the release-readiness audit;
+> behavioral acceptance and interoperability remain pending.
+
+Selected decision proposals for B1–B8/B10 are now in RFCs 0003–0005,
+[RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md) D1 (raw-wire multiplicity,
+body/metadata partition and reserved-tag validation), and RFCs 0006/0007 for
+the required recovery/SC1 target. They remain Draft and do not activate owning
+requirements. The [current audit](../audits/v1-release-readiness.md) records a
+subsequent successful run of the 13-test archive-based schema suite; older
+pending-run statements below describe the earlier record, not this new run.
 
 ## 1. Summary
 
