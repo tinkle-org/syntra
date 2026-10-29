@@ -1,0 +1,21 @@
+specifications/security/device-authorization.md
+  s_a39ba3149a9bac::t_ee3f0788376583 143-145,148
+docs/v1-acceptance-package.md
+  s_a39ba3149a9bac::t_87e15e8b33e2dc 68-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c075466fa4bfe852cd9229d9eb57645b1e214eb",
+  "prompts": {},
+  "sessions": {
+    "s_a39ba3149a9bac": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e75fea9b4ffew3g3usGisHFSCh",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
