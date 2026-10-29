@@ -7,7 +7,7 @@
 - Normative references:
   - BCP 14; `threat-model.md` (T1, T3, T5, T8, T9); `transport-security.md`; `replay-protection.md`; `opaque-payloads.md`
   - `specifications/core/authentication.md` (SNTR-AUTH-*, framework/principal/authorization in §1A–§1D), `sessions.md` (three concepts, resumption, cross-transport, HTTP, termination, timeouts in §1A–§1G), `handshake.md` (lifecycle table, ordering, diagrams in §1A–§1B/§2A), `errors.md`, `reliability.md`
-  - `proto/syntra/v1/session.proto` (`ClientHello`, `ServerReady`)
+  - `proto/syntra/v1/handshake.proto` (`ClientHello`, `ServerReady`)
 - Scope: Security rules for credential carriage, principal handling, expiry/revocation, resume-token design, rotation, fixation defenses, and error disclosure. Credential formats and identity stores belong to the application; this document defines only channel, lifetime, and disclosure rules and is generic across user, service, device, or key-based principals.
 - Terminology: Per `core/protocol.md`. **Principal** = opaque authenticated identity (never assumed to be a user account). **Resume token** = optional opaque token enabling resumption ONLY if a capability RFC defines it (default: no resumption in v1).
 

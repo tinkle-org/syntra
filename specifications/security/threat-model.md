@@ -8,7 +8,7 @@
   - BCP 14 / RFC 2119 / RFC 8174
   - `specifications/architecture.md` (SYN-ARCH-030–035, ownership SYN-ARCH-043)
   - `specifications/core/protocol.md` (SNTR-CORE-*), `handshake.md`, `authentication.md`, `sessions.md`, `rpc.md`, `events.md`, `reliability.md`, `errors.md`, `capabilities.md`, `versioning.md`
-  - `proto/syntra/v1/session.proto`, `proto/syntra/v1/error.proto`
+  - `proto/syntra/v1/envelope.proto`, `proto/syntra/v1/handshake.proto`, `proto/syntra/v1/errors.proto`
 - Scope: The authoritative threat model for Syntra v1 public deployments. It identifies assets, attackers, trust boundaries, assumptions, in-scope vs out-of-scope threats, mitigations, and residual risks. Companion documents (`transport-security.md`, `authentication-security.md`, `replay-protection.md`, `opaque-payloads.md`) own the corresponding normative mitigations and MUST NOT weaken this model.
 - Terminology: Per `core/protocol.md`. **Asset** = anything whose compromise violates a security requirement. **Trust boundary** = a point where data or control passes between mutually distrusting parties. **Mitigation** = a REQUIRED mechanism; **residual risk** = accepted remaining risk that deployments MUST document.
 

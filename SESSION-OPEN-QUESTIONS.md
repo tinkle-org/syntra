@@ -1,6 +1,34 @@
 # Session Open Questions (release blockers)
 
-Status: Draft 2026-10-19. Produced because unresolved release-blocking questions remain for authentication, session lifecycle, and resumption. None of these is resolved by implementation choice. Normative clarifications landed in `specifications/core/handshake.md` (§1A–§1B/§2A), `authentication.md` (§1A–§1D), `sessions.md` (§1A–§1G), and `conformance/auth-session/`; the items below still need RFC decisions before stable v1.
+Status: Updated 2026-10-28; acceptance still pending. Produced because unresolved release-blocking questions remain for authentication and session lifecycle. None is resolved by implementation choice. The owning core/security documents remain drafts. The historical inventory below is supplemented by the selected release scope and proposal map here.
+
+## Selected mobile release scope and decision package
+
+The selected target requires SC1 and standardized update recovery. Their wire
+optionality remains distinct from inclusion in this release bundle; a Core-only
+pass does not satisfy it. See [delivery sequence](docs/mobile-v1-delivery.md),
+[current readiness](audits/v1-release-readiness.md), and
+[mobile acceptance plan](conformance/plans/mobile-v1.md). Selection is not RFC
+acceptance, maintainer quorum, security review or a behavioral test pass.
+
+| Workstream | Selected proposal | Remaining gate |
+|---|---|---|
+| Handshake failures | RFC 0003: local typed cause/native generic peer signal, fail-close pre-ACTIVE notifications, timer phase binding | Acceptance and synchronized owning specs/cases |
+| Correlation/races/HTTP | RFC 0004: increasing emitted request IDs, ordered high-water admission, connection-fatal reuse, one terminal gate, profile credentials | Compatibility approval, owner edits and runtime tests |
+| Bounds/negotiation/imports | RFC 0005: profile-specific recovery negotiation, concrete limits, current matching IDs, real downstream Go path | Acceptance; Go option FILE/source-break handling; no baseline relaxation |
+| Recovery | RFC 0006 §11: fresh-round handles, local overflow isolation, scoped continuity, crash-safe persistence/confirmation and snapshot install | Required, not deferred; owner/IDL synchronization and recovery-plan execution |
+| SC1 wire mismatch | RFC 0007 §11: new canonical `syntra.sc1.v1` context/prologue/subprotocol, explicit legacy migration | Rust/Go alignment, independent Noise vectors and both socket roles; not fixed yet |
+| Mobile/parser/resources | RFC 0008: raw body classification, suspend-aware deadlines, half-open/replacement/reconnect rules, bounded executions/drain | Acceptance, case registration, iOS/Android and operational evidence |
+
+Rust local revision 1 and Go draft-1 differ in context magic/domain, field order,
+mode values, carrier representation and WS subprotocol. Source inspection is
+recorded with pinned commits in RFC 0007 §11. Public context fixtures have a
+separate lint test; they contain no Noise ciphertext and establish no peer
+acceptance or interoperability verdict.
+
+Logical-session resumption, reliable-session RPC reconciliation, UDP/QUIC and
+automatic mutation replay remain deferred. Reusing an enrollment or restoring
+durable update progress does not resume a connection or replay its RPCs.
 
 ## SC1 draft-1 implementation and pending acceptance (2026-10-28)
 
@@ -65,7 +93,7 @@ forcibly terminate uncooperative operations. See
 ## Blockers
 
 1. **Mechanism negotiation.** No identifier/advertisement/selection/challenge fields exist. If stable claims anything beyond opaque credential presentation with application-side agility, a capability RFC is required (see `rfcs/0002-auth-session-lifecycle.md` §10.7 and core `open-questions.md` blocker 4).
-2. **Resumption standard.** No token format, lifetime, rotation, replay window, restored-state list, or revocation transport exists. Default v1 has no resumption; any resumption claim needs the full RFC (see `sessions.md` §1C, security open-questions item 5, `rfcs/0002` §10.8).
+2. **Resumption standard (conditional, deferred).** Default v1 has no logical-session resumption; it is not required by this release target. Any future resumption claim needs token/lifetime/rotation/replay/state/revocation rules (see `sessions.md` §1C, security open-questions item 5, `rfcs/0002` §10.8). Required update recovery is separately tracked in RFC 0006.
 3. **Typed pre-`ACTIVE` error carrier (B1).** Which `Frame`, if any, carries handshake errors; zero-`request_id` `result` stays forbidden.
 4. **Pre-`ACTIVE` notification conflict (B2).** Ignore-with-diagnostic vs fail/close.
 5. **Stale `request_id` reuse (B3).** Core re-use permission vs replay rejection.

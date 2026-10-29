@@ -73,6 +73,26 @@ the crates.io model governs.
 
 ## [Unreleased]
 
+### Mobile v1 decision package — 2026-10-28
+
+- Selected SC1 and standardized update recovery as required release deliverables,
+  retaining specification-first ownership and independent downstream Rust/Go.
+- Replaced RFC 0003–0005 decision menus with concrete proposals for local/native
+  handshake errors, increasing request identities, terminal race rules,
+  profile-specific negotiation/carriage, encoded-frame limits and public Go
+  package migration. All remain Draft; no schema/baseline or owner requirement
+  is changed before acceptance.
+- Added RFC 0006 recovery amendment for fresh rounds, local overflow isolation,
+  scoped generations, durable state/checkpoint confirmation and local snapshot
+  installation. Recovery is required for the target, while negotiated on wire.
+- Identified incompatible Rust local-1/Go draft-1 SC1 bytes and selected a new
+  canonical context/prologue/subprotocol proposal in RFC 0007 §11, with public
+  context JSON and lint tests. No cryptographic vector or interop pass is claimed.
+- Added Draft RFC 0008 mobile/parser/resource decisions, end-to-end acceptance
+  plans and an SDD delivery record. Refreshed release readiness while retaining
+  the October 19 audit as history. Formal acceptance, downstream alignment,
+  independent security/interop and mobile execution remain release gates.
+
 ### Implementation evidence — 2026-10-28
 
 - Recorded delivered bounded experimental Go SC1 draft-1 over TCP/WS/WSS,

@@ -118,6 +118,13 @@ and the RFC set; no stable `v1` release exists yet. Draft
 status means: implementable for interop experiments, not yet stable —
 check the referenced RFCs before freezing a production dependency.
 
+The selected [mobile v1 delivery target](docs/mobile-v1-delivery.md) requires
+SC1 and standardized update recovery, plus mobile lifecycle and independent
+Rust/Go verification. RFCs 0003–0008 contain selected proposals, not approvals.
+The current Rust/Go SC1 experimental formats differ; the canonical wire proposal
+and migration are in RFC 0007 §11. No interoperability fix or conformance pass
+is claimed until downstream execution establishes it.
+
 The SC1 design remains **Draft, not Accepted** in
 [RFC 0007](rfcs/0007-secure-channel-device-authorization.md). An experimental
 draft-1 implementation is delivered; its contract and evidence are recorded

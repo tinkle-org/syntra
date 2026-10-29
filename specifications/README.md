@@ -11,6 +11,13 @@ All core, transport, and security specifications are **drafts pending
 maintainer approval via RFC**. Release-blocking open questions are tracked
 in `SESSION-OPEN-QUESTIONS.md` and the RFC set.
 
+The [mobile delivery record](../docs/mobile-v1-delivery.md) selects SC1 and
+update recovery as release deliverables. [RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md)
+adds mobile lifecycle and raw-wire decision proposals; RFCs 0006/0007 record
+recovery corrections and canonical SC1 migration. These proposals do not
+supersede the owning drafts before acceptance. Conformance plans and public
+context fixture lint are not executable interoperability verdicts.
+
 ## Secure-channel proposal and experimental implementation
 
 [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) proposes
