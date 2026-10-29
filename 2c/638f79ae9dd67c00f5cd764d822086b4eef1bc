@@ -1,0 +1,47 @@
+scripts/validate-repo.py
+  s_29e46b07ebd1af::t_b9e83c292818bf 58
+MAINTAINERS.md
+  s_29e46b07ebd1af::t_95387b03ceb8c9 9
+docs/client-implementation.md
+  s_29e46b07ebd1af::t_42924af5bdad0f 65-68
+specifications/core/handshake.md
+  s_29e46b07ebd1af::t_6c7e20942190d4 22-25
+specifications/transports/noise-bindings.md
+  s_29e46b07ebd1af::t_014759b950e6f9 90-95
+specifications/security/open-questions.md
+  s_29e46b07ebd1af::t_ef4444000bf758 86-88
+  s_29e46b07ebd1af::t_f2893cb02b104e 102-105
+RELEASE.md
+  s_29e46b07ebd1af::t_ea50fdc33c9a1e 30
+conformance/manifest/sc1-wss.yaml
+  s_29e46b07ebd1af::t_0606b25797af0d 348
+  s_29e46b07ebd1af::t_8201e7cce7b709 341-347,349-412,433,454-458
+  s_29e46b07ebd1af::t_fbca5ead289e9f 340
+  s_29e46b07ebd1af::t_71000fd114ab5a 93,99
+  s_29e46b07ebd1af::t_30a4106317aec4 100-120
+  s_29e46b07ebd1af::t_022500115f792c 36,41-42
+  s_29e46b07ebd1af::t_3f99d2c3336d0f 193
+  s_29e46b07ebd1af::t_74c54a0644a687 413-432,434-453,459
+specifications/architecture.md
+  s_29e46b07ebd1af::t_d4be3fa00e30b6 65-71
+  s_29e46b07ebd1af::t_a78442f6c63378 77,81,83-89
+conformance/manifest/requirements.yaml
+  s_29e46b07ebd1af::t_ec8b2ae0169d1b 925-926,932,935,953,955,959
+  s_29e46b07ebd1af::t_ca1d49c32dfdec 927,952,980,997
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c638f79ae9dd67c00f5cd764d822086b4eef1bc",
+  "prompts": {},
+  "sessions": {
+    "s_29e46b07ebd1af": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e76a503b9ffeNEdXe6u75Bt6oK",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
