@@ -1,0 +1,39 @@
+docs/client-implementation.md
+  s_92ca6104e4801c::t_dcc8a93a14aac4 83-85
+CHANGELOG.md
+  s_92ca6104e4801c::t_5fb6922d9d9799 19
+specifications/schema/reference.md
+  s_92ca6104e4801c::t_dbec33d79263b7 91-95,98-101
+  s_92ca6104e4801c::t_ea0a0323c7c675 10
+conformance/manifest/sc1-wss.yaml
+  s_92ca6104e4801c::t_e8130fe00abfa2 140-160
+scripts/validate-repo.py
+  s_92ca6104e4801c::t_3adc5f72484c21 600-603
+rfcs/0007-secure-channel-device-authorization.md
+  s_92ca6104e4801c::t_1fb827ec47e971 512
+  s_92ca6104e4801c::t_a7b2d1cdd1e3cd 364
+specifications/README.md
+  s_92ca6104e4801c::t_44b55631ed7664 10-15,20-24
+conformance/manifest/requirements.yaml
+  s_92ca6104e4801c::t_775ce0ba1a7178 956
+docs/transport-selection.md
+  s_92ca6104e4801c::t_78ba8c28072ed2 103-106
+specifications/transports/websocket.md
+  s_92ca6104e4801c::t_c8bfd5d268fc70 71-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9e2f8929c4d2c2bcfec3ffecc620483f996afdea",
+  "prompts": {},
+  "sessions": {
+    "s_92ca6104e4801c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7642926effeNiLWv1XFSqvKGg",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
