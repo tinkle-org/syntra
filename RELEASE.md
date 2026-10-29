@@ -95,6 +95,15 @@ results from the [acceptance plan](conformance/plans/mobile-v1.md). Core-only
 or same-implementation passes cannot satisfy this target. This supplement
 does not retroactively change the historical RC-1 snapshot or claim completion.
 
+[Draft RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md) proposes
+the exact WSS-first stable bundle, sole-maintainer bootstrap, and reconciliation
+of single-transport claims with the separate two-transport proof. The
+[acceptance package](docs/v1-acceptance-package.md) separates specification
+freeze from independent execution and stable authorization. These are proposals,
+not an effective waiver of the checklist or current governance. Prerelease
+configuration remains unchanged; structural validation alone does not authorize
+stable promotion.
+
 Check each box with evidence (command output, PR link, or reviewer sign-off).
 An unchecked box blocks tagging.
 

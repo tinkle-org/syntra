@@ -18,6 +18,14 @@ Selected alternatives are not accepted normative changes: real reviewers,
 maintainer quorum, security review and explicit compatibility designation are
 still required by [governance](../GOVERNANCE.md).
 
+Planning update (2026-10-29): [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
+proposes public owner-ratified bootstrap governance and the exact SC1/WSS-first
+stable scope. The [acceptance package](../docs/v1-acceptance-package.md) and
+[decision-record template](../docs/decision-record-template.md) prepare the
+next approval/activation work. No transition, RFC acceptance, independent review,
+wire/profile change or release authorization is recorded by those proposals.
+The BLOCKED verdict and historical verification record below are unchanged.
+
 ## Current area assessment
 
 | Area | Verdict | Current finding / next gate |

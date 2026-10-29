@@ -73,6 +73,21 @@ the crates.io model governs.
 
 ## [Unreleased]
 
+### v1 acceptance preparation — 2026-10-29
+
+- Added Draft RFC 0009 proposing an explicit public owner-ratified bootstrap
+  to a published sole-maintainer approval model, with security self-review
+  disclosure and independent SC1 composition review retained for production.
+- Selected SC1 over verified WSS as the first stable bundle's transport,
+  with standardized recovery and applicable mobile evidence. Proposed exact
+  scope separates single-transport claims from the two-transport independence
+  proof; no existing claim or profile rule is changed before acceptance.
+- Added an informative decision-record template and dependency-ordered v1
+  acceptance package separating RFC acceptance, normative activation/freeze,
+  independent execution and stable release authorization. Current quorum,
+  RFCs 0001–0008, schemas, compatibility archives, conformance registrations
+  and prerelease automation are unchanged. No approval or PASS is invented.
+
 ### Mobile v1 decision package — 2026-10-28
 
 - Selected SC1 and standardized update recovery as required release deliverables,

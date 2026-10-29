@@ -94,3 +94,10 @@ Accepted RFCs are never renumbered or deleted.
 ## Template
 
 See [`template.md`](template.md).
+
+The informative [decision-record template](../docs/decision-record-template.md)
+helps retain actual approvals, reviewed revisions, compatibility dispositions
+and evidence. [Draft RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md)
+proposes its use with a sole-maintainer bootstrap and separate
+acceptance/freeze/release decisions. Neither document changes the current
+quorum or accepts another RFC by publication or merge.
