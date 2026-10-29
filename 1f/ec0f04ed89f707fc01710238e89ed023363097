@@ -1,0 +1,36 @@
+audits/history/v1-release-readiness-2026-10-19.md
+  s_c96331edcc1f5b::t_debf1b48b75e89 109
+rfcs/0003-handshake-failure-signaling.md
+  s_c96331edcc1f5b::t_debf1b48b75e89 65-68
+audits/v1-release-readiness.md
+  s_c96331edcc1f5b::t_debf1b48b75e89 51
+rfcs/0008-mobile-lifecycle-and-v1-acceptance.md
+  s_c96331edcc1f5b::t_debf1b48b75e89 120
+conformance/plans/update-recovery.md
+  s_c96331edcc1f5b::t_689c7e325eedfa 367
+  s_c96331edcc1f5b::t_debf1b48b75e89 351-355
+tests/test_sc1_proposal_vectors.py
+  s_c96331edcc1f5b::t_debf1b48b75e89 15
+MIGRATION.md
+  s_c96331edcc1f5b::t_689c7e325eedfa 436-437
+  s_c96331edcc1f5b::t_debf1b48b75e89 433-435
+rfcs/0004-correlation-identity-carriage.md
+  s_c96331edcc1f5b::t_689c7e325eedfa 243-244
+  s_c96331edcc1f5b::t_debf1b48b75e89 240-242
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1fec0f04ed89f707fc01710238e89ed023363097",
+  "prompts": {},
+  "sessions": {
+    "s_c96331edcc1f5b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7a0f975cffeRBeQkjFdjh4fIP",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
