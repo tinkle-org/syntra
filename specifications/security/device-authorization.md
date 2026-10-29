@@ -140,11 +140,12 @@ Applications MUST re-evaluate scope/policy for the chosen endpoint/carrier.
 Implementations MUST NOT place AKs, handles or enrollment results in
 `connection_id`, invent an issuance field, or infer authenticated device
 context from client-provided metadata alone. Host authentication MUST receive
-trusted, connection-scoped channel verification context. The experimental API
-below specifies that integration; it awaits acceptance and review. An enrollment
+trusted, connection-scoped channel verification context. The accepted API
+below specifies that integration; independent human security review remains a
+release gate and is not supplied by the API or its tests. An enrollment
 RPC contract remains absent; new wire fields require the schema RFC/generation
 workflow. No credential-issuance or full binding conformance claim is established
-by the experimental API or its tests.
+by the API or its tests.
 
 `ChannelIdentity` contains mode, carrier, scope, handle, epoch and principal.
 `ChannelIdentityProvider.ChannelIdentity()` returns that value and a separate

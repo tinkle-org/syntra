@@ -65,9 +65,11 @@ independent interoperability or release gates.
 - Declarations already have PASS, FAIL, SKIP, UNSUPPORTED and NOT_EXECUTED.
   Add specification/implementation/suite provenance, evidence references and
   complete role/mode/case selection instead of creating a second verdict model.
-- The current core conformance document requires two transports for every claim;
-  the interop matrix permits single-transport claims. Apply the accepted scoped
-  two-transport-proof decision across owners and selection rules together.
+- RFC 0009 D4 scoped the two-transport proof: a claim may be made on one named
+  transport profile, including SC1 scoped to `SNTR-SC1-WSS-V1`; a proof across
+  two named transports is required only when a claim asserts transport
+  independence. Apply this scoped rule consistently across owners and selection
+  rules together.
 - The Go package change fails current FILE checks and exact-option schema
   tests. Its intentional source migration needs its own reviewed transition;
   keep STANDARD/FILE and immutable initial/historical evidence.
