@@ -1,0 +1,19 @@
+rfcs/0003-handshake-failure-signaling.md
+  s_c96331edcc1f5b::t_1398417085fa89 69-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1840630ea6cb6e1686942853a92370396ecdb1e7",
+  "prompts": {},
+  "sessions": {
+    "s_c96331edcc1f5b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7a0f975cffeRBeQkjFdjh4fIP",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
