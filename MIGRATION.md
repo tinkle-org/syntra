@@ -430,8 +430,11 @@ baseline `syntra.v1` WS mapping keep their historical meanings.
 
 The proposed increasing request-ID rule, raw-body field partition, deadline
 origins and recovery snapshot/generation changes are behavioral compatibility
-changes. An explicit pre-stable freeze/version designation and downstream
-inventory remain prerequisites. RFC 0005 proposes the actual public Go generated
+changes, as are RFC 0003's fail-close behavior, version-mismatch code, peer
+reporting, WebSocket timeout mapping and timer boundaries, and RFC 0004's
+credential carriage and reauthentication changes. An explicit pre-stable
+freeze/version designation and downstream inventory remain prerequisites.
+RFC 0005 proposes the actual public Go generated
 package path; the option bytes are unchanged here because that future edit is
 FILE/source-breaking. Do not regenerate an immutable baseline or weaken Buf
 checks to hide it. This change adds no generated types, runtime or artifacts.

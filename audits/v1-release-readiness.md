@@ -48,7 +48,7 @@ closes a behavioral defect merely because a proposal exists.
 | F-01 profile identifiers | Resolved in current source; verify consistency mechanically, do not carry historical mismatch as P0 |
 | F-02 completed-ID reuse | Open; RFC 0004 increasing-ID/non-reuse proposal replaces the bounded-window alternative |
 | F-03 pre-ACTIVE carrier | Open; RFC 0003 proposes local precise cause and native/generic peer failure without an illegal result |
-| F-04 HTTP stale-ID conflict | Open; RFC 0004 per-exchange specialization needs synchronized owning clauses |
+| F-04 HTTP stale-ID conflict | Open; RFC 0004 per-exchange specialization needs to be synchronized with the owning clauses |
 | F-05 generated import identity | Open source/FILE migration; package path references removed in-tree layout, not a required BSR publication workflow |
 | F-06 payload/frame limit | Open; RFC 0005 selects exact encoded MAX/MAX+1 and fitting payloads |
 | F-07/F-08/F-09 notifications/illustration/version code | Open; selected RFC 0003 proposals await owner/case activation |

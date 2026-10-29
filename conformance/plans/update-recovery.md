@@ -348,8 +348,11 @@ must cover replay; Syntra supplies no distributed transaction.
 Maps `SYN-URP-001`, `006`, `010`, `012`, `013`, `019`, `022`, `025`, `026`.
 
 For each row: preserve listed durable data, end the old connection, reach
-ACTIVE with newly validated credentials, negotiate anew, Subscribe with exact
-checkpoint bytes, and observe a fresh H/new capture B or explicit rejection.
+ACTIVE with newly validated credentials, and negotiate anew. For rows with
+durable C or S0, Subscribe with exact checkpoint bytes. For the no-durable-safe-C
+row, reconcile the application fence before choosing an explicit snapshot or
+initial live-only baseline, without sending a checkpoint. Observe a fresh H/new
+capture B or explicit rejection.
 No automatic session, capability, cursor or snapshot-handle continuity.
 
 | Reconnect input | Expected host and application observations |
@@ -361,7 +364,7 @@ No automatic session, capability, cursor or snapshot-handle continuity.
 | Same scope/generation, outside retention | Explicit bound replay/catch-up failure plus snapshot-required; no silently truncated success. |
 | Same P/S but G changed or binding cannot be recovered | Explicit invalidation/rejection, then current-generation recovery/snapshot; no re-labeling old C. |
 | Different P; same selector bytes but different resolved S; changed authorization scope | Reject transplanted C without effects or leakage; selector equality/credential reuse does not authorize progress. |
-| No durable safe C | Reconcile the application fence; otherwise explicit snapshot or deliberately initial live-only baseline. Never claim old state restored by empty start. |
+| No durable safe C | Reconcile the application fence before choosing an explicit snapshot or deliberately initial live-only baseline, without sending a checkpoint. Never claim old state restored by empty start. |
 
 Try every old H/X/marker on the new connection and inject old completion after
 new subscription acceptance. No new-round progress or held-queue release.

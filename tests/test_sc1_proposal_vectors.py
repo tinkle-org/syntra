@@ -12,7 +12,7 @@ VECTORS = ROOT / "conformance/plans/sc1-context-v1.json"
 
 class Sc1ProposalVectorTests(unittest.TestCase):
     def setUp(self):
-        self.data = json.loads(VECTORS.read_text())
+        self.data = json.loads(VECTORS.read_text(encoding="utf-8"))
 
     def test_status_and_coverage(self):
         self.assertEqual(self.data["status"], "proposal-only")

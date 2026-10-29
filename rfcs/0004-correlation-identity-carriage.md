@@ -237,8 +237,11 @@ Initiator writer                               Host admission
 ```
 
 Acceptance would revise SNTR-RPC-002/010/020/021/030/031, SNTR-WIRE-010,
-SNTR-RPL-012/020/030 and RPC §4 together, replacing both reuse permission and
-duplicate same-ID error behavior. Cross-connection numeric equality is harmless;
+SNTR-RPL-012/020/030 and RPC §4 together, alongside sessions §1B/§1E for D3's
+per-exchange semantics, authentication-security SNTR-ASEC-003 and core
+authentication SNTR-AUTH-010 for D5's credential carriage and reauthentication
+changes. The correlation edits replace both reuse permission and duplicate
+same-ID error behavior. Cross-connection numeric equality is harmless;
 continuity/idempotency never derives from correlation IDs. Errors §1C would
 name the connection-fatal ID violation explicitly. Errors §1D and handshake
 examples would continue to prohibit synthetic or zero-ID results.

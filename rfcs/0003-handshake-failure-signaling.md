@@ -62,9 +62,10 @@ Existing requirement references identify the clauses to revise after approval.
   `hello`, invented handshake record, or error in a notification. Failure never
   establishes ACTIVE, authentication success, or a subscription.
 
-Acceptance would revise SNTR-HS-020/030/040 and SNTR-ERR-004 to distinguish
-detecting-side cause from peer-visible transport evidence, including all tables
-and diagrams currently implying a typed error `Frame`.
+Acceptance would revise SNTR-HS-003/004/020/030/040, SNTR-ERR-004 and the
+handshake §5 failure table to distinguish detecting-side cause from peer-visible
+transport evidence and align version mismatch with D3's `UNIMPLEMENTED`, including
+all tables and diagrams currently implying a typed error `Frame`.
 
 ### D2 — Select fail-close for pre-ACTIVE notifications
 

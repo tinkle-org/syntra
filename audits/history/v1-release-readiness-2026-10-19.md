@@ -106,7 +106,7 @@ packet-fixture verification — also unexecuted).
    `CHANGELOG.md` migration notes, tagged release notes
    (`GOVERNANCE.md` Sec. 5).
 
-Acceptance criterion "repository can be publicly tagged as RC":procedure
+Acceptance criterion "repository can be publicly tagged as RC": procedure
 is ready (`RELEASE.md`, validators, workflows, artifacts script); the
 tag MUST NOT be created until the BLOCKED items above clear, per the RC
 checklist. No tag was created by this task. No `buf push` was performed.

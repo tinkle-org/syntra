@@ -117,7 +117,7 @@ recovery is separate. Never persist a traffic cipher or monotonic timestamp for
 cross-process reuse.
 
 On wake, account elapsed expiry and authorization/channel lifetime before
-processing buffered results or scheduling sends. A result selected terminal
+processing buffered results or scheduling sends. A result selected as terminal
 before suspension remains terminal. Merely buffered bytes not validated and
 selected before the deadline do not win retroactively. RFC 0004 owns the
 single-terminal linearization rule; no synchronized peer wall clock is required.
