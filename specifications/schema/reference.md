@@ -101,7 +101,7 @@ defines no enrollment RPC contract or enrollment protocol messages, and no
 `.proto` or generated type change is introduced. This does not prohibit
 host- or application-owned enrollment RPCs; enrollment authorization is
 application-defined and owns its provisioning contract
-([`SNTR-DAUTH-002`](../../specifications/security/device-authorization.md)).
+([`SNTR-DAUTH-002`](../security/device-authorization.md)).
 
 ### `ServerReady` — handshake.proto
 
