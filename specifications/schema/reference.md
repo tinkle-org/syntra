@@ -7,7 +7,7 @@
 
 ## Authority and compatibility status
 
-`proto/syntra/v1` is the sole Protobuf source of truth by explicit user direction, recorded in RFC 0001 B9 and reflected in [ADR-002](../decisions/ADR-002-protobuf-idl.md), [architecture `SYN-ARCH-040` and §8](../architecture.md#8-requirement-ownership-authoritative-sources), and [serialization `SNTR-SER-001`](../core/serialization.md#1-protocol-requirements). The old source tree is removed. Historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto) and [error.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/error.proto) remain pinned provenance; their declarations are preserved in [the archived historical descriptor](../../compatibility/v1-initial/README.md). This layout decision does not establish formal maintainer quorum or behavioral RFC acceptance. The core and security specifications cited below are drafts pending approval; their requirement IDs identify the defining documents, and unresolved contradictions are recorded explicitly.
+`proto/syntra/v1` is the sole Protobuf source of truth by explicit user direction, recorded in RFC 0001 B9 and reflected in [ADR-002](../decisions/ADR-002-protobuf-idl.md), [architecture `SYN-ARCH-040` and §8](../architecture.md#8-requirement-ownership-authoritative-sources), and [serialization `SNTR-SER-001`](../core/serialization.md#1-protocol-requirements). The old source tree is removed. Historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto) and [error.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/error.proto) remain pinned provenance; their declarations are preserved in [the archived historical descriptor](../../compatibility/v1-initial/README.md). This layout decision does not establish formal maintainer quorum or behavioral RFC acceptance. The core and most security specifications cited below are drafts pending approval; the accepted RFC 0007 owner documents ([secure-channel.md](../security/secure-channel.md), [device-authorization.md](../security/device-authorization.md), [noise-bindings.md](../transports/noise-bindings.md)) are not — their statements are normative. Requirement IDs identify the defining documents, and unresolved contradictions are recorded explicitly.
 
 Moving the definitions preserves binary WIRE compatibility but breaks FILE/source/descriptor compatibility: proto imports, declaration-owning files, generated file-level APIs, descriptor filenames/dependencies and source locations change. An unchanged fully qualified message name or Go package does not preserve all generated APIs. Buf `FILE` failures against the historical layout remain known breaking differences after the implemented layout decision; WIRE compatibility alone does not clear them. Never combine the historical and current descriptor sets into one pool: duplicate symbols and conflicting `syntra/v1/session.proto` identities result. There is no second live source root. See [RFC §6](../../rfcs/0001-public-idl-layout.md#6-compatibility).
 
@@ -88,15 +88,17 @@ Sources: [framing `SNTR-WIRE-002…005/010/011`](../core/framing.md), [handshake
 Validate range, envelope size and resource bounds before credential policy (`SNTR-HS-030`, `SNTR-SER-020`, `SNTR-ASEC-040`). Credential format and principal type are application-owned. `credential` has no schema redaction or field-specific maximum; deployments still need documented bounds (RFC B7). No mechanism selector, auth-round field, capability list, resume token or requested-limit record is declared.
 
 [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-establishes a [shared Noise channel](../security/secure-channel.md)
-before the Syntra handshake and supply separately trusted channel context to
-host authentication. Its [device-authorization proposal](../security/device-authorization.md)
-uses an enrolled shared AK and scoped eight-byte lookup handle; neither is a
+establishes the accepted [shared Noise channel](../security/secure-channel.md)
+before the Syntra handshake and supplies separately trusted channel context to
+host authentication. [Device authorization](../security/device-authorization.md)
+under the same RFC uses an enrolled shared AK and scoped eight-byte lookup
+handle; neither is a
 new `ClientHello` field or an implicit interpretation of `credential`.
 Empty credentials remain anonymous attempts under current policy, not proof
-of a returning-device handshake. The proposed context hook and authorized
-enrollment RPC/out-of-band contract remain blockers. No `.proto` or generated
-type change is introduced by that proposal.
+of a returning-device handshake. Host authentication receives the trusted,
+connection-scoped channel context through the accepted integration; no
+enrollment RPC contract exists and no `.proto` or generated type change is
+introduced.
 
 ### `ServerReady` — handshake.proto
 

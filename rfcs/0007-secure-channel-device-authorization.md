@@ -361,7 +361,7 @@ before promoting this proposal to a production default.
 5. Release gates: independent deterministic vectors, cross-implementation
    interoperability, full-composition threat analysis and independent security
    review.
-6. Resolved: `SNTR-SC1-WSS-V1` and `CONF-SCW-001`–`CONF-SCW-016` are registered.
+6. Resolved: `SNTR-SC1-WSS-V1` and `CONF-SCW-001`–`CONF-SCW-024` are registered.
    Registration is not execution; no verdict is claimed.
 
 HTTP/HTTPS request-response is excluded from SC1; existing profiles remain
@@ -509,7 +509,7 @@ Acceptance synchronized `security/secure-channel.md`,
 `security/device-authorization.md`, `transports/noise-bindings.md`, ADR-011,
 ADR-008, the requirement indexes and the registered SC1 cases/profile.
 Requirement traces are `SNTR-SC-001`–`SNTR-SC-015`, `SNTR-DAUTH-001`–`SNTR-DAUTH-010`
-and `SNTR-SCW-001`–`SNTR-SCW-012`; cases are `CONF-SCW-001`–`CONF-SCW-016`.
+and `SNTR-SCW-001`–`SNTR-SCW-012`; cases are `CONF-SCW-001`–`CONF-SCW-024`.
 The implementation ledger remains historical evidence, not the definition of
 the new bytes. No core `.proto` field or baseline replacement is made here.
 

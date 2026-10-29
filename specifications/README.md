@@ -7,16 +7,21 @@ carries a requirement ID (`SNTR-*`, `SYN-ARCH-*`) and links to a
 conformance test. In case of conflict, the ownership matrix
 (`architecture.md` Sec. 8) decides which document prevails.
 
-All core, transport, and security specifications are **drafts pending
-maintainer approval via RFC**. Release-blocking open questions are tracked
+Core, transport, and security specifications are **drafts pending
+maintainer approval via RFC**, except the accepted RFC 0007 owner documents
+([secure-channel.md](security/secure-channel.md),
+[device-authorization.md](security/device-authorization.md),
+[transports/noise-bindings.md](transports/noise-bindings.md)), which are
+normative for `SNTR-SC1-WSS-V1`. Release-blocking open questions are tracked
 in `SESSION-OPEN-QUESTIONS.md` and the RFC set.
 
 The [mobile delivery record](../docs/mobile-v1-delivery.md) selects SC1 and
 update recovery as release deliverables. [RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md)
-adds mobile lifecycle and raw-wire decision proposals; RFCs 0006/0007 record
-recovery corrections and canonical SC1 migration. These proposals do not
-supersede the owning drafts before acceptance. Conformance plans and public
-context fixture lint are not executable interoperability verdicts.
+adds mobile lifecycle and raw-wire decision proposals, and RFC 0006 records
+recovery corrections; those proposals do not supersede the owning drafts
+before acceptance. RFC 0007 is accepted, so its SC1 contract and migration are
+normative (see the accepted secure channel section below). Conformance plans
+and public context fixture lint are not executable interoperability verdicts.
 
 ## Accepted secure channel (SC1)
 

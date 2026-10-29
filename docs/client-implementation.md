@@ -80,8 +80,9 @@ cancellation after I/O begins can terminate an adapter; do not cancel its
 shared receive pump merely to abandon one RPC. See
 [ownership and limits](sc1-implementation.md#operational-limits).
 
-WS uses exact subprotocol `syntra.sc1.draft1`, binary messages and disabled
-compression; it does not use the baseline one-message/one-`Frame` mapping.
+WS and WSS use the exact `syntra.sc1.v1` subprotocol, one binary message per
+M1/M2/record and disabled compression; they do not use the baseline
+one-message/one-`Frame` mapping.
 WSS retains verified outer TLS ≥1.3 as well as the Noise server pin. Standard
 inspectable HTTP transports enforce verification; custom RoundTrippers own
 their TLS policy. Redirects and automatic downgrade/fallback are refused.

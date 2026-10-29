@@ -137,7 +137,27 @@ cases:
       session_state: none
       transport: { upgrade_status: 400 }
       hygiene: { absent_from: [fixture, credential, token] }
-    notes: "Authorization and Cookie are rejected. Origin and forwarded headers are not authentication. No Syntra credential in the Upgrade. Repeat with a missing/wrong subprotocol and an invalid Sec-WebSocket-Accept."
+    notes: "Authorization and Cookie are rejected. Origin and forwarded headers are not authentication. No Syntra credential in the Upgrade. Repeat with a missing/wrong subprotocol. Client-side rejection of an invalid 101/Sec-WebSocket-Accept response without sending M1 is CONF-SCW-024."
+
+  - id: CONF-SCW-024
+    requirement: [SNTR-SCW-006]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: websocket_upgrade
+        path: /syntra/v1/sc1/ws
+        subprotocol: syntra.sc1.v1
+        server_response: { upgrade_status: 101, sec_websocket_accept: invalid }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { upgrade_response_validated: true, m1_sent: false }
+      hygiene: { absent_from: [credential, token] }
+    notes: "Client-side validation: a 101 response whose Sec-WebSocket-Accept is invalid causes the client to close with no M1 and no Noise material. Host-side rejection with HTTP 400 of forbidden request headers is CONF-SCW-006."
 
   - id: CONF-SCW-007
     requirement: [SNTR-SCW-007, SNTR-TSEC-008]

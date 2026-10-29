@@ -16,7 +16,7 @@ development, changes land under `Unreleased`.
   `docs/decisions/0001-bootstrap-ratification.md`.
 - Accepted RFC 0007 and ADR-011. Added the canonical `syntra.sc1.v1` carrier
   mapping, `SNTR-SCW-001`–`SNTR-SCW-012`, and the `SNTR-SC1-WSS-V1` profile
-  with `CONF-SCW-001`–`CONF-SCW-016` case specifications.
+  with `CONF-SCW-001`–`CONF-SCW-024` case specifications.
 - Added public SC1 context/prologue vectors under
   `conformance/test-vectors/sc1/`.
 

@@ -597,6 +597,10 @@ def check_vectors():
                 err(sc1_path, f"vector {vid} domain is not syntra.sc1.v1")
             if ctx[13] != v.get("mode") or ctx[14] != v.get("carrier"):
                 err(sc1_path, f"vector {vid} mode/carrier mismatch")
+            if ctx[13] not in (1, 2):
+                err(sc1_path, f"vector {vid} mode {ctx[13]} outside bootstrap 1/returning 2")
+            if ctx[14] not in (1, 2, 3):
+                err(sc1_path, f"vector {vid} carrier {ctx[14]} outside TCP 1/WS 2/WSS 3")
             if int.from_bytes(ctx[15:19], "big") != v.get("server_key_id"):
                 err(sc1_path, f"vector {vid} server_key_id mismatch")
             if int.from_bytes(ctx[19:27], "big") != v.get("epoch"):

@@ -953,7 +953,7 @@ requirements:
   - { requirement_id: SNTR-SCW-003, specification: specifications/transports/noise-bindings.md, section: "§3", test_ids: [CONF-SCW-003, CONF-SCW-021], automation_status: automated }
   - { requirement_id: SNTR-SCW-004, specification: specifications/transports/noise-bindings.md, section: "§3", test_ids: [CONF-SCW-004], automation_status: automated }
   - { requirement_id: SNTR-SCW-005, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-005, CONF-SCW-019, CONF-SCW-021], automation_status: automated }
-  - { requirement_id: SNTR-SCW-006, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-006], automation_status: automated }
+  - { requirement_id: SNTR-SCW-006, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-006, CONF-SCW-024], automation_status: automated }
   - { requirement_id: SNTR-SCW-007, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-007], automation_status: automated }
   - { requirement_id: SNTR-SCW-008, specification: specifications/transports/noise-bindings.md, section: "§5", test_ids: [CONF-SCW-008], automation_status: automated }
   - { requirement_id: SNTR-SCW-009, specification: specifications/transports/noise-bindings.md, section: "§6", test_ids: [CONF-SCW-009, CONF-SCW-020, CONF-SCW-022, CONF-SCW-023], automation_status: automated }

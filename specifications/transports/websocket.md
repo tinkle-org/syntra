@@ -68,12 +68,14 @@ the `SNTR-SC1-WSS-V1` profile and explicit endpoint/subprotocol selection,
 not `SNTR-WS-V1` or `syntra.v1`. This profile's binary-message-to-`Frame`,
 no-prefix, close and test rules remain unchanged; plaintext WS stays
 restricted-development.
-The proposed shared channel uses fresh ephemeral/directional keys on every
-new carrier connection, even with a persistent enrollment AK; it restores no
-logical session, subscriptions or in-flight RPCs. The exact context and
-`syntra.sc1.draft1` subprotocol are defined in the carrier contract, with
-[executed implementation evidence](../../docs/sc1-implementation.md).
-RFC acceptance and formal profile registration remain pending.
+The shared channel uses fresh ephemeral/directional keys on every
+new carrier connection, even with the persistent enrollment AK; it restores no
+logical session, subscriptions or in-flight RPCs. The accepted carrier
+contract defines the exact context and the `syntra.sc1.v1` subprotocol, with
+[implementation evidence](../../docs/sc1-implementation.md) that is not
+conformance evidence; RFC acceptance and profile registration as
+`SNTR-SC1-WSS-V1` are complete. The historical `syntra.sc1.draft1` identifier
+is not an alias and MUST be rejected.
 
 **SNTR-WS-031** — Binary required: peers MUST send only binary messages (opcode 0x2) for Syntra data. Text messages (opcode 0x1) are invalid and MUST be rejected per §1D/§4 (close code 1003, `UNIMPLEMENTED` context). No Syntra envelope is ever encoded as UTF-8 text, JSON, or base64 inside a text message.
 

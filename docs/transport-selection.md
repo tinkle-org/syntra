@@ -100,9 +100,10 @@ TLS ≥1.3, while custom RoundTrippers own TLS policy. Accept binds WS/WSS to
 `r.TLS`, not forwarded headers. There is no automatic downgrade or fallback.
 Servers own TLS, origin admission and HTTP header limits/timeouts.
 
-High-level dial returns after core ready within a 10s total establishment
-budget, shortened by the caller. Adapter handshake/write/record/frame limits
-default to 5s and may only be shortened; lifetime defaults/maxes at 24h,
+High-level dial returns after core ready within a 15s total establishment
+budget, shortened by the caller. Adapter handshake/write limits default to 5s
+and record/frame limits default to 30s; any of these may only be shortened.
+Lifetime defaults/maxes at 24h,
 with 2^32 records per direction as an additional channel ceiling. Operation
 admission defaults to 32 per direction (maximum 1,024). A record's assembly
 clock begins on its first wire byte; a frame's clock begins on its first
