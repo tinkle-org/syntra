@@ -1,0 +1,36 @@
+docs/decision-record-template.md
+  s_74178c9dea2aa9::t_db5a5934b2c703 1-122
+RELEASE.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 98-106
+CHANGELOG.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 76-90
+rfcs/0009-v1-bootstrap-governance-and-release-scope.md
+  s_74178c9dea2aa9::t_db5a5934b2c703 1-310
+rfcs/README.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 97-103
+audits/v1-release-readiness.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 21-28
+GOVERNANCE.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 7-13
+docs/mobile-v1-delivery.md
+  s_74178c9dea2aa9::t_1f3f39ba689825 31-39,44
+docs/v1-acceptance-package.md
+  s_74178c9dea2aa9::t_db5a5934b2c703 1-82
+  s_74178c9dea2aa9::t_828376f28a8d8e 83-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5636be86bb732320119073513cece08ad129efa7",
+  "prompts": {},
+  "sessions": {
+    "s_74178c9dea2aa9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e79e94fb7ffeGBYMoQ611PI8qN",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
