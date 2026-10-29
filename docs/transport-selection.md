@@ -101,8 +101,13 @@ TLS ≥1.3, while custom RoundTrippers own TLS policy. Accept binds WS/WSS to
 Servers own TLS, origin admission and HTTP header limits/timeouts.
 
 High-level dial returns after core ready within a 15s total establishment
-budget, shortened by the caller. Adapter handshake/write limits default to 5s
-and record/frame limits default to 30s; any of these may only be shortened.
+budget, shortened by the caller. The carrier contract
+([noise-bindings.md](../specifications/transports/noise-bindings.md)) defaults
+SC1 establishment plus first-record confirmation to 5s and one complete
+frame's encrypted output to 10s; next-record and frame-assembly limits
+default to 30s, and every limit may only be shortened. A shorter adapter
+write limit (the shipped adapter uses 5s) is implementation-specific, not a
+contract default.
 Lifetime defaults/maxes at 24h,
 with 2^32 records per direction as an additional channel ceiling. Operation
 admission defaults to 32 per direction (maximum 1,024). A record's assembly

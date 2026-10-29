@@ -96,9 +96,12 @@ handle; neither is a
 new `ClientHello` field or an implicit interpretation of `credential`.
 Empty credentials remain anonymous attempts under current policy, not proof
 of a returning-device handshake. Host authentication receives the trusted,
-connection-scoped channel context through the accepted integration; no
-enrollment RPC contract exists and no `.proto` or generated type change is
-introduced.
+connection-scoped channel context through the accepted integration; Syntra
+defines no enrollment RPC contract or enrollment protocol messages, and no
+`.proto` or generated type change is introduced. This does not prohibit
+host- or application-owned enrollment RPCs; enrollment authorization is
+application-defined and owns its provisioning contract
+([`SNTR-DAUTH-002`](../../specifications/security/device-authorization.md)).
 
 ### `ServerReady` — handshake.proto
 
