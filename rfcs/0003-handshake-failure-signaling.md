@@ -66,6 +66,9 @@ Acceptance would revise SNTR-HS-003/004/020/030/040, SNTR-ERR-004 and the
 handshake §5 failure table to distinguish detecting-side cause from peer-visible
 transport evidence and align version mismatch with D3's `UNIMPLEMENTED`, including
 all tables and diagrams currently implying a typed error `Frame`.
+Acceptance would also revise SNTR-WS-081 and SNTR-WSS-081, including their
+normative close-mapping and failure tables (WS/WSS §1J and §4), to select Close
+`1001` for core handshake timeout while preserving mappings for other conditions.
 
 ### D2 — Select fail-close for pre-ACTIVE notifications
 
