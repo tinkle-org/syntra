@@ -19,9 +19,10 @@ client verifies the second message before sending an encrypted `hello`; the
 host verifies fresh client transport traffic and current enrollment policy
 before `ready` or protected effects. The first authenticated envelope is
 exactly one complete framed `ClientHello`. No early RPCs or new core
-state/variant are implied. The existing state machine below is unchanged;
-numeric channel budgets and the trusted authentication-context API remain
-acceptance blockers in the RFC.
+state/variant are implied. The existing state machine below is unchanged.
+Numeric channel budgets and the trusted authentication-context API are
+implementation and release work, not acceptance blockers; RFC 0007 has accepted
+the SC1 contract.
 
 ## 1. State machine
 

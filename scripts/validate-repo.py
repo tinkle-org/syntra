@@ -55,7 +55,7 @@ def is_content_path(path):
     return True
 
 
-PROFILE_PATTERN = re.compile(r"\bSNTR-[A-Z0-9]+-V1\b")
+PROFILE_PATTERN = re.compile(r"\bSNTR-[A-Z0-9]+(?:-[A-Z0-9]+)*-V1\b")
 KNOWN_PROFILES = {
     "SNTR-CORE-V1", "SNTR-SESS-V1", "SNTR-RPC-V1", "SNTR-EVENTS-V1",
     "SNTR-TCP-V1", "SNTR-TLS-TCP-V1", "SNTR-HTTP-V1", "SNTR-HTTPS-H1-V1",

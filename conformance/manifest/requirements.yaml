@@ -922,17 +922,17 @@ requirements:
     notes: "No private-product/company/infrastructure dependency: attested by review (see independence verification; F-05 tracks the go_package exception)."
 
   # ---- RFC 0007 accepted SC1/WSS: registered cases; registration is not execution ----
-  - { requirement_id: SNTR-SC-001, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-003], automation_status: automated }
-  - { requirement_id: SNTR-SC-002, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-005], automation_status: automated }
-  - { requirement_id: SNTR-SC-003, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-002, CONF-SCW-013], automation_status: automated }
+  - { requirement_id: SNTR-SC-001, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-003, CONF-SCW-021], automation_status: automated }
+  - { requirement_id: SNTR-SC-002, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-005, CONF-SCW-019, CONF-SCW-021], automation_status: automated }
+  - { requirement_id: SNTR-SC-003, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-002, CONF-SCW-013, CONF-SCW-017], automation_status: automated }
   - { requirement_id: SNTR-SC-004, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-003, CONF-SCW-014], automation_status: automated }
   - { requirement_id: SNTR-SC-005, specification: specifications/security/secure-channel.md, section: "§1", test_ids: [CONF-SCW-003], automation_status: partially_automated,
       notes: "Fresh ephemerals and entropy-failure behavior are executable; randomness quality is not proven by a test." }
   - { requirement_id: SNTR-SC-006, specification: specifications/security/secure-channel.md, section: "§2", test_ids: [CONF-SCW-011, CONF-SCW-014], automation_status: automated }
-  - { requirement_id: SNTR-SC-007, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-005, CONF-SCW-009], automation_status: automated }
+  - { requirement_id: SNTR-SC-007, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-005, CONF-SCW-009, CONF-SCW-019, CONF-SCW-020, CONF-SCW-022, CONF-SCW-023], automation_status: automated }
   - { requirement_id: SNTR-SC-008, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-010], automation_status: automated }
   - { requirement_id: SNTR-SC-009, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-012], automation_status: automated }
-  - { requirement_id: SNTR-SC-010, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-013, CONF-SCW-014], automation_status: automated }
+  - { requirement_id: SNTR-SC-010, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-013, CONF-SCW-014, CONF-SCW-017, CONF-SCW-019, CONF-SCW-020, CONF-SCW-022, CONF-SCW-023], automation_status: automated }
   - { requirement_id: SNTR-SC-011, specification: specifications/security/secure-channel.md, section: "§3", test_ids: [CONF-SCW-012], automation_status: partially_automated,
       notes: "Adapter bounds and close behavior are executable with injected clocks; aggregate deployment budgets remain host-owned." }
   - { requirement_id: SNTR-SC-012, specification: specifications/security/secure-channel.md, section: "§4", test_ids: [CONF-SCW-012], automation_status: partially_automated,
@@ -949,14 +949,14 @@ requirements:
 
   # ---- RFC 0007 accepted carrier requirements: SNTR-SCW-001…012 ----
   - { requirement_id: SNTR-SCW-001, specification: specifications/transports/noise-bindings.md, section: "§1", test_ids: [CONF-SCW-001], automation_status: automated }
-  - { requirement_id: SNTR-SCW-002, specification: specifications/transports/noise-bindings.md, section: "§1", test_ids: [CONF-SCW-002, CONF-SCW-013], automation_status: automated }
-  - { requirement_id: SNTR-SCW-003, specification: specifications/transports/noise-bindings.md, section: "§3", test_ids: [CONF-SCW-003], automation_status: automated }
+  - { requirement_id: SNTR-SCW-002, specification: specifications/transports/noise-bindings.md, section: "§1", test_ids: [CONF-SCW-002, CONF-SCW-013, CONF-SCW-017], automation_status: automated }
+  - { requirement_id: SNTR-SCW-003, specification: specifications/transports/noise-bindings.md, section: "§3", test_ids: [CONF-SCW-003, CONF-SCW-021], automation_status: automated }
   - { requirement_id: SNTR-SCW-004, specification: specifications/transports/noise-bindings.md, section: "§3", test_ids: [CONF-SCW-004], automation_status: automated }
-  - { requirement_id: SNTR-SCW-005, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-005], automation_status: automated }
+  - { requirement_id: SNTR-SCW-005, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-005, CONF-SCW-019, CONF-SCW-021], automation_status: automated }
   - { requirement_id: SNTR-SCW-006, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-006], automation_status: automated }
   - { requirement_id: SNTR-SCW-007, specification: specifications/transports/noise-bindings.md, section: "§4", test_ids: [CONF-SCW-007], automation_status: automated }
   - { requirement_id: SNTR-SCW-008, specification: specifications/transports/noise-bindings.md, section: "§5", test_ids: [CONF-SCW-008], automation_status: automated }
-  - { requirement_id: SNTR-SCW-009, specification: specifications/transports/noise-bindings.md, section: "§6", test_ids: [CONF-SCW-009], automation_status: automated }
+  - { requirement_id: SNTR-SCW-009, specification: specifications/transports/noise-bindings.md, section: "§6", test_ids: [CONF-SCW-009, CONF-SCW-020, CONF-SCW-022, CONF-SCW-023], automation_status: automated }
   - { requirement_id: SNTR-SCW-010, specification: specifications/transports/noise-bindings.md, section: "§6", test_ids: [CONF-SCW-010], automation_status: automated }
   - { requirement_id: SNTR-SCW-011, specification: specifications/transports/noise-bindings.md, section: "§7", test_ids: [CONF-SCW-011, CONF-SCW-014], automation_status: automated }
   - { requirement_id: SNTR-SCW-012, specification: specifications/transports/noise-bindings.md, section: "§8", test_ids: [CONF-SCW-012], automation_status: partially_automated,
@@ -977,7 +977,7 @@ requirements:
     test_ids: []
     automation_status: manual
     notes: "Protected storage, wrap/unwrap and complete secret-erasure assurance are host-owned. Redacted diagnostics and scratch cleanup are reviewed, not proven by a wire case."
-  - { requirement_id: SNTR-DAUTH-005, specification: specifications/security/device-authorization.md, section: "§2", test_ids: [CONF-SCW-016], automation_status: partially_automated,
+  - { requirement_id: SNTR-DAUTH-005, specification: specifications/security/device-authorization.md, section: "§2", test_ids: [CONF-SCW-016, CONF-SCW-018], automation_status: partially_automated,
       notes: "Same-principal denial is executable with fixtures; the host identity store and current-enrollment check remain implementation evidence." }
   - requirement_id: SNTR-DAUTH-006
     specification: specifications/security/device-authorization.md
@@ -994,4 +994,4 @@ requirements:
   - { requirement_id: SNTR-DAUTH-008, specification: specifications/security/device-authorization.md, section: "§3", test_ids: [CONF-SCW-014], automation_status: partially_automated,
       notes: "Replayed M1 and generic refusal are executable; store timing, enumeration resistance and rate limits remain host evidence." }
   - { requirement_id: SNTR-DAUTH-009, specification: specifications/security/device-authorization.md, section: "§4", test_ids: [CONF-SCW-012], automation_status: automated }
-  - { requirement_id: SNTR-DAUTH-010, specification: specifications/security/device-authorization.md, section: "§4", test_ids: [CONF-SCW-011, CONF-SCW-016], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-010, specification: specifications/security/device-authorization.md, section: "§4", test_ids: [CONF-SCW-011, CONF-SCW-016, CONF-SCW-018], automation_status: automated }

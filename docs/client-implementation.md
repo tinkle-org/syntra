@@ -62,6 +62,10 @@ authenticated context. Neither AK nor handle is `connection_id`. M1/M2 payloads
 are empty; no credentials or RPCs are early data. Every reconnect uses fresh
 ephemeral material and directional traffic keys.
 
+The Upgrade MUST use `/syntra/v1/sc1/ws` and the exact subprotocol
+`syntra.sc1.v1`. The historical `syntra.sc1.draft1` identifier is not a v1
+alias and MUST be rejected.
+
 A conforming client completes TLS, Upgrade, SC1, hello and validated
 `ServerReady` within one bounded attempt (default 15 seconds, shortened by the
 caller). Channel establishment and first-record confirmation default to 5

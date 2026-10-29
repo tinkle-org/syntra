@@ -27,7 +27,7 @@ conformance green (that is the stable-release bar per `GOVERNANCE.md`
 Sec. 5). Known unresolved blockers MUST be listed in
 `audits/v1-release-readiness.md` and MUST block promotion to stable.
 
-### Accepted SC1 profile and release scope
+## Accepted SC1 profile and release scope
 
 [RFC 0007](rfcs/0007-secure-channel-device-authorization.md) and
 [ADR-011](specifications/decisions/ADR-011-noise-device-authorization.md) are

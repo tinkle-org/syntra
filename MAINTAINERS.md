@@ -6,7 +6,7 @@ rules.
 
 | Public account | Role | Scope |
 |---|---|---|
-| [oscarlaw](https://github.com/oscarlaw) | Active maintainer; repository owner | Normative acceptance, specification freeze, release authorization |
+| [oscarlaw](https://github.com/oscarlaw) | Active maintainer; repository owner | Normative acceptance including governance amendments, specification freeze, release authorization |
 
 The owner authority for the 2026-10-29 bootstrap transition was verified from
 the GitHub repository administration record for `tinkle-org/syntra`

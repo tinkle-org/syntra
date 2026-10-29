@@ -33,13 +33,13 @@ cases:
     input:
       transport:
         action: sc1_handshake
-        contexts: [SC1-CONTEXT-02, SC1-CONTEXT-03, SC1-CONTEXT-04]
+        contexts: [SC1-CONTEXT-02, SC1-CONTEXT-04]
         vectors: conformance/test-vectors/sc1/context-vectors.yaml
     expected:
       connection_state: ACTIVE
       session_state: active
-      transport: { context_matches: true, prologue_matches: true }
-    notes: "Exact context/prologue bytes for bootstrap and returning modes, including multibyte UTF-8 scope. The context MUST equal the prologue and the M1 prefix."
+      transport: { context_matches: true, prologue_matches: true, carrier: 3 }
+    notes: "Exact WSS context/prologue bytes for bootstrap and returning modes, including multibyte UTF-8 scope. The context MUST equal the prologue and the M1 prefix. SC1-CONTEXT-03 is exercised as a carrier-mismatch rejection in CONF-SCW-017."
 
   - id: CONF-SCW-003
     requirement: [SNTR-SCW-003, SNTR-SC-001, SNTR-SC-004, SNTR-SC-005]
@@ -90,14 +90,34 @@ cases:
     input:
       transport:
         action: send_ws_messages
-        message_kinds: [binary, text, fragmented_binary, compressed]
+        message_kinds: [binary, fragmented_binary]
         records_per_message: 1
         sc1_prefix: none
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-      transport: { binary_accepted: true, text_rejected: true, fragments_reassembled: true, compressed_rejected: true }
-    notes: "One reassembled binary message per M1, M2 or record, with no u16BE SC1 prefix. Ping/Pong/Close never complete an RPC or confirm a channel."
+      transport: { binary_accepted: true, fragments_reassembled: true, sc1_prefix: none }
+    notes: "Success path only: active-session protected records. One reassembled binary message per record, with no u16BE SC1 prefix. Ping/Pong/Close never complete an RPC or confirm a channel. Non-binary and malformed messages are covered by CONF-SCW-019; pre-session fragmented M1/M2 coverage is CONF-SCW-021."
+
+  - id: CONF-SCW-021
+    requirement: [SNTR-SCW-003, SNTR-SCW-005, SNTR-SC-002]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, handshake_started, valid_chain]
+    input:
+      transport:
+        action: send_ws_messages
+        message_kinds: [fragmented_m1, fragmented_m2]
+        records_per_message: 1
+        sc1_prefix: none
+        phase: pre_ready
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { fragments_reassembled: true, handshake_messages_intact: true }
+    notes: "Pre-session-activation probe: fragmented M1 and M2 are each reassembled into one binary message before Noise processing. This is separate from the active-session protected-record success path in CONF-SCW-005."
 
   - id: CONF-SCW-006
     requirement: [SNTR-SCW-006, SNTR-SC-013]
@@ -166,12 +186,11 @@ cases:
         plaintext_bytes: [1, 65519]
         ciphertext_bytes: [17, 65535]
         associated_data: empty
-        plaintext_65520: reject
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       transport: { max_plaintext: 65519, max_ciphertext: 65535, ad_empty: true }
-    notes: "Empty plaintext records are rejected. Oversize and truncated tags fail closed. Carrier headers are not authenticated AD."
+    notes: "Success path only: boundary record sizes and empty AD. Oversize, truncated-tag and non-empty-AD rejection is covered by CONF-SCW-020. Carrier headers are not authenticated AD."
 
   - id: CONF-SCW-010
     requirement: [SNTR-SCW-010, SNTR-SC-008]
@@ -313,10 +332,128 @@ cases:
         action: sc1_policy
         enrollment_principal: principal-a
         channel_principal: principal-b
-        denied_method: "/example.Admin/Reset"
     expected:
       connection_state: CLOSED
       session_state: none
       error: { code: PERMISSION_DENIED }
       hygiene: { absent_from: [credential, token] }
-    notes: "Returning policy principal differing from the trusted enrollment principal fails before ready; no privilege union. A denied method leaves the connection usable after ready and produces no effect. Empty credentials never select the channel principal."
+    notes: "Returning policy principal differing from the trusted enrollment principal fails before ready; no privilege union, ready or protected effect. Empty credentials never select the channel principal. Denied-method-after-ready behavior is CONF-SCW-018."
+
+  - id: CONF-SCW-017
+    requirement: [SNTR-SCW-002, SNTR-SC-003, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      transport:
+        action: sc1_handshake
+        contexts: [SC1-CONTEXT-03]
+        vectors: conformance/test-vectors/sc1/context-vectors.yaml
+        expected_carrier: 3
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "SC1-CONTEXT-03 encodes carrier 2 (WS). Under SNTR-SC1-WSS-V1 the responder requires carrier 3 and MUST reject this context before Noise or credential lookup. This vector is a negative case for this profile, not a WSS success vector."
+
+  - id: CONF-SCW-018
+    requirement: [SNTR-DAUTH-005, SNTR-DAUTH-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      credentials: "fixture:sc1-principal"
+      transport:
+        action: sc1_method_denial
+        principal: principal-a
+        method: "/example.Admin/Reset"
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: PERMISSION_DENIED }
+      hygiene: { absent_from: [credential, token] }
+    notes: "After ready, a denied method returns one terminal PERMISSION_DENIED result, has no handler effect and leaves the connection usable. This is distinct from the pre-ready principal mismatch in CONF-SCW-016."
+
+  - id: CONF-SCW-019
+    requirement: [SNTR-SCW-005, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: send_ws_messages
+        message_kinds: [text, compressed, empty, truncated]
+        records_per_message: 1
+        sc1_prefix: none
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+      transport: { text_rejected: true, compressed_rejected: true, empty_rejected: true, truncated_rejected: true }
+    notes: "Rejection path only: text, compressed, empty and truncated messages fail without protected dispatch. Binary and fragmented success is CONF-SCW-005."
+
+  - id: CONF-SCW-020
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 65520
+        ciphertext_bytes: 65536
+        tag: full
+        associated_data: empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the oversize condition: an otherwise valid record with plaintext 65,520 and ciphertext 65,536 fails closed. Boundary-size success with empty AD is CONF-SCW-009."
+
+  - id: CONF-SCW-022
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 1
+        ciphertext_bytes: 17
+        truncated_tag: true
+        associated_data: empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the truncated-tag condition: size bounds and AD are otherwise valid; the record fails closed."
+
+  - id: CONF-SCW-023
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 1
+        ciphertext_bytes: 17
+        tag: full
+        associated_data: non_empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the non-empty associated-data condition: size bounds and tag are otherwise valid; the record fails closed."

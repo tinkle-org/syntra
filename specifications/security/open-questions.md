@@ -83,10 +83,9 @@ security above or replace the baseline TLS profiles.
 
 ### Open blockers and deferred work
 
-1. **Authority and compatibility.** Assign authors and protocol/cryptographic
-   reviewers; accept the policy amendment proposed in
-   [ADR-011](../decisions/ADR-011-noise-device-authorization.md). Replacing required
-   profiles requires an explicit version/deprecation decision and migration window.
+1. **Profile replacement.** Replacing required profiles requires an explicit
+   version/deprecation decision and migration window. SC1/WSS is additive and
+   does not replace the baseline TLS profiles.
 2. **Enrollment and storage.** Only out-of-band preprovisioning is delivered.
    Authorized issuance, protected transfer/storage, durable commit/acknowledgment,
    bounded RPC contract, retries/idempotency and interrupted-enrollment recovery
@@ -100,7 +99,7 @@ security above or replace the baseline TLS profiles.
    bounded fragmentation. UDP remains deferred, not inferred from stream tests.
 5. **Independent verification and conformance.** Independent vectors,
    cross-implementation interoperability and full-composition security review
-   remain open against the [planned acceptance cases](../../conformance/plans/secure-channel.md).
-   No formal SC1 `CONF-*` cases or profiles are registered. Scoped executed
-   implementation evidence does not establish full conformance, production
-   acceptance, performance superiority or post-quantum security.
+   remain open. `SNTR-SC1-WSS-V1` and its `CONF-SCW-*` cases are registered, but
+   registration is not execution. Scoped implementation evidence does not
+   establish conformance, production acceptance, performance superiority or
+   post-quantum security.

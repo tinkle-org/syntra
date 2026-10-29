@@ -87,11 +87,12 @@ confirmation or RPC results.
 
 **SNTR-SCW-006** — The Upgrade request MUST target `/syntra/v1/sc1/ws` with no
 userinfo, query or fragment. The host MUST require the exact subprotocol
-`syntra.sc1.v1` and MUST validate the 101 response, `Upgrade` and `Connection`
-tokens, `Sec-WebSocket-Accept` and the selected subprotocol before accepting
-SC1 bytes. The host MUST reject `Authorization` and `Cookie` request headers.
-The client MUST NOT send a Syntra credential in the request target or Upgrade
-headers. `Origin` and forwarding headers MUST NOT be treated as authentication.
+`syntra.sc1.v1`, MUST reject `Authorization` and `Cookie` request headers, and
+MUST NOT treat `Origin` or forwarding headers as authentication. The client
+MUST validate the 101 response and its `Upgrade` and `Connection` tokens,
+`Sec-WebSocket-Accept` and selected subprotocol before sending any SC1 bytes;
+if validation fails, it MUST close and send no M1. The client MUST NOT send a
+Syntra credential in the request target or Upgrade headers.
 
 **SNTR-SCW-007** — The host MUST terminate TLS itself for the initial permitted
 topology in §8. A deployment that terminates TLS at a proxy MUST NOT claim

@@ -62,29 +62,31 @@ authenticator. Enrollment, credential storage and permissions stay host-owned;
 no particular account model is required. The public profile is
 `SNTR-SC1-WSS-V1`; SC1/WSS still requires verified outer TLS 1.3.
 
-The proposal adds a transport-independent channel layer below Syntra frames,
-with separate TCP, UDP and WebSocket mappings. It does not make the core
-open sockets, require a carrier library or implement application E2EE.
-Existing adapters remain optional implementations, not the definition of
-the protocol. No first-flight application effects or automatic security
-fallback are proposed.
+The accepted profile adds a transport-independent channel layer below Syntra
+frames, with separate TCP, WS and WSS mappings. It does not make the core open
+sockets, require a carrier library or implement application E2EE. Existing
+adapters remain optional implementations, not the definition of the protocol.
+No first-flight application effects or automatic security fallback are
+permitted. Independent verification remains a release gate; profile acceptance
+is complete.
 
 ```text
 Application: enrollment authority, stores, permissions, opaque payloads
 Syntra core: Frame, hello/ready, sessions, RPC and correlation
 SC1: established Noise implementation, channel state, protected records
-Carrier binding: TCP stream | UDP datagrams | WebSocket binary messages
+Carrier binding: TCP stream (development) | WSS | UDP deferred
 External carrier I/O supplied by the embedding application
 ```
 
-See the proposed [shared channel](security/secure-channel.md),
+See the accepted [shared channel](security/secure-channel.md),
 [device authorization](security/device-authorization.md),
-[carrier bindings](transports/noise-bindings.md), and [ADR-011](decisions/ADR-011-noise-device-authorization.md).
-These do not yet amend the baseline requirements in §§3/7/9 or ADR-008.
-Raw UDP is still deferred; existing HTTPS/WSS retain TLS, and a new
-Noise-in-WebSocket binding would not change existing WS/WSS wire formats.
-Persistent authorization is separate from logical-session recovery and RPC
-replay. Acceptance and independent verification are outstanding.
+[carrier binding](transports/noise-bindings.md), and
+[ADR-011](decisions/ADR-011-noise-device-authorization.md). They add
+`SNTR-SC1-WSS-V1` without removing the baseline requirements in §§3/7/9.
+Raw UDP is deferred; existing HTTPS/WSS retain TLS, and the SC1/WSS binding
+does not change existing WS/WSS wire formats. Persistent authorization is
+separate from logical-session recovery and RPC replay. Profile acceptance is
+complete; independent verification remains a release gate.
 
 ## 2. What Syntra is not
 
