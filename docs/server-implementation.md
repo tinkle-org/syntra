@@ -8,10 +8,10 @@ table + §4, `SNTR-RPC-030/031/032`, errors `SNTR-ERR-020/021`, reliability
 `SNTR-REL-030/031`, transport server sections, security `SNTR-ASEC-*`.
 
 Current listener and handshake instructions below retain the baseline TLS
-requirements and existing executable profiles. The SC1 section describes
-delivered experimental draft-1 behavior and host obligations; the design in
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
-Proposed ADR-011 still requires acceptance.
+requirements and existing executable profiles. [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+and ADR-011 are accepted; the SC1 section describes the accepted
+`SNTR-SC1-WSS-V1` host obligations. Exact bytes and limits are in
+[noise-bindings.md](../specifications/transports/noise-bindings.md).
 
 ## Listener profiles
 
@@ -55,15 +55,16 @@ documented. Never log, persist, echo, or metric-label credential material.
 Bind exactly one principal at `ServerReady` for the connection lifetime;
 principal change requires a new connection.
 
-## Experimental SC1 draft-1: host authorization boundary
+## SC1 v1: host authorization boundary
 
-Delivered TCP/WS/WSS adapters use bootstrap
-`Noise_NK_25519_ChaChaPoly_SHA256` and returning
+SC1/WSS uses bootstrap `Noise_NK_25519_ChaChaPoly_SHA256` and returning
 `Noise_NKpsk0_25519_ChaChaPoly_SHA256`. Both handshake payloads are empty.
-Bootstrap authenticates the pinned host, not an enrolled client, and grants
-no enrollment permission. Returning proves AK possession, but M1 is replayable:
+Bootstrap authenticates the pinned host, not an enrolled client, and grants no
+enrollment permission. Returning proves AK possession, but M1 is replayable:
 the host requires an authenticated client record under fresh keys before
-channel evidence is confirmed. The encrypted hello normally supplies it.
+channel evidence is confirmed. The first authenticated envelope is exactly one
+complete framed `ClientHello`, with no trailing envelope; it may span records.
+Host policy runs before `ready`.
 
 `HostConfig.ChannelPolicy` replaces ordinary `Policy` and requires confirmed
 `ChannelIdentityProvider` evidence. It receives mode, carrier, exact scope,

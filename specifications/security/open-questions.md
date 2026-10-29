@@ -26,35 +26,40 @@
 
 - No custom cryptography, no application E2EE in core, no URL credentials, TLS≠idempotency, opaque discipline, at-most-once default — closed per charter/ADRs; reopening REQUIRES a major RFC with migration and threat re-analysis.
 
-## RFC 0007 blockers (proposal-specific)
+## RFC 0007 accepted decisions and remaining gates
 
-[Draft RFC 0007 §10](../../rfcs/0007-secure-channel-device-authorization.md#10-unresolved-questions-and-blockers)
-owns these blockers. Its [shared channel](secure-channel.md),
-[device authorization](device-authorization.md) and
-[carrier candidates](../transports/noise-bindings.md) describe a selected
-target, not an exception to current TLS policy or the blockers above.
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) is accepted.
+Its [shared channel](secure-channel.md), [device authorization](device-authorization.md)
+and [carrier profile](../transports/noise-bindings.md) are normative for
+`SNTR-SC1-WSS-V1`. The profile is additive: it does not weaken transport
+security above or replace the baseline TLS profiles.
 
-### Implemented experimental definitions (acceptance pending)
+### Accepted definitions
 
-- **Context/carriers.** The [draft-1 carrier contract](../transports/noise-bindings.md)
-  specifies exact domain `syntra.sc1.draft1`, mode/carrier/server-key selector,
-  epoch, handle and exact UTF-8 scope bytes, carried before M1 and authenticated
-  as the Noise prologue. TCP wraps every handshake/record in `u16BE`; WS/WSS
-  use one binary message per handshake/record with exact case-sensitive
-  subprotocol `syntra.sc1.draft1`. These implemented definitions are not design
-  TBDs or accepted profile identifiers. Existing WS/WSS bytes and browser outer
-  TLS remain unchanged; HTTP/HTTPS request-response is excluded from SC1 scope.
-- **Authentication/resources.** `ChannelIdentity`/`ChannelPolicy`, fresh client
-  confirmation, fail-closed method authorization, bounded ordered adapters and
-  the post-ready host async writer are implemented. Numeric defaults and limits
-  are concrete in the [implementation evidence ledger](../../docs/sc1-implementation.md),
-  not new accepted core requirements. No automatic reconnect, replay or fallback
-  is provided. Replayed M1 supplies no fresh client confirmation.
-- **Executed verification.** Local unit/race/native-core tests and six
-  same-implementation Docker groups (TCP/WS/WSS × NK/NKpsk0) are recorded in
-  the ledger. They are not independent cryptographic/runtime interoperability,
-  accepted conformance cases or a security audit. In-memory benchmark results
-  are not TLS comparisons.
+- **Context/carriers.** The [SC1/WSS mapping](../transports/noise-bindings.md)
+  defines exact domain `syntra.sc1.v1`, mode/carrier/server-key selector, epoch,
+  handle and exact UTF-8 scope bytes, carried before M1 and authenticated as the
+  Noise prologue. TCP wraps every handshake/record in `u16BE`; WS/WSS use one
+  binary message per handshake/record with the exact subprotocol
+  `syntra.sc1.v1` at `/syntra/v1/sc1/ws`. The `draft-1` and local-revision-1
+  formats are historical and are not aliases. Existing WS/WSS bytes remain
+  unchanged; HTTP/HTTPS request-response is excluded from SC1.
+- **First envelope.** The first authenticated plaintext is exactly one complete
+  framed `ClientHello`; it may span records, and the completing record ends at
+  the hello boundary. No second complete or partial envelope is permitted
+  there. Host policy runs before `ready` and before protected effects.
+- **Authentication/resources.** Fresh client confirmation, fail-closed method
+  authorization, bounded ordered adapters and the post-ready host writer are
+  required. The accepted defaults and maxima are in
+  [noise-bindings.md](../transports/noise-bindings.md) §8. No automatic
+  reconnect, replay or fallback is provided. Replayed M1 supplies no fresh
+  client confirmation.
+- **Executed verification.** The Rust implementation records local
+  unit/race/native-core/transport tests and security checks as implementation
+  evidence. They are not independent cryptographic/runtime interoperability,
+  executed `CONF-SCW-*` verdicts or a security audit. Independent vectors,
+  pure-Go/Rust both-role and both-mode runs, direct-topology tests,
+  mobile/recovery evidence and independent human review remain release gates.
 
 ### Partial integration and responsibilities
 

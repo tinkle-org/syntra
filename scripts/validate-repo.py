@@ -60,6 +60,7 @@ KNOWN_PROFILES = {
     "SNTR-CORE-V1", "SNTR-SESS-V1", "SNTR-RPC-V1", "SNTR-EVENTS-V1",
     "SNTR-TCP-V1", "SNTR-TLS-TCP-V1", "SNTR-HTTP-V1", "SNTR-HTTPS-H1-V1",
     "SNTR-HTTPS-H2-V1", "SNTR-WS-V1", "SNTR-WSS-H1-V1",
+    "SNTR-SC1-WSS-V1",
 }
 KNOWN_CAPABILITIES = {"events-v1", "events-replay-v1", "resume-v1", "syntra.update-recovery/1", "syntra.reliable-session/1"}
 KNOWN_AUTOMATION = {"automated", "partially_automated", "manual", "not_testable"}
@@ -561,7 +562,60 @@ def check_vectors():
                     and needle not in str(fx.get("bad", "")):
                 err("conformance/test-vectors/websocket/fixtures.yaml",
                     f"fixture {fx.get('id')} kind {kind} missing marker {needle!r}")
-    print("vectors: protobuf/TCP/HTTP/WS fixtures checked")
+    # SC1 v1 context/prologue fixtures: public encoding only, no keys/ciphertext.
+    sc1_path = tv / "sc1" / "context-vectors.yaml"
+    if sc1_path.exists():
+        sc1 = yaml.safe_load(sc1_path.read_text())
+        seen = set()
+        for v in sc1.get("vectors", []):
+            vid = v.get("id")
+            if not vid or vid in seen:
+                err(sc1_path, f"SC1 vector has missing/duplicate id {vid}")
+                continue
+            seen.add(vid)
+            try:
+                ctx = binascii.unhexlify(v["context_hex"])
+                pro = binascii.unhexlify(v["prologue_hex"])
+            except (binascii.Error, ValueError, KeyError):
+                err(sc1_path, f"vector {vid} has invalid hex")
+                continue
+            if pro != ctx:
+                err(sc1_path, f"vector {vid} prologue differs from context")
+            if len(ctx) < 37:
+                err(sc1_path, f"vector {vid} shorter than the 37-byte fixed context")
+                continue
+            scope_len = int.from_bytes(ctx[35:37], "big")
+            if not (1 <= scope_len <= 255):
+                err(sc1_path, f"vector {vid} scope length {scope_len} out of range")
+            if len(ctx) != 37 + scope_len:
+                err(sc1_path, f"vector {vid} length {len(ctx)} != 37 + scope length {scope_len}")
+            if v.get("context_bytes") != len(ctx):
+                err(sc1_path, f"vector {vid} context_bytes {v.get('context_bytes')} != {len(ctx)}")
+            if v.get("m1_bytes") != len(ctx) + 48:
+                err(sc1_path, f"vector {vid} m1_bytes {v.get('m1_bytes')} != context + 48")
+            if ctx[:13] != b"syntra.sc1.v1":
+                err(sc1_path, f"vector {vid} domain is not syntra.sc1.v1")
+            if ctx[13] != v.get("mode") or ctx[14] != v.get("carrier"):
+                err(sc1_path, f"vector {vid} mode/carrier mismatch")
+            if int.from_bytes(ctx[15:19], "big") != v.get("server_key_id"):
+                err(sc1_path, f"vector {vid} server_key_id mismatch")
+            if int.from_bytes(ctx[19:27], "big") != v.get("epoch"):
+                err(sc1_path, f"vector {vid} epoch mismatch")
+            if ctx[27:35].hex() != v.get("handle_hex", "").lower():
+                err(sc1_path, f"vector {vid} handle mismatch")
+            try:
+                scope = ctx[37:37 + scope_len].decode("utf-8")
+            except UnicodeDecodeError:
+                err(sc1_path, f"vector {vid} scope is not UTF-8")
+                continue
+            if scope != v.get("scope"):
+                err(sc1_path, f"vector {vid} scope mismatch")
+        for rec in sc1.get("negative_recipes", []):
+            if rec.get("base") not in seen:
+                err(sc1_path, f"negative recipe {rec.get('id')} references unknown base")
+            if rec.get("expected") != "reject-before-noise":
+                err(sc1_path, f"negative recipe {rec.get('id')} has unexpected expectation")
+    print("vectors: protobuf/TCP/HTTP/WS/SC1 fixtures checked")
 
 
 # --------------------------------------------------------------------------

@@ -79,12 +79,12 @@ if allowed, gets least privilege. Document expiry/revocation propagation
 windows — clients treat post-expiry RPCs as `UNAUTHENTICATED` and
 reconnect with fresh credentials.
 
-### Experimental SC1 device policy
+### Accepted SC1 device policy
 
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md), not
-an Accepted RFC, selects transport-independent SC1 with initial
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is accepted and
+adds `SNTR-SC1-WSS-V1` with initial
 `Noise_NK_25519_ChaChaPoly_SHA256` enrollment and returning
-`Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels. The selected
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels. The accepted
 [device model](../specifications/security/device-authorization.md) gives
 each device a unique random shared 32-byte AK and opaque 8-byte `auth_id`
 lookup handle. Hosts own enrollment permission, protected storage,
@@ -100,14 +100,14 @@ client transport record before protected actions. Syntra hello/ready
 remains necessary. Returning authentication does not resume a Syntra
 session, restore subscriptions, or make an RPC safe to retry.
 
-The proposed [secure channel](../specifications/security/secure-channel.md)
+The accepted [secure channel](../specifications/security/secure-channel.md)
 protects the peer-to-host path, not application E2EE. Its
-[TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md) do
-not change current TLS requirements or executable profiles. TCP/WS/WSS have
-executed draft-1 implementations; UDP is deferred and SC1 HTTP/HTTPS
-request-response is excluded. Existing
-HTTPS/WSS TLS compatibility remains; browser `wss://` retains outer TLS,
-and Noise-in-WS is distinct from current WS/WSS wire mappings.
+[WSS mapping and restricted TCP/WS carriers](../specifications/transports/noise-bindings.md)
+do not change existing TLS requirements or executable baseline profiles.
+SC1/WSS requires verified outer TLS 1.3 plus the provisioned Noise pin; TCP/WS
+are development-only; UDP is deferred and SC1 HTTP/HTTPS request-response is
+excluded. Browser `wss://` retains outer TLS, and Noise-in-WS is distinct from
+the baseline WS/WSS frame mappings.
 
 The [implementation record](sc1-implementation.md#authentication-boundary)
 defines the trusted channel-policy hook. It receives confirmed channel identity

@@ -17,15 +17,15 @@ Implementation tests are evidence, never the source of truth
 (ADR-010, SYN-ARCH-041). This
 repository is pre-release.
 
-Planned Draft RFC 0007 coverage for secure channels and device authorization is
-recorded in [`plans/secure-channel.md`](plans/secure-channel.md). Its 25 proposed
-requirements retain manual acceptance traceability and empty formal `test_ids`:
-no SC1 `CONF-*` cases or active profiles are registered. Executed experimental
-TCP/WS/WSS unit, race and Docker integration tests, with measured in-memory
-benchmarks, are recorded separately in the
-[implementation evidence ledger](../docs/sc1-implementation.md). They are not
-full conformance or independent interoperability and do not authorize
-production Noise or amend the TLS policy.
+RFC 0007 is accepted. `SNTR-SC1-WSS-V1` is registered in
+[`profiles.yaml`](profiles.yaml) with executable case specifications in
+[`manifest/sc1-wss.yaml`](manifest/sc1-wss.yaml); the companion
+[`plans/secure-channel.md`](plans/secure-channel.md) retains historical
+manual-observation mapping. Registration is not execution: no `CONF-SCW-*`
+verdict is claimed. Rust implementation tests and measured in-memory benchmarks
+are recorded separately in the [implementation evidence ledger](../docs/sc1-implementation.md);
+they are not full conformance or independent interoperability. The profile is
+additive and does not remove the TLS policy.
 
 > A completely separate repository or a third-party implementation in any
 > language MUST be able to read these files and build its own conformance
@@ -212,7 +212,7 @@ conformance/
   profiles.yaml              — machine-readable profile definitions (§2)
   claims.md                  — badge / claim wording rules (§8)
   declaration.example.yaml   — implementation declaration template (§7)
-  plans/secure-channel.md    — Draft RFC 0007 manual/planned acceptance cases
+  plans/secure-channel.md    — RFC 0007 companion plan and historical observation mapping
   manifest/
     README.md                — manifest format + field reference (§C)
     schema.yaml              — machine-readable schema for manifests

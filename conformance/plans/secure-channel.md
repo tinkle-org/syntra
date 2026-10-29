@@ -1,33 +1,37 @@
 # Secure channel and device authorization acceptance plan
 
-- Status: manual acceptance plan for Draft RFC 0007; executed implementation evidence mapped below, no registered SC1 conformance cases.
-- Proposal: `rfcs/0007-secure-channel-device-authorization.md`.
+- Status: accepted companion plan for RFC 0007; formal cases are registered in [`../manifest/sc1-wss.yaml`](../manifest/sc1-wss.yaml), but registration is not execution.
+- Owner: `rfcs/0007-secure-channel-device-authorization.md`.
 - Requirement owners: `specifications/security/secure-channel.md`
-  (`SNTR-SC-001` through `SNTR-SC-015`) and
+  (`SNTR-SC-001` through `SNTR-SC-015`),
   `specifications/security/device-authorization.md`
-  (`SNTR-DAUTH-001` through `SNTR-DAUTH-010`).
-- Informative carrier mapping: `specifications/transports/noise-bindings.md`;
-  it contributes no additional requirement IDs.
-- Evidence: executed local and same-implementation integration checks are retained
-  in [the implementation ledger](../../docs/sc1-implementation.md). Independent
-  Rust–Go interoperability and formal SC1 conformance remain unverified.
+  (`SNTR-DAUTH-001` through `SNTR-DAUTH-010`) and
+  `specifications/transports/noise-bindings.md`
+  (`SNTR-SCW-001` through `SNTR-SCW-012`).
+- Profile: `SNTR-SC1-WSS-V1`; see [`../profiles.yaml`](../profiles.yaml).
+- Evidence: the Rust implementation records local and same-implementation
+  integration checks in its `AUDIT.md` and `docs/implementation-status.md`.
+  Independent Rust–Go interoperability, executed `CONF-SCW-*` verdicts and
+  independent security review remain outstanding.
 
 ## 1. Scope, authority, and prerequisites
 
-This document records proposed acceptance observations for RFC review. All
-33 `PLAN-*` references below are local planning references, not registered
-`CONF-*` tests, profiles, capabilities, or results. Their `manual` dispositions
-in `../manifest/requirements.yaml` identify formal acceptance work awaiting review and execution;
-they do not assert that a manual check has passed. The existing schema permits
-`automation_status: manual`, empty `test_ids`, and explanatory `notes`.
+This document retains the manual-observation plan and its historical
+draft-1 evidence. The normative v1 contract is RFC 0007 §11.4 and
+`specifications/transports/noise-bindings.md`; the executable case
+specifications are `../manifest/sc1-wss.yaml`. All 33 `PLAN-*` references below
+are local planning references, not registered `CONF-*` tests or executed
+results. The `CONF-SCW-*` cases are registered; no verdict is implied.
 
-Draft RFC 0007 is not shipping authority. This plan neither authorizes production
-Noise nor establishes secure-channel, device-authorization, or UDP conformance.
-The existing profiles and claim rules continue to define their own boundaries.
+RFC 0007 is accepted, but acceptance does not authorize a stable release or
+establish secure-channel, device-authorization or UDP conformance. The existing
+profiles and claim rules continue to define their own boundaries. TCP/WS remain
+restricted development carriers, WSS is the public profile, and UDP is deferred.
 
 ### Implementation evidence versus acceptance
 
-The following observations have been executed for experimental draft-1. The
+The following observations were executed for the historical experimental
+draft-1 implementation. The
 ledger records environment, scope and limitations. This mapping is not a
 per-`CONF-*` result declaration and does not turn `PLAN-*` into test IDs.
 
@@ -92,12 +96,11 @@ allocation/write hooks, and injected clocks. Deterministic crypto fixtures will
 need independently checked provenance and complete inputs after context bytes are
 fixed. This plan supplies no fabricated golden ciphertext. Statistical samples
 alone do not prove entropy quality or the absence of timing oracles.
-
-The empty-payload Noise bodies total **96 bytes** in either mode. Experimental
-draft-1 additionally carries the full `41 + S`-byte context, where scope byte
-length `S` is 1–255: **138–392 bytes before carrier framing**, or **142–396 bytes
-over TCP** including the two length prefixes. These exclude carrier establishment,
-Syntra hello/ready and traffic confirmation; they are not total readiness costs.
+The empty-payload Noise bodies total **96 bytes** in either mode. Canonical v1
+carries the `37 + S`-byte context, where scope byte length `S` is 1–255:
+**134–388 bytes before carrier framing**, or **138–392 bytes over TCP**
+including the two length prefixes. These exclude carrier establishment, Syntra
+hello/ready and traffic confirmation; they are not total readiness costs.
 
 ## 3. Secure-channel requirement cases (all manual / planned)
 
@@ -136,8 +139,8 @@ Maps `SNTR-SC-003`.
   specified by that contract.
 - Negatives: alter one byte of each bound component, swap roles/carriers, omit
   or reorder fields, or use an ambiguously encoded length; authentication fails
-   without dispatch. Use the concrete draft-1 field inventory for experimental checks;
-  semantic equivalence is not a substitute for transcript binding.
+   without dispatch. Use the canonical v1 context vectors for exact checks;
+   semantic equivalence is not a substitute for transcript binding.
 
 ### PLAN-SC-004 — empty handshake payloads and no early effects
 
@@ -427,7 +430,7 @@ they add no requirement IDs and establish no transport profile.
 
 Maps `SNTR-SC-007`, `SNTR-SC-008`, `SNTR-SC-011`.
 
-- Success: using the concrete draft-1 header formats, split every record prefix byte,
+- Success: using the canonical v1 header formats, split every record prefix byte,
   encrypted body, and tag across reads (including one-byte reads); coalesce
   multiple records into a read and several logical frames into a stream. Use
   accepted segmentation for a frame larger than one Noise plaintext record,

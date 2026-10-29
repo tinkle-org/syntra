@@ -52,23 +52,23 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WSS-030** — Exactly one complete binary WebSocket message contains exactly one serialized Syntra `Frame`. Binary-only (opcode 0x2); text (0x1) is invalid and closes with 1003; empty binary messages are protocol errors; fragmentation with reassembly-before-decode is REQUIRED; frame boundaries are irrelevant; decode runs on assembled bytes; the maximum assembled size is the effective maximum envelope size (default 1 MiB) enforced during assembly with code 1009 on exceedance. All per SNTR-WS-030…035, incorporated without change.
 
-### Separate experimental ciphertext binding (informative)
+### Separate SC1 ciphertext binding (informative)
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-and its [WebSocket carrier candidate](noise-bindings.md#3-websocket-message-candidate)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and its [SC1/WSS mapping](noise-bindings.md#4-wss-mapping)
 place channel handshake messages/ciphertexts in binary messages rather than
-serialized `Frame`s. Implemented draft-1 selects the exact subprotocol
-`syntra.sc1.draft1` and the WSS carrier value in its authenticated context;
-formal profile registration and RFC acceptance remain open. It cannot reuse `SNTR-WSS-H1-V1`
-or `syntra.v1` for different bytes. Its fresh channel keys and subsequent
-Syntra authorization do not replace Origin/admission policy or resume
-an old session.
+serialized `Frame`s. The registered `SNTR-SC1-WSS-V1` profile selects the exact
+subprotocol `syntra.sc1.v1`, endpoint `/syntra/v1/sc1/ws` and WSS carrier value
+`3` in its authenticated context. It cannot reuse `SNTR-WSS-H1-V1` or
+`syntra.v1` for different bytes. Its fresh channel keys and subsequent Syntra
+authorization do not replace Origin/admission policy or resume an old session.
+The initial permitted topology is direct verified TLS termination by the host.
 
 Browser `wss://` still establishes outer TLS before the Upgrade even if a
 new selected binding protects binary messages inside it. This profile keeps
 its current one-message-one-`Frame` mapping, certificate/hostname checks,
-no-prefix rule and SNTR-WSS-900/901 coverage. RFC 0007 and proposed ADR-011
-do not waive the existing TLS production policy before acceptance.
+no-prefix rule and SNTR-WSS-900/901 coverage. RFC 0007 and ADR-011 add a
+separate SC1 profile and do not waive the existing TLS production policy.
 The [implementation ledger](../../docs/sc1-implementation.md) records verified
 WSS integration, wrong-host/untrusted-CA rejection and the limits of that evidence.
 

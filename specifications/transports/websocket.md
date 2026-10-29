@@ -59,15 +59,15 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-WS-030** — Normative mapping: exactly one complete binary WebSocket message (opcode 0x2, assembled across all its constituent frames) contains exactly one serialized Syntra `Frame` (envelope). Peers MUST send each `Frame` as a single binary message and MUST decode each received binary message as exactly one `Frame`. One WebSocket frame is not one Syntra envelope; one complete binary message is one Syntra envelope.
 
-The [WebSocket Noise candidate](noise-bindings.md#3-websocket-message-candidate)
-under [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-implements experimental draft-1 with one M1, M2 or bounded ciphertext per
-complete binary message. Authenticated plaintext feeds
-an inner length-prefixed envelope stream, potentially spanning messages.
-That is a distinct binding requiring a different profile identifier and
-explicit endpoint/subprotocol selection, not `SNTR-WS-V1` or `syntra.v1`.
-This profile's binary-message-to-`Frame`, no-prefix, close and test rules
-remain unchanged; it stays restricted-development under current TLS policy.
+The [SC1/WSS mapping](noise-bindings.md#4-wss-mapping)
+under [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+implements v1 with one M1, M2 or bounded ciphertext per complete binary
+message. Authenticated plaintext feeds an inner length-prefixed envelope
+stream, potentially spanning messages. That is a distinct binding requiring
+the `SNTR-SC1-WSS-V1` profile and explicit endpoint/subprotocol selection,
+not `SNTR-WS-V1` or `syntra.v1`. This profile's binary-message-to-`Frame`,
+no-prefix, close and test rules remain unchanged; plaintext WS stays
+restricted-development.
 The proposed shared channel uses fresh ephemeral/directional keys on every
 new carrier connection, even with a persistent enrollment AK; it restores no
 logical session, subscriptions or in-flight RPCs. The exact context and

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
 development, changes land under `Unreleased`.
 
+## [Unreleased]
+
+### Added
+
+- Accepted the 2026-10-29 bootstrap governance transition: roster-based
+  approval rule, `MAINTAINERS.md`, and
+  `docs/decisions/0001-bootstrap-ratification.md`.
+- Accepted RFC 0007 and ADR-011. Added the canonical `syntra.sc1.v1` carrier
+  mapping, `SNTR-SCW-001`–`SNTR-SCW-012`, and the `SNTR-SC1-WSS-V1` profile
+  with `CONF-SCW-001`–`CONF-SCW-016` case specifications.
+- Added public SC1 context/prologue vectors under
+  `conformance/test-vectors/sc1/`.
+
+### Changed
+
+- Replaced the experimental `syntra.sc1.draft1` carrier documentation with the
+  accepted v1 WSS mapping. Draft-1 and local-revision-1 remain historical and
+  are not aliases.
+- Made the release checklist and Core conformance claim rule scope-aware: a
+  single named transport is sufficient for a Core claim; a two-transport proof
+  is required only for a transport-independence claim.
+- Marked the Go draft-1 implementation ledger historical; current Rust
+  implementation evidence is recorded downstream and is not a conformance
+  result.
+
 ## [v1.0.0-rc.1] - 2026-10-22 (release candidate, not stable)
 
 First release candidate scope (protocol v1) for external Rust/Go imports.

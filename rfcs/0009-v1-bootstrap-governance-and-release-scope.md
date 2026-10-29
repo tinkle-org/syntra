@@ -2,19 +2,20 @@
 
 - RFC: 0009
 - Title: Explicit sole-maintainer ratification, specification acceptance, and WSS-first release gates
-- Author(s): TBD — blocker (public owner assignment)
-- Status: Draft
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-29
-- Target version: pre-stable governance transition and v1 release-scope proposal; no wire activation
+- Target version: pre-stable governance transition and v1 release-scope decision; no wire activation by this RFC
 - Relates to: GOVERNANCE.md §§2–6/8; CONTRIBUTING.md §4; RFC process; RFCs 0001–0008; RELEASE.md; docs/mobile-v1-delivery.md; conformance/claims.md
-- Reviewers: TBD — blocker (public protocol/process and security assignments)
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
-This document proposes a governance amendment; it does not enact one. Current
-[governance](../GOVERNANCE.md#3-who-approves-normative-changes) still requires
-two maintainer approvals, including for governance changes. The owner's
-selection of this direction is not a public ratification record, RFC acceptance,
-security review, conformance result, or release authorization. No approval is
-inferred from this RFC's publication or merge.
+This document records the accepted governance amendment. The public bootstrap
+ratification is [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md);
+the active roster is [MAINTAINERS.md](../MAINTAINERS.md). The prior
+two-maintainer quorum was not met; the transition is a one-time owner-ratified
+bootstrap act, not a second approval. Acceptance of this RFC does not accept
+RFCs 0001–0008, activate wire behavior, register a profile or authorize a
+release.
 
 ## 1. Summary
 
@@ -24,7 +25,7 @@ acceptance of a specification from activation in its owning documents and
 from authorization of a stable production release. Select canonical SC1 over
 verified TLS 1.3 WSS, standardized update recovery, and applicable mobile
 lifecycle evidence for the first stable bundle. Other transport claims remain
-independent. This proposal changes no peer behavior, schema, profile registry,
+independent. This RFC changes no peer behavior, schema, profile registry,
 or current production policy.
 
 ## 2. Motivation
@@ -49,10 +50,10 @@ needed, not an accidental extra implementation dependency.
 
 ## 3. Proposal
 
-The following clauses are proposed replacement/addition text for the owners
+The following clauses are the accepted replacement/addition text for the owners
 listed in §4. They allocate no wire requirement IDs or conformance case IDs.
 Initiator/host obligations, schema fields, errors, timers, and connection states
-are unchanged by this proposal; RFCs 0001–0008 retain their own approval gates.
+are unchanged by this RFC; RFCs 0001–0008 retain their own approval gates.
 
 ### D1. Disclose and ratify the bootstrap transition
 
@@ -136,7 +137,7 @@ The first stable bundle requires the following reviewed and activated contracts:
 | SC1/WSS | Canonical RFC 0007 §11 bytes over verified TLS 1.3 WSS, independent server-key pinning, both bootstrap NK and returning NKpsk0 modes |
 | Update recovery | Accepted RFC 0006 contract, explicit per-connection negotiation, required recovery behavior, persistence and snapshot crash evidence |
 | Mobile/runtime | Accepted RFC 0008 lifecycle, replacement fencing, deadlines, reconnect, bounded execution/shutdown, supported iOS/Android integration evidence |
-| Host deployment | Reviewed authorization/storage/rotation/revocation contract and at least one specified and tested permitted proxy topology |
+| Host deployment | Reviewed authorization/storage/rotation/revocation contract and at least one specified and tested permitted deployment topology. The accepted initial topology is direct verified TLS 1.3 WSS termination by the host; proxy termination is deferred and cannot be claimed until separately specified and tested (acceptance amendment, §11.2) |
 
 The SC1/WSS identifier is allocated by the accepted carrier/profile work, not
 by this RFC. SC1/WSS ciphertext records do not reuse the baseline WSS frame
@@ -193,8 +194,8 @@ development merges do not constitute that authorization.
 
 ## 4. Detailed design and activation map
 
-This proposal is the first specification-first delivery increment. It adds
-no runtime or generated bindings, profile registration, automatic approval
+This accepted decision is the first specification-first delivery increment. It
+adds no runtime or generated bindings, profile registration, automatic approval
 checker, or changed validator expectations.
 
 | Proposed decision | Activation owner changes after ratification/acceptance |
@@ -236,7 +237,7 @@ The proposed Go package migration is not authorized here. Its later decision
 identifies exact option changes, downstream imports and FILE/source impact;
 preserve immutable archives, keep STANDARD/FILE, and review any candidate
 baseline transition explicitly. No baseline or compatibility failure is
-hidden or rewritten by this proposal. `MIGRATION.md` and `CHANGELOG.md` are
+hidden or rewritten by this RFC. `MIGRATION.md` and `CHANGELOG.md` are
 updated with the actual authorized changes when they land.
 
 ## 7. Security considerations
@@ -269,7 +270,7 @@ reviewer identity or artifact authenticity; those are verified during review.
 - [ ] In the later evidence-tooling increment, add executable rejection tests
   for invalid records, incomplete role/mode matrices and missing required cases.
 
-No runtime conformance test is added: this proposal activates no wire behavior.
+No runtime conformance test is added: this RFC activates no wire behavior.
 The [record template](../docs/decision-record-template.md) describes human
 review checks, not an implemented machine validator or a successful review.
 
@@ -284,18 +285,68 @@ published transport specifications are not mistaken for certified implementation
 
 ## 10. Unresolved questions and blockers
 
-1. Public owner identity, ratification link and active roster: TBD — blocker.
+1. Public owner identity, ratification link and active roster: resolved by
+   [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md) and
+   [MAINTAINERS.md](../MAINTAINERS.md).
 2. Named protocol/process and human security review assignments and results:
-   TBD — blocker; no reviewer or qualification is invented here.
+   process review is recorded as self-review by the sole maintainer. Independent
+   production security review remains a release gate and is not claimed.
 3. RFCs 0001–0008 consolidated approvals, compatibility decisions and owning
-   activation: pending; this RFC is not their acceptance record.
-4. SC1/WSS profile registration and exact requirement/case selection: pending
-   acceptance and synchronized conformance work, not allocated here.
+   activation: pending their individual decisions; this RFC is not their
+   acceptance record.
+4. SC1/WSS profile registration and exact requirement/case selection: activated
+   by the accepted RFC 0007 decision and the registered
+   `SNTR-SC1-WSS-V1` profile; see §11.
 5. Independent vectors, both-role/mode results, host/proxy lifecycle evidence,
-   supported mobile runs and independent composition approval: pending release
-   gates, not fulfilled by repository checks.
+   supported mobile runs and independent composition review: pending release
+   gates, not fulfilled by repository checks. The initial permitted topology is
+   direct verified TLS 1.3 WSS; proxy termination is deferred.
 6. Decision/evidence machine validation and stable-promotion guards: pending
    tooling increment. Existing release automation is not changed by this RFC.
+
+## 11. Acceptance decision (2026-10-29)
+
+Decision state: accepted by the sole active maintainer under the bootstrap rule
+in §3 D2. Author and approver are the same person; self-approval is disclosed.
+This decision covers governance/process and the release-scope selection only.
+It does not accept RFCs 0001–0008, activate wire behavior, register a profile,
+or authorize a stable release.
+
+Reviewed content: `tinkle-org/syntra` at
+`94404d7378136d8b6c88ece28bf945c88d1653ba` plus the accepted governance/roster
+diff. The public bootstrap act is
+[Decision 0001](../docs/decisions/0001-bootstrap-ratification.md).
+
+### 11.1 Accepted policy changes
+
+- `GOVERNANCE.md` §§2/3 adopt the roster-based approval rule in D2.
+- `CONTRIBUTING.md` §4 and `rfcs/README.md` reference the same rule.
+- `MAINTAINERS.md` publishes the initial active roster.
+- Acceptance, specification freeze and stable release remain separate
+  milestones as proposed in D3.
+
+### 11.2 Accepted release-scope amendments
+
+The first stable bundle remains SC1/WSS, standardized recovery and applicable
+mobile lifecycle evidence. Two scope details are fixed as follows:
+
+- The host-deployment gate requires at least one specified and tested permitted
+  topology. The initial permitted topology is **direct verified TLS 1.3 WSS
+  termination by the host**. Proxy termination is deferred; it MUST NOT be
+  claimed, and a forwarded header does not establish the external carrier.
+- SC1/WSS ciphertext records remain distinct from the baseline WSS frame
+  mapping. Baseline profiles retain their own identifiers and wire contracts.
+
+Independent pure-Go/Rust execution, mobile and recovery evidence, the selected
+topology tests and independent human composition review remain release gates
+under D5. The Rust implementation at `tinkle-org/syntra-rs` main is implementation
+evidence, not independent interoperability or an independent security review.
+
+### 11.3 Claims excluded
+
+No stable tag, production authorization, profile pass, or cross-language
+interoperability claim follows from this acceptance. RFC 0006 recovery and the
+core RFCs remain pending their own decisions.
 
 ## Appendix: References
 

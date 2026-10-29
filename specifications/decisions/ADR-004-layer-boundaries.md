@@ -5,12 +5,12 @@
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)
 - Relates to: `specifications/architecture.md` Sec. 2, 5; ADR-006; ADR-007
 
-## Selected direction under review
+## Accepted direction
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-proposes a shared Noise channel whose key/record state is separate from
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+adds a shared Noise channel whose key/record state is separate from
 carrier I/O and opaque application payloads. The host retains enrollment,
-credential storage and authorization policy. The proposed channel can
+credential storage and authorization policy. The accepted channel can
 authenticate transport records without interpreting application ciphertext;
 this does not introduce application E2EE or silently amend this decision.
 

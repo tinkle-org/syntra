@@ -443,3 +443,21 @@ The [mobile plan](conformance/plans/mobile-v1.md) and
 [recovery plan](conformance/plans/update-recovery.md) state expected acceptance
 coverage. Context JSON lint verifies public encoding consistency only, not
 Noise cryptography, parser rejection, socket interop or production readiness.
+
+## 12. SC1 v1 acceptance (2026-10-29)
+
+RFC 0007 and ADR-011 are accepted. The normative SC1/WSS contract is
+`syntra.sc1.v1` in
+[noise-bindings.md](specifications/transports/noise-bindings.md), registered
+as `SNTR-SC1-WSS-V1`. Sections 9 and 11 remain historical records of the
+selected design and the earlier draft-1 implementation; they do not define
+accepted bytes.
+
+This is an additive profile, not a replacement of TLS/TCP, HTTPS or WSS. The
+`draft-1` and local-revision-1 identifiers are not aliases: a deployment that
+temporarily retains a legacy endpoint must configure it separately, and a
+failed v1 attempt must not fall back to it. No Protobuf field or generated type
+changes. The first stable bundle requires SC1/WSS, recovery and applicable
+mobile evidence; baseline transports remain independently claimable. Independent
+interoperability, mobile/recovery execution and independent security review are
+release gates, not consequences of acceptance.

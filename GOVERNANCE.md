@@ -4,12 +4,13 @@ This document defines who decides what in Syntra, how normative changes
 are approved, how breaking changes are handled, and how a protocol
 release becomes stable.
 
-Pending amendment: [Draft RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-proposes an explicit owner-ratified sole-maintainer bootstrap and WSS-first
-release scope. It is not effective policy: the two-maintainer quorum below
-remains in force until the disclosed transition or existing approval process
-is actually completed. The [decision-record template](docs/decision-record-template.md)
-prepares evidence; it grants no authority by itself.
+Bootstrap transition: the repository owner ratified a one-time transition on
+2026-10-29 under [RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md).
+The public record is [Decision 0001](docs/decisions/0001-bootstrap-ratification.md);
+the active roster is [MAINTAINERS.md](MAINTAINERS.md). The prior two-maintainer
+quorum was not met. This is an owner-ratified bootstrap act, not a second
+approval. The [decision-record template](docs/decision-record-template.md)
+records evidence; it grants no authority by itself.
 
 ## 1. Principles
 
@@ -30,11 +31,10 @@ prepares evidence; it grants no authority by itself.
 - **Reviewers** — contributors with a track record whom maintainers
   invite to review. Reviews are advisory.
 - **Maintainers** — the approval authority for normative changes,
-  releases, and governance amendments. Maintainers are listed in the
-  repository's maintainer file or GitHub team when designated by the
-  project owners. Until that list is published, the repository owners
-  act as interim maintainers. No individual contact address is listed
-  here; use repository GitHub flows.
+  releases, and governance amendments. Maintainers are listed in
+  [`MAINTAINERS.md`](MAINTAINERS.md). Until a roster was published, the
+  repository owners acted as interim maintainers. No individual contact
+  address is listed here; use repository GitHub flows.
 
 Maintainer decisions are recorded on the relevant RFC or PR. Absence of
 a published maintainer list does not block non-normative contributions.
@@ -73,15 +73,23 @@ for:
    - REQUIRES an RFC (`rfcs/README.md`) with a test plan. Only an
      **Accepted** RFC may modify normative behavior; Draft, Discussion,
      Review, Withdrawn, and Superseded RFCs are proposals or history.
-   - REQUIRES maintainer approval with quorum: at least two maintainer
-     approvals and no unresolved normative objection from a maintainer.
+   - REQUIRES maintainer approval under the published active roster, with no
+     unresolved normative objection from a maintainer in every case:
+     - with exactly one active maintainer, that maintainer's explicit
+       approval is sufficient; the record MUST disclose when the approver
+       is also the author;
+     - with two or more active maintainers, at least two distinct
+       active-maintainer approvals are required; one person cannot count
+       twice;
+     - with no active maintainer, normative acceptance is blocked.
+     Silence, a bot merge and CI success are not approvals.
    - REQUIRES security review if the change touches handshake, auth,
      credentials, transport policy, resource limits, errors, or streams.
      Security fixes with exploitation risk are developed privately per
      `SECURITY.md` and disclosed via advisory + `CHANGELOG.md` entry;
      embargo details MUST NOT appear in public issues or PRs.
-    - Schema changes (field addition/deprecation/option change, `buf.yaml`
-      rule changes) follow this same bar, plus a clean `buf lint`,
+   - Schema changes (field addition/deprecation/option change, `buf.yaml`
+     rule changes) follow this same bar, plus a clean `buf lint`,
       `buf build`, and `buf breaking` gate. Wire-incompatible schema
       changes are breaking (Sec. 4). GitHub Releases attach release notes
       only, on reviewed release-please tags via the gated release workflow.
@@ -129,6 +137,13 @@ capabilities); this subsection states who approves and records it:
    presence fixtures) and `CHANGELOG.md` (Deprecated section).
 
 ## 5. How a protocol release becomes stable
+
+Acceptance, specification freeze and stable release are separate decisions.
+Acceptance approves a consolidated contract and its compatibility/security
+disposition; it does not activate conflicting owner text. A freeze names the
+revision at which accepted owners, schemas, requirement indexes, profiles and
+cases agree. Stable release authorization requires the evidence in Sec. 5 and,
+where RFC 0009 applies, its independent production gates.
 
 A protocol release is stable when **all** hold (a package version alone
 does not assert protocol stability):

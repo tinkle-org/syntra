@@ -1,13 +1,13 @@
-# SC1 draft-1 implementation and verification record
+# SC1 draft-1 implementation and verification record (historical)
 
-Date: 2026-10-28. This record describes the implemented experimental channel,
-its integration boundary and executed verification. Syntra owns the contract
-in the [carrier binding](../specifications/transports/noise-bindings.md),
-[channel requirements](../specifications/security/secure-channel.md) and
-[device authorization](../specifications/security/device-authorization.md).
-RFC 0007 remains Draft and ADR-011 remains Proposed. Implementation and test
-execution do not change the accepted production TLS policy or register a
-conformance profile.
+Date: 2026-10-28. **Historical record.** It describes the earlier experimental
+Go draft-1 channel and its executed verification. RFC 0007 and ADR-011 are now
+accepted, and the normative v1 bytes are
+[noise-bindings.md](../specifications/transports/noise-bindings.md). The current
+Rust implementation evidence is recorded in `tinkle-org/syntra-rs` (`SC1.md`,
+`AUDIT.md`, `docs/implementation-status.md`). This ledger is retained for
+history; it does not define the accepted v1 contract, execute `CONF-SCW-*`
+cases, or establish independent interoperability or security review.
 
 ## Implementation status
 

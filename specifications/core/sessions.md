@@ -12,8 +12,8 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 ## Persistent device authorization is not session resumption
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-proposes persistent shared device authorization with fresh Noise keys for
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+establishes persistent shared device authorization with fresh Noise keys for
 each new channel. Reusing a valid enrollment can avoid another interactive
 login, but does not attach a previous session, restore pending RPCs or
 subscriptions, or transfer cipher/counter state between carriers. The host

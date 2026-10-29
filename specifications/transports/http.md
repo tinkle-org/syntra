@@ -30,7 +30,7 @@ failure of the HTTP binding itself travels as a non-2xx status with no
 Syntra body. HTTP semantics stay a transport mapping and never redefine
 RPC semantics (SYN-ARCH-042, ADR-003).
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 proposes a carrier-independent channel with [TCP/UDP/WebSocket candidates](noise-bindings.md),
 not a Noise-over-HTTP request/response mapping. This profile's endpoint,
 one-`Frame` body, `Authorization: Syntra` carriage, status layering and

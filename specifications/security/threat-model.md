@@ -95,16 +95,17 @@ flowchart LR
 | T9 | Unauthorized RPC/subscription/event leak | Auth-before-dispatch; per-subscription authorization; post-revocation termination (`authentication-security.md`, `events.md`) | STEST-AUTHZ |
 | T10 | Proxy-induced identity/binding break | Explicit termination config; backend-leg security; hostname/SNI consistency (`transport-security.md`) | STEST-PROXY |
 
-### RFC 0007 review scope (informative; proposed coverage)
+### RFC 0007 scope (informative; accepted coverage)
 
-The [shared-channel proposal](secure-channel.md) and
-[device-authorization proposal](device-authorization.md), owned by
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md), add
-review targets below without changing T1–T10, their current TLS mitigations,
-or STEST mappings. The proposed security layer stays independent of carrier
-I/O, the core and host-owned credential storage.
+The [shared channel](secure-channel.md), [device authorization](device-authorization.md)
+and [carrier mapping](../transports/noise-bindings.md), owned by
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md), add the
+review targets below without changing T1–T10, their current TLS mitigations or
+STEST mappings. The security layer stays independent of carrier I/O, the core
+and host-owned credential storage. Acceptance does not establish that every
+deployment implements these controls or that independent review occurred.
 
-| Proposed asset/boundary | Threat and review obligation |
+| Accepted asset/boundary | Threat and review obligation |
 |---|---|
 | Provisioned server static key and bootstrap enrollment authority | Wrong-key provisioning, unauthorized issuance and rotation failure; NK server authentication alone grants no enrollment permission |
 | Unique shared 32-byte AK and usable host store | Stolen AKs allow affected-device impersonation until revocation; wrapping at rest does not protect an already authorized compromised process |

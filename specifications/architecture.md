@@ -50,15 +50,17 @@ Neutral examples used throughout this project: `echo`, `get`/`put` on a
 generic key/value service, and subscription to a generic event topic.
 These examples illustrate mechanics only and impose no data model.
 
-### Selected secure-channel direction (proposal, not current authority)
+### Accepted secure-channel profile
 
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) records
-Syntra Secure Channel v1 (SC1): Noise NK for authenticated bootstrap and
-Noise NKpsk0 for returning devices sharing a unique random 32-byte
-authorization key (AK). AKs persist across reconnects; ephemeral keys,
-directional traffic keys and channel state do not. A lookup handle is not
-an authenticator. Enrollment, credential storage and permissions stay
-host-owned; no particular account model is required.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+are accepted. Syntra Secure Channel v1 (SC1) uses Noise NK for authenticated
+bootstrap and Noise NKpsk0 for returning devices sharing a unique random
+32-byte authorization key (AK). AKs persist across reconnects; ephemeral keys,
+directional traffic keys and channel state do not. A lookup handle is not an
+authenticator. Enrollment, credential storage and permissions stay host-owned;
+no particular account model is required. The public profile is
+`SNTR-SC1-WSS-V1`; SC1/WSS still requires verified outer TLS 1.3.
 
 The proposal adds a transport-independent channel layer below Syntra frames,
 with separate TCP, UDP and WebSocket mappings. It does not make the core
@@ -275,10 +277,10 @@ informative for that concern.
 | Executable verification (what "conformant" means) | Conformance and interoperability suite (forthcoming) | Manual test notes |
 | Implementation (one way to satisfy the above) | Separate language implementation projects, out of scope for this repository (non-normative) | Any conforming implementation |
 
-For RFC 0007, the proposed security owners are `security/secure-channel.md`
-and `security/device-authorization.md`; the proposed network-mapping owner
-is `transports/noise-bindings.md`. They remain proposals until acceptance,
-not exceptions silently granted by this ownership matrix.
+For RFC 0007, the accepted security owners are `security/secure-channel.md`
+and `security/device-authorization.md`; the network-mapping owner is
+`transports/noise-bindings.md`. Acceptance does not create an exception to
+this ownership matrix or to the TLS production policy.
 
 **SYN-ARCH-040** — Protobuf schemas are the sole authority for data
 representation. Specification prose MUST NOT redefine field numbers or

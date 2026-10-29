@@ -46,13 +46,18 @@ opaquely and still requires transport security (see
 `docs/building-on-syntra.md`).
 
 **What is SC1, and can I use it now?**
-Syntra Secure Channel v1 has a delivered bounded experimental Go draft-1
-implementation over TCP/WS/WSS, in bootstrap and returning modes. The
-[self-contained contract](sc1-implementation.md#implementation-status) records
-its bytes, limits and APIs. [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-remains Draft and ADR-011 Proposed: implementation delivery is not acceptance,
-independent audit or a production-default decision. Current TLS requirements
-and existing executable profile meanings remain unchanged. UDP is deferred;
+Syntra Secure Channel v1 is accepted as an additive secure profile.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+are accepted. The public profile is `SNTR-SC1-WSS-V1`: canonical
+`syntra.sc1.v1` context inside verified TLS 1.3 WSS at `/syntra/v1/sc1/ws`,
+in bootstrap and returning modes. TCP and plaintext WS are restricted
+development carriers. The [carrier contract](../specifications/transports/noise-bindings.md)
+records the exact bytes and limits. Registration is not execution: independent
+vectors, cross-implementation interoperability, mobile/recovery evidence and
+independent security review remain release gates, so this is not yet a
+production default or a claimable conformance result. Current TLS requirements
+and existing profile meanings remain unchanged. UDP is deferred;
 HTTP/HTTPS request-response is excluded from this implementation.
 
 **Does the selected design need human accounts or device signing keys?**

@@ -92,30 +92,27 @@ behind documented bounds and capability negotiation, never silent defaults.
 
 ## 5. Experimental SC1 handshake size accounting
 
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-selects transport-independent SC1 and remains Draft. Experimental draft-1
-implementations and benchmarks now exist. The
-[implementation status](sc1-implementation.md#implementation-status) and
-[verification evidence](sc1-implementation.md#verification-evidence) ledger
-owns implementation coverage and conformance status; the measurements below
-do not establish RFC acceptance or a production security profile.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is accepted.
+The measured results below come from the earlier experimental draft-1
+implementation and are retained as historical observations; they do not
+measure the accepted v1 Rust implementation or establish a conformance result.
 
 The [shared channel contract](../specifications/security/secure-channel.md)
 owns authentication ordering. The exact context and carrier bytes belong to
-the [draft-1 carrier contract](../specifications/transports/noise-bindings.md).
-For scope length `S` in exact UTF-8 bytes, `1 <= S <= 255`, the canonical
+the [SC1/WSS carrier contract](../specifications/transports/noise-bindings.md).
+For scope length `S` in exact UTF-8 bytes, `1 <= S <= 255`, the canonical v1
 context contains:
 
 | Field | Bytes |
 |---|---:|
-| Domain `syntra.sc1.draft1` | 17 |
+| Domain `syntra.sc1.v1` | 13 |
 | Mode + carrier | 2 |
 | Server-key selector | 4 |
 | Epoch | 8 |
 | Opaque handle | 8 |
 | Scope-length prefix | 2 |
 | Scope | S |
-| **Context total** | **41 + S** |
+| **Context total** | **37 + S** |
 
 The context prefixes M1 in clear and is also the exact Noise prologue.
 Bootstrap includes the zero epoch and zero handle; returning mode includes
@@ -125,11 +122,11 @@ key and a 16-byte tag for its empty encrypted payload.
 
 | Path | M1 including context | M2 | Total before carrier framing | TCP total, including two u16 length prefixes |
 |---|---:|---:|---:|---:|
-| Bootstrap `Noise_NK_25519_ChaChaPoly_SHA256` | 89 + S | 48 | 137 + S = 138–392 | 141 + S = 142–396 |
-| Returning `Noise_NKpsk0_25519_ChaChaPoly_SHA256` | 89 + S | 48 | 137 + S = 138–392 | 141 + S = 142–396 |
+| Bootstrap `Noise_NK_25519_ChaChaPoly_SHA256` | 85 + S | 48 | 133 + S = 134–388 | 137 + S = 138–392 |
+| Returning `Noise_NKpsk0_25519_ChaChaPoly_SHA256` | 85 + S | 48 | 133 + S = 134–388 | 137 + S = 138–392 |
 
 Raw Noise bodies alone total 96 bytes. The shorthand `104 = 96 + 8` counts
-only those bodies and a handle, not a complete draft-1 handshake. These
+only those bodies and a handle, not a complete handshake. These
 analytical totals exclude carrier establishment, WS framing, outer TLS,
 client transport confirmation, Syntra `hello`/`ready`, enrollment and policy
 work, and failed/new attempts. They are neither measured latency nor the
@@ -138,8 +135,9 @@ application data or credentials; reusing device authority does not imply
 session resumption or automatic RPC retries. See the ledger's
 [authentication boundary](sc1-implementation.md#authentication-boundary).
 
-Draft-1 covers TCP/WS/WSS; HTTP/HTTPS request-response is excluded and UDP
-is deferred. WSS retains verified outer TLS 1.3 or later under the carrier
+SC1/WSS is the public v1 carrier; TCP/WS are restricted development carriers.
+HTTP/HTTPS request-response is excluded and UDP is deferred. WSS retains
+verified outer TLS 1.3 or later under the carrier
 contract; the measurements below do not measure that TLS layer.
 
 ## 6. SC1 draft-1 measured results

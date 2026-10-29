@@ -78,12 +78,18 @@ and no test, claim, or release may cite them as authority.
 
 ## Who approves
 
-Per `GOVERNANCE.md` Sec. 3:
+Per `GOVERNANCE.md` Sec. 3 and the published `MAINTAINERS.md` roster:
 
 - Non-normative: one maintainer may merge.
-- Normative: at least two maintainer approvals, no unresolved normative
-  objection, security review for security-adjacent work.
+- Normative: approval by the active roster — one active maintainer may accept
+  with disclosed self-approval; two or more require two distinct approvals.
+  No unresolved normative objection; security review for security-adjacent
+  work.
 - Breaking: major-version RFC + migration plan + `CHANGELOG.md` entry.
+
+The 2026-10-29 bootstrap transition is recorded in
+[`docs/decisions/0001-bootstrap-ratification.md`](../docs/decisions/0001-bootstrap-ratification.md).
+It does not accept any protocol RFC by itself.
 
 ## Numbering
 
@@ -95,9 +101,10 @@ Accepted RFCs are never renumbered or deleted.
 
 See [`template.md`](template.md).
 
-The informative [decision-record template](../docs/decision-record-template.md)
-helps retain actual approvals, reviewed revisions, compatibility dispositions
-and evidence. [Draft RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md)
-proposes its use with a sole-maintainer bootstrap and separate
-acceptance/freeze/release decisions. Neither document changes the current
-quorum or accepts another RFC by publication or merge.
+The [decision-record template](../docs/decision-record-template.md) retains
+actual approvals, reviewed revisions, compatibility dispositions and evidence.
+[RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md) is accepted; its
+bootstrap transition is recorded in
+[Decision 0001](../docs/decisions/0001-bootstrap-ratification.md). The
+acceptance/freeze/release milestones remain separate. Publishing or merging an
+RFC does not accept another RFC.

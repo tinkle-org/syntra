@@ -2,14 +2,14 @@
 
 - Identifier: `specifications/security/transport-security.md`
 - Title: TLS and Transport Profile Security
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-26)
+- Status: Accepted (2026-10-29) — includes the RFC 0007/ADR-011 SC1/WSS amendment
+- Version: 1.0.0 (2026-10-29)
 - Normative references:
   - BCP 14; RFC 8446 (TLS 1.3); RFC 5280 (PKIX); RFC 6125 / RFC 9110 §4.3.3 (hostname verification principles); RFC 7301 (ALPN)
   - `threat-model.md` (T1, T2, T10); `authentication-security.md`; `opaque-payloads.md`
   - `specifications/architecture.md` SYN-ARCH-030/031/050/051; `specifications/core/handshake.md`, `versioning.md`
-- Scope: Transport security for the seven v1 profiles. Defines TLS 1.3 requirements, validation, downgrade rejection, rotation, termination/proxy rules, ALPN, and permitted plaintext development use. Per-profile byte framing belongs to future transport specs and MUST NOT weaken this document.
-- Terminology: Per `core/protocol.md` and `threat-model.md`. **Secure profile** = TLS 1.3/TCP, HTTPS/H1, HTTPS/H2, WSS/H1. **Plaintext profile** = TCP, HTTP/1.1, WS/H1 (restricted development only).
+- Scope: Transport security for the v1 profiles, including `SNTR-SC1-WSS-V1`. Defines TLS 1.3 requirements, validation, downgrade rejection, rotation, termination/proxy rules, ALPN, and permitted plaintext development use. Per-profile byte framing belongs to the transport specs and MUST NOT weaken this document.
+- Terminology: Per `core/protocol.md` and `threat-model.md`. **Secure profile** = TLS 1.3/TCP, HTTPS/H1, HTTPS/H2, WSS/H1, and SC1/WSS. **Plaintext profile** = TCP, HTTP/1.1, WS/H1 and SC1 TCP/WS for restricted development only.
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
@@ -69,29 +69,29 @@ TLS protects the channel, not application semantics: it does not provide idempot
 
 Tightening (e.g., removing a weak configuration) is a minor clarification; permitting a weaker TLS version or new plaintext public use is major and FORBIDDEN for v1 public deployments. New secure transports REQUIRE transport-profile RFCs that cite this document.
 
-### Proposed policy interaction (informative)
+### Accepted policy interaction
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) and
-[proposed ADR-011](../decisions/ADR-011-noise-device-authorization.md) select
-a carrier-independent [Noise channel](secure-channel.md) for evaluation.
-This would require an accepted amendment to the exclusive TLS production
-policy; it grants no exception to SNTR-TSEC-001–011 today. Existing TLS/TCP,
-HTTPS and WSS certificate, hostname, rotation and downgrade rules still apply.
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](../decisions/ADR-011-noise-device-authorization.md) add
+`SNTR-SC1-WSS-V1` as a secure production profile. This is an additive
+amendment; it does not create an exception to SNTR-TSEC-001–011. Existing
+TLS/TCP, HTTPS and WSS certificate, hostname, rotation, downgrade and
+termination rules still apply.
 
-The proposed channel authenticates a provisioned server static key, uses NK
-for authorized bootstrap and NKpsk0 with a per-enrollment shared AK on return,
-then gates Syntra readiness on current principal policy. Its mode and carrier
-are explicitly selected and authenticated in experimental draft-1, with fresh ephemeral and
-directional traffic keys on every new channel; no failed TLS connection
-triggers a Noise or plaintext fallback. [Candidate TCP/WS mappings](../transports/noise-bindings.md)
-define concrete context bytes and the `syntra.sc1.draft1` WS subprotocol, with
-[executed implementation evidence](../../docs/sc1-implementation.md). Formal
-profile registration and RFC acceptance remain pending; UDP is deferred until a
-complete binding is frozen, reviewed and accepted. Browser `wss://` retains
-outer TLS even with the experimental channel inside its messages. SC1 over
-HTTP/HTTPS request-response is excluded. Acceptance,
-independent verification and any major-version/deprecation decision precede
-replacement of current requirements or conformance coverage.
+SC1/WSS authenticates a provisioned server static key with Noise, uses NK for
+authorized bootstrap and NKpsk0 with a per-enrollment shared AK on return, and
+gates Syntra readiness on current host policy. TLS 1.3 certificate and hostname
+verification are required before SC1 bytes; the Noise pin is independent of TLS
+trust. There is no fallback to plaintext or another profile. The canonical
+`syntra.sc1.v1` context, WSS endpoint `/syntra/v1/sc1/ws`, subprotocol, Upgrade
+admission and first-envelope rule are owned by
+[noise-bindings.md](../transports/noise-bindings.md). The initial permitted
+production topology is direct verified TLS termination by the host; proxy
+termination is deferred and MUST NOT be claimed. SC1 over HTTP/HTTPS
+request-response is excluded, and UDP is deferred.
+
+Registration is not execution. Independent vectors, interoperability, mobile
+and recovery evidence and independent security review remain release gates.
 
 ## 7. Conformance requirements
 

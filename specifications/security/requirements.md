@@ -21,35 +21,32 @@
 
 Total: 5 defining security documents + test plan, ~70 normative IDs + conformance/test IDs.
 
-## Proposed families — RFC 0007 only
+## Accepted SC1 families — RFC 0007
 
-These entries index selected design work under
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md), not
-current profile obligations. The baseline above, its test IDs and ADR-008 TLS
-policy remain in effect until acceptance; this index grants no normative
-approval or implementation/conformance claim.
+These entries index the accepted
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) profile.
+The baseline above and ADR-008 TLS policy remain in effect; SC1/WSS is an
+additional secure profile and does not replace them.
 
-| Proposed ID family | Defining proposal | Concern | Status |
+| ID family | Defining document | Concern | Status |
 |---|---|---|---|
-| `SNTR-SC-001`–`SNTR-SC-015` | [secure-channel.md](secure-channel.md) | Carrier-independent NK/NKpsk0 channel, authenticated context, fresh keys/confirmation, bounded records/lifecycle and claim limits | Proposal only |
-| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Proposal only; partial experimental integration exists |
+| `SNTR-SC-001`–`SNTR-SC-015` | [secure-channel.md](secure-channel.md) | Carrier-independent NK/NKpsk0 channel, authenticated context, fresh keys/confirmation, bounded records/lifecycle and claim limits | Accepted |
+| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Accepted; host lifecycle work remains |
+| `SNTR-SCW-001`–`SNTR-SCW-012` | [noise-bindings.md](../transports/noise-bindings.md) | Canonical v1 WSS mapping, Upgrade admission, first-envelope rule, restricted TCP/WS and deferred UDP | Accepted |
 
-[Carrier mappings](../transports/noise-bindings.md) specify concrete experimental
-draft-1 TCP/WS/WSS context and bytes without registering new profiles. Their
-[acceptance plan](../../conformance/plans/secure-channel.md) contains planned/manual
-traceability, not executable test IDs or pass results. Separately, the
-[implementation evidence ledger](../../docs/sc1-implementation.md) records scoped
-local unit/race/native-core and same-implementation integration execution,
-authentication/async-writer behavior and numeric operational limits. Those
-results do not imply coverage of every SC/DAUTH obligation, RFC acceptance or
-independent interoperability/security review. Enrollment issuance, protected
-storage/transactions and rotation flows remain absent; UDP remains deferred
-and HTTP/HTTPS request-response is excluded from SC1 scope. No formal SC1
-`CONF-*` cases or profiles are registered.
+[Carrier mapping](../transports/noise-bindings.md) registers
+`SNTR-SC1-WSS-V1` and its `CONF-SCW-*` cases. Registration is not execution.
+The [implementation evidence ledger](../../docs/sc1-implementation.md) retains
+historical draft-1 evidence; current Rust local results are recorded
+downstream. Those results do not imply coverage of every SC/DAUTH/SCW
+obligation, independent interoperability or independent security review.
+Enrollment issuance, protected storage/transactions and rotation flows remain
+host obligations; UDP remains deferred and HTTP/HTTPS request-response is
+excluded from SC1.
 
 ## Uniqueness and ownership rules
 
-- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`; proposed `SC`, `DAUTH` under RFC 0007).
+- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`; `SC`, `DAUTH` and `SCW` under RFC 0007).
 - No ID is defined twice; companions cite, never duplicate (single-definition rule shared with core).
 - `SNTR-SEC-*` is intentionally unused to keep per-document traceability; the family prefix `SNTR-*SEC*` collectively denotes security scope.
 - Charter `SYN-ARCH-030–035` and core `SNTR-*` remain distinct namespaces; where this suite tightens a core rule (e.g., disclosure), the stricter security rule governs for security claims (SYN-ARCH-043) and MUST be cited in the implementation's conformance report.

@@ -73,19 +73,20 @@ flowchart LR
   S --> V[Verdict: pass/fail + logs]
 ```
 
-## 4. RFC 0007 acceptance work (proposed; separate from current groups)
+## 4. RFC 0007 accepted work (separate from current groups)
 
-The [planned secure-channel acceptance cases](../../conformance/plans/secure-channel.md)
-trace [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-to proposed `SNTR-SC-001`–`SNTR-SC-015` and
-`SNTR-DAUTH-001`–`SNTR-DAUTH-010`. Their formal acceptance references remain
-manual/planned, not registered executable IDs. Separately, the
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) is accepted.
+The registered cases in
+[`conformance/manifest/sc1-wss.yaml`](../../conformance/manifest/sc1-wss.yaml)
+trace `SNTR-SC-001`–`SNTR-SC-015`, `SNTR-DAUTH-001`–`SNTR-DAUTH-010` and
+`SNTR-SCW-001`–`SNTR-SCW-012` for `SNTR-SC1-WSS-V1`. Registration is not
+execution: no `CONF-SCW-*` verdict is claimed. The historical
 [implementation ledger](../../docs/sc1-implementation.md#verification-evidence)
-records executed unit/race and same-implementation Docker tests across
-TCP/WS/WSS × bootstrap/returning, with measured in-memory benchmarks. These
-results do not establish independent interoperability or complete acceptance.
-SNTR-STEST-001–011/900, certificate fixtures and
-current core/profile expectations retain their existing meaning and coverage.
+records earlier draft-1 unit/race and same-implementation Docker tests; current
+Rust results are downstream evidence. These do not establish independent
+interoperability or independent security review. SNTR-STEST-001–011/900,
+certificate fixtures and current core/profile expectations retain their
+existing meaning and coverage.
 
 The additional review includes independently derived NK/NKpsk0 vectors,
 wrong server keys/AKs, unauthorized or interrupted enrollment, handle

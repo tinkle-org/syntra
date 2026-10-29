@@ -1,25 +1,33 @@
 # v1 specification acceptance package
 
-Status: selected work plan, not an accepted specification or release approval.
-Baseline: `f092a4912c1259c0899b828e7570be0edd666ec4`. Scope was selected as
+Status: active work plan. Governance, RFC 0009 and RFC 0007/SC1 are accepted;
+core, recovery and release-scope work remains in progress. This is not a
+specification freeze or release approval.
+Baseline: `94404d7378136d8b6c88ece28bf945c88d1653ba`. Scope is
 specification-first, canonical SC1 over verified WSS first, standardized update
-recovery and applicable mobile lifecycle. One active maintainer is the reported
-working situation; no public identity or approval is invented here.
+recovery and applicable mobile lifecycle. One active maintainer is the public
+roster; the bootstrap ratification is
+[Decision 0001](decisions/0001-bootstrap-ratification.md).
 
-## First increment and approval boundary
+## Current progress and approval boundary
 
-[Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-provides the proposed sole-maintainer bootstrap rule, exact release scope,
-separate acceptance/freeze/release milestones and independent production gates.
-The [decision-record template](decision-record-template.md) makes the required
-identities, revisions, compatibility choices and evidence explicit.
+[RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md) is
+accepted. The public bootstrap record, active roster, roster-based quorum and
+acceptance/freeze/release separation are in
+[`GOVERNANCE.md`](../GOVERNANCE.md), [`MAINTAINERS.md`](../MAINTAINERS.md) and
+[`CONTRIBUTING.md`](../CONTRIBUTING.md). [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
+and [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+are accepted; the canonical v1 mapping, first-envelope rule, Upgrade admission
+and direct-TLS topology are activated in the owning security/transport docs.
+`SNTR-SC1-WSS-V1` is registered in
+[`conformance/profiles.yaml`](../conformance/profiles.yaml) with executable
+case specifications in [`sc1-wss.yaml`](../conformance/manifest/sc1-wss.yaml).
+Registration is not execution.
 
-This increment prepares those documents only. It leaves current quorum,
-RFCs 0001–0008, normative owners, IDL, profile/case registries, compatibility
-archives and prerelease configuration unchanged. Publication or merge does
-not ratify the amendment. Next, the actual owner records the explicit public
-bootstrap decision (or appoints a second maintainer under the existing rule),
-then the authorized governance/roster changes can land.
+RFCs 0001, 0003, 0004, 0005, 0006 and 0008 remain Draft. Their owning
+specifications still contain the conflicting text identified below; no core,
+recovery or mobile activation is claimed. The schema source migration, evidence
+tooling, freeze and stable promotion are also outstanding.
 
 ## Dependency-ordered follow-up changes
 
@@ -39,6 +47,13 @@ inferred from a registered case.
 | 7. Evidence tooling | Extend existing declarations, requirement/profile validation, role/mode selection and release checks | Negative tests reject missing provenance, invalid approvals and omitted required execution; structural checks remain separate |
 | 8. Freeze and handoff | Pin accepted specification/suite revision; update guides, migrations and readiness assessment; give Go/Rust exact implementation and execution tasks | No in-scope owner contradictions or undecided contracts; explicit unexecuted downstream gates |
 | 9. Stable promotion | Review independent pure-Go/Rust, mobile/operational, lifecycle and independent security evidence; authorize reviewed release notes/revision | All applicable selected gates pass; only then approve stable release configuration/tagging |
+
+Increments 1 and 5 have landed at the SC1 scope recorded here. Increment 2 is
+partial: RFC 0009 and RFC 0007 are accepted; RFCs 0001/0003/0004/0005/0006/0008
+still need their own decisions. Increments 3, 4 and 6–9 remain open. The Rust
+implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
+reviewed SC1 proposal; its local evidence does not close the registered cases,
+independent interoperability or release gates.
 
 ## Specific tooling and consistency work
 

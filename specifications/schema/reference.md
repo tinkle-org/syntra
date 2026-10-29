@@ -87,8 +87,8 @@ Sources: [framing `SNTR-WIRE-002…005/010/011`](../core/framing.md), [handshake
 
 Validate range, envelope size and resource bounds before credential policy (`SNTR-HS-030`, `SNTR-SER-020`, `SNTR-ASEC-040`). Credential format and principal type are application-owned. `credential` has no schema redaction or field-specific maximum; deployments still need documented bounds (RFC B7). No mechanism selector, auth-round field, capability list, resume token or requested-limit record is declared.
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-would establish a [shared Noise channel](../security/secure-channel.md)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+establishes a [shared Noise channel](../security/secure-channel.md)
 before the Syntra handshake and supply separately trusted channel context to
 host authentication. Its [device-authorization proposal](../security/device-authorization.md)
 uses an enrolled shared AK and scoped eight-byte lookup handle; neither is a
