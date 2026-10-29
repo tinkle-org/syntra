@@ -1,0 +1,19 @@
+specifications/schema/reference.md
+  s_c75c7480a9e079::t_9055768eb63a14 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dad82cc9caf434ba8b10abc7d28330fef4cef427",
+  "prompts": {},
+  "sessions": {
+    "s_c75c7480a9e079": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e7630482cffe7P0NaYLizGUU3Z",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
