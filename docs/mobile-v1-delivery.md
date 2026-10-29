@@ -28,10 +28,20 @@ This repository owns specifications, schemas and conformance definitions.
 mobile/FFI integration. No implementation source or generated binding is added
 here. No production secrets or private infrastructure are prerequisites.
 
+The selected first increment is specification-only, with SC1 over verified WSS
+as the initial production release target rather than certification of all
+baseline transports. A sole active maintainer needs an explicit governance
+transition, not an invented second approval. [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
+proposes that transition and the exact scope; the
+[acceptance package](v1-acceptance-package.md) maps the follow-up changes.
+Current quorum, baseline profile meanings and release gates remain unchanged
+until the applicable decisions and owner edits are recorded.
+
 ## Dependency-ordered work and exit criteria
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
+| 0. Approval process | RFC 0009 governance/scope proposal and decision-record format; actual owner ratification/roster and authorized process edits next | Verifiable public transition or existing quorum; no retroactive protocol/security approval |
 | 1. Decisions | RFCs 0001–0005 core/parser/identity/bounds; RFC 0006 recovery amendment; RFC 0007 canonical SC1; RFC 0008 mobile lifecycle | Explicit compatibility designation, protocol/security reviews, maintainer acceptance |
 | 2. Normative activation | Synchronize owning specifications, authorized schema edits, permanent requirement IDs, profile/case definitions and positive/negative fixtures | No contradictory owner text; structural/Buf checks pass; reviewed requirement-to-case mapping |
 | 3. Downstream alignment | Both independent implementations pin the same accepted revision; generated types refreshed where authorized; TDD fixes and host-policy/lifecycle examples | Package/runtime/adapter/security tests; ABI/mobile builds and bridge lifecycle tests where applicable |

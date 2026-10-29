@@ -4,6 +4,13 @@ This document defines who decides what in Syntra, how normative changes
 are approved, how breaking changes are handled, and how a protocol
 release becomes stable.
 
+Pending amendment: [Draft RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
+proposes an explicit owner-ratified sole-maintainer bootstrap and WSS-first
+release scope. It is not effective policy: the two-maintainer quorum below
+remains in force until the disclosed transition or existing approval process
+is actually completed. The [decision-record template](docs/decision-record-template.md)
+prepares evidence; it grants no authority by itself.
+
 ## 1. Principles
 
 1. Specification authority is explicit
