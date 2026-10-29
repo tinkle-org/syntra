@@ -1,0 +1,219 @@
+docs/client-implementation.md
+  s_29e46b07ebd1af::t_2b65cf6bc79ff9 54,56-63,65-68
+  s_29e46b07ebd1af::t_c27770fb102822 9-13
+rfcs/0009-v1-bootstrap-governance-and-release-scope.md
+  s_29e46b07ebd1af::t_dc6495dfe304fb 140
+  s_29e46b07ebd1af::t_09e6921a996c15 288-290,292-293,295-299,301-303
+  s_29e46b07ebd1af::t_7db3efcae14f50 273
+  s_29e46b07ebd1af::t_7ca5c8ecc567a4 307-350
+  s_29e46b07ebd1af::t_7b726bd4c78cee 197-198
+  s_29e46b07ebd1af::t_f86edbae77db71 5-6,8,10,12-18
+  s_29e46b07ebd1af::t_78b8c9e1ef87d0 240
+  s_29e46b07ebd1af::t_bb97580cb38b13 28
+  s_29e46b07ebd1af::t_572acab0871094 53,56
+specifications/security/test-plan.md
+  s_29e46b07ebd1af::t_9b89f1788eaec8 76-83,85-89
+docs/mobile-v1-delivery.md
+  s_29e46b07ebd1af::t_75ab8c0c5dd569 3-7
+  s_29e46b07ebd1af::t_3579c3f6837de6 56,58-63
+conformance/plans/mobile-v1.md
+  s_29e46b07ebd1af::t_8d631638a5979f 4
+specifications/transports/noise-bindings.md
+  s_29e46b07ebd1af::t_56197a9bfa30a6 1,3-5,8-62,64-220,224-232
+docs/transport-selection.md
+  s_29e46b07ebd1af::t_07c11ab4ca73fc 76,78-81,83,85-89
+  s_29e46b07ebd1af::t_7aa3f7e8cbfdc2 16-18
+rfcs/README.md
+  s_29e46b07ebd1af::t_203646b50ea481 104-110
+  s_29e46b07ebd1af::t_b9d054aa90e3aa 81,84-87,90-92
+  s_29e46b07ebd1af::t_e8e844c7477c21 93
+specifications/core/authentication.md
+  s_29e46b07ebd1af::t_554a56affead38 13,16
+  s_29e46b07ebd1af::t_762b0381010874 15
+specifications/security/replay-protection.md
+  s_29e46b07ebd1af::t_554a56affead38 40
+  s_29e46b07ebd1af::t_762b0381010874 42
+specifications/README.md
+  s_29e46b07ebd1af::t_72390bfbede71a 21-30,34-35,37-61
+  s_29e46b07ebd1af::t_a42b19c5a0d240 134-137
+docs/decisions/0001-bootstrap-ratification.md
+  s_29e46b07ebd1af::t_c09669d0ac5c7f 1-83
+conformance/manifest/README.md
+  s_29e46b07ebd1af::t_6edeaa5b816d48 104-110
+conformance/test-vectors/sc1/context-vectors.yaml
+  s_29e46b07ebd1af::t_f84ab6bb334b4d 1-65
+MIGRATION.md
+  s_29e46b07ebd1af::t_67086ad8740b2f 446-463
+MAINTAINERS.md
+  s_29e46b07ebd1af::t_ed127c4edfcd2a 1-19
+specifications/transports/tcp.md
+  s_29e46b07ebd1af::t_762b0381010874 19
+  s_29e46b07ebd1af::t_f76de1ca064c48 28-34
+  s_29e46b07ebd1af::t_442c4af8362e88 21
+conformance/profiles.yaml
+  s_29e46b07ebd1af::t_87f703769a6357 129-139
+  s_29e46b07ebd1af::t_6b6c47c25e2a27 144
+  s_29e46b07ebd1af::t_05bb9ad0f0cf8f 5-7
+docs/perf-tradeoffs.md
+  s_29e46b07ebd1af::t_0d87abd25b1473 138-140
+  s_29e46b07ebd1af::t_2b5fb3357b1947 95-98,102-103,108,115,125-126,129
+specifications/decisions/ADR-003-transport-independent-core.md
+  s_29e46b07ebd1af::t_762b0381010874 10
+  s_29e46b07ebd1af::t_554a56affead38 8,11
+specifications/decisions/README.md
+  s_29e46b07ebd1af::t_4f74db3ab9a235 20,22-25
+CONTRIBUTING.md
+  s_29e46b07ebd1af::t_4186c6a4a3059b 85-89
+docs/implementer-guide.md
+  s_29e46b07ebd1af::t_dffe87c2b02945 13,17-25
+  s_29e46b07ebd1af::t_b84a7425f879f8 54-55
+  s_29e46b07ebd1af::t_e769fc0d2da46e 44-49
+specifications/core/sessions.md
+  s_29e46b07ebd1af::t_762b0381010874 15
+  s_29e46b07ebd1af::t_554a56affead38 16
+specifications/decisions/ADR-004-layer-boundaries.md
+  s_29e46b07ebd1af::t_554a56affead38 8,11,13
+  s_29e46b07ebd1af::t_762b0381010874 10
+specifications/schema/reference.md
+  s_29e46b07ebd1af::t_554a56affead38 91
+  s_29e46b07ebd1af::t_762b0381010874 90
+specifications/decisions/ADR-011-noise-device-authorization.md
+  s_29e46b07ebd1af::t_cd4a80c828bb1b 3,5,15,19-28,31-34,38-39,50-60,62-66,70-75,79-82
+  s_29e46b07ebd1af::t_5d85ccc679efed 61
+rfcs/0007-secure-channel-device-authorization.md
+  s_29e46b07ebd1af::t_610dcc4961ec7e 57,59,61,65-67
+  s_29e46b07ebd1af::t_2f65f7e1abe528 479
+  s_29e46b07ebd1af::t_dd56e824ba78f8 508,510-513
+  s_29e46b07ebd1af::t_ef68344f9bed1b 348-381
+  s_29e46b07ebd1af::t_67d1f22cfcfe58 5-6,8-22
+  s_29e46b07ebd1af::t_eb7bdddae5c5ce 388,401,427
+  s_29e46b07ebd1af::t_ee47ba69d5b37e 516-567
+  s_29e46b07ebd1af::t_9c398f851e15e4 33-39
+specifications/transports/websocket.md
+  s_29e46b07ebd1af::t_442c4af8362e88 62
+  s_29e46b07ebd1af::t_431627c9fc19df 64-70
+  s_29e46b07ebd1af::t_762b0381010874 63
+specifications/security/transport-security.md
+  s_29e46b07ebd1af::t_334e7366cf9aa6 72-94
+  s_29e46b07ebd1af::t_8a9169d08d2384 5-6
+  s_29e46b07ebd1af::t_03f177bae9ebe4 11-12
+specifications/security/device-authorization.md
+  s_29e46b07ebd1af::t_0c25f7b1d6e66a 163
+  s_29e46b07ebd1af::t_b925120c1b70e7 1,3-4,7,9-12,14-23
+  s_29e46b07ebd1af::t_ce7a7e9e50047b 44-55
+conformance/manifest/sc1-wss.yaml
+  s_29e46b07ebd1af::t_492b2e2f5ad788 1-296,298-322
+  s_29e46b07ebd1af::t_e5c2d0850ee024 297
+docs/faq.md
+  s_29e46b07ebd1af::t_a0f5805b3cd34d 49-60
+conformance/claims.md
+  s_29e46b07ebd1af::t_8175aed6498920 6-11
+scripts/validate-repo.py
+  s_29e46b07ebd1af::t_f7ca18542d0146 565-618
+  s_29e46b07ebd1af::t_f7fe66be8cc642 63
+specifications/security/review-checklist.md
+  s_29e46b07ebd1af::t_268c7ab0414a20 43,45-51,53
+conformance/plans/secure-channel.md
+  s_29e46b07ebd1af::t_82a94fd7a77fbe 33-34
+  s_29e46b07ebd1af::t_9e53c50f3717e7 142-143
+  s_29e46b07ebd1af::t_69e744bd7e95ae 433
+  s_29e46b07ebd1af::t_6bb7f090f94537 99-103
+  s_29e46b07ebd1af::t_3eeac4cb49d1cd 3-4,6,8-15,19-24,26-29
+specifications/transports/secure-websocket.md
+  s_29e46b07ebd1af::t_762b0381010874 57
+  s_29e46b07ebd1af::t_04bc0e42774109 55,60-65
+  s_29e46b07ebd1af::t_0b6ca3c6b73fbd 70-71
+  s_29e46b07ebd1af::t_442c4af8362e88 58
+docs/server-implementation.md
+  s_29e46b07ebd1af::t_09f623321eb626 11-14
+  s_29e46b07ebd1af::t_4ee04e5d593333 58,60,62-63,65-67
+specifications/schema/generation.md
+  s_29e46b07ebd1af::t_554a56affead38 82
+  s_29e46b07ebd1af::t_762b0381010874 80
+specifications/security/threat-model.md
+  s_29e46b07ebd1af::t_9dd78facf73189 98,100-106,108
+specifications/security/requirements.md
+  s_29e46b07ebd1af::t_addb9e5deb0634 24,26-29,31,33-45
+  s_29e46b07ebd1af::t_dc68ea16e243e3 49
+specifications/transports/http.md
+  s_29e46b07ebd1af::t_762b0381010874 33
+conformance/README.md
+  s_29e46b07ebd1af::t_8eb8daffbd637a 20-28
+  s_29e46b07ebd1af::t_60d6f1adc9c3eb 215
+specifications/decisions/ADR-008-transport-security.md
+  s_29e46b07ebd1af::t_2208f41b29155e 8-13
+  s_29e46b07ebd1af::t_a9a160310dee02 24-25,27-28
+  s_29e46b07ebd1af::t_66db0ec1560ee9 67-69
+specifications/security/open-questions.md
+  s_29e46b07ebd1af::t_5e109d0ff585ef 31
+  s_29e46b07ebd1af::t_03207aff22ee94 29,32-35,37,39-62
+specifications/transports/tls-tcp.md
+  s_29e46b07ebd1af::t_442c4af8362e88 29
+  s_29e46b07ebd1af::t_762b0381010874 30
+CHANGELOG.md
+  s_29e46b07ebd1af::t_5d8d6a832a9f5f 10-34
+RELEASE.md
+  s_29e46b07ebd1af::t_9ae420c2b7fde2 110-114
+  s_29e46b07ebd1af::t_9863a597ae232b 99-105
+  s_29e46b07ebd1af::t_72b352041be561 30-49
+  s_29e46b07ebd1af::t_951dbef06d097f 146
+specifications/architecture.md
+  s_29e46b07ebd1af::t_a8e7a1a7c43d4c 53-63
+  s_29e46b07ebd1af::t_a48ae7b3c4230c 280-283
+docs/building-on-syntra.md
+  s_29e46b07ebd1af::t_738fd9831ffd5c 82,84-85,87
+  s_29e46b07ebd1af::t_7e44c015aef3e4 103,105-110
+specifications/security/secure-channel.md
+  s_29e46b07ebd1af::t_bb0d888b3c6d83 204-210
+  s_29e46b07ebd1af::t_1a35fc4b10642c 145-154
+  s_29e46b07ebd1af::t_92e1eac9cfe075 201
+  s_29e46b07ebd1af::t_d0c94d8eb6de59 214-222
+  s_29e46b07ebd1af::t_a40b9f0361f996 124-129
+  s_29e46b07ebd1af::t_cfb62a4f4a003a 1,3-4,7-21
+  s_29e46b07ebd1af::t_0da604ff91dae3 41-50
+  s_29e46b07ebd1af::t_becb01d7bd75a7 69-74
+  s_29e46b07ebd1af::t_9fd5e09384fe7d 67-68,75-88
+specifications/security/README.md
+  s_29e46b07ebd1af::t_b6ba30e38ec3e1 27,29-33,35,39,43-44,47-48,50,53-56,63-66
+  s_29e46b07ebd1af::t_610d22e7742fa3 42
+specifications/core/conformance.md
+  s_29e46b07ebd1af::t_a3fe2909fcfa6a 31
+docs/v1-acceptance-package.md
+  s_29e46b07ebd1af::t_78989d94825b7e 51-57
+  s_29e46b07ebd1af::t_57e689074d9e9d 3-6,8-10,12,14-25,27-30
+specifications/transports/https.md
+  s_29e46b07ebd1af::t_762b0381010874 29
+GOVERNANCE.md
+  s_29e46b07ebd1af::t_44792681384a87 7-13
+  s_29e46b07ebd1af::t_c453e44fb07832 34-37
+  s_29e46b07ebd1af::t_05f3c51da90e99 91-92
+  s_29e46b07ebd1af::t_d0c12c2f3ebc7a 76-85
+  s_29e46b07ebd1af::t_83522c206f7476 141-147
+docs/sc1-implementation.md
+  s_29e46b07ebd1af::t_6bf9218b761237 1,3-10
+specifications/core/framing.md
+  s_29e46b07ebd1af::t_762b0381010874 15
+  s_29e46b07ebd1af::t_554a56affead38 13,17
+specifications/core/handshake.md
+  s_29e46b07ebd1af::t_d41fe0300a425b 13,15-22
+docs/glossary.md
+  s_29e46b07ebd1af::t_8169e08558aca8 72,74-81
+conformance/manifest/requirements.yaml
+  s_29e46b07ebd1af::t_ff1a7bc541bd65 924-942,945,948,950-966,969,972-973,976,979-981,984,987,990,993-997
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2703c2965d0b3b598e571b098291c25551162102",
+  "prompts": {},
+  "sessions": {
+    "s_29e46b07ebd1af": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e76a503b9ffeNEdXe6u75Bt6oK",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
