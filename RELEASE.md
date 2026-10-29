@@ -27,23 +27,61 @@ conformance green (that is the stable-release bar per `GOVERNANCE.md`
 Sec. 5). Known unresolved blockers MUST be listed in
 `audits/v1-release-readiness.md` and MUST block promotion to stable.
 
-### SC1 proposal and release scope
+### SC1 draft-1 implementation evidence and release scope
 
 The selected Syntra Secure Channel v1 (SC1) design is recorded in
 [Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md), not an
 Accepted RFC. It does not change the baseline TLS requirements, the seven
 existing transport profiles, or their executable conformance checks below.
-The [migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
-describes the proposed NK enrollment/NKpsk0 returning-device model and
-the compatibility boundary, including the distinct Noise-in-WS wire.
+The [current migration record](MIGRATION.md#11-sc1-draft-1-implementation-evidence-2026-10-28)
+records delivered experimental Go SC1 draft-1: bounded TCP/WS/WSS bootstrap
+and returning channels, ready-to-call connection helpers, server admission,
+channel-aware host policy, owned transport lifecycle and an asynchronous
+FIFO writer. UDP is deferred and HTTP/HTTPS request-response is excluded
+from that implementation. WSS retains verified outer TLS ≥1.3, without
+automatic downgrade. Proposed ADR-011 is not accepted production policy.
 
-Release notes should distinguish current implementation artifacts from
-this selected proposal. The [SC1 conformance plan](conformance/plans/secure-channel.md)
-is planned verification, not a release verdict. Documentation, generation,
-existing profile passes, or a package tag do not establish SC1 crypto,
-TCP/UDP/WS binding support, or performance. Any future SC1 release scope
-follows the acceptance and evidence rules above; this record adds no
-current SC1 implementation or executable-profile release gate.
+The [implementation ledger](docs/sc1-implementation.md#implementation-status)
+records the self-contained contract. Host policy must independently verify root
+identity, current enrollment and admission before ready and enforce its intended
+returning-mode same-principal binding; the library does not compare principals
+automatically.
+Nil method authorization denies calls. There is no enrollment RPC or complete
+issuance/storage/rotation workflow.
+
+#### Recorded validation (2026-10-28)
+
+The final implementation working-tree verification used Go 1.26.10 on
+darwin/arm64, Apple M4, and records:
+
+- Root pure-Go tests with CGO disabled, race tests and staticcheck passed;
+  native-core race tests and staticcheck passed. Go 1.23.12 compatibility
+  passed; it is a compatibility floor, not a production-security recommendation.
+- Actual Docker adapter/core integration passed in **30.681s**, covering all
+  six TCP/WS/WSS × bootstrap/returning groups with none skipped, including
+  verified WSS and returning-mode Toxiproxy stalls/resets. High-level connection
+  orchestration is covered by local unit tests, not those container cases.
+- Reachable-vulnerability scans were zero for both root and integration
+  modules on Go 1.26.10. This does not mean every dependency is advisory-free
+  or that all build variants and the separately built fault proxy were scanned.
+- Three 100ms in-memory benchmark samples at CPU settings 1 and 4 passed
+  without failed samples. Timing is report-only, with no hard performance
+  threshold; full Protobuf decode and RPCs are not zero-allocation.
+
+See [verification evidence](docs/sc1-implementation.md#verification-evidence)
+and [performance measurements](docs/perf-tradeoffs.md) for conditions and
+limits. These results are implementation evidence, not a frozen release
+attestation, independent SC1 wire interoperability or formal `CONF-*` verdicts.
+Native-core linkage still uses the Go SC1 carriers.
+
+Release promotion still needs the [remaining work](docs/sc1-implementation.md#remaining-work):
+independent review, independent vectors/interoperability, accepted wire/policy
+decisions and the applicable conformance declaration. Native ABI v1 lacks a
+completion-timestamp input and explicit post-hello credential release; Go and
+library cleanup do not guarantee erasure of all secret copies. Existing profile
+passes, generation checks and document tags do not close these gaps. The
+[SC1 conformance plan](conformance/plans/secure-channel.md) remains acceptance
+planning; no new executable-profile release gate is implied by this record.
 
 ## 1. Release checklist (v1 RC)
 

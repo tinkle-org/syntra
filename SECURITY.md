@@ -7,8 +7,10 @@
 
 Syntra v1 is in development. Core, transport, and security specifications
 are drafts pending the RFC process; package prereleases do not establish
-protocol stability. SC1 in Draft RFC 0007 is selected design work, not a
-supported cryptographic implementation or an Accepted RFC.
+protocol stability. A bounded experimental Go SC1 draft-1 implementation is
+delivered over TCP/WS/WSS. RFC 0007 remains Draft and ADR-011 Proposed;
+delivery and local verification do not establish an independently audited
+construction, accepted production default or stable security-support window.
 
 | Version | Status | Security support |
 |---------|--------|------------------|
@@ -76,12 +78,13 @@ truncation, and injection on insecure transports. See
 The baseline [transport-security specification](specifications/security/transport-security.md)
 owns these requirements. This file states process, not protocol behavior.
 
-## Selected SC1 proposal: security boundary
+## Experimental SC1 draft-1: security boundary
 
 [Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md) proposes
 transport-independent Syntra Secure Channel v1 (SC1). It is not Accepted
 and does not replace the TLS baseline above or alter existing executable
-conformance profiles. The proposed [secure-channel state machine](specifications/security/secure-channel.md)
+conformance profiles. The delivered draft-1 [implementation contract](docs/sc1-implementation.md#implementation-status)
+follows the selected [secure-channel construction](specifications/security/secure-channel.md), which
 uses `Noise_NK_25519_ChaChaPoly_SHA256` for initial enrollment and
 `Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices.
 
@@ -99,19 +102,97 @@ before protected actions; successful Noise exchange alone does not grant
 enrollment or method authority. Syntra hello/ready remains a separate gate.
 Fresh channels do not imply session resumption or safe automatic RPC retry.
 
-The proposed TCP/UDP/WS bindings are described in
-[noise-bindings.md](specifications/transports/noise-bindings.md). Existing
-HTTPS/WSS TLS compatibility remains, including outer TLS for browser
-`wss://`; Noise-in-WS has a distinct wire binding from current WS profiles.
-The [SC1 verification plan](conformance/plans/secure-channel.md) is planned
-coverage, not evidence of implementation or security testing.
+Delivered carriers are TCP/WS/WSS in both modes. UDP is deferred and HTTP/HTTPS
+request-response is excluded from this implementation. Draft-1's exact context
+domain/WS subprotocol is `syntra.sc1.draft1`, distinct from existing profile
+identifiers and baseline WS bytes. WSS retains verified outer TLS ≥1.3 and an
+independent Noise pin; no automatic downgrade is implemented. Standard
+inspectable HTTP transports enforce certificate verification, while custom
+RoundTrippers own their TLS policy. Accept uses `r.TLS`, not forwarded headers,
+to bind the carrier. The application owns server TLS, origin and HTTP limits.
+
+### Host policy and enrollment obligations
+
+The delivered `ChannelPolicy` receives confirmed channel evidence and explicit
+hello credentials. Host policy must independently verify root identity, current
+enrollment and admission before ready, then enforce the intended returning-mode
+same-principal binding itself. **The library does not compare principals
+automatically** or implicitly authorize an empty credential. Nil method authorization selects deny;
+every method still needs explicit authorization. See
+[authentication boundary](docs/sc1-implementation.md#authentication-boundary).
+
+Enrollment lookup is read-only, scoped to server-key ID/carrier/exact scope/
+handle/epoch, and requires a nonzero AK, nonempty principal, future expiry and
+no revocation. Key/principal bindings must be immutable under that tuple:
+`Check` rechecks validity/principal, not original-key equality. Confirmed-peer
+checks run after confirmation and on a 1s ticker with 1s lookup contexts;
+scheduling and store latency prevent an exact 1s propagation promise. These
+checks do not replace synchronous admission policy. Hosts can also disconnect
+current connections by principal and must deny subsequent admissions.
+
+Only authenticated out-of-band provisioning is supported. Independent random
+handles need scoped collision checks. There is no enrollment RPC or complete
+transactional issuance/delivery/ack recovery, protected client storage or
+rotation workflow. Rate limits, cross-server budgets and lookup timing/privacy
+remain host responsibilities.
+
+### Resource and shutdown boundaries
+
+Ciphertext is at most 65,535 bytes; serialized frames at most 1 MiB. Adapter
+handshake/write/record/frame budgets default/max at 5s, lifetime at 24h including
+establishment, and record count at 2^32 per direction. Pending operations default
+to 32/direction, maximum 1,024. High-level establishment has a 10s total budget;
+server admission defaults to 128 connections/16 handshakes, maxima 4,096/256,
+with handshake admission held through ready write.
+
+One post-ready asynchronous writer owns FIFO snapshots and caps queued plus
+active output at 256 frames/8 MiB, including terminal results. Writes default
+to 5s; saturation or write failure terminates the session. The pure-Go core's
+separate notification admission cap is not a delivery acknowledgement. Method
+authorization returning `UNAUTHENTICATED` cancels callbacks and attempts an
+actual-send denial drain for up to 200ms, which may fail. Enrollment-watchdog
+failure and explicit principal disconnect close directly. Sessions own terminal
+transport close. Distinguish core callback grace
+(1s), writer join (1s **after transport Close returns**) and high-level connection
+server shutdown (default/max 5s). Uncooperative callbacks cannot be killed;
+`Lookup`, I/O and `Close` must honor cancellation. Low-level close can otherwise
+block. See [operational limits](docs/sc1-implementation.md#operational-limits).
+
+### Assurance and verification limits
+
+The final 2026-10-28 [verification record](docs/sc1-implementation.md#verification-evidence)
+uses Go 1.26.10: root pure-Go CGO-disabled/race/staticcheck, native-core
+race/staticcheck and Go 1.23.12 compatibility passed. Compatibility does not
+recommend an old toolchain for production. Root and integration scans found
+zero reachable vulnerabilities; that is not a dependency-wide advisory-free
+claim or coverage of every build variant or the fault proxy's own module graph.
+Production builds require a security-patched toolchain.
+
+Actual Docker integration passed in 30.681s across six carrier/mode groups,
+none skipped. It exercises adapters/core sessions, not high-level connection
+helpers, whose coverage is local unit tests. Same-implementation Docker,
+same-library Noise and native-core linkage are not independent SC1 wire
+interoperability, a cryptographic audit or formal `CONF-*` conformance. The
+[SC1 acceptance plan](conformance/plans/secure-channel.md) retains those distinctions.
+In-memory benchmark passes likewise establish no performance superiority;
+see [measurement conditions](docs/perf-tradeoffs.md).
+
+Independent review, vectors/interoperability and complete credential lifecycle
+work remain open. Native ABI v1 has no handler-completion timestamp input or
+explicit post-hello credential-release operation; pure-Go timing fixes do not
+establish native parity. Clearing accessible scratch and dropping references
+does not guarantee erasure of every Go, native, Noise or compiler-created secret
+copy. Key diagnostic formatting is redacted, but generated hello/debug output
+and arbitrary application logs are not automatically safe. See
+[remaining work](docs/sc1-implementation.md#remaining-work).
 
 ## Scope
 
 In scope: wire schemas, framing, handshake, RPC, errors, streams,
-transport profiles, and the conformance suite. This repository publishes
-specifications and schemas only; language implementations are separate
-projects with their own security processes.
+transport profiles, the conformance suite and the implementation evidence
+recorded here. Publication remains specifications/schema provenance rather
+than language artifacts; experimental implementation results do not amend
+normative security requirements.
 
 Out of scope: application payload semantics, credential formats, host
 authorization policy, and third-party deployments — though Syntra

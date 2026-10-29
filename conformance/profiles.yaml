@@ -2,8 +2,9 @@
 # Companion to conformance/README.md §2. Kinds: MANDATORY_CORE | OPTIONAL_CAPABILITY | TRANSPORT_PROFILE.
 # An implementation claims Core by passing its selected core/session/RPC/security/event cases
 # over at least one transport profile; each extra transport/capability is claimed independently.
-# Draft RFC 0007: conformance/plans/secure-channel.md is manual/planned coverage only;
-# it registers no active profile and supplies no executed conformance evidence or production Noise authorization.
+# Draft RFC 0007: formal acceptance cases remain manual/planned; no SC1 profile is registered.
+# Executed experimental implementation evidence is recorded in docs/sc1-implementation.md,
+# separately from profile conformance and production Noise authorization.
 format_version: "1.0"
 syntra_version: "v1"
 profiles:

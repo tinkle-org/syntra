@@ -1,6 +1,6 @@
 # Syntra Secure Channel v1 — Persistent device authorization proposal
 
-- Status: Proposal only — Draft RFC 0007; no implemented credential mechanism
+- Status: Draft RFC 0007; experimental preprovisioned-AK authentication implemented, acceptance pending
 - Date: 2026-10-27
 - Owner: [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 - Scope: Per-device shared authorization secrets and host-owned lifecycle
@@ -11,6 +11,10 @@ the current [authentication interface](../core/authentication.md) or
 [credential-security baseline](authentication-security.md) before acceptance.
 The [shared channel](secure-channel.md) defines encryption/confirmation;
 applications own enrollment authority, identity stores and permissions.
+The [implementation evidence ledger](../../docs/sc1-implementation.md) records
+bootstrap and preprovisioned returning-channel integration and its tests. Enrollment
+issuance, durable provisioning/storage transactions and rotation flows are not
+delivered; supporting NK bootstrap does not implement authorized enrollment.
 An enrolled principal can be a device, service or other generic identity;
 there is no required human-account model.
 
@@ -39,9 +43,12 @@ provisioning is not implicitly enabled by this draft.
 eight-byte lookup handle with collision checks in its store scope. It MUST
 NOT derive authority from secrecy or substitute for PSK proof, principal
 authorization or a session identifier. Both peers MUST bind handle, epoch
-and endpoint scope into the authenticated context. Exact wire encoding and
-rotation selection are freeze blockers. Deployments MUST account for clear
-stable handles enabling correlation and MUST NOT expose them as public
+and endpoint scope into the authenticated context. The exact experimental
+draft-1 encoding is defined in the [carrier contract](../transports/noise-bindings.md):
+bootstrap has zero epoch/handle and no AK; returning mode has nonzero epoch,
+nonzero handle and a nonzero 32-byte AK. Rotation selection/lifecycle remains
+open; encoding those fields does not implement rotation. Deployments MUST account
+for clear stable handles enabling correlation and MUST NOT expose them as public
 device identities or unrestricted log/metric labels.
 
 ## 2. Storage and principal binding
@@ -68,6 +75,12 @@ a mandatory database schema or new Protobuf message. The host passes only
 the minimum trusted context required for authentication/policy; application
 payloads and identity-store structure remain outside core interpretation.
 
+Implemented lookup is host-owned and receives the full channel context; returned
+key, principal, expiry and revoked state are validated. Preprovisioned keys are
+immutable within a handle/epoch. Subsequent `Check` evaluates validity and
+principal, not key equality; changing key material in place is not a rotation
+mechanism. This lookup surface is not a delivered protected-storage backend.
+
 ## 3. Expiration, revocation, and rotation
 
 **SNTR-DAUTH-006** — Applications MUST define bounded credential validity,
@@ -78,6 +91,16 @@ Clients MUST treat loss/rejection of authorization as requiring explicit
 recovery or enrollment, not automatic downgrade or continued use of cached
 permissions. Persistent authorization means no repeated interactive login
 while valid, not perpetual authorization.
+
+The implemented watchdog begins after first client-record confirmation and uses
+a 1-second tick with 1-second lookup contexts, including idle channels. These
+intervals are not an exact 1-second revocation SLA, nor a synchronous pre-ready
+validity check. A host requiring current enrollment before `ready` must enforce
+it in policy. Principal disconnect closes current connections; it does not deny
+future admission. Both watchdog failure and principal disconnect close directly.
+Only method authorization returning `UNAUTHENTICATED` attempts a bounded
+actual-send denial drain. That path and callback-cancellation limits are
+documented in the evidence ledger.
 
 **SNTR-DAUTH-007** — A rotation mechanism MUST define fresh AK/handle
 issuance, epoch selection, bounded old/new overlap, durable state changes,
@@ -113,18 +136,27 @@ Applications MUST re-evaluate scope/policy for the chosen endpoint/carrier.
 Implementations MUST NOT place AKs, handles or enrollment results in
 `connection_id`, invent an issuance field, or infer authenticated device
 context from client-provided metadata alone. Host authentication MUST receive
-trusted, connection-scoped channel verification context. A new API and
-enrollment RPC contract require explicit specification/review; new wire
-fields require the schema RFC/generation workflow. Before that contract
-exists, no binding or credential-issuance conformance claim is permitted.
+trusted, connection-scoped channel verification context. The experimental API
+below specifies that integration; it awaits acceptance and review. An enrollment
+RPC contract remains absent; new wire fields require the schema RFC/generation
+workflow. No credential-issuance or full binding conformance claim is established
+by the experimental API or its tests.
 
-Current implementations receive credential bytes only and require explicit
-integration design for any proposed secure-channel hook. A completed
-NKpsk0 handshake cannot silently authorize an empty `credential` using the
-existing anonymous policy. The proposed hook must distinguish verified
-enrollment context from bootstrap/anonymous attempts while leaving ordinary
-opaque credential mechanisms unchanged. No handshake capability or field is
-implicitly negotiated by this draft.
+`ChannelIdentity` contains mode, carrier, scope, handle, epoch and principal.
+`ChannelIdentityProvider.ChannelIdentity()` returns that value and a separate
+fresh-confirmation boolean. `ChannelPolicy` replaces ordinary `Policy`, requires
+fresh confirmed client transport and receives the explicit opaque hello
+credential, including an empty value. It returns a nonempty principal. Only the
+first valid client transport record provides confirmation; encrypted hello
+normally does so, while replayed M1 does not. A completed NKpsk0 handshake or
+empty credential never automatically authorizes an anonymous or enrolled binding.
+
+The bridge does not automatically compare the identity principal with the policy
+result, independently verify trusted root identity, or synchronously `Check`
+enrollment before `ready`. Those are explicit host-policy responsibilities;
+nil method `Authorize` denies methods. Ordinary opaque-credential mechanisms
+retain their meaning. No handshake capability or new field is implicitly
+negotiated by this draft.
 
 ## 5. Security and acceptance
 
@@ -139,5 +171,9 @@ storage or rotation.
 The [acceptance plan](../../conformance/plans/secure-channel.md) covers
 enrollment authorization, no secret leakage, handle collision/correlation,
 lookup failures, expiry, active-binding revocation, rotation overlap/crashes,
-cross-carrier separation and trusted authentication integration. No test
-results, deployment certification or dependency audit are claimed here.
+cross-carrier separation and trusted authentication integration. The evidence
+ledger separately records executed local and same-implementation integration
+tests with their limited scope. Enrollment and rotation execution, independent
+vectors/interoperability, deployment certification and independent security
+review are not established by those results. No formal SC1 `CONF-*` cases or
+profiles are registered.

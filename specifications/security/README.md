@@ -35,7 +35,7 @@ proposed, not a supersession of ADR-008.
 |---|---|---|
 | [secure-channel.md](secure-channel.md) | Shared channel independent of carrier I/O | `SNTR-SC-001`–`SNTR-SC-015` |
 | [device-authorization.md](device-authorization.md) | Persistent per-enrollment shared authorization | `SNTR-DAUTH-001`–`SNTR-DAUTH-010` |
-| [noise-bindings.md](../transports/noise-bindings.md) | Candidate TCP/WS mappings and deferred UDP design | References SC/DAUTH; no registered profiles |
+| [noise-bindings.md](../transports/noise-bindings.md) | Concrete experimental draft-1 TCP/WS/WSS mappings and deferred UDP design | References SC/DAUTH; no registered profiles |
 
 After the baseline, read RFC 0007 → shared channel → device authorization →
 carrier bindings → [planned acceptance cases](../../conformance/plans/secure-channel.md).
@@ -44,5 +44,23 @@ and `Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices, with a
 host-issued unique random 32-byte shared AK enrolled through authorized
 bootstrap. Persistent authorization retains neither traffic keys nor session
 state. The core keeps generic principals and opaque application payloads;
-no signing-key-pair credential model, implementation support, or post-quantum
-security is claimed.
+no signing-key-pair credential model or post-quantum security is claimed.
+
+## Experimental implementation and remaining work
+
+The [implementation evidence ledger](../../docs/sc1-implementation.md) owns the
+delivered-scope, authentication-boundary, operational-limit and execution record.
+The channel, TCP/WS/WSS adapters, trusted `ChannelIdentity`/`ChannelPolicy`
+integration and bounded host async writer have local unit/race/native-core and
+same-implementation Docker coverage. Draft-1 context bytes, carrier selection
+and numeric defaults are specified, not unresolved design TBDs. These facts
+do not accept RFC 0007 or register SC1 conformance profiles/cases.
+
+Only out-of-band preprovisioning is delivered; enrollment issuance, protected
+storage/transactions and rotation flows remain absent. Host policy still owns
+principal agreement, trusted root identity and synchronous enrollment checking
+before `ready`; empty credentials never authorize automatically and nil method
+authorization denies access. UDP is deferred; HTTP/HTTPS request-response is
+excluded from SC1 scope, with baseline profiles unchanged. Independent vectors,
+cross-implementation interoperability and independent security review remain
+open. In-memory benchmarks are not TLS-relative performance evidence.

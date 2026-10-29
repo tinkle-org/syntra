@@ -18,8 +18,9 @@ data model, or internal architecture.
 - IDL: Protocol Buffers (proto3), governed by Buf v2; document releases are
   managed by release-please through this repository's Git tags and GitHub
   Releases (see [Schema distribution](#schema-distribution))
-- Implementations: separate, non-normative, and out of scope for this
-  repository (see [Repository boundary](#repository-boundary))
+- Implementation evidence: delivered experimental Go SC1 draft-1 over
+  TCP/WS/WSS, recorded in the [implementation ledger](docs/sc1-implementation.md#implementation-status);
+  implementation behavior does not confer normative authority
 - Methodology: Specification-Driven Development — specifications first,
   code second (this repository hosts specifications, schemas, and
   conformance definitions only)
@@ -105,9 +106,11 @@ responsibilities (`SYN-ARCH-010`–`013`).
   **drafts, acceptance pending**)
 - [x] Conformance + interop suite (`conformance/`, executable manifests
   and test vectors)
-- Implementation status is out of scope for this repository; executable
-  conformance runs remain a pending verification goal, not an RFC-accepted
-  completion claim
+- [x] Bounded experimental SC1 draft-1 TCP/WS/WSS implementation, connection
+  orchestration, local regressions, and same-implementation Docker integration
+  recorded in the [evidence ledger](docs/sc1-implementation.md#verification-evidence)
+- Independent SC1 wire interoperability and formal conformance verdicts
+  remain pending; local test passes are not RFC acceptance
 
 Each item is accepted via the RFC process in `rfcs/README.md`.
 Release-blocking open questions are tracked in `SESSION-OPEN-QUESTIONS.md`
@@ -115,9 +118,10 @@ and the RFC set; no stable `v1` release exists yet. Draft
 status means: implementable for interop experiments, not yet stable —
 check the referenced RFCs before freezing a production dependency.
 
-The selected SC1 design is recorded in new **Draft, not Accepted**
-[RFC 0007](rfcs/0007-secure-channel-device-authorization.md). Selection is
-design direction, not RFC acceptance or shipped cryptography. Baseline TLS
+The SC1 design remains **Draft, not Accepted** in
+[RFC 0007](rfcs/0007-secure-channel-device-authorization.md). An experimental
+draft-1 implementation is delivered; its contract and evidence are recorded
+here without promoting it to accepted production policy. Baseline TLS
 requirements and all existing executable conformance profiles are unchanged.
 
 ## Supported v1 transports
@@ -141,14 +145,15 @@ Insecure transports MUST NOT be used for public production traffic
 [`docs/transport-selection.md`](docs/transport-selection.md) for neutral
 selection guidance and the per-profile specifications for bindings.
 
-## Selected proposed design: Syntra Secure Channel v1 (SC1)
+## Experimental implementation: Syntra Secure Channel v1 (SC1)
 
 SC1 is a transport-independent secure-channel state machine beneath Syntra
-envelopes. The selected proposal uses:
+envelopes. The delivered Go draft-1 implementation uses:
 
-- **Initial enrollment:** `Noise_NK_25519_ChaChaPoly_SHA256`, with a trusted
-  host static key. NK authenticates the host; device enrollment remains a
-  separate host-authorized action over the established channel.
+- **Bootstrap:** `Noise_NK_25519_ChaChaPoly_SHA256`, with a provisioned host
+  static-key pin. NK authenticates the host, not an enrolled client. Only
+  authenticated out-of-band provisioning is supported; no enrollment RPC
+  or complete issuance/storage/rotation workflow is implemented.
 - **Returning device:** `Noise_NKpsk0_25519_ChaChaPoly_SHA256`, using a
   unique, random shared **32-byte authorization key (AK)** per device and
   an opaque **8-byte `auth_id`** for host-side key lookup. The AK is not
@@ -160,33 +165,50 @@ envelopes. The selected proposal uses:
   the host first verifies an authenticated client transport record. Syntra
   `ClientHello`/`ServerReady` and readiness checks are still required.
 
-Enrollment, AK storage, authorization, and revocation are host-owned;
-human accounts are not mandatory. The AK is a shared symmetric secret,
-not a device signing keypair. Returning-device authentication creates a
-new channel; it does not resume a Syntra session, restore subscriptions,
-or authorize automatic RPC retries.
+The channel-aware host hook receives confirmed channel evidence and explicit
+`ClientHello.credential` bytes. Host policy must independently verify the root
+credential, current enrollment and admission before `ServerReady`, enforcing
+the intended returning-mode same-principal binding itself: the library does
+not compare principals automatically. Missing method authorization denies calls. See the
+[authentication boundary](docs/sc1-implementation.md#authentication-boundary).
 
-The proposed carrier bindings cover TCP, UDP, and WebSocket. The core
-does not dial sockets or require WebSocket or gRPC. Existing HTTPS/WSS TLS
-compatibility remains; browser `wss://` still requires outer TLS.
-Noise-in-WebSocket is a distinct wire binding, not a reinterpretation of
-`SNTR-WS-V1`, `SNTR-WSS-H1-V1`, or the existing `syntra.v1` mapping. UDP
-is a proposed binding, not current transport support.
+Delivered carriers are **TCP, WS and WSS**, in bootstrap and returning modes.
+UDP is deferred. HTTP/HTTPS request-response is excluded from this
+implementation; HTTP is used for WebSocket upgrade. Existing baseline profile
+definitions remain. SC1 uses the distinct `syntra.sc1.draft1` context domain
+and WS subprotocol, not the baseline `syntra.v1` mapping. WSS retains verified
+outer TLS 1.3 or newer; there is no automatic downgrade.
 
-With empty M1/M2 payloads, NK handshake bodies total **96 bytes**; the
-returning path totals **104 = 96 + 8 bytes** including the lookup handle.
-Those counts exclude framing and additional epoch/version fields and do
-not measure full channel establishment or the Syntra hello/ready RTT.
+The canonical context is 42–296 bytes; M1 is context plus 48 Noise bytes,
+and M2 is 48 bytes. Both modes therefore use **138–392 bytes before carrier
+framing**, excluding confirmation and core hello/ready. TCP prefixes every
+handshake/record message with u16BE; WS carries one message without that prefix.
+Records protect an inner u32BE-length-prefixed frame stream, with empty AD,
+65,535-byte ciphertext and 1 MiB serialized-frame ceilings.
+
+Ready-to-call connection helpers bound socket/upgrade, SC1 and core readiness
+to 10s total; successful client lifetime is independently owned. Server
+admission defaults to 128 connections/16 handshakes, held through ready write.
+Post-ready output uses one owned FIFO writer, bounded to 256 queued-plus-active
+frames/8 MiB, with a 5s default per-write timeout. Sessions own transport close;
+reconnect, subscription restoration and RPC replay remain explicit application
+decisions. Exact limits and shutdown qualifications are in
+[operational limits](docs/sc1-implementation.md#operational-limits).
 
 Read the proposed [secure channel](specifications/security/secure-channel.md),
 [device authorization](specifications/security/device-authorization.md),
 [carrier bindings](specifications/transports/noise-bindings.md), and
 [ADR-011 rationale](specifications/decisions/ADR-011-noise-device-authorization.md).
-The [SC1 conformance plan](conformance/plans/secure-channel.md) describes
-future verification, not executable coverage or a passing claim. See
-[migration record §9](MIGRATION.md#9-selected-sc1-design-record-2026-10-27)
-for the compatibility boundary. This documentation adds no SC1 runtime,
-support, benchmark, or conformance claim.
+The [SC1 conformance plan](conformance/plans/secure-channel.md) distinguishes
+local evidence from formal coverage. Docker exercised all six carrier/mode
+groups, but same-implementation tests and native-core linkage are not independent
+SC1 wire interoperability. [Performance evidence](docs/perf-tradeoffs.md) covers
+in-memory measurements, not a deployment-speed guarantee. Independent review,
+vectors/interoperability and native ABI completion-time/credential-release gaps
+remain [open](docs/sc1-implementation.md#remaining-work). RFC 0007 and Proposed
+ADR-011 still require acceptance; this evidence does not replace production TLS.
+See [migration record §11](MIGRATION.md#11-sc1-draft-1-implementation-evidence-2026-10-28)
+for the current implementation scope.
 
 ## Specification structure
 
@@ -253,6 +275,8 @@ Normative (the specification):
 Supporting (validation, process, explanation):
 
 - `docs/`, `rfcs/`, `audits/`
+- `docs/sc1-implementation.md` — self-contained experimental contract and
+  implementation evidence; it does not amend draft requirements or grant conformance
 - `scripts/`, `tests/` — repository validation tooling only (requirement
   linter, manifest and vector validators, descriptor and codec checks;
   never a Syntra client/server implementation). `.tmp/` holds only
@@ -417,7 +441,7 @@ of the remaining behavioral RFC questions.
 | Network mappings | `specifications/transports/*.md` (drafts, acceptance pending) |
 | Security requirements | `specifications/security/*.md` (drafts, acceptance pending) |
 | Executable verification | Conformance suite (`conformance/`) |
-| Implementation | Separate projects, out of scope for this repository (**non-normative**) |
+| Implementation evidence | `docs/sc1-implementation.md` (**informative**; implementation behavior does not override specifications) |
 
 In case of conflict, the listed owner prevails. See
 `specifications/architecture.md` Sec. 8 for the full matrix

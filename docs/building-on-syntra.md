@@ -79,7 +79,7 @@ if allowed, gets least privilege. Document expiry/revocation propagation
 windows — clients treat post-expiry RPCs as `UNAUTHENTICATED` and
 reconnect with fresh credentials.
 
-### Selected SC1 device policy (proposal)
+### Experimental SC1 device policy
 
 [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md), not
 an Accepted RFC, selects transport-independent SC1 with initial
@@ -103,9 +103,19 @@ session, restore subscriptions, or make an RPC safe to retry.
 The proposed [secure channel](../specifications/security/secure-channel.md)
 protects the peer-to-host path, not application E2EE. Its
 [TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md) do
-not change current TLS requirements or executable profiles. Existing
+not change current TLS requirements or executable profiles. TCP/WS/WSS have
+executed draft-1 implementations; UDP is deferred and SC1 HTTP/HTTPS
+request-response is excluded. Existing
 HTTPS/WSS TLS compatibility remains; browser `wss://` retains outer TLS,
 and Noise-in-WS is distinct from current WS/WSS wire mappings.
+
+The [implementation record](sc1-implementation.md#authentication-boundary)
+defines the trusted channel-policy hook. It receives confirmed channel identity
+and an explicit opaque hello credential; it does not independently establish
+root identity, compare principals or recheck enrollment before ready on behalf
+of the application. Those checks remain host-policy duties, and unset method
+authorization denies access. Current delivery uses authenticated out-of-band
+preprovisioning, not an enrollment RPC or complete storage/rotation transaction.
 
 ## Opaque encrypted payloads
 

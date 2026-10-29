@@ -25,8 +25,12 @@ records delimited by `u16BE` lengths. It is not the plaintext mapping here:
 SNTR-TCP-V1 still begins directly with the four-byte `hello` length prefix,
 and its vectors, restrictions and tests retain that meaning.
 
-The new binding identifier and context encoding are freeze blockers. Returning
-authorization would reuse a scoped enrollment AK, but each new channel uses
+Experimental draft-1 has concrete context bytes and `u16BE` framing for M1, M2
+and records, as defined in the carrier contract. The
+[implementation record](../../docs/sc1-implementation.md) retains executed
+TCP/WS/WSS tests and measured costs. Acceptance and formal profile registration
+remain open, not the experimental byte encoding. Returning
+authorization reuses a scoped enrollment AK, but each new channel uses
 fresh ephemeral/directional keys and a new Syntra handshake, without migrating
 traffic state from TCP, WebSocket or any future UDP binding. UDP remains
 deferred until its complete binding is frozen, reviewed and accepted. Current

@@ -8,8 +8,8 @@ reliability `SNTR-REL-020/021`, transport client sections.
 
 The steps below describe the current TLS/profile baseline. The selected
 SC1 path in [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-is not Accepted or implemented by these instructions; its client-side
-implications are recorded separately below.
+has a delivered experimental Go draft-1 implementation, described separately
+below. RFC acceptance and production TLS requirements remain unchanged.
 
 ## Transport establishment
 
@@ -34,6 +34,11 @@ handshake error: surface the typed code, close the transport, and do not
 retry with downgraded versions unless the application explicitly
 re-negotiates.
 
+The pre-`ACTIVE` typed-error carrier is still unresolved. In delivered SC1,
+host policy rejection closes the connection and the client can observe
+`UNAVAILABLE`; that does not establish receipt of a typed authentication
+denial. Do not retry automatically with bootstrap or another carrier.
+
 ## Authentication
 
 Obtain credentials out of band. Send them only over permitted transports
@@ -45,32 +50,56 @@ identical bytes only with bounded backoff, never in a tight loop. Treat
 `PERMISSION_DENIED` as "valid credential, access refused — do not retry
 identically" (`SNTR-AUTH-021`).
 
-## Selected SC1 proposal: client enrollment and returning channels
+## Experimental SC1 draft-1 clients
 
-For the proposed [SC1 state machine](../specifications/security/secure-channel.md),
-the initiator trusts the host static key before initial
-`Noise_NK_25519_ChaChaPoly_SHA256` enrollment. Enrollment permission and
-issuance/storage of a unique random shared 32-byte AK plus opaque 8-byte
-`auth_id` are defined by [host device policy](../specifications/security/device-authorization.md).
-The client protects its stored AK; no signing keypair or human account is
-required by this model.
+The delivered [implementation contract](sc1-implementation.md#implementation-status)
+supports TCP/WS/WSS, explicitly selected in bootstrap NK or returning NKpsk0
+mode. Bootstrap requires a trusted, provisioned server static-key pin;
+returning mode also requires a nonzero 32-byte AK, an independently generated
+eight-byte handle and nonzero epoch. The exact UTF-8 scope, carrier and
+server-key ID are authenticated context. Neither AK nor handle is
+`connection_id`. M1/M2 payloads are empty; no credentials or RPCs are early data.
+Every reconnect uses fresh ephemeral material and directional traffic keys.
 
-A returning initiator supplies the lookup handle and uses
-`Noise_NKpsk0_25519_ChaChaPoly_SHA256`, without transmitting the AK.
-Use fresh ephemeral material and derive fresh directional traffic keys on
-every channel. M1/M2 payloads stay empty: no 0-RTT credentials or
-application data. The host verifies the first authenticated client
-transport record before protected actions. Syntra `ClientHello` and
-`ServerReady` still gate RPCs; Noise completion alone is not readiness.
-Neither AK nor `auth_id` is `connection_id`.
+`connection.DialTCP` and `DialWebSocket` return a ready-to-call client after
+socket/upgrade, SC1 and validated core `ServerReady`, within one 10s total
+budget shortened by the caller. Adapter establishment and core hello each
+retain a 5s limit. `connection.Connect` takes ownership of an already
+established transport, including on failure. At the lower level,
+`Client.WaitReady` waits while a separately started `Run` drives I/O; it
+does not perform I/O itself. Readiness is a snapshot, not a guarantee that
+the next call cannot encounter disconnection.
 
-The proposed [TCP/UDP/WS bindings](../specifications/transports/noise-bindings.md)
-do not change baseline TLS validation or existing HTTPS/WSS compatibility.
-Browser `wss://` retains outer TLS; Noise-in-WS uses a distinct wire from
-current WS/WSS profiles. Reconnect still needs explicit application
-recovery and retry decisions; returning-device authentication supplies no
-session resumption, subscription restoration, or proof that a lost RPC did
-not execute.
+A successfully connected client's lifetime is independent of its dial context.
+Close it explicitly: high-level `Client.Close` cancels and joins for at most
+5s; `Done` and `Wait(ctx)` observe termination, and canceling a wait does not
+close the connection. Running core sessions own transport closure. Receive
+cancellation after I/O begins can terminate an adapter; do not cancel its
+shared receive pump merely to abandon one RPC. See
+[ownership and limits](sc1-implementation.md#operational-limits).
+
+WS uses exact subprotocol `syntra.sc1.draft1`, binary messages and disabled
+compression; it does not use the baseline one-message/one-`Frame` mapping.
+WSS retains verified outer TLS ≥1.3 as well as the Noise server pin. Standard
+inspectable HTTP transports enforce verification; custom RoundTrippers own
+their TLS policy. Redirects and automatic downgrade/fallback are refused.
+UDP is deferred and HTTP/HTTPS request-response is excluded from this stack.
+
+The host's [channel-aware policy](sc1-implementation.md#authentication-boundary)
+must independently verify root credentials, current enrollment and admission
+before ready, enforcing the intended returning-mode same-principal binding
+itself. The library does not compare principals or implicitly authorize empty hello
+credentials. Bootstrap authenticates the host, not an enrolled client;
+only explicit authenticated out-of-band provisioning is supported. Secure
+client storage, enrollment RPCs and complete issuance/rotation recovery are
+not supplied. Reconnect/resubscribe and retry decisions remain explicit;
+AK possession proves neither a lost RPC's outcome nor replay safety.
+
+Local connection tests and same-implementation container carrier tests are
+recorded in [verification evidence](sc1-implementation.md#verification-evidence).
+They are not independent wire interoperability or formal conformance.
+Independent review/vectors/interoperability and native-core ABI credential
+release/completion-time gaps remain [open](sc1-implementation.md#remaining-work).
 
 ## Request IDs
 
@@ -94,6 +123,13 @@ abandoning an RPC you no longer need, but still await (or explicitly
 discard with a local timeout) the terminal `result` to avoid ID-reuse
 races. Never treat transport/framing/TLS success as application success —
 only `RpcResult{payload}` proves success.
+
+The delivered Go client defaults to 16 outstanding calls and permits configured
+limits of 1–16; the host defaults to 16 and permits 1–256. A configuration below
+16 does not establish the baseline concurrency-floor claim without a negotiated
+lower-limit binding. Default RPC timeout is 3s, maximum 30s. Hello credentials
+are capped at 8 KiB and methods at 512 bytes; the 1 MiB serialized-envelope
+ceiling includes overhead. These are implementation limits, not new RFC decisions.
 
 ## Error handling
 

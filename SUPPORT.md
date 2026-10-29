@@ -31,25 +31,45 @@ reporting for this repository are the authoritative channels.
   FILE/source migration is a known breaking difference.
 - Draft specifications, transport profiles, and the conformance suite —
   support scope for each is stated in its README and `CHANGELOG.md`.
-  Language implementations are separate projects with their own support
-  channels.
+- Experimental Go SC1 draft-1 contract and implementation evidence, recorded
+  in the [implementation ledger](docs/sc1-implementation.md#implementation-status).
+  Best-effort development support does not establish accepted production
+  policy, a stable support window or independent security assurance.
 
-## SC1 design discussion
+## SC1 implementation and design discussion
 
 The selected transport-independent secure-channel proposal is
 [Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md), not an
-Accepted RFC or supported runtime feature. For design questions, cite the
-proposed [secure channel](specifications/security/secure-channel.md),
+Accepted RFC. Bounded experimental TCP/WS/WSS bootstrap and returning channels,
+high-level connection helpers, channel-aware host policy, deny-by-default method
+authorization and owned asynchronous output/shutdown are delivered. For design
+questions, cite the proposed [secure channel](specifications/security/secure-channel.md),
 [device authorization](specifications/security/device-authorization.md), or
 [TCP/UDP/WS bindings](specifications/transports/noise-bindings.md), and
-identify whether the report concerns that proposal or the current profile.
+identify whether the report concerns draft-1 behavior, a proposal decision or
+a baseline profile. UDP remains deferred; HTTP/HTTPS request-response is
+excluded from this implementation. WSS retains verified outer TLS ≥1.3 and
+does not automatically downgrade.
 The TLS baseline and existing executable conformance profiles remain current.
 
-Enrollment, per-device AK storage, authorization, and revocation are
-host-owned integration policy; no mandatory human account system is
-provided. The [SC1 conformance plan](conformance/plans/secure-channel.md)
-does not establish implementation support, test results, or benchmarks.
-Continue to report vulnerabilities privately through `SECURITY.md`.
+Host policy must independently verify root identity, current enrollment and
+admission before ready, enforcing the intended returning-mode same-principal
+binding; the library does not compare principals automatically. Enrollment, per-device AK
+storage, authorization and revocation remain host-owned. There is no enrollment
+RPC or complete issuance/storage/rotation workflow. Independent review,
+vectors/interoperability and native ABI completion-time/credential-release
+gaps remain [open](docs/sc1-implementation.md#remaining-work).
+
+For implementation reports include mode/carrier, toolchain, pure-Go or native
+core, reproduction, configured limits and whether the failure occurred before
+ready, during RPCs or during close. High-level connection helpers have local
+unit coverage; the six-group Docker suite exercises adapters with core sessions.
+Same-implementation tests are not independent wire interoperability or formal
+`CONF-*` verdicts. Cite [verification evidence](docs/sc1-implementation.md#verification-evidence)
+and [performance evidence](docs/perf-tradeoffs.md) with their conditions, rather
+than treating the [acceptance plan](conformance/plans/secure-channel.md) as a pass.
+Never include credentials or full hello/provisioning buffers. Continue to
+report vulnerabilities privately through `SECURITY.md`.
 
 ## What is not supported
 

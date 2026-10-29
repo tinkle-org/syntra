@@ -78,8 +78,13 @@ flowchart LR
 The [planned secure-channel acceptance cases](../../conformance/plans/secure-channel.md)
 trace [Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 to proposed `SNTR-SC-001`–`SNTR-SC-015` and
-`SNTR-DAUTH-001`–`SNTR-DAUTH-010`. They are manual/planned work, not
-executable IDs or results. SNTR-STEST-001–011/900, certificate fixtures and
+`SNTR-DAUTH-001`–`SNTR-DAUTH-010`. Their formal acceptance references remain
+manual/planned, not registered executable IDs. Separately, the
+[implementation ledger](../../docs/sc1-implementation.md#verification-evidence)
+records executed unit/race and same-implementation Docker tests across
+TCP/WS/WSS × bootstrap/returning, with measured in-memory benchmarks. These
+results do not establish independent interoperability or complete acceptance.
+SNTR-STEST-001–011/900, certificate fixtures and
 current core/profile expectations retain their existing meaning and coverage.
 
 The additional review includes independently derived NK/NKpsk0 vectors,

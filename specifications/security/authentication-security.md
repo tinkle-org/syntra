@@ -58,13 +58,40 @@ policies; a one-way hash alone cannot supply a Noise PSK. This host-owned
 store does not authorize credential persistence in the core or adapters.
 
 Fresh client transport-record confirmation, current enrollment validity and
-principal policy would precede `ready`, with per-method authorization still
-required. Persisting an AK does not resume a logical session or preserve old
-traffic keys. The trusted connection-scoped authentication hook and bounded
-enrollment/rotation RPC contracts are blockers: the current credential-only
-interface does not establish that context. `ClientHello.credential` stays
-opaque, empty credentials still follow anonymous policy, and `connection_id`
-remains diagnostic. These proposed SC/DAUTH requirements do not amend the
+principal policy must precede `ready` under the proposal, with per-method
+authorization still required. Persisting an AK does not resume a logical session
+or preserve old traffic keys. The implemented experimental bridge provides
+`ChannelIdentity` (mode, carrier, scope, handle, epoch and principal), a provider
+returning a separate fresh-confirmation boolean, and `ChannelPolicy`, which
+replaces ordinary `Policy` and receives the
+explicit opaque hello credential, including empty bytes. It requires fresh
+confirmed client transport and a nonempty returned principal. Replayed M1 is
+not confirmation; the first valid client record, normally encrypted hello, is.
+
+The bridge does not automatically compare channel and returned principals,
+independently verify trusted root identity or synchronously `Check` enrollment
+before `ready`; these are explicit host-policy duties. Empty credentials never
+automatically authorize access; a nil method `Authorize` hook denies methods.
+Host-owned lookup receives the full context and validates returned key,
+principal, expiry and revoked state. Keys are immutable within a handle/epoch;
+later `Check` evaluates validity and principal, not key equality.
+
+The watchdog begins at first confirmation and runs on a 1-second tick with
+1-second lookup contexts, including idle channels. This is not an exact
+1-second revocation SLA. Principal disconnect closes current connections, not
+future admission. Bounded close depends on cancellation-compliant I/O/store
+callbacks and cannot forcibly terminate them. The
+[implementation evidence ledger](../../docs/sc1-implementation.md) documents
+the authentication boundary, actual-send drain, writer/operational budgets,
+executed tests and remaining gaps.
+
+Only out-of-band preprovisioning is delivered. Enrollment issuance, protected
+storage/transactions and rotation flows remain absent; independent vectors,
+interoperability and security review remain open. `ClientHello.credential`
+stays opaque and `connection_id` diagnostic. The codec's 8 KiB pre-allocation
+credential gate, depth-32/full validation and reserved-16/17 rejection in both
+directions do not close the native-ABI completion-timestamp and post-hello
+credential-release gaps. These proposed SC/DAUTH requirements do not amend the
 current ASEC carriage, TLS or lifecycle rules before RFC acceptance.
 
 ## 2. Request-security hooks (per-connection/session limits)

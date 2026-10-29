@@ -18,12 +18,16 @@ devices. Each enrolled device and its host share a unique random 32-byte
 authorization key (AK). The AK persists across reconnects; ephemeral keys,
 directional traffic keys, and channel state do not.
 
-This RFC is a proposal, not an acceptance record or implementation claim.
+This RFC remains a proposal; recording experimental delivery below is not an
+acceptance record.
 ADR-008 and the existing production TLS policy remain in effect. No existing
 profile identifier, conformance case, Protobuf field, or generated type changes
 meaning through this RFC. Raw UDP remains deferred until its binding is
-specified and accepted. No SC1 implementation is added by this documentation
-change.
+specified and accepted. Experimental draft-1 channel, TCP/WS/WSS adapter,
+host-authorization and asynchronous-writer implementations have been exercised.
+Their scope and retained verification are recorded in the
+[implementation evidence ledger](../docs/sc1-implementation.md). Implementation
+and test execution do not accept this RFC or register a conformance profile.
 
 ## 2. Motivation
 
@@ -35,8 +39,9 @@ carrier libraries: the same channel construction should have explicit TCP,
 UDP, and WebSocket mappings.
 
 SC1 uses an established Noise construction rather than introducing primitives
-or a separate key schedule. Smaller dependency footprint, lower CPU use, and
-better latency are evaluation goals, not measured results. The tradeoffs
+or a separate key schedule. In-memory benchmarks are recorded in the evidence
+ledger; they are not TLS comparisons or evidence of a smaller dependency
+footprint, lower CPU use, or better network latency. The tradeoffs
 include server-side secret storage, authenticated server-key provisioning,
 credential lifecycle management, and a new interoperable wire contract.
 
@@ -50,7 +55,7 @@ Proposed requirements are owned by these companion drafts:
 | Persistent authorization | [device-authorization.md](../specifications/security/device-authorization.md) | `SNTR-DAUTH-*` |
 | Carrier mappings | [noise-bindings.md](../specifications/transports/noise-bindings.md) | references the two families above |
 | Policy rationale | [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md) | proposed amendment to ADR-008 |
-| Verification | [acceptance plan](../conformance/plans/secure-channel.md) | planned cases, not executable conformance |
+| Verification | [acceptance plan](../conformance/plans/secure-channel.md) and [implementation evidence](../docs/sc1-implementation.md) | planned conformance work and separately scoped executed implementation tests |
 
 ### Client and host obligations
 
@@ -103,6 +108,9 @@ Returning device:
     |--- encrypted generic RPC --------->|
 ```
 
+The enrollment RPC/result above illustrates the proposed lifecycle, not a
+delivered issuance flow. Current execution uses out-of-band preprovisioning.
+
 The first bootstrap `ready` binds only the principal established by bootstrap
 policy. Enrollment does not change that binding in place: the device opens a
 new channel to authenticate using its new AK. Empty/anonymous bootstrap
@@ -121,21 +129,35 @@ External I/O: socket / datagram / WebSocket implementation
 ```
 
 The security state machine does not dial sockets, own application identity
-databases, or require an RPC framework or WebSocket library. A future optional
-reference module can consume and produce bounded messages through caller-owned
-I/O. Existing core/runtime and FFI complete-frame boundaries remain separate.
-Host authentication integration needs trusted per-channel context rather than
-an attacker-supplied assertion that a handle was verified.
+databases, or require an RPC framework or WebSocket library. The implemented
+experimental channel consumes and produces bounded messages through caller-owned
+I/O; adapters own TCP/WS/WSS carriage. HTTP/HTTPS request-response is excluded
+from SC1 draft-1; existing HTTP/HTTPS profiles are unchanged. Complete-frame
+core and native-ABI boundaries remain separate.
+
+The implemented `ChannelIdentity` carries mode, carrier, scope, handle, epoch
+and principal. `ChannelIdentityProvider.ChannelIdentity()` returns that value
+and a separate fresh-confirmation boolean. `ChannelPolicy` replaces ordinary
+`Policy` for this integration, requires fresh confirmed client transport traffic,
+and receives the explicit opaque hello credential, including an empty value.
+It must return a nonempty principal. Empty credentials never automatically
+authorize a channel. Comparing the channel principal with the callback's returned
+principal, independently establishing trusted root identity, and checking current
+enrollment synchronously before `ready` are explicit host-policy responsibilities;
+the bridge does not perform those checks automatically. A nil `Authorize` hook
+denies methods. See the evidence ledger for the complete authentication boundary.
 
 ### 4.2 Credential and context
 
 AK is a uniformly random 256-bit secret scoped to one device enrollment and
-intended Noise/hash context. `auth_id` is a proposed collision-checked,
-independent eight-byte lookup handle, not proof of identity. An authorization
-epoch belongs to credential lifecycle state. The exact wire representation
-of the version, mode, carrier binding, endpoint scope, handle, and epoch is a
-freeze blocker; both parties must bind identical authenticated context through
-Noise's prologue. The secret itself is an input to `psk0`, never the prologue.
+intended Noise/hash context. `auth_id` is a collision-checked independent
+eight-byte lookup handle, not proof of identity. An authorization epoch belongs
+to credential lifecycle state. The implemented experimental draft-1 context has
+the exact domain, mode, carrier, server-key selector, epoch, handle and scope
+encoding specified in [the carrier contract](../specifications/transports/noise-bindings.md).
+It is carried in clear before M1 and supplied unchanged as the Noise prologue.
+The AK is an input to standard `psk0`, never the prologue. This encoding is
+concrete experimental behavior; acceptance and independent verification remain open.
 
 No negotiation menu or fallback is introduced. Bootstrap and returning modes
 are explicitly selected. An unknown/revoked credential does not silently
@@ -149,7 +171,7 @@ tag; transport plaintext is at most 65,519 bytes. Carrier limits may be much
 smaller. The default serialized Syntra envelope remains 1,048,576 bytes and
 requires bounded segmentation/reconstruction where necessary.
 
-The carrier proposal retains an encrypted inner `u32BE frame_length || Frame`
+The implemented experimental binding retains an encrypted inner `u32BE frame_length || Frame`
 stream for ordered carriers. It avoids new fragment identifiers on reliable
 streams. UDP requires a separately reviewed datagram mapping; the stream
 mapping is not transplanted to datagrams. The exact mappings and their
@@ -157,18 +179,38 @@ tradeoffs are recorded in the carrier draft, not in core serialization.
 
 ### 4.4 Budgets, shutdown, and reconnect
 
-The channel needs documented absolute handshake, record/frame assembly,
-write-stall and close deadlines, plus aggregate connection, handshake-worker,
-queue-byte/count and reassembly budgets. Trickle input does not extend an
-absolute deadline. Numerical channel defaults are acceptance blockers; core
-Syntra handshake and RPC bounds are not substitutes for these budgets.
+The implemented ordered adapters default to absolute 5-second channel-handshake,
+record-assembly, frame-assembly and write deadlines, configurable only to shorter
+positive durations. Trickle input does not extend absolute deadlines. Dialing
+has one 10-second total budget across socket establishment, Upgrade, Noise and
+hello/ready, shortened by the caller's deadline; the core hello budget is
+separately 5 seconds. Aggregate admission, queue, server and shutdown defaults
+are specified in the [operational evidence ledger](../docs/sc1-implementation.md).
+Server admission defaults to 128 connections (maximum 4,096) and 16 handshakes
+(maximum 256), with handshake slots held through the `ready` write. Server
+shutdown defaults to 5 seconds, configurable only to shorter positive durations.
+These implementation defaults are not new accepted core requirements.
 
-The proposed operational ceiling is a new channel before 24 hours or
-`2^32` records in either direction, whichever is first. These are proposed
-Syntra policy, not Noise limits. A deployment may choose stricter ceilings.
+The experimental operational ceiling is a new channel before 24 hours or
+`2^32` records in either direction, whichever is first, with stricter limits
+permitted. The entry clock includes establishment, and lifetime expiry also
+applies while idle. These implemented limits await policy acceptance and are
+not Noise limits.
 No nonce reset, copied cipher state, custom ratchet, or PSK-only fast path is
 defined. Connection renewal is a fresh channel and Syntra handshake, not an
 in-place reauthentication or resumption shortcut.
+
+The host's post-ready asynchronous writer owns FIFO snapshots and bounds queued
+plus active output to 256 frames / 8 MiB. Saturation is terminal
+`RESOURCE_EXHAUSTED`; the host loop continues cancellation, deadlines and
+dispatch while writes stall. Its write timeout defaults to 5 seconds but accepts
+any positive host-configured value, independently of the adapter's at-most-5-second
+write deadline. Method authorization returning `UNAUTHENTICATED` uses an
+actual-send denial-drain budget of 200 ms; lifecycle-check failure and explicit
+principal disconnect instead abort the connection. Writer
+join is bounded to 1 second after `Close` returns. Abortive adapter close depends
+on cancellation-compliant I/O and store callbacks, not forcible callback killing.
+These bounds are distinct from the core callback grace and server shutdown budget.
 
 Finish admitted complete output within a close budget or abort. Noise has no
 authenticated orderly-close marker in this proposal. EOF even at a complete
@@ -227,12 +269,20 @@ No raw secrets or attacker-controlled private diagnostics belong in errors.
 ## 8. Test plan and acceptance criteria
 
 The [acceptance plan](../conformance/plans/secure-channel.md) traces every
-proposed requirement to planned positive and negative cases. Traceability
-rows are explicitly manual/planned with no executable test IDs or results.
-Current conformance profiles and expected outcomes remain unchanged.
+proposed requirement to planned positive and negative cases. No formal SC1
+`CONF-*` cases or profiles are registered. Separately, the
+[implementation evidence ledger](../docs/sc1-implementation.md) records executed
+local unit, race and native-core tests and six Docker integration groups:
+TCP/WS/WSS × NK/NKpsk0. Those groups exercise echo, 64 KiB and near-1 MiB
+payloads, 16 concurrent calls, cancellation/deadlines, authorization and bad-key
+rejection, verified TLS, stalled/reset connections, restart and shutdown.
+They use the same implementation and are not independent cryptographic or
+runtime interoperability evidence. Current profile expectations remain unchanged.
+The unchecked criteria below cover complete acceptance work; scoped execution
+of overlapping tests is recorded in the ledger and is not erased by that status.
 
-- [ ] Freeze wire context and carrier schemas; publish deterministic vectors
-      derived through independent implementations, not invented ciphertext.
+- [ ] Accept the concrete experimental wire context/carrier schemas and publish
+      independently derived deterministic vectors, not invented ciphertext.
 - [ ] Verify independent Rust–Go handshake/record interoperability and generic
       RPC exchange across accepted carrier bindings.
 - [ ] Exercise wrong server keys, wrong/revoked AKs, stale epochs, replayed
@@ -252,27 +302,56 @@ Current conformance profiles and expected outcomes remain unchanged.
 Server-held authorization secrets add a compromise surface. Authenticated
 static-key provisioning and rotation replace neither application enrollment
 nor permissions. New bindings add framing/replay/DoS state. Smaller wire
-headers do not demonstrate smaller binaries or faster endpoints. Multiple
-carrier implementations and an independent security review are required
+headers do not demonstrate smaller binaries or faster endpoints. Independent
+verification of the implemented carriers and an independent security review are required
 before promoting this proposal to a production default.
 
 ## 10. Unresolved questions and blockers
 
-1. Maintainer authorship/review assignment and approval of the policy amendment.
-2. Exact canonical context, bootstrap/returning discriminant, epoch and
-   server-key selection encoding; authenticated scope and negotiation rules.
-3. Bounded enrollment RPC/out-of-band contract, host storage interface,
-   idempotency, receipt/commit behavior and cross-language test fixtures.
-4. Trusted channel-authentication context API for runtime/Go/FFI boundaries,
-   preserving opaque credential carriage and existing principal semantics.
-5. Numeric establishment/assembly/close and aggregate resource defaults;
-   validation of proposed lifetime ceilings.
-6. Frozen TCP/WS bindings and identifiers; complete UDP handshake demux,
-   counters, replay window, path/DoS/reliability/fragmentation specification.
-7. Revocation propagation bound, active-channel closure, rotation persistence
-   and crash/concurrency semantics.
-8. Version/deprecation designation if existing required behavior is replaced.
-9. Independent vectors, implementations, threat analysis and security review.
+### Implemented experimental definitions; acceptance pending
+
+- Exact draft-1 context and explicit mode/carrier selection, standard Noise
+  suites, TCP length framing and WS/WSS binary mapping/subprotocol are defined
+  in the carrier contract. They are no longer design TBDs.
+- Trusted `ChannelIdentity`/`ChannelPolicy` integration, fail-closed method
+  authorization, bounded adapters, operational defaults and host async writing
+  exist with scoped execution evidence. They do not establish full conformance.
+
+### Partial integration; explicit responsibilities and remaining gaps
+
+- Preprovisioned credentials are supported through host-owned full-context
+  lookup; key/principal/expiry/revoked fields are validated. Keys are immutable
+  within a handle/epoch. Later `Check` validates validity and principal, not
+  key equality. No enrollment issuance, transaction, protected-storage backend
+  or rotation workflow is delivered.
+- Confirmation comes only from the first valid client record, normally encrypted
+  hello, never replayed M1. The watchdog starts at first confirmation and checks
+  on a 1-second tick with 1-second lookup contexts, including idle channels;
+  this is not an exact 1-second revocation SLA. Disconnecting a principal closes
+  current connections, not future admission. Host policy still owns synchronous
+  pre-ready validity checks, principal agreement and trusted root identity.
+- The codec rejects reserved fields 16/17 in both directions, gates credentials
+  at 8 KiB before allocation, bounds depth to 32 and performs full validation.
+  Native-ABI completion-timestamp and post-hello credential-release gaps remain.
+
+### Open acceptance and delivery work
+
+1. Maintainer authorship/review assignment, policy amendment approval, and
+   explicit version/deprecation designation if required behavior is replaced.
+2. Authorized enrollment issuance/provisioning, durable storage/commit/receipt,
+   retry/idempotency, interrupted enrollment and rotation/crash/concurrency flows.
+3. Deployment revocation-propagation guarantees and independent validation of
+   lifecycle, resource, lifetime and cancellation assumptions.
+4. Complete UDP demux, counters/replay window, path validation, anti-amplification,
+   reliability and bounded fragmentation contract; UDP remains deferred.
+5. Independent deterministic vectors, cross-implementation interoperability,
+   full-composition threat analysis and independent security review.
+6. Accepted portable conformance cases and any separately approved profiles.
+
+HTTP/HTTPS request-response is excluded from this SC1 implementation scope;
+existing profiles remain unchanged. In-memory measurements do not establish
+TLS-relative performance superiority. The evidence ledger owns detailed results
+and the remaining-work record.
 
 Until these blockers are resolved, no production, interoperability, or full
 conformance claim follows from this RFC or its companion documents.

@@ -16,16 +16,32 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 and [device authorization](../security/device-authorization.md) select a
 shared per-device AK incorporated into Noise NKpsk0 on returning channels.
 The AK is not sent as `ClientHello.credential`, and a client-supplied handle
-alone is not evidence of authentication. A future host hook needs trusted
-per-channel verification context to bind the enrollment to a principal;
-the existing opaque-credential interface is not silently reinterpreted.
+alone is not evidence of authentication. The implemented experimental bridge
+provides trusted per-channel verification context through `ChannelIdentity`
+and `ChannelPolicy`; it does not silently reinterpret the existing
+opaque-credential interface. The exact experimental contract and executed tests
+are recorded in the [implementation evidence ledger](../../docs/sc1-implementation.md).
+
+`ChannelIdentity` carries mode, carrier, scope, handle, epoch and principal.
+`ChannelIdentityProvider.ChannelIdentity()` returns it with a separate
+fresh-confirmation boolean. `ChannelPolicy` replaces ordinary `Policy` and receives
+that identity plus the explicit opaque hello credential, including empty bytes.
+It requires fresh confirmed client transport and returns a nonempty principal.
+The bridge does not automatically compare channel and returned principals,
+independently verify trusted root identity or synchronously `Check` enrollment
+before `ready`; these are explicit host-policy responsibilities. Empty
+credentials never automatically authorize a channel. A nil method `Authorize`
+hook denies methods, including after successful channel authentication.
 
 Bootstrap uses completed Noise NK before enrollment authorization. A valid
 reconnect establishes a fresh principal binding; it does not change an old
 binding or restore a session. `hello`/`ready` and method permissions still
 apply. Enrollment responses require a separate application/provisioning
-contract, not an invented `ServerReady` issuance field. The current
-requirements below remain unchanged until RFC acceptance.
+contract, not an invented `ServerReady` issuance field. Only out-of-band
+preprovisioning is delivered; enrollment issuance/storage transactions and
+rotation flows remain absent. The current requirements below remain unchanged
+until RFC acceptance, and implementation tests do not establish formal SC1
+conformance or independent interoperability.
 
 ## 1. Protocol requirements
 

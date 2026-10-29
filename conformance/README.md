@@ -11,15 +11,21 @@
 
 This directory is the **sole executable definition of conformance**.
 Language implementations are separate projects, out of scope for this
-repository; executing conformance runs against any implementation is a
-pending verification goal (CI currently validates manifests and vectors
-only) and never the source of truth (ADR-010, SYN-ARCH-041). This
+repository; complete manifest-driven conformance runs remain a pending
+verification goal (CI currently validates manifests and vectors only).
+Implementation tests are evidence, never the source of truth
+(ADR-010, SYN-ARCH-041). This
 repository is pre-release.
 
 Planned Draft RFC 0007 coverage for secure channels and device authorization is
 recorded in [`plans/secure-channel.md`](plans/secure-channel.md). Its 25 proposed
-requirements have manual/planned traceability only: no executable cases,
-executed conformance evidence, active profiles, or production Noise authorization.
+requirements retain manual acceptance traceability and empty formal `test_ids`:
+no SC1 `CONF-*` cases or active profiles are registered. Executed experimental
+TCP/WS/WSS unit, race and Docker integration tests, with measured in-memory
+benchmarks, are recorded separately in the
+[implementation evidence ledger](../docs/sc1-implementation.md). They are not
+full conformance or independent interoperability and do not authorize
+production Noise or amend the TLS policy.
 
 > A completely separate repository or a third-party implementation in any
 > language MUST be able to read these files and build its own conformance

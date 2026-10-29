@@ -2,9 +2,9 @@
 
 Status: Draft 2026-10-19. Produced because unresolved release-blocking questions remain for authentication, session lifecycle, and resumption. None of these is resolved by implementation choice. Normative clarifications landed in `specifications/core/handshake.md` (§1A–§1B/§2A), `authentication.md` (§1A–§1D), `sessions.md` (§1A–§1G), and `conformance/auth-session/`; the items below still need RFC decisions before stable v1.
 
-## Selected SC1 direction (2026-10-27; proposal only)
+## SC1 draft-1 implementation and pending acceptance (2026-10-28)
 
-New [RFC 0007](rfcs/0007-secure-channel-device-authorization.md) is
+[RFC 0007](rfcs/0007-secure-channel-device-authorization.md) is
 **Draft, not Accepted**. The selected target is transport-independent SC1:
 initial `Noise_NK_25519_ChaChaPoly_SHA256` enrollment, then returning
 `Noise_NKpsk0_25519_ChaChaPoly_SHA256` channels using a unique random shared
@@ -18,7 +18,16 @@ by RFC acceptance. Baseline TLS requirements and all existing executable
 conformance profiles remain unchanged. Returning-device authentication is
 not session resumption, restored subscriptions, or automatic RPC retry.
 
-Proposal review still needs to establish the complete bounds, failure and
+Delivered experimental Go SC1 draft-1 supports bounded TCP/WS/WSS in both
+modes, ready-to-call connection helpers, server admission, channel-aware host
+policy and owned asynchronous output/shutdown. Its self-contained
+[implementation record](docs/sc1-implementation.md#implementation-status)
+supplies concrete bytes and numerical defaults; those choices do not settle
+normative blockers. UDP is deferred and HTTP/HTTPS request-response is excluded
+from this implementation. WSS retains verified outer TLS ≥1.3 with no automatic
+downgrade. Proposed ADR-011 has not replaced production TLS policy.
+
+Proposal review still needs to accept the complete bounds, failure and
 verification details in the [secure-channel draft](specifications/security/secure-channel.md),
 [device-authorization draft](specifications/security/device-authorization.md),
 and [TCP/UDP/WS binding draft](specifications/transports/noise-bindings.md),
@@ -26,10 +35,32 @@ with the [conformance plan](conformance/plans/secure-channel.md). In
 particular, the host first verifies an authenticated client transport
 record before protected actions, and Syntra hello/ready remains required.
 Enrollment/storage/authorization/revocation are host-owned without
-mandatory human accounts; revocation enforcement still needs an explicit
-deployment policy. Browser `wss://` retains outer TLS, and Noise-in-WS is
-distinct from existing WS/WSS wire profiles. These are design constraints,
-not new implementation, transport-support, or passing-test claims.
+mandatory human accounts. Confirmed-peer lifecycle checks run on a 1s ticker
+with 1s lookup contexts, not a guarantee of exact 1s revocation propagation.
+Before ready, host policy must independently verify root identity, current
+enrollment and admission and enforce the intended returning-mode same-principal
+binding; the library does not compare principals automatically. Nil method
+authorization denies effects. See [authentication boundary](docs/sc1-implementation.md#authentication-boundary).
+
+The [verification record](docs/sc1-implementation.md#verification-evidence)
+includes final Go 1.26.10 root/native-core checks, Go 1.23.12 compatibility,
+zero reachable root/integration scan findings and a 30.681s Docker pass across
+all six carrier/mode groups with none skipped. High-level orchestration is
+covered locally, not in containers. Same-implementation passes are not
+independent SC1 wire interoperability or formal `CONF-*` evidence. In-memory
+[benchmark evidence](docs/perf-tradeoffs.md) is report-only and full RPCs are
+not zero-allocation.
+
+Remaining SC1 work includes accepted wire/context identifiers and policy,
+independent review/vectors/interoperability, complete provisioning and rotation
+workflow, secure storage and deployment revocation/rate-limit policy. There is
+no enrollment RPC. Native ABI v1 still lacks completion timestamps and explicit
+post-hello credential release; cleanup does not guarantee erasure of every
+secret copy. The core 1s callback grace, writer 1s join after transport close
+and connection-server default/max 5s shutdown budget are distinct and cannot
+forcibly terminate uncooperative operations. See
+[operational limits](docs/sc1-implementation.md#operational-limits) and
+[remaining work](docs/sc1-implementation.md#remaining-work).
 
 ## Blockers
 

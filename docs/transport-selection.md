@@ -13,8 +13,8 @@ profiles.
 ## Current baseline profiles
 
 The profiles below retain the baseline TLS requirements and existing
-executable conformance scope. The selected SC1 proposal is described
-separately at the end of this guide; it adds no current transport support.
+executable conformance scope. Delivered experimental SC1 draft-1 carriers
+are described separately below; they do not replace these profile definitions.
 
 ### TLS over TCP (`SNTR-TLS-TCP-V1`, secure)
 
@@ -72,31 +72,53 @@ Deferred transports (UDP, DTLS, QUIC, HTTP/3, QUIC DATAGRAM, WebSocket
 over HTTP/2 Extended CONNECT) MUST NOT be described as implemented; they
 are future extensions only.
 
-## Selected SC1 proposal: choose the carrier separately
+## Experimental SC1 draft-1: choose the carrier separately
 
 [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-selects transport-independent Syntra Secure Channel v1 (SC1), with one
-[secure-channel state machine](../specifications/security/secure-channel.md)
-and proposed [TCP, UDP, and WebSocket bindings](../specifications/transports/noise-bindings.md).
-It is not Accepted and does not replace the chooser above. The protocol
-core does not dial sockets or require WebSocket or gRPC.
+selects transport-independent Syntra Secure Channel v1 (SC1). The Go
+implementation delivers bounded TCP/WS/WSS in bootstrap NK and returning
+NKpsk0 modes. Its [contract and implementation status](sc1-implementation.md#implementation-status)
+are experimental; RFC 0007 and Proposed ADR-011 remain unaccepted and the
+production TLS policy above is unchanged.
 
-| Proposed carrier | Integration concern |
+| Carrier | Delivered mapping and integration concern |
 |---|---|
-| TCP | Keep stream framing and bounded record parsing in the binding. SC1 records are distinct from the baseline plaintext `Frame` stream. |
-| UDP | Define datagram record boundaries, loss/reorder handling, and resource limits in the binding. A proposed carrier does not imply implemented UDP or reliable RPC delivery. |
-| WebSocket | Carry SC1 on a distinct wire binding; do not reinterpret existing WS/WSS profile IDs or the `syntra.v1` one-message/one-`Frame` mapping. Browser `wss://` still needs outer TLS. |
+| TCP | u16BE length for every M1/M2/record message; encrypted inner u32BE frame stream. Packet boundaries have no protocol meaning. |
+| WS | One binary message per M1/M2/record, no SC1 u16 prefix; compression disabled, exact `syntra.sc1.draft1` subprotocol. |
+| WSS | Same SC1 message mapping with independently verified outer TLS ≥1.3 and the provisioned Noise server pin. |
+| UDP | Deferred; no datagram binding, reliability, replay window or roaming support is implemented. |
+| HTTP/HTTPS request-response | Excluded from this implementation. HTTP serves only the WS upgrade; baseline request-response specifications retain their meaning. |
 
-Existing HTTPS/WSS TLS compatibility stays available. SC1's NK enrollment
-and NKpsk0 returning-device authentication do not replace host-owned
-[device policy](../specifications/security/device-authorization.md),
-Syntra hello/ready, or RPC retry discipline. Empty M1/M2 payloads carry
-no application data or credentials; the host verifies the first
-authenticated client transport record before protected actions.
+The versioned public context binds mode, carrier, server-key ID, epoch,
+independent eight-byte handle and exact UTF-8 scope. Both Noise payloads are
+empty. Record ciphertext is 17–65,535 bytes; serialized frames are 1–1,048,576
+bytes and may span records. Clear framing is not AEAD AD. Existing WS/WSS
+identifiers and `syntra.v1` bytes must not be silently reinterpreted.
 
-The 96-byte NK handshake-body total and 104 = 96 + 8-byte returning total
-(including `auth_id`) exclude framing and extra epoch/version fields.
-They are not full establishment RTTs or transport benchmarks; see
-[the size accounting](perf-tradeoffs.md#5-sc1-handshake-size-accounting-proposal-only).
-The [SC1 conformance plan](../conformance/plans/secure-channel.md) is future
-verification, not an addition to today's executable profiles.
+Choose explicit endpoints, modes and provisioning. Dial refuses redirects;
+standard inspectable HTTP transports enforce certificate verification and
+TLS ≥1.3, while custom RoundTrippers own TLS policy. Accept binds WS/WSS to
+`r.TLS`, not forwarded headers. There is no automatic downgrade or fallback.
+Servers own TLS, origin admission and HTTP header limits/timeouts.
+
+High-level dial returns after core ready within a 10s total establishment
+budget, shortened by the caller. Adapter handshake/write/record/frame limits
+default to 5s and may only be shortened; lifetime defaults/maxes at 24h,
+with 2^32 records per direction as an additional channel ceiling. Operation
+admission defaults to 32 per direction (maximum 1,024). A record's assembly
+clock begins on its first wire byte; a frame's clock begins on its first
+authenticated prefix byte, without trickle refresh. See
+[operational limits](sc1-implementation.md#operational-limits) for ownership,
+server admission and shutdown qualifications.
+
+Bootstrap does not enroll a client implicitly. Returning authentication still
+requires explicit [host policy](sc1-implementation.md#authentication-boundary),
+hello/ready and per-method authorization. Provisioning/storage/rotation and
+RPC retry safety remain application responsibilities.
+
+[Verification evidence](sc1-implementation.md#verification-evidence) includes
+same-implementation Docker tests across six carrier/mode groups. High-level
+connection orchestration has local unit coverage, not container coverage.
+Neither establishes independent wire interoperability or formal `CONF-*`
+conformance. [In-memory benchmarks](perf-tradeoffs.md) do not establish network
+deployment performance; independent review and interoperability remain open.

@@ -104,10 +104,13 @@ capability-free cases; see `conformance/README.md` §2.1).
 Draft RFC 0007 coverage is documented in
 [`../plans/secure-channel.md`](../plans/secure-channel.md). The 25 proposed
 `SNTR-SC-*` / `SNTR-DAUTH-*` rows in `requirements.yaml` use the existing
-`manual` disposition with empty `test_ids` and explicit planned-case references
-in `notes`. This is a coverage-status record, not a completed manual review or
-executable manifest: no automated case or executed conformance evidence is
-claimed, and no active profile selects the plan.
+`manual` acceptance disposition with empty formal `test_ids`. Their `notes`
+retain planned-case references and scoped implementation evidence, as mapped
+in the plan and [implementation ledger](../../docs/sc1-implementation.md).
+Executed TCP/WS/WSS tests and benchmarks do not register portable SC1 `CONF-*`
+cases or constitute a completed acceptance review. No active profile selects
+the plan, and no full conformance or independent interoperability verdict is
+claimed.
 
 | File | Cases | Section |
 |---|---|---|
