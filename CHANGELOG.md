@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
 development, changes land under `Unreleased`.
 
+## [1.0.0-rc.2](https://github.com/tinkle-org/syntra/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-10-30)
+
+
+### Features
+
+* add v1 release readiness with public IDL, RFCs, and conformance suite ([#1](https://github.com/tinkle-org/syntra/issues/1)) ([9d384cf](https://github.com/tinkle-org/syntra/commit/9d384cfa2b799e3763e3c4d91711b7d3ef842c98))
+* native Rust workspace with Go FFI and registry releases ([#4](https://github.com/tinkle-org/syntra/issues/4)) ([aaa040d](https://github.com/tinkle-org/syntra/commit/aaa040d7d168e1a0846b1300e8559b6ace3ff35e))
+* optional update/recovery profile with replay and snapshot recovery ([#7](https://github.com/tinkle-org/syntra/issues/7)) ([7cb8875](https://github.com/tinkle-org/syntra/commit/7cb8875100668f62d3a1ae226fe3d32cfb99a131))
+* production runtime with native ABI and recovery boundary ([#6](https://github.com/tinkle-org/syntra/issues/6)) ([a07de4a](https://github.com/tinkle-org/syntra/commit/a07de4aa64831d58a0da002745bf3dbcc31c0680))
+* reliable sessions with delivery reconciliation and recovery hardening ([#9](https://github.com/tinkle-org/syntra/issues/9)) ([8d13ebe](https://github.com/tinkle-org/syntra/commit/8d13ebe4b5882e125ce51a5b29082977d9d6bc0f))
+* replay-then-live recovery contract with fixed boundary and loss observability ([#8](https://github.com/tinkle-org/syntra/issues/8)) ([9b8be21](https://github.com/tinkle-org/syntra/commit/9b8be21762bafb3f7eac2faa2445525f8609a37f))
+
+
+### Bug Fixes
+
+* **deps:** bump tokio 1.54.0 -&gt; 1.54.1 (1.54.0 yanked) ([b97f351](https://github.com/tinkle-org/syntra/commit/b97f3517343adc72cdd9f5c1358006c1a3806a03))
+* **deps:** bump tokio 1.54.0 -&gt; 1.54.1 (1.54.0 yanked) ([160ed4c](https://github.com/tinkle-org/syntra/commit/160ed4c89c801af9f0754a07709c475e4c374000))
+* enable BSR publish on main pushes with kept BUF_TOKEN ([#2](https://github.com/tinkle-org/syntra/issues/2)) ([02169d2](https://github.com/tinkle-org/syntra/commit/02169d2a42fce330670bac5d678450afd22990d5))
+* trigger BSR publish on workflow changes and manual dispatch ([#3](https://github.com/tinkle-org/syntra/issues/3)) ([8b7a14c](https://github.com/tinkle-org/syntra/commit/8b7a14c0e46d9622c0ff72e0e2a1dc322a03b925))
+
 ## [Unreleased]
 
 ### Added
