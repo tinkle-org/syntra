@@ -82,8 +82,11 @@ Summary:
   protocol and security perspective.
 - **Non-normative** changes: one maintainer approval may merge.
 - **Normative** changes: REQUIRE maintainer approval per
-  [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 3 (quorum, no unresolved
-  normative objection, security review for security-adjacent changes).
+  [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 3 and the published
+  [`MAINTAINERS.md`](MAINTAINERS.md) roster (one active maintainer may accept
+  with disclosed self-approval; two or more require two distinct approvals;
+  no unresolved normative objection; security review for security-adjacent
+  changes).
 - **Breaking (wire-incompatible) changes**: REQUIRE an accepted major-
   version RFC, migration notes, and a `CHANGELOG.md` entry. See
   `GOVERNANCE.md` Sec. 4.

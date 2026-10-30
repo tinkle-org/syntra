@@ -6,10 +6,11 @@ events. Normative requirements: `SNTR-CORE-010/011/012`, handshake
 `SNTR-HS-001` table + §3, `SNTR-RPC-020/021`, errors `SNTR-ERR-010/011`,
 reliability `SNTR-REL-020/021`, transport client sections.
 
-The steps below describe the current TLS/profile baseline. The selected
-SC1 path in [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-has a delivered experimental Go draft-1 implementation, described separately
-below. RFC acceptance and production TLS requirements remain unchanged.
+The steps below describe the baseline TLS/profile behavior. SC1/WSS is an
+accepted additional secure profile in
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md). Its exact
+bytes are in [noise-bindings.md](../specifications/transports/noise-bindings.md).
+The earlier Go draft-1 implementation is historical and is not the v1 format.
 
 ## Transport establishment
 
@@ -50,24 +51,25 @@ identical bytes only with bounded backoff, never in a tight loop. Treat
 `PERMISSION_DENIED` as "valid credential, access refused — do not retry
 identically" (`SNTR-AUTH-021`).
 
-## Experimental SC1 draft-1 clients
+## SC1 v1 clients
 
-The delivered [implementation contract](sc1-implementation.md#implementation-status)
-supports TCP/WS/WSS, explicitly selected in bootstrap NK or returning NKpsk0
-mode. Bootstrap requires a trusted, provisioned server static-key pin;
-returning mode also requires a nonzero 32-byte AK, an independently generated
-eight-byte handle and nonzero epoch. The exact UTF-8 scope, carrier and
-server-key ID are authenticated context. Neither AK nor handle is
-`connection_id`. M1/M2 payloads are empty; no credentials or RPCs are early data.
-Every reconnect uses fresh ephemeral material and directional traffic keys.
+The accepted [carrier contract](../specifications/transports/noise-bindings.md)
+selects WSS explicitly in bootstrap NK or returning NKpsk0 mode. Bootstrap
+requires a trusted, provisioned server static-key pin; returning mode also
+requires a nonzero 32-byte AK, an independently generated eight-byte handle and
+nonzero epoch. The exact UTF-8 scope, carrier and server-key ID are
+authenticated context. Neither AK nor handle is `connection_id`. M1/M2 payloads
+are empty; no credentials or RPCs are early data. Every reconnect uses fresh
+ephemeral material and directional traffic keys.
 
-`connection.DialTCP` and `DialWebSocket` return a ready-to-call client after
-socket/upgrade, SC1 and validated core `ServerReady`, within one 10s total
-budget shortened by the caller. Adapter establishment and core hello each
-retain a 5s limit. `connection.Connect` takes ownership of an already
-established transport, including on failure. At the lower level,
-`Client.WaitReady` waits while a separately started `Run` drives I/O; it
-does not perform I/O itself. Readiness is a snapshot, not a guarantee that
+The Upgrade MUST use `/syntra/v1/sc1/ws` and the exact subprotocol
+`syntra.sc1.v1`. The historical `syntra.sc1.draft1` identifier is not a v1
+alias and MUST be rejected.
+
+A conforming client completes TLS, Upgrade, SC1, hello and validated
+`ServerReady` within one bounded attempt (default 15 seconds, shortened by the
+caller). Channel establishment and first-record confirmation default to 5
+seconds. Readiness is a snapshot, not a guarantee that
 the next call cannot encounter disconnection.
 
 A successfully connected client's lifetime is independent of its dial context.
@@ -78,8 +80,9 @@ cancellation after I/O begins can terminate an adapter; do not cancel its
 shared receive pump merely to abandon one RPC. See
 [ownership and limits](sc1-implementation.md#operational-limits).
 
-WS uses exact subprotocol `syntra.sc1.draft1`, binary messages and disabled
-compression; it does not use the baseline one-message/one-`Frame` mapping.
+WS and WSS use the exact `syntra.sc1.v1` subprotocol, one binary message per
+M1/M2/record and disabled compression; they do not use the baseline
+one-message/one-`Frame` mapping.
 WSS retains verified outer TLS ≥1.3 as well as the Noise server pin. Standard
 inspectable HTTP transports enforce verification; custom RoundTrippers own
 their TLS policy. Redirects and automatic downgrade/fallback are refused.

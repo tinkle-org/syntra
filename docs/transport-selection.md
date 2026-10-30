@@ -13,8 +13,9 @@ profiles.
 ## Current baseline profiles
 
 The profiles below retain the baseline TLS requirements and existing
-executable conformance scope. Delivered experimental SC1 draft-1 carriers
-are described separately below; they do not replace these profile definitions.
+executable conformance scope. `SNTR-SC1-WSS-V1` is an additional accepted
+secure profile; its restricted TCP/WS carriers are development-only. Neither
+replaces the baseline profile definitions.
 
 ### TLS over TCP (`SNTR-TLS-TCP-V1`, secure)
 
@@ -72,22 +73,20 @@ Deferred transports (UDP, DTLS, QUIC, HTTP/3, QUIC DATAGRAM, WebSocket
 over HTTP/2 Extended CONNECT) MUST NOT be described as implemented; they
 are future extensions only.
 
-## Experimental SC1 draft-1: choose the carrier separately
+## Accepted SC1/WSS: choose the carrier separately
 
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-selects transport-independent Syntra Secure Channel v1 (SC1). The Go
-implementation delivers bounded TCP/WS/WSS in bootstrap NK and returning
-NKpsk0 modes. Its [contract and implementation status](sc1-implementation.md#implementation-status)
-are experimental; RFC 0007 and Proposed ADR-011 remain unaccepted and the
-production TLS policy above is unchanged.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is accepted and
+registers `SNTR-SC1-WSS-V1`. The production carrier is verified TLS 1.3 WSS;
+TCP and plaintext WS are restricted development carriers. The exact bytes are
+in [noise-bindings.md](../specifications/transports/noise-bindings.md).
 
-| Carrier | Delivered mapping and integration concern |
+| Carrier | Accepted mapping and integration concern |
 |---|---|
-| TCP | u16BE length for every M1/M2/record message; encrypted inner u32BE frame stream. Packet boundaries have no protocol meaning. |
-| WS | One binary message per M1/M2/record, no SC1 u16 prefix; compression disabled, exact `syntra.sc1.draft1` subprotocol. |
-| WSS | Same SC1 message mapping with independently verified outer TLS ≥1.3 and the provisioned Noise server pin. |
-| UDP | Deferred; no datagram binding, reliability, replay window or roaming support is implemented. |
-| HTTP/HTTPS request-response | Excluded from this implementation. HTTP serves only the WS upgrade; baseline request-response specifications retain their meaning. |
+| TCP (development) | u16BE length for every M1/M2/record message; encrypted inner u32BE frame stream. Packet boundaries have no protocol meaning. |
+| WS (development) | One binary message per M1/M2/record, no SC1 u16 prefix; compression disabled, exact `syntra.sc1.v1` subprotocol. Loopback/isolated tests only. |
+| WSS | Same SC1 message mapping with independently verified outer TLS ≥1.3 and the provisioned Noise server pin. Direct host TLS termination is the initial permitted topology. |
+| UDP | Deferred; no datagram binding, reliability, replay window or roaming support is standardized. |
+| HTTP/HTTPS request-response | Excluded from SC1. HTTP serves only the WS upgrade; baseline request-response specifications retain their meaning. |
 
 The versioned public context binds mode, carrier, server-key ID, epoch,
 independent eight-byte handle and exact UTF-8 scope. Both Noise payloads are
@@ -101,9 +100,15 @@ TLS ≥1.3, while custom RoundTrippers own TLS policy. Accept binds WS/WSS to
 `r.TLS`, not forwarded headers. There is no automatic downgrade or fallback.
 Servers own TLS, origin admission and HTTP header limits/timeouts.
 
-High-level dial returns after core ready within a 10s total establishment
-budget, shortened by the caller. Adapter handshake/write/record/frame limits
-default to 5s and may only be shortened; lifetime defaults/maxes at 24h,
+High-level dial returns after core ready within a 15s total establishment
+budget, shortened by the caller. The carrier contract
+([noise-bindings.md](../specifications/transports/noise-bindings.md)) defaults
+SC1 establishment plus first-record confirmation to 5s and one complete
+frame's encrypted output to 10s; next-record and frame-assembly limits
+default to 30s, and every limit may only be shortened. A shorter adapter
+write limit (the shipped adapter uses 5s) is implementation-specific, not a
+contract default.
+Lifetime defaults/maxes at 24h,
 with 2^32 records per direction as an additional channel ceiling. Operation
 admission defaults to 32 per direction (maximum 1,024). A record's assembly
 clock begins on its first wire byte; a frame's clock begins on its first

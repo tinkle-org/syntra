@@ -1,11 +1,10 @@
 # Mobile v1 specification-driven delivery
 
-Status: selected delivery target, not accepted protocol or a release verdict.
-The user selected SC1 and standardized update recovery as required deliverables.
-[RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) records the
-mobile contract and [release readiness](../audits/v1-release-readiness.md)
-records remaining gates. Formal normative acceptance remains governed by
-`GOVERNANCE.md` §3; no author, reviewer or approval is invented here.
+Status: selected delivery target, not a release verdict. SC1/WSS is accepted;
+[RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) remains Draft,
+so the mobile lifecycle and recovery portions are not yet normative.
+[Release readiness](../audits/v1-release-readiness.md) records remaining
+gates. Formal normative acceptance remains governed by `GOVERNANCE.md` §3.
 
 ## Scope and boundaries
 
@@ -54,13 +53,14 @@ discovery that changes behavior goes back through RFC review, not an explanatory
 doc edit that makes code authoritative. After execution, finalize implementation
 guidance, supported-profile claims and measured limitations.
 
-## Concrete SC1 interoperability blocker
+## SC1 interoperability status
 
-Pinned inspection found Rust local revision 1 and Go draft-1 use incompatible
-contexts, mode values and prologues, plus different WS subprotocols. RFC 0007
-§11 selects one new v1 identifier/context proposal with explicit migration from
-both; neither implementation wins by existing first. Current same-implementation
-passes do not close this blocker.
+The earlier Rust local-revision-1 and Go draft-1 formats were incompatible in
+context, mode values, prologue and WS subprotocol. RFC 0007 §11.4 now fixes the
+canonical `syntra.sc1.v1` format, and the Rust implementation at
+`tinkle-org/syntra-rs` main (`50ca849`) implements that proposal. No legacy
+identifier is an alias. Independent pure-Go/Rust execution in both roles and
+both modes remains outstanding; same-implementation passes do not close it.
 
 [Public context fixtures](../conformance/plans/sc1-context-v1.json) are checked
 by `tests/test_sc1_proposal_vectors.py`. They contain no cryptographic vectors.

@@ -28,7 +28,7 @@ Optional (only if claimed): event subscribe→events→cancel, replay/cursor, re
 - Neutral payloads only: `echo`, generic key/value, generic subscription. No domain types.
 - Deterministic vectors: fixed bytes for every valid/invalid frame; no time-dependent flakiness (deadlines use injected clocks or generous margins + explicit `DEADLINE_EXCEEDED` assertion).
 - Negative tests REQUIRED for every `MUST NOT` and every failure row in `handshake.md` §5.
-- Two-transport interop proof (SNTR-WIRE-901) + dimension-independence proof (SNTR-VER-901) REQUIRED for any conformance claim.
+- A single named transport profile is sufficient for a Core claim. Two-transport interop proof (SNTR-WIRE-901) and dimension-independence proof (SNTR-VER-901) are REQUIRED only for a claim of transport independence across two named transports. RFC 0009 D4 accepted this claim-scope rule; a baseline profile is never certified by another profile's pass.
 
 ## Reporting
 

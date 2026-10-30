@@ -69,12 +69,16 @@ requirements or existing executable conformance profiles.
   reported only when executed; `SKIP`, `UNSUPPORTED`, and `NOT_EXECUTED`
   are never passes.
 
-## Selected SC1 proposal vocabulary
+## SC1 vocabulary
 
-These definitions follow new [Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md),
-which is not Accepted and establishes no implementation or support claim.
-See the proposed [secure channel](../specifications/security/secure-channel.md)
-and [device authorization](../specifications/security/device-authorization.md).
+These definitions follow the accepted
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md).
+Acceptance establishes the profile contract, not an implementation,
+interoperability or conformance claim. See the
+[secure channel](../specifications/security/secure-channel.md),
+[device authorization](../specifications/security/device-authorization.md) and
+[carrier mapping](../specifications/transports/noise-bindings.md).
 
 - **SC1 (Syntra Secure Channel v1)** — Transport-independent secure-channel
   state machine beneath Syntra envelopes, with proposed TCP/UDP/WS

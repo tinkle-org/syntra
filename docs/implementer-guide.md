@@ -10,17 +10,19 @@ The sequence below is ordered so each step is testable before the next
 begins. After every step, run the corresponding conformance cases; do not
 proceed on failing cases.
 
-## Baseline and selected SC1 work
+## Baseline and accepted SC1 work
 
 The numbered steps implement the current baseline: its TLS requirements
 and all existing executable conformance profiles remain unchanged.
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-records the selected transport-independent SC1 proposal. A bounded Go draft-1
-implementation is delivered over TCP/WS/WSS, with high-level connection
-orchestration and channel-aware host policy. This is experimental behavior,
-not Accepted policy. Local tests do not add formal SC1 conformance verdicts
-to the suite used in step 10. Read the self-contained
-[implementation contract](sc1-implementation.md#implementation-status).
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is accepted
+and adds the `SNTR-SC1-WSS-V1` profile: canonical `syntra.sc1.v1` context
+inside verified TLS 1.3 WSS at `/syntra/v1/sc1/ws`, with TCP/WS retained for
+restricted development. The exact bytes and limits are in
+[noise-bindings.md](../specifications/transports/noise-bindings.md). The Rust
+implementation records local evidence, but registered `CONF-SCW-*` cases are
+not executed by that evidence. Read the
+[SC1 contract](../specifications/transports/noise-bindings.md) and the
+[historical implementation record](sc1-implementation.md#implementation-status).
 
 For SC1 integration, keep three separate gates: carrier establishment,
 secure-channel authentication/confirmation, then Syntra hello/ready and
@@ -39,17 +41,18 @@ human accounts. Every channel has fresh ephemeral material and directional
 traffic keys; returning-device authentication adds no session resumption
 or automatic RPC retry.
 
-Delivered draft-1 binds TCP messages with u16BE lengths, and WS/WSS binary
-messages without that prefix. Both protect an inner u32BE-length-prefixed
-frame stream. The exact domain/subprotocol is `syntra.sc1.draft1`; ciphertext
-is at most 65,535 bytes and serialized frames at most 1 MiB. UDP remains
-deferred and HTTP/HTTPS request-response is excluded from this implementation.
+Canonical v1 binds TCP messages with u16BE lengths, and WS/WSS binary messages
+without that prefix. Both protect an inner u32BE-length-prefixed frame stream.
+The exact domain/subprotocol is `syntra.sc1.v1`; ciphertext is at most 65,535
+bytes and serialized frames at most 1 MiB. The first authenticated envelope is
+exactly one complete framed `ClientHello`. UDP remains deferred and HTTP/HTTPS
+request-response is excluded from SC1.
 The core remains independent of socket dialing and carrier libraries. WSS
 keeps verified outer TLS ≥1.3 and an independent Noise pin, without automatic
 downgrade. These bytes do not redefine baseline WS/WSS profiles or production
 TLS policy. [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
-remains Proposed; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
-distinguishes planned acceptance from implementation tests.
+is accepted; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
+distinguishes registered cases from implementation tests.
 
 Only authenticated out-of-band provisioning is supported. Enrollment RPCs,
 complete issuance/delivery/ack recovery, secure storage and rotation are open

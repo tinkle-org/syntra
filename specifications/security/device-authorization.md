@@ -1,22 +1,26 @@
-# Syntra Secure Channel v1 — Persistent device authorization proposal
+# Syntra Secure Channel v1 — Persistent device authorization
 
-- Status: Draft RFC 0007; experimental preprovisioned-AK authentication implemented, acceptance pending
-- Date: 2026-10-27
+- Status: Accepted (2026-10-29) — RFC 0007; normative for `SNTR-SC1-WSS-V1`
+- Date: 2026-10-29
 - Owner: [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 - Scope: Per-device shared authorization secrets and host-owned lifecycle
-- Proposed requirements: `SNTR-DAUTH-001`–`SNTR-DAUTH-010`
+- Requirements: `SNTR-DAUTH-001`–`SNTR-DAUTH-010`
 
-BCP 14 keywords below describe proposed obligations only. They do not amend
-the current [authentication interface](../core/authentication.md) or
-[credential-security baseline](authentication-security.md) before acceptance.
-The [shared channel](secure-channel.md) defines encryption/confirmation;
+BCP 14 keywords below are normative for the accepted profile. They do not
+replace the generic [authentication interface](../core/authentication.md) or
+weaken the [credential-security baseline](authentication-security.md).
+The [shared channel](secure-channel.md) defines encryption and confirmation;
 applications own enrollment authority, identity stores and permissions.
-The [implementation evidence ledger](../../docs/sc1-implementation.md) records
-bootstrap and preprovisioned returning-channel integration and its tests. Enrollment
-issuance, durable provisioning/storage transactions and rotation flows are not
-delivered; supporting NK bootstrap does not implement authorized enrollment.
-An enrolled principal can be a device, service or other generic identity;
-there is no required human-account model.
+[noise-bindings.md](../transports/noise-bindings.md) owns the accepted v1
+handle/epoch context bytes and first-envelope admission.
+
+Enrollment issuance, durable provisioning/storage transactions, rotation flows
+and revocation propagation remain host implementation obligations; supporting
+NK bootstrap does not implement authorized enrollment. The Rust implementation
+records preprovisioned-AK and local lifecycle tests as implementation evidence,
+not conformance or independent security review. An enrolled principal can be a
+device, service or other generic identity; there is no required human-account
+model.
 
 ## 1. Authorization material
 
@@ -37,18 +41,18 @@ The provisioning contract MUST specify the authorized generator, secure
 transfer, durable commit, acknowledgment, retry/idempotency and interrupted
 enrollment behavior before implementation. The recommended bootstrap flow
 uses a host-generated AK protected in transit to the device; client-generated
-provisioning is not implicitly enabled by this draft.
+provisioning is not implicitly enabled by this profile.
 
-**SNTR-DAUTH-003** — The proposed `auth_id` MUST be an independent random
-eight-byte lookup handle with collision checks in its store scope. It MUST
-NOT derive authority from secrecy or substitute for PSK proof, principal
-authorization or a session identifier. Both peers MUST bind handle, epoch
-and endpoint scope into the authenticated context. The exact experimental
-draft-1 encoding is defined in the [carrier contract](../transports/noise-bindings.md):
-bootstrap has zero epoch/handle and no AK; returning mode has nonzero epoch,
-nonzero handle and a nonzero 32-byte AK. Rotation selection/lifecycle remains
-open; encoding those fields does not implement rotation. Deployments MUST account
-for clear stable handles enabling correlation and MUST NOT expose them as public
+**SNTR-DAUTH-003** — The `auth_id` MUST be an independent random eight-byte
+lookup handle with collision checks in its store scope. It MUST NOT derive
+authority from secrecy or substitute for PSK proof, principal authorization or
+a session identifier. Both peers MUST bind handle, epoch and endpoint scope into
+the authenticated context. The canonical v1 encoding is defined in
+[noise-bindings.md](../transports/noise-bindings.md) §2: bootstrap has zero
+epoch/handle and no AK; returning mode has nonzero epoch, nonzero handle and a
+nonzero 32-byte AK. Rotation selection and lifecycle remain host obligations;
+encoding those fields does not implement rotation. Deployments MUST account for
+clear stable handles enabling correlation and MUST NOT expose them as public
 device identities or unrestricted log/metric labels.
 
 ## 2. Storage and principal binding
@@ -136,11 +140,12 @@ Applications MUST re-evaluate scope/policy for the chosen endpoint/carrier.
 Implementations MUST NOT place AKs, handles or enrollment results in
 `connection_id`, invent an issuance field, or infer authenticated device
 context from client-provided metadata alone. Host authentication MUST receive
-trusted, connection-scoped channel verification context. The experimental API
-below specifies that integration; it awaits acceptance and review. An enrollment
+trusted, connection-scoped channel verification context. The accepted API
+below specifies that integration; independent human security review remains a
+release gate and is not supplied by the API or its tests. An enrollment
 RPC contract remains absent; new wire fields require the schema RFC/generation
 workflow. No credential-issuance or full binding conformance claim is established
-by the experimental API or its tests.
+by the API or its tests.
 
 `ChannelIdentity` contains mode, carrier, scope, handle, epoch and principal.
 `ChannelIdentityProvider.ChannelIdentity()` returns that value and a separate
@@ -156,7 +161,7 @@ result, independently verify trusted root identity, or synchronously `Check`
 enrollment before `ready`. Those are explicit host-policy responsibilities;
 nil method `Authorize` denies methods. Ordinary opaque-credential mechanisms
 retain their meaning. No handshake capability or new field is implicitly
-negotiated by this draft.
+negotiated by this profile.
 
 ## 5. Security and acceptance
 
@@ -175,5 +180,6 @@ cross-carrier separation and trusted authentication integration. The evidence
 ledger separately records executed local and same-implementation integration
 tests with their limited scope. Enrollment and rotation execution, independent
 vectors/interoperability, deployment certification and independent security
-review are not established by those results. No formal SC1 `CONF-*` cases or
-profiles are registered.
+review are not established by those results. The accepted
+`SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are registered;
+registration is not execution, and no `CONF-*` verdict is claimed.

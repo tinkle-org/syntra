@@ -1,0 +1,479 @@
+# SC1/WSS profile cases. Profile: SNTR-SC1-WSS-V1 (RFC 0007 §11.4).
+# Prose owners: specifications/transports/noise-bindings.md and
+# specifications/security/secure-channel.md. Registration is not execution.
+format_version: "1.0"
+profile: SNTR-SC1-WSS-V1
+cases:
+  - id: CONF-SCW-001
+    requirement: [SNTR-SCW-001, SNTR-SC-013]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: websocket_upgrade
+        path: /syntra/v1/sc1/ws
+        subprotocol: syntra.sc1.v1
+        carrier: 3
+    expected:
+      connection_state: CONNECTED
+      session_state: none
+      transport: { upgrade_status: 101, subprotocol: syntra.sc1.v1, compression: disabled }
+    notes: "Positive selection. Repeat with /syntra/v1/ws, syntra.v1 and syntra.sc1.draft1: each MUST fail without SC1 bytes or fallback."
+
+  - id: CONF-SCW-002
+    requirement: [SNTR-SCW-002, SNTR-SC-003]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      transport:
+        action: sc1_handshake
+        contexts: [SC1-CONTEXT-02, SC1-CONTEXT-04]
+        vectors: conformance/test-vectors/sc1/context-vectors.yaml
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { context_matches: true, prologue_matches: true, carrier: 3 }
+    notes: "Exact WSS context/prologue bytes for bootstrap and returning modes, including multibyte UTF-8 scope. The context MUST equal the prologue and the M1 prefix. SC1-CONTEXT-03 is exercised as a carrier-mismatch rejection in CONF-SCW-017."
+
+  - id: CONF-SCW-003
+    requirement: [SNTR-SCW-003, SNTR-SC-001, SNTR-SC-004, SNTR-SC-005]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      transport:
+        action: sc1_handshake
+        m1_bytes: [86, 340]
+        m2_bytes: 48
+        payloads: empty
+        modes: [bootstrap, returning]
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { handshake_payload_bytes: 0, fresh_ephemeral: true }
+    notes: "Both modes. Non-empty handshake payloads, unexpected lengths, wrong PSK and wrong suite fail with no protected dispatch."
+
+  - id: CONF-SCW-004
+    requirement: [SNTR-SCW-004, SNTR-TSEC-003, SNTR-TSEC-004]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, invalid_chain]
+    input:
+      transport:
+        action: tls_connect
+        pki: test-pki-wrong-host
+        noise_pin: wrong-key
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+      hygiene: { absent_from: [credential, token, "PRIVATE KEY"] }
+    notes: "TLS identity failure and Noise pin failure are independent terminal failures. No hello, credential or fallback. Repeat with a valid chain and wrong pin."
+
+  - id: CONF-SCW-005
+    requirement: [SNTR-SCW-005, SNTR-SC-007]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: send_ws_messages
+        message_kinds: [binary, fragmented_binary]
+        records_per_message: 1
+        sc1_prefix: none
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      transport: { binary_accepted: true, fragments_reassembled: true, sc1_prefix: none }
+    notes: "Success path only: active-session protected records. One reassembled binary message per record, with no u16BE SC1 prefix. Ping/Pong/Close never complete an RPC or confirm a channel. Non-binary and malformed messages are covered by CONF-SCW-019; pre-session fragmented M1/M2 coverage is CONF-SCW-021."
+
+  - id: CONF-SCW-021
+    requirement: [SNTR-SCW-003, SNTR-SCW-005, SNTR-SC-002]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, handshake_started, valid_chain]
+    input:
+      transport:
+        action: send_ws_messages
+        message_kinds: [fragmented_m1, fragmented_m2]
+        records_per_message: 1
+        sc1_prefix: none
+        phase: pre_ready
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { fragments_reassembled: true, handshake_messages_intact: true }
+    notes: "Pre-session-activation probe: fragmented M1 and M2 are each reassembled into one binary message before Noise processing. This is separate from the active-session protected-record success path in CONF-SCW-005."
+
+  - id: CONF-SCW-006
+    requirement: [SNTR-SCW-006, SNTR-SC-013]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: websocket_upgrade
+        path: /syntra/v1/sc1/ws
+        headers: { Authorization: "Bearer fixture", Cookie: "session=fixture" }
+        origin: "https://fixture.invalid"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { upgrade_status: 400 }
+      hygiene: { absent_from: [fixture, credential, token] }
+    notes: "Authorization and Cookie are rejected. Origin and forwarded headers are not authentication. No Syntra credential in the Upgrade. Repeat with a missing/wrong subprotocol. Client-side rejection of an invalid 101/Sec-WebSocket-Accept response without sending M1 is CONF-SCW-024."
+
+  - id: CONF-SCW-024
+    requirement: [SNTR-SCW-006]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: websocket_upgrade
+        path: /syntra/v1/sc1/ws
+        subprotocol: syntra.sc1.v1
+        server_response: { upgrade_status: 101, sec_websocket_accept: invalid }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      transport: { upgrade_response_validated: true, m1_sent: false }
+      hygiene: { absent_from: [credential, token] }
+    notes: "Client-side validation: a 101 response whose Sec-WebSocket-Accept is invalid causes the client to close with no M1 and no Noise material. Host-side rejection with HTTP 400 of forbidden request headers is CONF-SCW-006."
+
+  - id: CONF-SCW-007
+    requirement: [SNTR-SCW-007, SNTR-TSEC-008]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: websocket_upgrade
+        terminated_by: proxy
+        forwarded_proto: https
+        forwarded_for: "203.0.113.7"
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "Direct verified TLS termination by the host is the initial permitted topology. Proxy termination and forwarded carrier claims are refused. Do not infer carrier 3 from a header."
+
+  - id: CONF-SCW-008
+    requirement: [SNTR-SCW-008, SNTR-SC-013]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport: { action: connect, carrier: 1, production_claim: true }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "SC1/TCP and SC1/WS are restricted development carriers and are disabled by default in production-claiming distributions. TLS over a development stream does not become carrier 3."
+
+  - id: CONF-SCW-009
+    requirement: [SNTR-SCW-009, SNTR-SC-007]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: [1, 65519]
+        ciphertext_bytes: [17, 65535]
+        associated_data: empty
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      transport: { max_plaintext: 65519, max_ciphertext: 65535, ad_empty: true }
+    notes: "Success path only: boundary record sizes and empty AD. Oversize, truncated-tag and non-empty-AD rejection is covered by CONF-SCW-020. Carrier headers are not authenticated AD."
+
+  - id: CONF-SCW-010
+    requirement: [SNTR-SCW-010, SNTR-SC-008]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_stream
+        frame_bytes: [1, 1048576]
+        frame_1048577: reject
+        splits: every_record_boundary
+        coalesced_frames: true
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      transport: { frames_dispatched_once: true, partial_dispatch: false }
+    notes: "Prefixes and frames may span records; multiple complete frames may share a record. No resynchronization, partial decode or allocation above the declared bound."
+
+  - id: CONF-SCW-011
+    requirement: [SNTR-SCW-011, SNTR-SC-006, SNTR-DAUTH-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      transport:
+        action: sc1_first_envelope
+        envelope: one_complete_hello
+        may_span_records: true
+        trailing_envelope: none
+        extra_complete_envelope: reject
+        extra_partial_envelope: reject
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      frames:
+        - { request_id: 0, body: hello }
+        - { request_id: 0, body: ready }
+    notes: "The record completing the hello ends at its boundary. No protected dispatch or sensitive output before hello validation, current-enrollment/same-principal policy and ready. A replayed M1 confirms nothing."
+
+  - id: CONF-SCW-012
+    requirement: [SNTR-SCW-012, SNTR-SC-009, SNTR-SC-011, SNTR-SC-012, SNTR-SC-014, SNTR-DAUTH-009]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session, connection_lost]
+    input:
+      transport:
+        action: sc1_limits
+        lifetime_s: 86400
+        records_per_direction: 4294967296
+        writer_stall: true
+        reconnect: fresh_handshake
+        replay: none
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      retry: "fresh-handshake-only"
+    notes: "Counter/lifetime exhaustion closes without wrapping. A stalled writer aborts or completes within budget and never re-encrypts a consumed nonce. Reconnect uses fresh keys and does not replay RPCs or resume the session."
+
+  - id: CONF-SCW-013
+    requirement: [SNTR-SCW-002, SNTR-SC-003, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      transport:
+        action: sc1_context_negatives
+        recipes: [SC1-N01, SC1-N02, SC1-N03, SC1-N04, SC1-N05, SC1-N06, SC1-N07, SC1-N08, SC1-N09, SC1-N10, SC1-N11, SC1-N12]
+        vectors: conformance/test-vectors/sc1/context-vectors.yaml
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+      hygiene: { absent_from: [credential, token, "PRIVATE KEY"] }
+    notes: "Legacy domain/magic, zero mode, unknown carrier, bootstrap epoch, zero returning handle, empty/oversize/truncated/trailing/invalid-UTF-8 scope and character-count length all fail before Noise or credential lookup."
+
+  - id: CONF-SCW-014
+    requirement: [SNTR-SC-004, SNTR-SC-006, SNTR-SC-010, SNTR-DAUTH-008]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, handshake_started]
+    input:
+      transport:
+        action: sc1_replay
+        replay_m1: true
+        omit_m2: true
+        corrupt_m2: true
+        pre_ready_request: true
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+      hygiene: { absent_from: [credential, token] }
+    notes: "Replayed M1 may elicit a bounded M2 but MUST NOT invoke host policy, bind a principal or dispatch. No hello/credential before verified M2; no protected request before ready."
+
+  - id: CONF-SCW-015
+    requirement: [SNTR-DAUTH-001, SNTR-DAUTH-003]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected]
+    input:
+      credentials: "fixture:sc1-preprovisioned"
+      transport:
+        action: sc1_key_validation
+        ak_bytes: 32
+        zero_ak: reject
+        zero_handle_returning: reject
+        zero_epoch_returning: reject
+        handle_collision: reject
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAUTHENTICATED }
+      hygiene: { absent_from: [credential, token, "PRIVATE KEY"] }
+    notes: "AK is 32 random bytes and enters only the PSK input. Handle is eight opaque bytes, independent of the key and principal. Collisions fail or are resolved by the documented bounded procedure."
+
+  - id: CONF-SCW-016
+    requirement: [SNTR-DAUTH-005, SNTR-DAUTH-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      credentials: "fixture:sc1-principal"
+      transport:
+        action: sc1_policy
+        enrollment_principal: principal-a
+        channel_principal: principal-b
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: PERMISSION_DENIED }
+      hygiene: { absent_from: [credential, token] }
+    notes: "Returning policy principal differing from the trusted enrollment principal fails before ready; no privilege union, ready or protected effect. Empty credentials never select the channel principal. Denied-method-after-ready behavior is CONF-SCW-018."
+
+  - id: CONF-SCW-017
+    requirement: [SNTR-SCW-002, SNTR-SC-003, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, valid_chain]
+    input:
+      transport:
+        action: sc1_handshake
+        contexts: [SC1-CONTEXT-03]
+        vectors: conformance/test-vectors/sc1/context-vectors.yaml
+        expected_carrier: 3
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      error: { code: UNAVAILABLE }
+    notes: "SC1-CONTEXT-03 encodes carrier 2 (WS). Under SNTR-SC1-WSS-V1 the responder requires carrier 3 and MUST reject this context before Noise or credential lookup. This vector is a negative case for this profile, not a WSS success vector."
+
+  - id: CONF-SCW-018
+    requirement: [SNTR-DAUTH-005, SNTR-DAUTH-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      credentials: "fixture:sc1-principal"
+      transport:
+        action: sc1_method_denial
+        principal: principal-a
+        method: "/example.Admin/Reset"
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      error: { code: PERMISSION_DENIED }
+      hygiene: { absent_from: [credential, token] }
+    notes: "After ready, a denied method returns one terminal PERMISSION_DENIED result, has no handler effect and leaves the connection usable. This is distinct from the pre-ready principal mismatch in CONF-SCW-016."
+
+  - id: CONF-SCW-019
+    requirement: [SNTR-SCW-005, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: send_ws_messages
+        message_kinds: [text, compressed, empty, truncated]
+        records_per_message: 1
+        sc1_prefix: none
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+      transport: { text_rejected: true, compressed_rejected: true, empty_rejected: true, truncated_rejected: true }
+    notes: "Rejection path only: text, compressed, empty and truncated messages fail without protected dispatch. Binary and fragmented success is CONF-SCW-005."
+
+  - id: CONF-SCW-020
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 65520
+        ciphertext_bytes: 65536
+        tag: full
+        associated_data: empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the oversize condition: an otherwise valid record with plaintext 65,520 and ciphertext 65,536 fails closed. Boundary-size success with empty AD is CONF-SCW-009."
+
+  - id: CONF-SCW-022
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 1
+        ciphertext_bytes: 17
+        truncated_tag: true
+        associated_data: empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the truncated-tag condition: size bounds and AD are otherwise valid; the record fails closed."
+
+  - id: CONF-SCW-023
+    requirement: [SNTR-SCW-009, SNTR-SC-007, SNTR-SC-010]
+    profile: SNTR-SC1-WSS-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, active_session]
+    input:
+      transport:
+        action: sc1_record
+        plaintext_bytes: 1
+        ciphertext_bytes: 17
+        tag: full
+        associated_data: non_empty
+    expected:
+      connection_state: CLOSED
+      session_state: terminated_abnormally
+      error: { code: UNAVAILABLE }
+    notes: "Isolates the non-empty associated-data condition: size bounds and tag are otherwise valid; the record fails closed."

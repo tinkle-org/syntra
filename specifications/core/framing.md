@@ -10,11 +10,11 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
-## Proposed secure-record mapping
+## Accepted secure-record mapping
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 keeps the `Frame` schema, validation and 1 MiB default envelope bound.
-[Proposed carrier bindings](../transports/noise-bindings.md) separate Noise
+[Accepted carrier binding](../transports/noise-bindings.md) separate Noise
 records from envelopes: the 65,535-byte ciphertext cap requires bounded
 segmentation for large frames. Only complete reconstructed envelopes reach
 the core. TCP lengths, WebSocket message boundaries and future UDP headers

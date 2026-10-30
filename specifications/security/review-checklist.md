@@ -40,15 +40,17 @@
 
 Approval REQUIRES all applicable boxes checked with requirement-ID citations on the RFC.
 
-## E. RFC 0007 proposal review (separate from current baseline checks)
+## E. RFC 0007 acceptance review (retained reference)
 
-These unchecked items review [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-and its proposed [SC](secure-channel.md), [DAUTH](device-authorization.md)
-and [carrier](../transports/noise-bindings.md) contracts. Completing this list
-is not RFC acceptance; sections A–D and current TLS/certificate tests continue
-to apply to existing profiles.
+These items review [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and its accepted [SC](secure-channel.md), [DAUTH](device-authorization.md)
+and [carrier](../transports/noise-bindings.md) contracts. The acceptance record
+is RFC 0007 §11.4 and
+[Decision 0001](../../docs/decisions/0001-bootstrap-ratification.md); unchecked
+boxes are not an approval or evidence record. Sections A–D and current
+TLS/certificate tests continue to apply to existing profiles.
 
-- [ ] Policy/status: ADR-011 remains proposed; accepted authority and an explicit version/deprecation decision precede replacing ADR-008 or current requirements/tests?
+- [x] Policy/status: RFC 0007 and ADR-011 are accepted; SC1/WSS is additive and does not replace ADR-008 or remove TLS 1.3.
 - [ ] Construction: exact NK bootstrap and NKpsk0 returning suites, authenticated server-key provisioning, canonical context, fresh ephemerals/directional keys, no automatic fallback or reused channel state (SC-001–005/009/013)?
 - [ ] Enrollment: host-issued unique random shared 32-byte AK only after authorized bootstrap; durable issuance/acknowledgment/retry contract; no selected signing-key-pair or required human-account model (DAUTH-001/002/005)?
 - [ ] Handle: independent eight-byte `auth_id`, collision-checked scoped lookup with no authority; epoch binding, bounded unknown-handle work, enumeration/correlation and rotation privacy addressed (DAUTH-003/008)?

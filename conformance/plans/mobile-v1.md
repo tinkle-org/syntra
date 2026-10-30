@@ -1,7 +1,7 @@
 # Mobile v1 acceptance plan
 
 Status: proposal-only, non-executable. Owner: [RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md),
-with [SC1 RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#11-selected-interoperability-proposal-2026-10-28-not-accepted)
+with [SC1 RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#11-accepted-interoperability-contract-2026-10-29)
 and [recovery plan](update-recovery.md). These scenario labels are planning
 labels, not registered conformance IDs. All behavioral outcomes below are
 proposed expectations awaiting acceptance; none is an execution verdict.

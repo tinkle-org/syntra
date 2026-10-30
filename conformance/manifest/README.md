@@ -101,16 +101,13 @@ capability-free cases; see `conformance/README.md` §2.1).
 
 ## Manifest index
 
-Draft RFC 0007 coverage is documented in
-[`../plans/secure-channel.md`](../plans/secure-channel.md). The 25 proposed
-`SNTR-SC-*` / `SNTR-DAUTH-*` rows in `requirements.yaml` use the existing
-`manual` acceptance disposition with empty formal `test_ids`. Their `notes`
-retain planned-case references and scoped implementation evidence, as mapped
-in the plan and [implementation ledger](../../docs/sc1-implementation.md).
-Executed TCP/WS/WSS tests and benchmarks do not register portable SC1 `CONF-*`
-cases or constitute a completed acceptance review. No active profile selects
-the plan, and no full conformance or independent interoperability verdict is
-claimed.
+RFC 0007 is accepted. `sc1-wss.yaml` registers the `SNTR-SC1-WSS-V1` cases
+against `SNTR-SCW-*`, `SNTR-SC-*` and `SNTR-DAUTH-*`. The companion
+[`../plans/secure-channel.md`](../plans/secure-channel.md) retains historical
+manual-observation mapping. Registration is not execution: no `CONF-SCW-*`
+verdict is claimed, and implementation tests are not a substitute for the
+registered cases. Lifecycle rows whose host transaction is not implemented
+remain manual in `requirements.yaml` rather than being marked automated.
 
 | File | Cases | Section |
 |---|---|---|

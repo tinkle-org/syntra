@@ -1,201 +1,233 @@
-# Syntra Secure Channel v1 — Carrier binding proposals
+# Syntra Secure Channel v1 — Carrier bindings
 
-- Status: Proposal only — Draft RFC 0007; no registered conformance profiles
-- Date: 2026-10-27
-- Parent: [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+- Status: Accepted (2026-10-29) — normative SC1/WSS profile `SNTR-SC1-WSS-V1`
+- Date: 2026-10-29
+- Owner: [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 - Security owners: [shared channel](../security/secure-channel.md) and
   [device authorization](../security/device-authorization.md)
+- Requirements: `SNTR-SCW-001`–`SNTR-SCW-012`
 
-These are concrete experimental draft-1 mappings for one transport-independent
-channel over TCP, WS and WSS, pending RFC acceptance. The core does not initiate
-networking; applications supply I/O through adapters. Executed implementation
-tests and integration evidence are recorded in the
-[implementation evidence ledger](../../docs/sc1-implementation.md).
-Existing profile identifiers and plaintext/TLS-backed mappings are unchanged.
-The draft-1 domain and WS subprotocol below identify experimental bytes, not
-accepted conformance profiles. Raw UDP remains deferred. HTTP/HTTPS
-request-response is excluded from SC1 draft-1; existing HTTP/HTTPS profiles
-remain unchanged.
+This document defines the accepted v1 byte mapping for the shared channel in
+[secure-channel.md](../security/secure-channel.md). WSS is the permitted public
+production carrier. TCP and plaintext WS are restricted development carriers.
+UDP is deferred and is not part of this profile.
 
-## 1. Common handshake mapping
+The accepted contract is RFC 0007 §11.4 and this document. The earlier
+`syntra.sc1.draft1` bytes and local-revision-1 format are historical
+experimental formats; they are not aliases and MUST be rejected. Baseline WSS
+profiles (`SNTR-WSS-H1-V1`) retain their own frame-per-message mapping,
+identifiers and claims. An SC1 pass does not certify a baseline profile.
 
-The binding selects `Noise_NK_25519_ChaChaPoly_SHA256` for bootstrap or
+## 1. Profile identity and selection
+
+**SNTR-SCW-001** — SC1/WSS implementations MUST select the profile explicitly
+by endpoint `/syntra/v1/sc1/ws` and the exact, case-sensitive WebSocket
+subprotocol `syntra.sc1.v1`. They MUST NOT reuse the baseline WebSocket
+endpoint `/syntra/v1/ws`, the baseline subprotocol `syntra.v1`, or a draft-1
+identifier. Selection failures MUST fail closed; a failed SC1 attempt MUST NOT
+trigger automatic retry over plaintext, bootstrap, another suite or a legacy
+format.
+
+**SNTR-SCW-002** — Both roles MUST encode and authenticate the canonical
+context in §2 byte-for-byte as the Noise prologue. The context is public and
+MUST be the exact prefix of M1. There is no additional domain separator,
+revision field, hash, padding or terminator. Context mismatch MUST fail before
+credential lookup, protected dispatch or application effects.
+
+## 2. Canonical context
+
+Let `S = len(scope)` in bytes. All offsets are zero-based and half-open.
+
+| Offset | Bytes | Field | Encoding |
+|---|---:|---|---|
+| `[0,13)` | 13 | domain | ASCII `syntra.sc1.v1`, no terminator |
+| `[13,14)` | 1 | mode | `u8`: bootstrap `1`, returning `2` |
+| `[14,15)` | 1 | carrier | `u8`: TCP `1`, WS `2`, WSS `3` |
+| `[15,19)` | 4 | `server_key_id` | `u32BE`; zero permitted |
+| `[19,27)` | 8 | enrollment epoch | `u64BE` |
+| `[27,35)` | 8 | enrollment handle | eight opaque bytes |
+| `[35,37)` | 2 | scope length `S` | `u16BE` |
+| `[37,37+S)` | `S` | scope | exact UTF-8, 1–255 bytes, no normalization |
+
+The context is `37 + S` bytes: **38–292 bytes**. Bootstrap requires mode `1`,
+epoch zero, an all-zero handle and no AK. Returning mode requires mode `2`, a
+nonzero epoch, a nonzero independent handle and a separately provisioned
+uniformly random 32-byte AK. The AK enters only the Noise PSK input, never the
+prologue. `server_key_id`, carrier and scope MUST match the responder's
+configuration; an input selector cannot create trust.
+
+## 3. Handshake
+
+**SNTR-SCW-003** — Both roles MUST use
+`Noise_NK_25519_ChaChaPoly_SHA256` for bootstrap and
 `Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices, with standard PSK
-placement 0. There is no negotiation menu or fallback. The exact canonical
-context is the following concatenation, with no padding or terminator:
+placement `0` and fresh ephemeral key pairs per attempt. Both handshake
+payloads MUST be empty. M1 is the context followed by exactly 48 Noise bytes
+(**86–340 bytes**); M2 is exactly 48 Noise bytes (**134–388 bytes** total
+before carrier framing). Unexpected lengths, payloads, modes, carriers,
+contexts or trailing bytes are terminal.
 
-| Field | Exact draft-1 encoding |
-|---|---|
-| Domain | ASCII `syntra.sc1.draft1` (17 bytes) |
-| Mode | `u8`: bootstrap = 1, returning = 2 |
-| Carrier | `u8`: TCP = 1, WS = 2, WSS = 3 |
-| ServerKeyID | `u32BE`; zero is allowed |
-| Epoch | `u64BE` |
-| Handle | Eight opaque bytes |
-| Scope length | `u16BE`, counting scope bytes |
-| Scope | Exact UTF-8, 1–255 bytes, without normalization |
+**SNTR-SCW-004** — The initiator MUST verify the trusted server static key
+through the Noise handshake and MUST verify the outer TLS 1.3 server
+certificate and hostname for WSS. TLS verification MUST NOT be disabled to make
+a deployment work. If either the TLS identity or the Noise pin fails, the
+attempt fails closed with no credential release and no fallback. The initiator
+MUST NOT send `hello` until M2 verifies.
 
-Context length is `41 + S` bytes, hence 42–296 bytes. Bootstrap requires epoch
-zero, an all-zero handle and no AK. Returning mode requires nonzero epoch,
-a handle other than all zero, and a 32-byte AK other than all zero. High-entropy
-AK generation remains a separate provisioning obligation; nonzero validation
-does not prove entropy. The AK enters only the standard PSK input.
+## 4. WSS mapping
 
-M1 is `canonical_context || NoiseMessage1[48]`: 90–344 bytes. The context is
-cleartext and is also supplied byte-for-byte as the Noise prologue. M2 is
-exactly `NoiseMessage2[48]`. Both handshake payloads are empty. Total handshake
-bytes before carrier framing are 138–392, for either mode. The raw Noise bodies
-alone total 96 bytes; 104 = 96 + 8 counts only those bodies and a handle, not
-this complete draft-1 exchange. Wrappers are bounded before Noise processing.
-No client may send Syntra credentials until M2 is verified. The host gates
-protected work on fresh client transport confirmation and subsequent Syntra
-handshake/authorization; replayed M1 does not provide that confirmation.
+**SNTR-SCW-005** — SC1/WSS MUST run over verified TLS 1.3 or later. Each M1,
+M2 and ciphertext record MUST occupy exactly one reassembled binary WebSocket
+message. There is no `u16BE` SC1 prefix inside a WebSocket message. Text
+messages, compressed messages, empty messages, truncated messages and invalid
+tags MUST be rejected. WebSocket fragmentation is reassembled by the carrier;
+SC1 record boundaries are not WebSocket frame boundaries. Ping, Pong and Close
+are carrier control operations and are never authorization, channel
+confirmation or RPC results.
 
-## 2. TCP stream candidate
+**SNTR-SCW-006** — The Upgrade request MUST target `/syntra/v1/sc1/ws` with no
+userinfo, query or fragment. The host MUST require the exact subprotocol
+`syntra.sc1.v1`, MUST reject `Authorization` and `Cookie` request headers, and
+MUST NOT treat `Origin` or forwarding headers as authentication. The client
+MUST validate the 101 response and its `Upgrade` and `Connection` tokens,
+`Sec-WebSocket-Accept` and selected subprotocol before sending any SC1 bytes;
+if validation fails, it MUST close and send no M1. The client MUST NOT send a
+Syntra credential in the request target or Upgrade headers.
 
-Every M1, M2 and transport record is wrapped in `u16BE(length) || message`.
-The prefix counts only the following message bytes. TCP handshake totals are
-142–396 bytes, including the two prefixes. After establishment:
+**SNTR-SCW-007** — The host MUST terminate TLS itself for the initial permitted
+topology in §8. A deployment that terminates TLS at a proxy MUST NOT claim
+SC1/WSS or assert carrier `3` until a proxy topology is separately specified
+and tested. A forwarded header is not evidence of the external carrier.
 
-```text
-TCP bytes:                 u16BE(C) || NoiseCiphertext[C] || ...
-Authenticated plaintext:   u32BE(F) || ProtobufFrame[F] || ...
-```
+## 5. Restricted development carriers
 
-`C` counts ciphertext including its tag and excludes the two-byte prefix.
-The experimental binding permits nonempty plaintext records, so `17 <= C <=
-65,535`; a standard Noise empty plaintext is not used as a heartbeat or close
-marker. `F` counts serialized `Frame` bytes, excluding its four-byte prefix:
-`1 <= F <= 1,048,576`, subject to a documented lower deployment limit.
+**SNTR-SCW-008** — SC1/TCP and SC1/WS are restricted development carriers. They
+MUST be disabled by default in any distribution claiming production readiness
+and MUST be documented as providing no outer TLS. SC1/TCP MUST wrap every
+handshake message and record in `u16BE(length) || bytes`, where the length
+counts only the following bytes. SC1/WS MUST use one binary message per
+handshake message or record, with carrier values TCP `1` and WS `2`
+respectively. Plaintext WS MUST be restricted to loopback or an isolated test
+network. Wrapping a development stream in TLS does not make it the WSS carrier
+and does not permit carrier value `3`.
 
-The encrypted inner stream retains a simple envelope length and can span
-records. Records may contain pieces of one envelope or several complete
-envelopes. Prefixes may themselves span records. This deliberately avoids
-frame IDs, fragment numbers and fragment counts on an already ordered stream.
-It has no record-type byte; overhead figures for a different grammar do not
-describe this binding.
+## 6. Records and the inner frame stream
 
-The receiver first bounds the outer length, authenticates the complete record,
-then incrementally reconstructs the inner stream. It bounds `F` before
-allocating frame storage and dispatches only complete validated envelopes.
-It never infers boundaries from reads or Protobuf parsing or scans to recover
-after corruption. The clear outer prefix is not authenticated AD: alteration
-can cause bounded waiting, truncation or tag failure, not unchecked allocation.
+**SNTR-SCW-009** — After Noise `Split()`, each direction MUST use independent
+standard Noise transport state, implicit ordered nonces and empty associated
+data. Record plaintext MUST be 1–65,519 bytes; ciphertext MUST be 17–65,535
+bytes including the 16-byte tag. Empty plaintext records are not used as
+heartbeats or close markers. Carrier headers are not authenticated AD; altering
+a clear length or WebSocket boundary may cause bounded waiting or failure, never
+unchecked allocation.
 
-One writer serializes ciphertexts and retains partial-write offsets. Once a
-nonce is consumed, the resulting ciphertext is sent in order or the channel
-is aborted. Cancellation cannot remove an unfinished envelope from the inner
-stream or insert another frame into it. A blocked writer has a separate
-deadline; RPC cancellation does not stop all remote processing by itself.
+**SNTR-SCW-010** — Authenticated plaintext is the stream
+`u32BE(F) || Frame || u32BE(F) || Frame ...`, where `F` is the serialized
+`Frame` length. `F` MUST be 1–1,048,576 bytes. Prefixes, frames and record
+boundaries are independent: a prefix or frame may span records, and one record
+may contain multiple complete frames. The receiver MUST authenticate a complete
+record before consuming plaintext, enforce `F` before frame allocation, and
+dispatch only complete validated `Frame` messages. It MUST NOT resynchronize,
+scan for a boundary or decode a partial frame.
 
-For an independently packed envelope of `F` bytes in `N` records, overhead is
-`4 + 18*N` bytes. For `N=1` it is 22 bytes above the serialized envelope.
-With maximal records, a 1 MiB envelope needs 17 records and 310 overhead bytes.
-These are framing calculations, not full-RPC or TCP/IP costs, worst-case
-tiny-record bounds, or measured performance.
+## 7. First authenticated envelope and readiness
 
-TCP establishment, channel establishment and Syntra `hello`/`ready` have
-separate bounded phases and a total-attempt budget. FIN/EOF and half-close do
-not prove application completion. Truncated outer/inner prefixes or bodies
-are failures; complete-boundary EOF is still not authenticated close. Drain
-within a close budget or abort, settle callers, and discard channel state.
+**SNTR-SCW-011** — The first authenticated plaintext MUST begin with exactly
+one complete framed `ClientHello`. The envelope MAY span multiple records. The
+record that completes it MUST end exactly at the hello boundary; no additional
+complete envelope and no partial trailing envelope are permitted there. The
+hello remains subject to the 1 MiB frame limit and to bounded frame-assembly
+time and bytes. The host MUST validate the hello, apply current enrollment,
+same-principal and method policy, and only then send `ready` and permit
+protected dispatch. A replayed M1, an unauthenticated record or an
+authenticated record without a valid hello supplies no fresh confirmation and
+MUST NOT bind a principal or release sensitive output. A violation terminates
+the channel natively and dispatches nothing.
 
-## 3. WebSocket message candidate
+## 8. Limits, cancellation and deployment
 
-Exactly one reassembled binary WebSocket message contains one M1, M2 or
-transport ciphertext. There is no TCP `u16BE` prefix. Selection uses the exact,
-case-sensitive subprotocol `syntra.sc1.draft1`; compression is off and text
-messages are rejected. Bounds apply to reassembled messages, not merely their
-individual fragments. WSS uses the distinct carrier value 3 and verified TLS
-1.3 or later; TLS policy for a custom `RoundTripper` is host-owned and must not
-be inferred to have been verified by the default adapter path.
+**SNTR-SCW-012** — Deployments MUST enforce finite, documented budgets and
+MUST NOT retain unbounded work. The SC1/WSS profile defines these defaults;
+implementations MAY choose shorter positive values and MUST NOT permit values
+above the stated maxima:
 
-The binding uses the same authenticated inner `u32BE(F) || Frame` stream as
-TCP to handle envelopes above the Noise record limit without introducing a
-second fragmentation grammar. An envelope may span multiple binary messages,
-and the parser preserves state across them. A single-envelope/single-record
-message adds 20 bytes above its envelope, excluding WebSocket framing.
+| Operation | Default | Maximum |
+|---|---:|---:|
+| Total dial, TLS, Upgrade, SC1 and core readiness attempt | 15 s | 24 h |
+| SC1 establishment and first-record confirmation | 5 s | 24 h |
+| Next complete record, including idle wait | 30 s | 24 h |
+| Frame assembly from first incomplete plaintext | 30 s | 24 h |
+| One complete frame's encrypted output | 10 s | 24 h |
+| Close/owner-task join after close | 1 s | 24 h |
+| Channel lifetime, including idle and suspension | 24 h | 24 h |
+| Protected records per direction | `2^32` | `2^32` |
 
-Carrier Ping/Pong/Close remain carrier operations, not authorization, Syntra
-RPC results or cryptographic record acknowledgments. Malformed wrappers,
-invalid lengths/tags and incomplete records/frames fail closed; there is no
-resynchronization. Operational deadlines and tested failure/close behavior are
-recorded in the evidence ledger. A browser may impose assembly limitations that
-prevent a full bounded-allocation claim; those limitations require disclosure.
+Trickle input MUST NOT refresh an absolute deadline. Pending-operation
+admission MUST be bounded (default 32 per direction, maximum 1,024) and excess
+work MUST be rejected immediately. Writer queue capacity MUST be bounded
+(default 256 frames, 1–1,024) and deployment memory budgets SHOULD use a
+smaller value. One writer MUST serialize each record and retain the exact
+ciphertext and partial-write offset; once a nonce is consumed, the ciphertext
+MUST be emitted in order or the channel aborted. Cancellation MUST NOT splice
+another frame into unfinished output or re-encrypt under a consumed nonce.
 
-This is **not** the existing WS/WSS mapping, where a binary message is a
-serialized `Frame`. Existing clients must not be silently upgraded or given
-the same profile/subprotocol identifier for different bytes. A separate
-explicit endpoint/subprotocol selection is required; draft-1 uses the token
-above, never `syntra.v1`.
-Browser `wss://` retains TLS outside WebSocket even when SC1 protects its
-binary messages. Existing HTTPS/WSS compatibility profiles remain available.
+At 24 hours or `2^32` records in either direction, the channel MUST close
+without wrapping counters. Renewal is a fresh handshake with fresh traffic
+keys, followed by explicit recovery negotiation where the application supports
+it; no in-place rekey, session resumption or RPC replay is implied.
 
-## 4. UDP datagram work required
+The initial permitted production topology is direct verified TLS 1.3 WSS
+termination by the host. Proxy termination is deferred. Hosts MUST bound
+aggregate connections, unauthenticated handshakes, crypto workers, queued bytes
+and reassembly memory. Operational budgets and their evidence belong to the
+deployment record.
 
-The same channel construction can have a datagram binding, but neither
-Noise nor an authenticated datagram supplies reliable ordered delivery.
-The following are blockers for a UDP specification and implementation:
+## 9. Failure, close and migration
 
-| Area | Required design/verification |
-|---|---|
-| Handshake | Attempt demultiplexing, bounded retransmission, duplicate flights, cached exact responses, fresh ephemerals per new attempt, replay/DoS budgets and absolute expiry |
-| Routing | Channel-handle assignment, collision scope, authenticated communication, retirement and unknown-handle behavior |
-| Records | Explicit per-direction nonce/counter, key limits, duplicate rejection and a bounded sliding receive window |
-| State updates | Authenticate and check replay before changing replay/peer/application state; invalid tags cannot advance the receive window |
-| Path changes | Return-path validation and anti-amplification; a valid tag alone does not establish source-address reachability |
-| Payload sizing | MTU/path behavior, bounded record sizes without relying on IP fragmentation, aggregate reconstruction caps and timeout |
-| Reliability | Congestion control, loss/retransmission and ordering semantics, delivery ambiguity and cancellation |
-| Fragmentation | Exact encoded frame length, identity/offset/count rules, overlap/duplicate handling, bounded concurrent assemblies and expiry |
-| Headers | Bind routing/type/context through an explicitly reviewed representation; do not silently add outer-header AD to standard Noise transport |
+Channel authentication, framing, context and policy failures MUST terminate the
+carrier without an SC1 diagnostic payload or a promised WebSocket close code.
+No carrier close is an authenticated SC1 close or a delivery acknowledgement.
+EOF at a complete boundary is transport loss, not proof of orderly application
+completion. Truncated records or frames MUST be discarded and never dispatched.
+Callers MUST settle under the core loss/cancellation rules; unknown outcomes
+remain unknown.
 
-The standard Noise out-of-order mechanism permits carrying a nonce and
-rejecting successfully authenticated duplicate nonces. That alone does not
-define the entire UDP binding above. If ciphertext is retransmitted, the
-binding must distinguish retransmitting identical bytes from encrypting a
-new message under an already used nonce. It must also prevent invalid input
-from poisoning counters, paths or assemblies.
+The v1 bytes are not backward compatible with `syntra.sc1.draft1` or the old
+local-revision-1 format. A deployment that temporarily retains a legacy
+endpoint MUST keep it explicitly configured and MUST NOT alias it to v1. A
+failed v1 attempt MUST NOT fall back to a legacy or plaintext profile.
 
-No 14-byte header, 31-byte overhead, roaming guarantee, reliability feature,
-or UDP production claim is standardized here. Those need frozen schemas,
-failure rules, threat review, deterministic fixtures and independent interop.
+## 10. Verification and claims
 
-## 5. Selection, compatibility, and verification
+Public context and prologue examples are frozen in
+[`conformance/plans/sc1-context-v1.json`](../../conformance/plans/sc1-context-v1.json)
+and registered through [`conformance/test-vectors/sc1/context-vectors.yaml`](../../conformance/test-vectors/sc1/context-vectors.yaml).
+These are encoding fixtures, not independent Noise ciphertext vectors.
 
-Endpoints select carrier/mode explicitly and bind them to the handshake.
-They never sniff a secure failure and automatically retry over another mode
-or plaintext. An AK can authorize another permitted carrier within its scope,
-but that carrier establishes new traffic keys and a new Syntra binding.
-Logical-session resumption, RPC idempotency and event recovery are separate.
+The Rust implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements
+the reviewed proposal and records local unit, race, transport, FFI/WASM and
+security-check results in its `SC1.md`, `AUDIT.md` and
+`docs/implementation-status.md`. That is implementation evidence for the
+selected bytes, not independent interoperability, formal `CONF-SCW-*`
+execution, mobile validation or an independent security review. Docker and
+browser runs were not established, and host authorization, durable recovery,
+production FFI and mobile integration remain implementation work.
 
-The implemented ordered record construction uses empty associated data and
-implicit ordered per-direction nonces; plaintext is 1–65,519 bytes and
-ciphertext is 17–65,535 bytes. Records are authenticated before allocating a
-declared inner frame. Both the inner prefix and frame can span records, and
-coalesced frames are accepted. The ordered adapters default to 5 seconds each
-for channel handshake, write, frame assembly and record assembly, configurable
-only to shorter positive durations. Pending-operation admission defaults to
-32 per direction including active work, permits at most 1,024, and rejects
-excess work immediately as busy. Lifetime defaults to 24 hours with shorter
-values permitted; usage is capped at `2^32` records per direction. The entry
-clock includes establishment and expires idle channels too. These are implemented experimental
-defaults, not accepted core requirements. The evidence ledger owns the total
-dial, server, async-writer and shutdown budgets and their cancellation limits.
-
-The [acceptance plan](../../conformance/plans/secure-channel.md) includes
-every split point of short TCP records, coalescing and large-frame assembly,
-message/carrier boundaries, malformed lengths/tags, bounded cancellation and
-shutdown, and the UDP-specific failure/DoS cases above. The
-[implementation evidence ledger](../../docs/sc1-implementation.md) separately
-records executed unit/race/native-core tests and same-implementation Docker
-integration across TCP/WS/WSS × NK/NKpsk0. No formal SC1 `CONF-*` cases or
-profiles are registered. Independent vectors, cross-implementation exchange
-and independent security review remain open; same-implementation success does
-not supply those results.
+The registered profile and cases are in
+[`conformance/profiles.yaml`](../../conformance/profiles.yaml) and
+[`conformance/manifest/sc1-wss.yaml`](../../conformance/manifest/sc1-wss.yaml).
+A profile registration is not an execution result. Independent vectors,
+pure-Go/Rust both-role and both-mode runs, direct-topology tests, recovery and
+mobile evidence and independent human review remain release gates.
 
 ## References
 
-- [Noise Protocol Framework](https://noiseprotocol.org/noise.html), §§3, 5,
-  11.4, 13–14.
-- Existing [TCP](tcp.md), [WebSocket](websocket.md), and
-  [secure WebSocket](secure-websocket.md) mappings, which are not redefined here.
+- [Noise Protocol Framework](https://noiseprotocol.org/noise.html), revision 34:
+  §§3, 5–7, 9, 11.2–11.4, 13–14.
+- [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) §11.
+- [Secure channel](../security/secure-channel.md),
+  [device authorization](../security/device-authorization.md),
+  [ADR-011](../decisions/ADR-011-noise-device-authorization.md).
+- Existing [TCP](tcp.md), [WebSocket](websocket.md) and
+  [secure WebSocket](secure-websocket.md) mappings, which are not redefined
+  here.

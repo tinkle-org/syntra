@@ -77,9 +77,9 @@ authentication validator, or cryptographic implementation is generated.
 
 ### RFC 0007 boundary (informative)
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 adds no `.proto` fields or generation step. Regenerating these message types
-does not implement the proposed [Noise channel](../security/secure-channel.md),
+does not implement the accepted [Noise channel](../security/secure-channel.md),
 [shared-AK enrollment/lifecycle](../security/device-authorization.md), or
 [carrier record mappings](../transports/noise-bindings.md). The selected
 NK/NKpsk0 suites require separate channel code, trusted host authentication

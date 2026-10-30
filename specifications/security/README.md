@@ -24,43 +24,43 @@
 
 All examples use neutral applications (echo, generic key/value, generic subscription). No application-level E2EE is defined; transport security remains REQUIRED even for opaque encrypted payloads.
 
-## Selected target under review — RFC 0007
+## Accepted secure channel — RFC 0007
 
-The table above is the current baseline. Its TLS policy and existing test IDs
-remain in effect until [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-is accepted; [ADR-011](../decisions/ADR-011-noise-device-authorization.md) is
-proposed, not a supersession of ADR-008.
+The table above remains the baseline. [RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and [ADR-011](../decisions/ADR-011-noise-device-authorization.md) add
+`SNTR-SC1-WSS-V1` as an additional secure profile; they do not remove or weaken
+the TLS profiles. SC1/WSS requires verified outer TLS 1.3 plus the separately
+provisioned Noise server pin.
 
-| Proposal | Concern | Proposed requirements only |
+| Accepted owner | Concern | Requirements |
 |---|---|---|
 | [secure-channel.md](secure-channel.md) | Shared channel independent of carrier I/O | `SNTR-SC-001`–`SNTR-SC-015` |
 | [device-authorization.md](device-authorization.md) | Persistent per-enrollment shared authorization | `SNTR-DAUTH-001`–`SNTR-DAUTH-010` |
-| [noise-bindings.md](../transports/noise-bindings.md) | Concrete experimental draft-1 TCP/WS/WSS mappings and deferred UDP design | References SC/DAUTH; no registered profiles |
+| [noise-bindings.md](../transports/noise-bindings.md) | Canonical v1 WSS mapping; restricted TCP/WS; deferred UDP | `SNTR-SCW-001`–`SNTR-SCW-012`; `SNTR-SC1-WSS-V1` |
 
 After the baseline, read RFC 0007 → shared channel → device authorization →
-carrier bindings → [planned acceptance cases](../../conformance/plans/secure-channel.md).
-The selected proposal uses `Noise_NK_25519_ChaChaPoly_SHA256` for bootstrap
-and `Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices, with a
+carrier mapping → [registered cases](../../conformance/manifest/sc1-wss.yaml). SC1 uses
+`Noise_NK_25519_ChaChaPoly_SHA256` for bootstrap and
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices, with a
 host-issued unique random 32-byte shared AK enrolled through authorized
 bootstrap. Persistent authorization retains neither traffic keys nor session
-state. The core keeps generic principals and opaque application payloads;
-no signing-key-pair credential model or post-quantum security is claimed.
+state. The core keeps generic principals and opaque application payloads; no
+signing-key-pair credential model or post-quantum security is claimed.
 
-## Experimental implementation and remaining work
+## Implementation evidence and remaining work
 
 The [implementation evidence ledger](../../docs/sc1-implementation.md) owns the
-delivered-scope, authentication-boundary, operational-limit and execution record.
-The channel, TCP/WS/WSS adapters, trusted `ChannelIdentity`/`ChannelPolicy`
-integration and bounded host async writer have local unit/race/native-core and
-same-implementation Docker coverage. Draft-1 context bytes, carrier selection
-and numeric defaults are specified, not unresolved design TBDs. These facts
-do not accept RFC 0007 or register SC1 conformance profiles/cases.
+historical and current implementation record. The Rust implementation records
+local unit/race/native-core/transport tests and security checks. These facts do
+not execute the registered `CONF-SCW-*` cases or establish independent
+interoperability.
 
 Only out-of-band preprovisioning is delivered; enrollment issuance, protected
 storage/transactions and rotation flows remain absent. Host policy still owns
 principal agreement, trusted root identity and synchronous enrollment checking
 before `ready`; empty credentials never authorize automatically and nil method
 authorization denies access. UDP is deferred; HTTP/HTTPS request-response is
-excluded from SC1 scope, with baseline profiles unchanged. Independent vectors,
-cross-implementation interoperability and independent security review remain
-open. In-memory benchmarks are not TLS-relative performance evidence.
+excluded from SC1, with baseline profiles unchanged. Independent vectors,
+cross-implementation interoperability, direct-topology tests, mobile/recovery
+evidence and independent human security review remain release gates. In-memory
+benchmarks are not TLS-relative performance evidence.

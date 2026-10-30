@@ -10,10 +10,10 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
-## Selected persistent-authorization proposal (not the v1 baseline)
+## Accepted persistent device authorization (additive profile)
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
-and [device authorization](../security/device-authorization.md) select a
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+and [device authorization](../security/device-authorization.md) establish a
 shared per-device AK incorporated into Noise NKpsk0 on returning channels.
 The AK is not sent as `ClientHello.credential`, and a client-supplied handle
 alone is not evidence of authentication. The implemented experimental bridge

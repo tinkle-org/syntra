@@ -7,58 +7,63 @@ carries a requirement ID (`SNTR-*`, `SYN-ARCH-*`) and links to a
 conformance test. In case of conflict, the ownership matrix
 (`architecture.md` Sec. 8) decides which document prevails.
 
-All core, transport, and security specifications are **drafts pending
-maintainer approval via RFC**. Release-blocking open questions are tracked
+Core, transport, and security specifications are **drafts pending
+maintainer approval via RFC**, except the accepted RFC 0007 owner documents
+([secure-channel.md](security/secure-channel.md),
+[device-authorization.md](security/device-authorization.md),
+[transports/noise-bindings.md](transports/noise-bindings.md)), which are
+normative for `SNTR-SC1-WSS-V1`. Release-blocking open questions are tracked
 in `SESSION-OPEN-QUESTIONS.md` and the RFC set.
 
 The [mobile delivery record](../docs/mobile-v1-delivery.md) selects SC1 and
 update recovery as release deliverables. [RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md)
-adds mobile lifecycle and raw-wire decision proposals; RFCs 0006/0007 record
-recovery corrections and canonical SC1 migration. These proposals do not
-supersede the owning drafts before acceptance. Conformance plans and public
-context fixture lint are not executable interoperability verdicts.
+adds mobile lifecycle and raw-wire decision proposals, and RFC 0006 records
+recovery corrections; those proposals do not supersede the owning drafts
+before acceptance. RFC 0007 is accepted, so its SC1 contract and migration are
+normative (see the accepted secure channel section below). Conformance plans
+and public context fixture lint are not executable interoperability verdicts.
 
-## Secure-channel proposal and experimental implementation
+## Accepted secure channel (SC1)
 
-[Draft RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) proposes
-Syntra Secure Channel v1 (SC1): `Noise_NK_25519_ChaChaPoly_SHA256` for
-authorized bootstrap enrollment and `Noise_NKpsk0_25519_ChaChaPoly_SHA256`
-for returning devices sharing a persistent random 32-byte AK. Every new
-channel derives fresh traffic keys. A bounded experimental Go SC1 draft-1
-implementation is delivered over TCP/WS/WSS in both modes, with high-level
-connection orchestration and channel-aware host policy. That evidence does
-not accept the RFC or Proposed ADR-011, register conformance profiles or
-change current production TLS requirements and baseline profile identifiers.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) is accepted.
+Syntra Secure Channel v1 (SC1) uses
+`Noise_NK_25519_ChaChaPoly_SHA256` for authorized bootstrap enrollment and
+`Noise_NKpsk0_25519_ChaChaPoly_SHA256` for returning devices sharing a
+persistent random 32-byte AK. Every new channel derives fresh traffic keys.
+The accepted public profile is `SNTR-SC1-WSS-V1`: canonical `syntra.sc1.v1`
+context over verified TLS 1.3 WSS at `/syntra/v1/sc1/ws`, with TCP and
+plaintext WS retained as restricted development carriers. UDP is deferred.
 
 Read the [shared channel](security/secure-channel.md),
 [device authorization](security/device-authorization.md),
-[carrier mappings](transports/noise-bindings.md),
-[proposed ADR-011](decisions/ADR-011-noise-device-authorization.md), and
+[carrier mapping](transports/noise-bindings.md),
+[ADR-011](decisions/ADR-011-noise-device-authorization.md), and
 [acceptance plan](../conformance/plans/secure-channel.md) together. The core
-remains independent of sockets and carrier libraries; TCP/UDP/WebSocket are
-separate bindings, with UDP still deferred until its complete binding is
-accepted. HTTP/HTTPS request-response is excluded from this implementation;
-WSS retains verified outer TLS ≥1.3 without automatic downgrade. Persistent
-device authorization does not resume logical sessions.
+remains independent of sockets and carrier libraries. HTTP/HTTPS
+request-response is excluded from SC1; WSS retains verified outer TLS ≥1.3
+without automatic downgrade. Persistent device authorization does not resume
+logical sessions.
 
-The informative [implementation ledger](../docs/sc1-implementation.md#implementation-status)
-records the exact draft-1 contract. Its [authentication boundary](../docs/sc1-implementation.md#authentication-boundary)
-requires host policy to independently verify root identity, current enrollment
-and admission before ready and enforce the intended returning-mode same-principal
-binding; the library does not compare principals automatically. Nil method authorization
-denies effects. [Operational limits](../docs/sc1-implementation.md#operational-limits)
-document admission, transport ownership and the separate callback/writer/
-connection shutdown budgets.
+The exact context is 38–292 bytes; M1 is 86–340 bytes and M2 is 48 bytes.
+The first authenticated envelope is exactly one complete framed `ClientHello`
+(which may span records, with no trailing envelope). Record plaintext is
+1–65,519 bytes and ciphertext is 17–65,535 bytes with empty AD; the inner
+stream is `u32BE(F) || Frame`, with frames of 1–1,048,576 bytes. A channel is
+limited to 24 hours and `2^32` protected records per direction. Renewal is a
+fresh handshake plus explicit recovery negotiation, never an in-place rekey.
 
-[Verification evidence](../docs/sc1-implementation.md#verification-evidence)
-distinguishes local high-level connection tests from six-group same-implementation
-Docker adapter/core tests, native-core checks and formal conformance. Neither
-test layer establishes independent SC1 wire interoperability. See
-[performance measurements](../docs/perf-tradeoffs.md) for report-only in-memory
-samples, and [remaining work](../docs/sc1-implementation.md#remaining-work) for
-independent review/vectors/interoperability, complete provisioning/storage/
-rotation and native ABI completion-time/credential-release gaps. No enrollment
-RPC or complete credential-lifecycle workflow is supplied.
+[Authentication and host policy](../docs/sc1-implementation.md#authentication-boundary)
+must independently verify root identity, current enrollment and same-principal
+admission before `ready`; the channel does not compare principals automatically.
+Nil method authorization denies effects.
+
+The Rust implementation records local unit/race/native-core/transport tests
+and security checks as implementation evidence. Registration in
+[`conformance/profiles.yaml`](../conformance/profiles.yaml) is not execution.
+Independent vectors, pure-Go/Rust both-role and both-mode runs, direct-topology
+tests, mobile/recovery evidence and independent human security review remain
+release gates. No enrollment RPC or complete credential-lifecycle workflow is
+supplied.
 
 ## Reading order
 
@@ -131,10 +136,10 @@ mechanics live in [`schema/`](schema/README.md); design rationale in
 | Security | `security/threat-model.md`, `transport-security.md`, `authentication-security.md`, `replay-protection.md`, `opaque-payloads.md`, `test-plan.md` | `SNTR-TMOD/TSEC/ASEC/RPL/OPQ/STEST-*` |
 | Schema | `schema/reference.md`, `generation.md`, `compatibility.md`, `validation.md` + `proto/syntra/v1/*.proto` | references `SNTR-*` |
 | Decisions | `decisions/ADR-001`–`ADR-010` | rationale, no new normative force |
-| Proposed SC1 security | `security/secure-channel.md`, `device-authorization.md` | `SNTR-SC-*`, `SNTR-DAUTH-*` (Draft RFC 0007 only) |
-| Proposed SC1 mappings | `transports/noise-bindings.md` | informative candidates; not registered profiles |
-| Proposed decision | `decisions/ADR-011-noise-device-authorization.md` | Proposed, not a supersession of ADR-008 yet |
-| Experimental SC1 evidence | `../docs/sc1-implementation.md`, `../docs/perf-tradeoffs.md` | informative implementation contract/results; no new normative IDs or conformance verdicts |
+| Accepted SC1 security | `security/secure-channel.md`, `device-authorization.md` | `SNTR-SC-*`, `SNTR-DAUTH-*` (RFC 0007) |
+| Accepted SC1/WSS mapping | `transports/noise-bindings.md` | `SNTR-SCW-*`; profile `SNTR-SC1-WSS-V1` |
+| Accepted decision | `decisions/ADR-011-noise-device-authorization.md` | additive amendment to ADR-008; does not remove TLS |
+| SC1 implementation evidence | `../docs/sc1-implementation.md`, `../docs/perf-tradeoffs.md` | informative results; not conformance verdicts or independent review |
 
 All specification examples use neutral applications: `echo`, generic
 key/value, generic event subscription. No domain-specific concepts appear.

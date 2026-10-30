@@ -27,25 +27,26 @@ conformance green (that is the stable-release bar per `GOVERNANCE.md`
 Sec. 5). Known unresolved blockers MUST be listed in
 `audits/v1-release-readiness.md` and MUST block promotion to stable.
 
-### SC1 draft-1 implementation evidence and release scope
+## Accepted SC1 profile and release scope
 
-The selected Syntra Secure Channel v1 (SC1) design is recorded in
-[Draft RFC 0007](rfcs/0007-secure-channel-device-authorization.md), not an
-Accepted RFC. It does not change the baseline TLS requirements, the seven
-existing transport profiles, or their executable conformance checks below.
-The [current migration record](MIGRATION.md#11-sc1-draft-1-implementation-evidence-2026-10-28)
-records delivered experimental Go SC1 draft-1: bounded TCP/WS/WSS bootstrap
-and returning channels, ready-to-call connection helpers, server admission,
-channel-aware host policy, owned transport lifecycle and an asynchronous
-FIFO writer. UDP is deferred and HTTP/HTTPS request-response is excluded
-from that implementation. WSS retains verified outer TLS ≥1.3, without
-automatic downgrade. Proposed ADR-011 is not accepted production policy.
+[RFC 0007](rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](specifications/decisions/ADR-011-noise-device-authorization.md) are
+accepted. `SNTR-SC1-WSS-V1` is an additional secure profile: canonical
+`syntra.sc1.v1` context inside verified TLS 1.3 WSS at `/syntra/v1/sc1/ws`.
+It does not change the baseline TLS requirements or the existing baseline
+transport profiles. TCP and plaintext WS are restricted development carriers;
+UDP is deferred and HTTP/HTTPS request-response is excluded from SC1. The
+initial permitted topology is direct TLS termination by the host; proxy
+termination is deferred.
 
-The [implementation ledger](docs/sc1-implementation.md#implementation-status)
-records the self-contained contract. Host policy must independently verify root
-identity, current enrollment and admission before ready and enforce its intended
-returning-mode same-principal binding; the library does not compare principals
-automatically.
+The accepted first stable bundle is SC1/WSS, standardized recovery and
+applicable mobile lifecycle evidence. Baseline transports remain independently
+claimable but are not all required for the initial bundle. The Rust
+implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
+reviewed proposal; its local evidence does not execute the registered
+`CONF-SCW-*` cases or close independent interoperability, recovery, mobile,
+topology or security-review gates. Host policy must independently verify root
+identity, current enrollment and same-principal admission before `ready`.
 Nil method authorization denies calls. There is no enrollment RPC or complete
 issuance/storage/rotation workflow.
 
@@ -95,17 +96,22 @@ results from the [acceptance plan](conformance/plans/mobile-v1.md). Core-only
 or same-implementation passes cannot satisfy this target. This supplement
 does not retroactively change the historical RC-1 snapshot or claim completion.
 
-[Draft RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md) proposes
-the exact WSS-first stable bundle, sole-maintainer bootstrap, and reconciliation
-of single-transport claims with the separate two-transport proof. The
-[acceptance package](docs/v1-acceptance-package.md) separates specification
-freeze from independent execution and stable authorization. These are proposals,
-not an effective waiver of the checklist or current governance. Prerelease
+[RFC 0009](rfcs/0009-v1-bootstrap-governance-and-release-scope.md) is accepted.
+It establishes the WSS-first stable bundle, the bootstrap roster rule, and the
+rule that a single-transport claim does not require a two-transport proof. The
+two-transport proof is required only for a claim of transport independence
+across two named transports. The [acceptance package](docs/v1-acceptance-package.md)
+separates specification freeze from independent execution and stable
+authorization. Acceptance does not waive any applicable bundle gate. Prerelease
 configuration remains unchanged; structural validation alone does not authorize
 stable promotion.
 
 Check each box with evidence (command output, PR link, or reviewer sign-off).
-An unchecked box blocks tagging.
+An unchecked box blocks tagging **for the declared release scope**. The initial
+stable bundle requires the SC1/WSS, recovery and mobile gates; it does not
+require every baseline transport. Any additional transport named in a claim
+must have its own applicable evidence. A baseline profile is never certified
+by an SC1/WSS pass.
 
 - [ ] Architecture approved
 - [ ] Threat model approved
@@ -137,7 +143,7 @@ Evidence mapping (where each box is verified):
 | Architecture / threat model approved | Accepted RFCs or maintainer quorum recorded on the RFC PRs; `SESSION-OPEN-QUESTIONS.md` shows no undecided blockers in scope |
 | Core, auth/session, RPC, events specs | `specifications/core/*.md` accepted via RFC; every MUST/MUST NOT carries an ID (`scripts/validate-repo.py requirements`) |
 | Events optional | `SNTR-EVENTS-V1` profile marked `OPTIONAL_CAPABILITY`; mandatory-only interop proven (`conformance/profiles.yaml`) |
-| TCP … WSS profiles (7) | `specifications/transports/*.md` accepted; profile IDs match `conformance/profiles.yaml` exactly |
+| Declared transport profiles | Every transport named in the release claim or bundle has an accepted spec and matching `conformance/profiles.yaml` ID. The initial bundle names SC1/WSS; baseline TCP/TLS/HTTP/HTTPS/WS/WSS are independently claimable and not all required. |
 | Proto lint / breaking | `buf lint`, `buf build`, `buf breaking --against <stable baseline>` green (CI job `buf`) |
 | Conformance requirements complete | `requirements.yaml` covers every defined ID; no `not_testable` without a stated reason (`validate-repo.py requirements manifests`) |
 | Test vectors validated | `validate-repo.py vectors` green (hex parses, protobuf decodes against `proto/`, TCP lengths match, malformed vectors intentionally malformed) |

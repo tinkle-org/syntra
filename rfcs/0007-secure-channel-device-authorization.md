@@ -2,12 +2,24 @@
 
 - RFC: 0007
 - Title: Transport-independent Noise secure channel with persistent device authorization
-- Author(s): TBD — blocker (maintainer assignment)
-- Status: Draft
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-27
-- Target version: additive experimental profile; mandatory replacement/removal requires a major-version decision
-- Relates to: ADR-003, ADR-004, ADR-008; proposed ADR-011; architecture §§5/7/9; core authentication, handshake, framing, sessions; security transport policy and replay protection
-- Reviewers: TBD — blocker (protocol and cryptographic security maintainers)
+- Target version: additive v1 profile; mandatory replacement/removal requires a major-version decision
+- Relates to: ADR-003, ADR-004, ADR-008; ADR-011; architecture §§5/7/9; core authentication, handshake, framing, sessions; security transport policy and replay protection
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
+
+Accepted 2026-10-29 under [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md)
+and [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md). The
+normative SC1 contract is §11 plus the activated owner documents:
+[secure-channel.md](../specifications/security/secure-channel.md),
+[device-authorization.md](../specifications/security/device-authorization.md),
+[noise-bindings.md](../specifications/transports/noise-bindings.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md).
+Earlier experimental text in this RFC is historical where it conflicts with
+§11; the `syntra.sc1.draft1` bytes are not an alias for v1. Independent
+vectors, cross-implementation interoperability and independent human security
+review remain release gates, not acceptance prerequisites.
 
 ## 1. Summary
 
@@ -18,16 +30,13 @@ devices. Each enrolled device and its host share a unique random 32-byte
 authorization key (AK). The AK persists across reconnects; ephemeral keys,
 directional traffic keys, and channel state do not.
 
-This RFC remains a proposal; recording experimental delivery below is not an
-acceptance record.
-ADR-008 and the existing production TLS policy remain in effect. No existing
-profile identifier, conformance case, Protobuf field, or generated type changes
-meaning through this RFC. Raw UDP remains deferred until its binding is
-specified and accepted. Experimental draft-1 channel, TCP/WS/WSS adapter,
-host-authorization and asynchronous-writer implementations have been exercised.
-Their scope and retained verification are recorded in the
-[implementation evidence ledger](../docs/sc1-implementation.md). Implementation
-and test execution do not accept this RFC or register a conformance profile.
+This RFC is accepted. ADR-008 remains in effect: SC1/WSS is an additive profile
+inside verified TLS 1.3 and does not remove the TLS policy. No existing profile
+identifier, baseline conformance case, Protobuf field or generated type changes
+meaning through this RFC. Raw UDP remains deferred. The Rust implementation at
+`tinkle-org/syntra-rs` main implements the reviewed proposal; its local results
+are implementation evidence, not executed `CONF-SCW-*` verdicts, independent
+interoperability or independent security review.
 
 ## 2. Motivation
 
@@ -45,17 +54,17 @@ footprint, lower CPU use, or better network latency. The tradeoffs
 include server-side secret storage, authenticated server-key provisioning,
 credential lifecycle management, and a new interoperable wire contract.
 
-## 3. Proposal
+## 3. Accepted contract and owners
 
-Proposed requirements are owned by these companion drafts:
+Accepted requirements are owned by these companion documents:
 
-| Concern | Owning proposal | Requirement family |
+| Concern | Owning document | Requirement family |
 |---|---|---|
 | Shared secure channel | [secure-channel.md](../specifications/security/secure-channel.md) | `SNTR-SC-*` |
 | Persistent authorization | [device-authorization.md](../specifications/security/device-authorization.md) | `SNTR-DAUTH-*` |
-| Carrier mappings | [noise-bindings.md](../specifications/transports/noise-bindings.md) | references the two families above |
-| Policy rationale | [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md) | proposed amendment to ADR-008 |
-| Verification | [acceptance plan](../conformance/plans/secure-channel.md) and [implementation evidence](../docs/sc1-implementation.md) | planned conformance work and separately scoped executed implementation tests |
+| Carrier mapping | [noise-bindings.md](../specifications/transports/noise-bindings.md) | `SNTR-SCW-*` |
+| Policy rationale | [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md) | accepted amendment to ADR-008 |
+| Verification | [registered cases](../conformance/manifest/sc1-wss.yaml) and [acceptance plan](../conformance/plans/secure-channel.md) | `CONF-SCW-*`; registration is not execution |
 
 ### Client and host obligations
 
@@ -269,8 +278,10 @@ No raw secrets or attacker-controlled private diagnostics belong in errors.
 ## 8. Test plan and acceptance criteria
 
 The [acceptance plan](../conformance/plans/secure-channel.md) traces every
-proposed requirement to planned positive and negative cases. No formal SC1
-`CONF-*` cases or profiles are registered. Separately, the
+proposed requirement to planned positive and negative cases. The accepted
+`SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are registered;
+registration is not execution, and no `CONF-*` verdict is claimed.
+Separately, the
 [implementation evidence ledger](../docs/sc1-implementation.md) records executed
 local unit, race and native-core tests and six Docker integration groups:
 TCP/WS/WSS × NK/NKpsk0. Those groups exercise echo, 64 KiB and near-1 MiB
@@ -336,41 +347,47 @@ before promoting this proposal to a production default.
 
 ### Open acceptance and delivery work
 
-1. Maintainer authorship/review assignment, policy amendment approval, and
-   explicit version/deprecation designation if required behavior is replaced.
-2. Authorized enrollment issuance/provisioning, durable storage/commit/receipt,
-   retry/idempotency, interrupted enrollment and rotation/crash/concurrency flows.
-3. Deployment revocation-propagation guarantees and independent validation of
-   lifecycle, resource, lifetime and cancellation assumptions.
-4. Complete UDP demux, counters/replay window, path validation, anti-amplification,
-   reliability and bounded fragmentation contract; UDP remains deferred.
-5. Independent deterministic vectors, cross-implementation interoperability,
-   full-composition threat analysis and independent security review.
-6. Accepted portable conformance cases and any separately approved profiles.
+1. Resolved by acceptance: maintainer decision, self-review disclosure and
+   policy disposition are recorded in §11.4. Any later replacement/removal of
+   existing TLS profiles still needs an explicit major-version/deprecation
+   decision.
+2. Host implementation obligation: authorized enrollment issuance/provisioning,
+   durable storage/commit/receipt, retry/idempotency, interrupted enrollment and
+   rotation/crash/concurrency flows. These are not supplied by the profile.
+3. Host/release evidence: deployment revocation-propagation guarantees and
+   independent validation of lifecycle, resource, lifetime and cancellation
+   assumptions.
+4. Deferred: complete UDP demux, counters/replay window, path validation,
+   anti-amplification, reliability and bounded fragmentation contract. UDP is
+   not part of `SNTR-SC1-WSS-V1`.
+5. Release gates: independent deterministic vectors, cross-implementation
+   interoperability, full-composition threat analysis and independent security
+   review.
+6. Resolved: `SNTR-SC1-WSS-V1` and `CONF-SCW-001`–`CONF-SCW-024` are registered.
+   Registration is not execution; no verdict is claimed.
 
-HTTP/HTTPS request-response is excluded from this SC1 implementation scope;
-existing profiles remain unchanged. In-memory measurements do not establish
-TLS-relative performance superiority. The evidence ledger owns detailed results
-and the remaining-work record.
+HTTP/HTTPS request-response is excluded from SC1; existing profiles remain
+unchanged. In-memory measurements do not establish TLS-relative performance
+superiority. Acceptance fixes the contract; items 2–5 remain host obligations
+or release gates. No production, interoperability or conformance claim follows
+from acceptance alone.
 
-Until these blockers are resolved, no production, interoperability, or full
-conformance claim follows from this RFC or its companion documents.
+## 11. Accepted interoperability contract (2026-10-29)
 
-## 11. Selected interoperability proposal (2026-10-28; not accepted)
-
-This section selects the target for review and takes precedence over conflicting
-experimental descriptions **within this proposal only**. It does not rewrite
-the evidence ledger, authorize shipping, or assert that either implementation
-already supports the selected bytes. [Governance](../GOVERNANCE.md) still owns
-acceptance. The mobile release target requires SC1 and the recovery profile;
-neither requirement turns a Core-only implementation into an SC1 implementation.
+This section is the accepted target and takes precedence over conflicting
+experimental descriptions in this RFC. It does not rewrite the historical
+evidence ledger, authorize a tag, or assert that every implementation supports
+the selected bytes. [Governance](../GOVERNANCE.md) and the
+[acceptance package](../docs/v1-acceptance-package.md) still own freeze and
+release decisions. The mobile release target requires SC1 and recovery; neither
+turns a Core-only implementation into an SC1 implementation.
 
 ### 11.1 Concrete mismatch and canonical context
 
 Source inspection at Rust commit `c6553185026e29ba28ae98e1b4c15f6c5100b3bd`
 and Go commit `7e2dc26aa5364839cf3177b2ce58299d9b98bc7c` found:
 
-| Concern | Rust local revision 1 | Go draft-1 | Selected proposal |
+| Concern | Rust local revision 1 | Go draft-1 | Accepted contract |
 |---|---|---|---|
 | Public prefix | `SNTRSC1L`, explicit revision | `syntra.sc1.draft1` | `syntra.sc1.v1` |
 | Mode | bootstrap 0, returning 1 | bootstrap 1, returning 2 | bootstrap 1, returning 2 |
@@ -383,7 +400,7 @@ These are observable incompatibilities, not a claim from a failed live test.
 Pinned sources: [Rust context](https://github.com/tinkle-org/syntra-rs/blob/c6553185026e29ba28ae98e1b4c15f6c5100b3bd/SC1.md)
 and [Go context](https://github.com/tinkle-org/syntra-go/blob/7e2dc26aa5364839cf3177b2ce58299d9b98bc7c/SC1.md).
 
-Let `S` be scope byte length. The proposed exact concatenation, with half-open
+Let `S` be scope byte length. The accepted exact concatenation, with half-open
 offsets, is:
 
 | Offset | Field | Encoding |
@@ -409,7 +426,7 @@ do not normalize or guess a legacy format.
 
 TCP retains u16BE lengths for every handshake/record. WS/WSS retain one binary
 message per handshake/record, without that prefix, with compression disabled.
-The proposed endpoint is `/syntra/v1/sc1/ws`, subprotocol `syntra.sc1.v1`;
+The accepted endpoint is `/syntra/v1/sc1/ws`, subprotocol `syntra.sc1.v1`;
 baseline `/syntra/v1/ws` and `syntra.v1` remain distinct. WSS uses carrier 3
 even behind a proxy only when the accepted proxy trust contract proves the
 external carrier. An untrusted forwarded header is insufficient. Initial public
@@ -461,7 +478,7 @@ overflow retires the enrollment rather than wrapping. Compromise recovery uses
 an independent trusted authority, not only the compromised secret. An initial
 implementation may use authenticated out-of-band provisioning, but it cannot
 claim an online issuance or seamless rotation workflow it has not implemented.
-The complete deployment contract and its execution remain acceptance gates.
+The complete deployment contract and its execution remain host/release gates.
 
 Host pin updates are independently authenticated, bounded sets with explicit
 activation, overlap, retirement and rollback prevention; the peer cannot teach
@@ -490,18 +507,66 @@ require independently derived Noise vectors with test-only static/ephemeral
 inputs, both role pairings and real sockets. No ciphertext is fabricated here.
 Public context lint is neither cryptographic validation nor conformance.
 
-On acceptance synchronize `security/secure-channel.md`,
+Acceptance synchronized `security/secure-channel.md`,
 `security/device-authorization.md`, `transports/noise-bindings.md`, ADR-011,
-requirement indexes and registered SC1 cases/profiles. Existing requirement
-traces are SNTR-SC-001 through SNTR-SC-015 and SNTR-DAUTH-001 through
-SNTR-DAUTH-010; allocate additional IDs at normative activation if necessary.
-Retain the implementation ledger as historical evidence, not the definition of
+ADR-008, the requirement indexes and the registered SC1 cases/profile.
+Requirement traces are `SNTR-SC-001`–`SNTR-SC-015`, `SNTR-DAUTH-001`–`SNTR-DAUTH-010`
+and `SNTR-SCW-001`–`SNTR-SCW-012`; cases are `CONF-SCW-001`–`CONF-SCW-024`.
+The implementation ledger remains historical evidence, not the definition of
 the new bytes. No core `.proto` field or baseline replacement is made here.
 
-Acceptance remains blocked on maintainer/security approvals, full lifecycle
-contracts, independent cryptographic vectors and composition review, and
-downstream execution. Selection is not acceptance and this section closes no
-interoperability verdict by inspection alone.
+### 11.4 Accepted decisions (2026-10-29)
+
+This section resolves the three carrier-policy questions and records the
+acceptance disposition. It is the normative SC1/WSS selection.
+
+**First authenticated envelope.** The first authenticated plaintext in each
+direction MUST begin with exactly one complete framed Syntra `ClientHello`.
+The envelope MAY span multiple Noise records. The record that completes it MUST
+end exactly at the hello boundary: no additional complete envelope and no
+partial trailing envelope are permitted in that record. The hello remains
+subject to the 1,048,576-byte serialized-frame limit and to bounded
+frame-assembly time/bytes. The host MUST validate the hello and apply current
+enrollment, same-principal and method policy before `ready` and before any
+protected effect. A replayed M1 or an unauthenticated record supplies no fresh
+confirmation. Violations terminate the channel natively and dispatch nothing.
+This decision removes the earlier ambiguity between a first *record* and a
+first *envelope*; it does not permit a second application frame before
+readiness.
+
+**Upgrade admission.** SC1/WSS uses endpoint `/syntra/v1/sc1/ws` and the exact
+case-sensitive subprotocol `syntra.sc1.v1`. The host MUST reject
+`Authorization` and `Cookie` request headers at the Upgrade, MUST NOT treat
+`Origin` or any forwarding header as authentication, and MUST NOT accept
+Syntra credentials in the request target or Upgrade headers. Compression is
+disabled. The client sends no Syntra credential in the Upgrade. The 101
+response, selected subprotocol, `Upgrade`/`Connection` tokens and
+`Sec-WebSocket-Accept` MUST be valid before SC1 bytes are accepted. Baseline
+WSS admission is not imported into SC1/WSS.
+
+**Deployment topology.** The initial permitted production topology is direct
+verified TLS 1.3 WSS termination by the host, with the separately provisioned
+Noise server pin and exact context. Proxy termination is deferred and MUST NOT
+be claimed until separately specified and tested; a forwarded header does not
+establish the external carrier. This amends RFC 0009 D4 as recorded in its
+§11.2 and does not authorize baseline WSS proxy assumptions.
+
+**Profile and requirements.** The accepted profile identifier is
+`SNTR-SC1-WSS-V1`. Carrier-specific normative requirements are
+`SNTR-SCW-001`–`SNTR-SCW-012` in
+[noise-bindings.md](../specifications/transports/noise-bindings.md). Baseline
+WSS profiles, identifiers and frame mappings are unchanged; an SC1 pass does
+not certify them, and a baseline WSS pass does not certify SC1.
+
+**Acceptance disposition.** Accepted by the sole active maintainer under
+RFC 0009 D2, with self-approval disclosed. Security review is self-review of
+the selected construction and owner documents; independent human composition
+review remains a release gate. Compatibility is additive: a new secure profile
+with no Protobuf field, baseline-profile or existing-claim change. Mandatory
+replacement or removal of TLS profiles still requires a major-version decision.
+Independent cryptographic vectors, both-role/mode interoperability, mobile and
+recovery evidence, direct-topology tests and independent review remain
+release gates under RFC 0009 D5. Acceptance does not authorize a tag.
 
 ## Appendix: References
 

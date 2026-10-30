@@ -37,9 +37,9 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-RPL-014** — Class 5 (duplicate events): initiators MUST tolerate duplicates (see `events.md` SNTR-EVENT-007/008, `reliability.md` SNTR-REL-005); hosts SHOULD minimize them but MAY emit them under replay/recovery/reconnect. Duplicates MUST NOT be treated as protocol violations and MUST NOT trigger error storms.
 
-### Proposed channel replay defenses (informative)
+### Accepted channel replay defenses (informative)
 
-[Draft RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
 adds a [channel-record and handshake replay review](secure-channel.md),
 separate from the five application replay classes above. Returning NKpsk0
 uses a persistent shared AK, but each attempt has fresh ephemeral keys,
