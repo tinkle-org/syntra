@@ -1,0 +1,480 @@
+CHANGELOG.md
+  s_91cd93ef1c98f8::t_8f2b98d8c0e10c 22-36,40-67
+RELEASE.md
+  s_4e9bc3c1038fc7::t_f67bb4cf8623c7 44-51
+  s_4e9bc3c1038fc7::t_a2d537d5aa554e 87-90
+  s_4e9bc3c1038fc7::t_f5818d12a3447f 101-103
+  s_4e9bc3c1038fc7::t_e3afbad80f6e41 32-33
+  s_4e9bc3c1038fc7::t_c9fcab1eca08ab 167-176,178-204,206-212
+  s_91cd93ef1c98f8::t_640e5cece48f59 166,177,205
+conformance/claims.md
+  s_4e9bc3c1038fc7::t_906f971e4087f7 6-16,20-24
+specifications/core/handshake.md
+  s_b0a1889bc508a9::t_abc6ff205d4f2e 253
+  s_b0a1889bc508a9::t_bb0fd9e3a0624c 64
+  s_b0a1889bc508a9::t_33529eaed4d049 77
+  s_b0a1889bc508a9::t_b980b6d129bb35 152-153
+  s_b0a1889bc508a9::t_8d6bc418810f5e 239
+  s_91cd93ef1c98f8::t_de3d957f6b6267 50
+  s_b0a1889bc508a9::t_994709bf9c2f49 113
+  s_b0a1889bc508a9::t_66cbaf498bdc2e 161
+  s_b0a1889bc508a9::t_b4eec6275e7a8b 79
+  s_b0a1889bc508a9::t_8e90fd49a58343 203
+  s_b0a1889bc508a9::t_0cab9502b45186 80
+  s_b0a1889bc508a9::t_3bb3700f2558d1 52
+  s_b0a1889bc508a9::t_ddd8aa7a578da6 120
+  s_b0a1889bc508a9::t_f09c3cec68211c 70
+  s_b0a1889bc508a9::t_fb64576410b34b 121
+  s_b0a1889bc508a9::t_d6b3d4a873f427 171
+  s_b0a1889bc508a9::t_2ffc7b072919f8 215-227
+  s_b0a1889bc508a9::t_8be75ce65a9edf 48
+  s_91cd93ef1c98f8::t_ec25c0bb9d7232 115
+  s_b0a1889bc508a9::t_edb1d59119cf25 85
+  s_b0a1889bc508a9::t_525f2cfb0b7e2b 104
+  s_91cd93ef1c98f8::t_f2f4caefc12448 228
+specifications/core/protocol.md
+  s_0e72dcafc6e17d::t_bc02c994d88700 33-34
+  s_0e72dcafc6e17d::t_768aefac74b82c 55
+  s_7dad73cff9f651::t_898fcb7348d138 75
+  s_0e72dcafc6e17d::t_2b54ea89134e4e 26
+  s_7dad73cff9f651::t_23265e0d8c528e 69
+docs/mobile-v1-delivery.md
+  s_91cd93ef1c98f8::t_3cf5a1600812f7 4-13,53
+  s_91cd93ef1c98f8::t_1a7af81b8db639 38-46
+conformance/recovery_profile/README.md
+  s_4960d2eba12166::t_d34c4f4f3f87a3 5-7,10-12,16-18,26-32,40-43,47-48,52,54-56,58-62,64,73-89
+specifications/core/errors.md
+  s_b0a1889bc508a9::t_a925dbee7f2339 74
+  s_b0a1889bc508a9::t_1be675782efe59 37
+  s_b0a1889bc508a9::t_c21c685efde20b 9
+  s_b0a1889bc508a9::t_843f3365c06703 57
+  s_b0a1889bc508a9::t_e68663f2d8640d 96-105
+  s_b0a1889bc508a9::t_cb4e4ccbc6e3f3 93-94
+  s_b0a1889bc508a9::t_7728aa7c95e0e0 31
+  s_b0a1889bc508a9::t_a81501fdd7994b 132
+  s_91cd93ef1c98f8::t_e59e09bfc819d4 95
+MIGRATION.md
+  s_91cd93ef1c98f8::t_6429960dedd4f6 20,468-515
+  s_91cd93ef1c98f8::t_113fe434ad6f2c 18,21-23
+  s_91cd93ef1c98f8::t_ef2271e4887667 19
+specifications/transports/http.md
+  s_7dad73cff9f651::t_8fe0ddd507ce8c 250
+  s_0e72dcafc6e17d::t_a68eba7e53319e 525-528,530-534
+  s_7dad73cff9f651::t_ed6ece1aaba922 254
+  s_7dad73cff9f651::t_ed1df555366e9a 501-503,506
+  s_7dad73cff9f651::t_c4cd0b85752a2c 504-505
+  s_0e72dcafc6e17d::t_cb5198364cbb86 332,334-338
+  s_7dad73cff9f651::t_20522712a91a3b 251
+  s_91cd93ef1c98f8::t_42039bfe366b6c 529
+  s_7dad73cff9f651::t_cf582ebd3f2b1b 245
+rfcs/0001-public-idl-layout.md
+  s_91cd93ef1c98f8::t_c029a76b8425e0 242-248
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5-6,10,23-25,27-30,224-241
+  s_91cd93ef1c98f8::t_fe29ae527bdb5f 115
+conformance/plans/secure-channel.md
+  s_6bd983f82ebd1d::t_5df705aadf4f62 23-26
+  s_91cd93ef1c98f8::t_46a5507e2f80d7 27-33,775-781
+  s_6bd983f82ebd1d::t_d7de34a8a35355 562-565,575-772,782-798,800-847
+  s_91cd93ef1c98f8::t_2260707951aa0c 568-572
+  s_91cd93ef1c98f8::t_31e1374e763ce7 566-567,573-574,799
+  s_6bd983f82ebd1d::t_bceb6df5a0b44b 8-9
+specifications/security/authentication-security.md
+  s_91cd93ef1c98f8::t_0a887d2cc6822c 145-146,148-149,152-156
+  s_1c811e88d1275c::t_e4c64a96a51652 22
+docs/implementer-guide.md
+  s_91cd93ef1c98f8::t_ec25c0bb9d7232 62-67
+  s_91cd93ef1c98f8::t_dae63f10050ccc 128
+  s_91cd93ef1c98f8::t_e1095384ad6eb1 57-61
+rfcs/0005-negotiation-bounds-identifiers.md
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5,9-10,339-362
+conformance/plans/update-recovery.md
+  s_7dad73cff9f651::t_0f5c4a0453f964 3,9
+  s_7dad73cff9f651::t_96745608279e9f 4-5,10
+  s_91cd93ef1c98f8::t_4d2c5f04243d7e 6
+conformance/manifest/recovery.yaml
+  s_91cd93ef1c98f8::t_fc626e1a464352 96,236,287
+  s_4960d2eba12166::t_98f49a778e4f51 271
+  s_91cd93ef1c98f8::t_58dd1a1d6df30f 31,161
+  s_4960d2eba12166::t_c9c1bb1797a450 1-16,23,39,50,53,65,68,73-74,79-83,86,92,99-100,103,108-109,115-116,119,133-134,137,142,149,152,157,167,169-170,173,178-179,184-187,190,195-235,237-270,272-286,288-298,303-305
+  s_91cd93ef1c98f8::t_bdb1588b2a96a3 29-30,35-36,158-160,162,168
+specifications/core/framing.md
+  s_7dad73cff9f651::t_4d402a2c37db89 49
+  s_0e72dcafc6e17d::t_627da1c35c2a84 50
+  s_0e72dcafc6e17d::t_17a6e502eefc80 41
+  s_0e72dcafc6e17d::t_0c9812006e1614 67
+  s_0e72dcafc6e17d::t_3c31eb7951075b 27
+  s_0e72dcafc6e17d::t_284f935e376824 37
+  s_7dad73cff9f651::t_2d919346239e76 59
+specifications/security/open-questions.md
+  s_6bd983f82ebd1d::t_2933ac8c566d56 103-116,119
+  s_6bd983f82ebd1d::t_8b242bfa9644f3 20
+  s_6bd983f82ebd1d::t_c429372017d53f 13-19,21
+  s_6bd983f82ebd1d::t_9b3811ed3bf336 42-48
+  s_6bd983f82ebd1d::t_abcfb54365e212 117-118
+specifications/schema/README.md
+  s_7dad73cff9f651::t_9480a7087ce99f 10-26
+specifications/core/open-questions.md
+  s_0e72dcafc6e17d::t_69d2bb9eb28198 11-16,26-27
+specifications/core/requirements.md
+  s_0e72dcafc6e17d::t_e2627e8b4d26cf 16
+specifications/architecture.md
+  s_0e72dcafc6e17d::t_14c88c7d96248b 293,304
+  s_0e72dcafc6e17d::t_bc7e447e8eeaf1 228-230
+  s_0e72dcafc6e17d::t_b936b7a09f25d6 205-207,209-211
+  s_0e72dcafc6e17d::t_a8bc8f64b5297f 294-303
+  s_0e72dcafc6e17d::t_d9cd99ced767a9 231-232
+specifications/security/replay-protection.md
+  s_1c811e88d1275c::t_7f3827574fd6e1 78
+  s_1c811e88d1275c::t_27776a334488ce 34
+  s_1c811e88d1275c::t_6f4d00576181bf 90
+rfcs/0010-sc1-host-authorization-lifecycle.md
+  s_91cd93ef1c98f8::t_e631b597093a61 7-8
+  s_6bd983f82ebd1d::t_e91f570fff0ac4 261
+  s_6bd983f82ebd1d::t_eebcad07416cfe 54-56
+  s_6bd983f82ebd1d::t_fefc097af2fa70 653-658
+  s_91cd93ef1c98f8::t_87b045dd51c947 619-622,675-681,698-700,702-703,705-706,785,808-810
+  s_6bd983f82ebd1d::t_04a3c1b12ada54 1-4,9-18,20-53,57-64,67-96,98-202,204-260,262-523,526-542,548,553-597,599-603,605-606,610-618,628-652,659-661,666-674,682-697,701,704,707-714,717,729,747-752,758-769,773-784,786-804,807,811-812
+  s_6bd983f82ebd1d::t_5240963206914f 203
+  s_6bd983f82ebd1d::t_4acfde841838e7 715-716,718-721
+  s_6bd983f82ebd1d::t_c020fba8b71059 662-665
+  s_6bd983f82ebd1d::t_2193adce74b9e2 524-525
+  s_6bd983f82ebd1d::t_4bd08efc63d264 65-66
+  s_6bd983f82ebd1d::t_61a10d46797911 543-547,549-552
+  s_6bd983f82ebd1d::t_486c6436ab6996 604,607-609
+  s_6bd983f82ebd1d::t_c317e562a22a16 805-806
+  s_6bd983f82ebd1d::t_030afa48b6c928 722-728,730-746
+  s_91cd93ef1c98f8::t_42a44e60b1319c 97
+  s_91cd93ef1c98f8::t_fe29ae527bdb5f 5,19
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 6
+  s_6bd983f82ebd1d::t_348929e6ab18a3 598
+  s_6bd983f82ebd1d::t_76962a48dd38f1 753-757
+  s_6bd983f82ebd1d::t_4c1b343ed30df6 770-772
+  s_91cd93ef1c98f8::t_ed4be7e8b3bb35 623-627
+rfcs/0004-correlation-identity-carriage.md
+  s_91cd93ef1c98f8::t_4b7bd84790bb52 1
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5,9-10,349-371
+  s_91cd93ef1c98f8::t_c2e7780f2b8719 12-22
+  s_91cd93ef1c98f8::t_15528898ca3e8c 11
+rfcs/0008-mobile-lifecycle-and-v1-acceptance.md
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5-6,10,12-19,283-296
+rfcs/0006-update-recovery-profile.md
+  s_91cd93ef1c98f8::t_1d9b15107b6943 443
+  s_91cd93ef1c98f8::t_04f75431dd0b4d 5,9,11
+  s_91cd93ef1c98f8::t_56ea7676ff5a38 237-244,246
+  s_91cd93ef1c98f8::t_cca88ef91f0e8a 1402-1405,1417-1423,1425-1430,1432,1434-1447,1449-1459
+  s_91cd93ef1c98f8::t_9bc5e620c9a50c 1053-1062,1066-1067,1075,1077-1082
+  s_91cd93ef1c98f8::t_25e58d0928ce7c 968,970-972
+  s_91cd93ef1c98f8::t_920c17dd68eddf 404-413,415,417,421-424
+  s_91cd93ef1c98f8::t_091bdaf9b9e1e9 290-292
+  s_91cd93ef1c98f8::t_d3e36bd621f238 550-551,556-558,560-573
+  s_91cd93ef1c98f8::t_04861ce04c22eb 127-133,136-143,145
+  s_91cd93ef1c98f8::t_d9618827943912 585,587-588
+  s_91cd93ef1c98f8::t_df74b62abc8d84 534
+  s_91cd93ef1c98f8::t_e360691a649968 864-868,898-913,939-940,943-945
+  s_91cd93ef1c98f8::t_c622e412ce8f7c 426-429
+  s_91cd93ef1c98f8::t_2a1ffcfc51758d 418-419
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 6,13-19
+  s_91cd93ef1c98f8::t_68299a4590cd9d 1093-1108
+  s_91cd93ef1c98f8::t_4183c5aa15f90f 144
+  s_91cd93ef1c98f8::t_9712373f37b5ff 169-177,181-186
+  s_91cd93ef1c98f8::t_84ebaf452adf78 1424,1431,1433
+  s_91cd93ef1c98f8::t_488b4f902aafc9 1139-1144
+  s_91cd93ef1c98f8::t_81166d3a706372 1448
+  s_91cd93ef1c98f8::t_a5667a9185d9f8 21-28
+  s_91cd93ef1c98f8::t_148a51e298dfb7 949-953,955-956
+  s_91cd93ef1c98f8::t_2fefdffef40067 320-352
+  s_91cd93ef1c98f8::t_6173d01aeb8113 1110,1122,1149,1184,1235,1258,1316,1345,1369,1399
+  s_91cd93ef1c98f8::t_a4a61a33462450 445
+  s_91cd93ef1c98f8::t_4d2c5f04243d7e 640
+  s_91cd93ef1c98f8::t_d2ccc494c9f169 542-548
+  s_91cd93ef1c98f8::t_545a3e9223bbcf 1085-1086
+  s_91cd93ef1c98f8::t_c56b568b3f84d3 474,482-483,490
+  s_91cd93ef1c98f8::t_1ebe9e16777fbc 512-516
+  s_91cd93ef1c98f8::t_cbb931d5523364 245
+  s_91cd93ef1c98f8::t_0463b460fcc77e 612-613,616-619,621-622,634-636,638-639,641-642
+  s_91cd93ef1c98f8::t_ae5088fcb1839d 1046
+  s_91cd93ef1c98f8::t_9c605f0dafeb45 353-361,363-372,377-380,383-390,393,396-402
+  s_91cd93ef1c98f8::t_7e5158464321a6 448,450-451,456-457
+  s_91cd93ef1c98f8::t_50fd7d82bed2cf 994
+  s_91cd93ef1c98f8::t_7b059583d749b2 1112-1118
+  s_91cd93ef1c98f8::t_57421418666639 12,20,425,1109,1111
+specifications/security/device-authorization.md
+  s_6bd983f82ebd1d::t_ce0a18a14d3c20 6-8,10-11,20-22
+  s_91cd93ef1c98f8::t_9e05c559f4b4d6 445-449
+  s_6bd983f82ebd1d::t_9812b1ba7400cf 564-567
+  s_6bd983f82ebd1d::t_703ddb7e250c5b 173-302,314-364,368-380,386-444,450-545
+  s_6bd983f82ebd1d::t_d15f6fdcbd6408 303-313
+  s_6bd983f82ebd1d::t_d473610ed45d5c 365-367,381-385
+rfcs/0003-handshake-failure-signaling.md
+  s_91cd93ef1c98f8::t_c2e7780f2b8719 1,12-22
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5,9-10,244-265
+  s_91cd93ef1c98f8::t_08d4cec6522d46 11
+docs/building-on-syntra.md
+  s_91cd93ef1c98f8::t_ec25c0bb9d7232 78
+rfcs/0002-auth-session-lifecycle.md
+  s_91cd93ef1c98f8::t_4b4d21f8685eba 5-6,10,14-22,137-155
+  s_91cd93ef1c98f8::t_84ebaf452adf78 156
+  s_91cd93ef1c98f8::t_8a714dbb12fe1f 120-122
+  s_91cd93ef1c98f8::t_b870671a3042ff 96-102
+specifications/core/authentication.md
+  s_1c811e88d1275c::t_4c8c92b00ca8c1 52
+  s_7dad73cff9f651::t_f69204bf539a97 139-141
+  s_1c811e88d1275c::t_16f8135c5dca97 50
+  s_1c811e88d1275c::t_123b7ac49c9208 66
+  s_7dad73cff9f651::t_6818932b8f39ad 64
+  s_1c811e88d1275c::t_963e9f787a21e1 9
+  s_1c811e88d1275c::t_fec8452fd7a9d1 110
+  s_1c811e88d1275c::t_ae4141458545a4 95
+specifications/security/requirements.md
+  s_7dad73cff9f651::t_df7143fcff0399 44-48
+  s_7dad73cff9f651::t_d79b18502e2084 52
+  s_7dad73cff9f651::t_5cad5771fd4e0c 34-35
+specifications/profiles/recovery.md
+  s_91cd93ef1c98f8::t_84ebaf452adf78 338
+  s_4960d2eba12166::t_ec57683611b7f2 4-6,10,12,18,20-21,23,32,38,41,43,51,55,59,61,63,65,67,71,73,75,77,79,81,83,85,87,89,93,99,101,104-106,108,110,112,114,116,118,120,122,124,126,130,132,138,140,142,144,151-163,168,170,172-179,185-186,188-197,199-203,206,208,210,212,214,216,218,220,222,224,226-228,235-249,252,254,259,262-266,268-280,284,294,296,298,310,312,314-316,319,321,325,327
+  s_4960d2eba12166::t_387ac8efa626e7 339
+  s_91cd93ef1c98f8::t_4d2c5f04243d7e 7,9,16,288,337
+  s_91cd93ef1c98f8::t_35500697e5e753 17
+SESSION-OPEN-QUESTIONS.md
+  s_4e9bc3c1038fc7::t_047496d807ebc7 80-81
+  s_4e9bc3c1038fc7::t_1a33b2ab36b512 96-99
+  s_4e9bc3c1038fc7::t_5d1a2549d3fd23 39,41-45,52-57
+  s_4e9bc3c1038fc7::t_1aae2b759b567e 61-62,64-75,78-79,82
+  s_4e9bc3c1038fc7::t_664286111b2b59 3-9,15,17-19,23-33
+  s_4e9bc3c1038fc7::t_224f0451c8767a 110-139
+specifications/core/events.md
+  s_b0a1889bc508a9::t_13c845eb0d2ed5 23
+  s_b0a1889bc508a9::t_b4c57f7a5c49ff 126
+  s_b0a1889bc508a9::t_b50c542bbdb9a1 194
+conformance/manifest/schema.yaml
+  s_4960d2eba12166::t_f4c65504d01ec2 46
+  s_4960d2eba12166::t_096540c9f6e18c 92
+  s_91cd93ef1c98f8::t_81e9baaa2424de 47-50,93-97
+specifications/core/sessions.md
+  s_1c811e88d1275c::t_89eac6a4ea8a37 151-154
+  s_1c811e88d1275c::t_8673170cdab422 160
+  s_1c811e88d1275c::t_3ced1bf6a8e8b8 120-121
+  s_7dad73cff9f651::t_29b818722e18cd 106-108
+  s_1c811e88d1275c::t_c6f0edb2ff2a5c 125
+  s_7dad73cff9f651::t_f1c7aef2a1766f 188
+  s_1c811e88d1275c::t_185a3be6dead91 72
+specifications/schema/reference.md
+  s_0e72dcafc6e17d::t_ea8a34a5ede514 79
+  s_0e72dcafc6e17d::t_b43c251dab894d 243-257
+  s_0e72dcafc6e17d::t_fb5d38eee24e25 187
+  s_0e72dcafc6e17d::t_00c373484fe7d9 10
+  s_91cd93ef1c98f8::t_42039bfe366b6c 60
+  s_0e72dcafc6e17d::t_64a23e78970cc4 227-229
+  s_0e72dcafc6e17d::t_653240ac2b69ed 89
+  s_0e72dcafc6e17d::t_259b3b6b6fb3c3 207
+  s_0e72dcafc6e17d::t_4e3e9339f67808 6
+  s_0e72dcafc6e17d::t_4efef2941a745d 37-43
+  s_0e72dcafc6e17d::t_f58c07b45a0f2e 68
+  s_0e72dcafc6e17d::t_047ffd362df5db 77
+  s_0e72dcafc6e17d::t_4362fbc5fa1314 3
+  s_0e72dcafc6e17d::t_51837737a1da11 16,29
+  s_0e72dcafc6e17d::t_eb154ce5c1286f 138
+  s_0e72dcafc6e17d::t_e8e10e1ae4433a 168
+  s_0e72dcafc6e17d::t_e827630cd79fb0 234-235
+  s_0e72dcafc6e17d::t_60144749185924 237,239
+  s_0e72dcafc6e17d::t_7b03e58aff5a29 150
+  s_0e72dcafc6e17d::t_db78978410c71f 159
+  s_0e72dcafc6e17d::t_95eb0e25f89aab 210
+  s_0e72dcafc6e17d::t_152abfa1af9688 27
+specifications/core/rpc.md
+  s_b0a1889bc508a9::t_b931f8d0fe635b 101-103,108-109
+  s_b0a1889bc508a9::t_caf28f1491ac14 31
+  s_b0a1889bc508a9::t_a6bf8547042dc5 152
+  s_b0a1889bc508a9::t_45c92a460dc658 17
+  s_b0a1889bc508a9::t_e5273da14b06e5 160
+  s_b0a1889bc508a9::t_f473d2d94f34c6 87,89
+  s_b0a1889bc508a9::t_e876a1c9343367 164
+  s_b0a1889bc508a9::t_992fdbf63e35ab 21
+  s_b0a1889bc508a9::t_bee230fffc6372 165
+  s_b0a1889bc508a9::t_a22e3dfef519d0 175
+  s_b0a1889bc508a9::t_45538f6462e32e 187
+  s_b0a1889bc508a9::t_57c0aabc6cfb10 91
+  s_b0a1889bc508a9::t_bc7574672c6d63 48,50-52,54-56,59
+  s_91cd93ef1c98f8::t_de3d957f6b6267 75
+specifications/security/threat-model.md
+  s_6bd983f82ebd1d::t_c37d1be3c7525c 125-152
+conformance/profiles.yaml
+  s_4960d2eba12166::t_fd9cc0eaf33563 56
+  s_4960d2eba12166::t_0e32b9cd371c2c 7-10
+conformance/manifest/requirements.yaml
+  s_91cd93ef1c98f8::t_c5f3ff952178d0 1058,1063
+  s_4e9bc3c1038fc7::t_9920d6e9f50213 1045-1057,1059-1062,1064-1076
+  s_4960d2eba12166::t_dfd08c2b795058 998-1044
+specifications/core/capabilities.md
+  s_0e72dcafc6e17d::t_eba3ae51b226c7 76-81
+  s_0e72dcafc6e17d::t_7c6a58e6c10b79 37-42
+  s_0e72dcafc6e17d::t_0e03bfec2ab324 17-19
+  s_0e72dcafc6e17d::t_82188a60e4ce37 8
+conformance/manifest/sc1-wss.yaml
+  s_91cd93ef1c98f8::t_7beb827fa002e8 506-507,515,610,751,755-756,758,766-827,829-849
+  s_4e9bc3c1038fc7::t_841839911bdb24 508-514
+  s_4e9bc3c1038fc7::t_bae7a995248b32 679-680
+  s_91cd93ef1c98f8::t_2260707951aa0c 491-494
+  s_4e9bc3c1038fc7::t_029bfb4d85ae87 4-9
+  s_4e9bc3c1038fc7::t_bb4adad2cf6664 486-490,495-505,516-609,611-678,681-750,752-754,757,759-765
+  s_91cd93ef1c98f8::t_c5f3ff952178d0 828
+specifications/core/conformance.md
+  s_4e9bc3c1038fc7::t_54abd47261d07e 35
+specifications/security/README.md
+  s_7dad73cff9f651::t_70f30134cebbac 38
+  s_7dad73cff9f651::t_8308ee2d47435f 59-63
+docs/v1-acceptance-package.md
+  s_91cd93ef1c98f8::t_2c89584922ff70 132,141
+  s_4e9bc3c1038fc7::t_527b6259e8d18a 61-70,72-75
+  s_91cd93ef1c98f8::t_640ffd5f1cf439 30-31,35-38
+  s_4e9bc3c1038fc7::t_0b38bbaeb0bd0d 150-153
+  s_4e9bc3c1038fc7::t_ace0bade48727b 92-95
+  s_91cd93ef1c98f8::t_84ebaf452adf78 149
+  s_4e9bc3c1038fc7::t_d1c3221cf88a43 59-60
+  s_4e9bc3c1038fc7::t_a4a0547a5bcb31 124,126-127,136-140,142-148
+  s_4e9bc3c1038fc7::t_30d11400c8193c 79-85
+  s_4e9bc3c1038fc7::t_300929c867e567 3-4,6-12,24-26,28-29,34
+docs/decision-record-template.md
+  s_91cd93ef1c98f8::t_71e7526a7275dc 4-9
+specifications/schema/validation.md
+  s_7dad73cff9f651::t_3eadf1d377f68a 100-102
+  s_7dad73cff9f651::t_a3fdefbb5e9894 117,119-126,131-141
+  s_7dad73cff9f651::t_c292c83ddac16d 90-98
+  s_91cd93ef1c98f8::t_a950f094a4825b 99
+docs/server-implementation.md
+  s_91cd93ef1c98f8::t_ec25c0bb9d7232 44-50
+  s_91cd93ef1c98f8::t_9e4958d979b6f8 33-34,36-41
+docs/client-implementation.md
+  s_91cd93ef1c98f8::t_ec25c0bb9d7232 42-44,48-51
+  s_91cd93ef1c98f8::t_689a9fd631b79d 33-41
+audits/v1-release-readiness.md
+  s_4e9bc3c1038fc7::t_fcec7b89195678 48-51,54-57,59
+  s_91cd93ef1c98f8::t_2c89584922ff70 52,99
+  s_4e9bc3c1038fc7::t_6d32d34d74985d 130-135
+  s_4e9bc3c1038fc7::t_4f9fe2c0b56488 136-138
+  s_4e9bc3c1038fc7::t_9e119ce23fac40 123-129,139
+  s_4e9bc3c1038fc7::t_3cf551e96e0e85 72-81,83
+  s_4e9bc3c1038fc7::t_0c53c2cd50c52e 10-20,27-42
+  s_4e9bc3c1038fc7::t_1ae1a0dee56f3d 93-94,98,102-114
+proto/syntra/v1/recovery_profile.proto
+  s_4960d2eba12166::t_54258bb4c3455e 233-245,252-255
+  s_91cd93ef1c98f8::t_4b7bd84790bb52 189-192
+  s_4960d2eba12166::t_8670f93ced783f 263-269
+  s_4960d2eba12166::t_fd9ab2d300b422 423-433
+  s_4960d2eba12166::t_fdfcbc9425ed9a 501-505
+  s_4960d2eba12166::t_200539899a6f3f 449-460,462-463
+  s_4960d2eba12166::t_07b3a42bd64baf 528,531-532
+  s_4960d2eba12166::t_06b29b41f50fa9 461
+  s_4960d2eba12166::t_f011635f4bd81f 78-79
+  s_4960d2eba12166::t_b378f3c4693caf 354-360
+  s_4960d2eba12166::t_ba7f0380fd2654 557-560,565-567
+  s_4960d2eba12166::t_b4b755bde40143 287-288
+  s_4960d2eba12166::t_a89485e1b6c6dc 143-149
+  s_4960d2eba12166::t_348af182517135 484-487
+  s_4960d2eba12166::t_9d060535508e82 124-130
+  s_4960d2eba12166::t_962f1c7370b5bd 325-330
+  s_4960d2eba12166::t_f95ac0ed770240 439-441
+  s_4960d2eba12166::t_ea19fe612de9c7 529-530
+  s_4960d2eba12166::t_5ce853a763c314 11-21,24-40
+  s_4960d2eba12166::t_120bb2d2d887a4 541-547
+  s_4960d2eba12166::t_a69b416526c0dc 304-310
+  s_4960d2eba12166::t_296a8deaea0200 384-387
+  s_4960d2eba12166::t_5ce9d31e552cbe 188
+specifications/core/versioning.md
+  s_1c811e88d1275c::t_7afef4d11299e5 28
+  s_91cd93ef1c98f8::t_9e4958d979b6f8 22
+  s_1c811e88d1275c::t_948085179d534c 48
+docs/decisions/0002-sdd-acceptance-wave.md
+  s_91cd93ef1c98f8::t_a8374aa294a6c1 1-16,19-221
+  s_91cd93ef1c98f8::t_5c7cf902801eec 17-18
+scripts/validate-repo.py
+  s_91cd93ef1c98f8::t_81e9baaa2424de 34-38,228-230,278-279
+  s_4960d2eba12166::t_7ee652541e945f 726-727
+  s_4960d2eba12166::t_929836a51680ac 33,39-43
+conformance/README.md
+  s_7dad73cff9f651::t_9738a65775195b 126
+  s_7dad73cff9f651::t_0cbf2732c5b1c6 154-160
+  s_7dad73cff9f651::t_2018901fcef1eb 229-230
+conformance/recovery_profile/recovery.md
+  s_4960d2eba12166::t_73174435fba1f7 1,7-10,14,18-29,31,33-63,71,73,76,79,81,83,86,89,91,93-96,99,101,103-106,109,111,113-116,119,121,123,126,129,131,133-136,139,143-146,149,151,153-156,159,161,163-226,229,238-247,249-252,255-258,260-261,268-284
+  s_4960d2eba12166::t_7a059faea9a3f4 259
+  s_4960d2eba12166::t_19a166346b6bfb 141
+  s_91cd93ef1c98f8::t_4d2c5f04243d7e 13
+  s_91cd93ef1c98f8::t_fc626e1a464352 65-66,69
+specifications/core/serialization.md
+  s_0e72dcafc6e17d::t_d4767877adc4a4 19-27
+  s_0e72dcafc6e17d::t_95c529f607397a 37
+  s_0e72dcafc6e17d::t_4612a7df4fd1ba 39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "87b3e6edae6ee68a73bfd6b89b609154858d7212",
+  "prompts": {},
+  "sessions": {
+    "s_0e72dcafc6e17d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74a77808ffehuygZOch2UR5Dl",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_1c811e88d1275c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74a7eeabffeg0aQ9YMXz7sY7h",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_4960d2eba12166": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74a8ae8dffe820K3ZZ6ZtO4Jv",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_4e9bc3c1038fc7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e747a8b9dffet2Pt9NJSvZR14Q",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_6bd983f82ebd1d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74a93e82ffeOZgFE3Kb50OPOj",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_7dad73cff9f651": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e748f4748ffe3DSoNw1sHm2sIF",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    },
+    "s_91cd93ef1c98f8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74cd95e5ffef82r3VnmMmZU2D",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_b0a1889bc508a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e74a83776ffe7L89blXZFvYL7O",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": null
+    }
+  }
+}
