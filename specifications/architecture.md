@@ -50,6 +50,17 @@ Neutral examples used throughout this project: `echo`, `get`/`put` on a
 generic key/value service, and subscription to a generic event topic.
 These examples illustrate mechanics only and impose no data model.
 
+An optional standardized recovery profile belongs to Syntra's **negotiated
+extension layer**, not to mandatory core framing. Under the accepted RFC 0009
+release scope, the selected first stable bundle will include the RFC 0006
+recovery profile once its separate behavior and schema contracts are accepted.
+The host/provider supplies authorized, generic ordered-stream data and
+replay/snapshot bindings; applications supply their own content semantics,
+entity state, persistence and idempotency fences. This overview does not
+activate the currently Draft recovery rules, prescribe a universal host event
+feed or make recovery a mandatory capability for Core-only peers.
+See the [recovery boundary rationale](../docs/recovery-profile-boundary.md).
+
 ### Accepted secure-channel profile
 
 [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and

@@ -14,9 +14,10 @@
 Current decision package: RFCs 0003–0005 select core/HTTP/bounds proposals,
 RFC 0006 §11 selects required update-recovery corrections, RFC 0007 §11
 selects canonical SC1 migration, and [RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md)
-selects mobile lifecycle/parser/resource behavior. All remain Draft. Historical
-references to approvals in this document are not evidence of acceptance of
-those proposals. Logical-session resumption remains deferred and distinct from
+selects mobile lifecycle/parser/resource behavior. RFC 0007 and
+RFC 0009 are now Accepted; RFCs 0001–0006 and 0008 remain Draft.
+Historical references to proposals in this document are not evidence of
+acceptance of the remaining draft contracts. Logical-session resumption remains deferred and distinct from
 required durable update recovery; no new core session identifier is introduced.
 
 ## 1. Summary

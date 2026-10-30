@@ -29,18 +29,20 @@ here. No production secrets or private infrastructure are prerequisites.
 
 The selected first increment is specification-only, with SC1 over verified WSS
 as the initial production release target rather than certification of all
-baseline transports. A sole active maintainer needs an explicit governance
-transition, not an invented second approval. [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-proposes that transition and the exact scope; the
-[acceptance package](v1-acceptance-package.md) maps the follow-up changes.
-Current quorum, baseline profile meanings and release gates remain unchanged
-until the applicable decisions and owner edits are recorded.
+baseline transports. The sole-maintainer governance transition and first stable bundle were
+accepted under [RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md),
+with public owner ratification in [Decision 0001](decisions/0001-bootstrap-ratification.md).
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
+ADR-011 are also accepted; other RFC decisions remain separate. The
+[acceptance package](v1-acceptance-package.md) maps pending owner edits
+and review gates. The selected [generic recovery profile](recovery-profile-boundary.md)
+remains Syntra-owned and post-ACTIVE negotiated, not mandatory Core wire.
 
 ## Dependency-ordered work and exit criteria
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
-| 0. Approval process | RFC 0009 governance/scope proposal and decision-record format; actual owner ratification/roster and authorized process edits next | Verifiable public transition or existing quorum; no retroactive protocol/security approval |
+| 0. Approval process | **Completed:** RFC 0009 governance, owner ratification, roster and WSS-first bundle scope | Public [Decision 0001](decisions/0001-bootstrap-ratification.md); this does not retroactively approve other draft RFCs |
 | 1. Decisions | RFCs 0001–0005 core/parser/identity/bounds; RFC 0006 recovery amendment; RFC 0007 canonical SC1; RFC 0008 mobile lifecycle | Explicit compatibility designation, protocol/security reviews, maintainer acceptance |
 | 2. Normative activation | Synchronize owning specifications, authorized schema edits, permanent requirement IDs, profile/case definitions and positive/negative fixtures | No contradictory owner text; structural/Buf checks pass; reviewed requirement-to-case mapping |
 | 3. Downstream alignment | Both independent implementations pin the same accepted revision; generated types refreshed where authorized; TDD fixes and host-policy/lifecycle examples | Package/runtime/adapter/security tests; ABI/mobile builds and bridge lifecycle tests where applicable |
@@ -56,9 +58,9 @@ guidance, supported-profile claims and measured limitations.
 ## SC1 interoperability status
 
 The earlier Rust local-revision-1 and Go draft-1 formats were incompatible in
-context, mode values, prologue and WS subprotocol. RFC 0007 §11.4 now fixes the
-canonical `syntra.sc1.v1` format, and the Rust implementation at
-`tinkle-org/syntra-rs` main (`50ca849`) implements that proposal. No legacy
+context, mode values, prologue and WS subprotocol. Accepted RFC 0007 §11.4 fixes the
+canonical `syntra.sc1.v1` format, and the Rust implementation merged
+PR #15 to `tinkle-org/syntra-rs` main (`73f9775`) targeting that accepted profile. No legacy
 identifier is an alias. Independent pure-Go/Rust execution in both roles and
 both modes remains outstanding; same-implementation passes do not close it.
 
@@ -82,8 +84,9 @@ cryptography and service-specific semantics do not become Syntra requirements.
 
 ## Current evidence limits
 
-This change supplies selected proposals, planned acceptance scenarios and public
-context fixture lint. It does not supply accepted normative owner edits,
-registered SC1 cases, a cryptographic vector corpus, downstream wire alignment,
-mobile execution, independent security approval or interoperability PASS.
-Actual validation commands and results are recorded in the readiness audit.
+The accepted SC1/WSS owner and its 24 registered cases now exist; that
+registration is not execution. Other core/recovery/mobile owner edits remain
+Draft. Public SC1 fixtures establish context encoding, not independent Noise
+ciphertext verification. Go/Rust interop, mobile execution, host lifecycle
+and independent security review remain unproven. The readiness audit separates
+historical structural checks from current source state.

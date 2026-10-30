@@ -53,8 +53,8 @@ Related: [`GOVERNANCE.md`](GOVERNANCE.md) (who approves what),
 
 ## 3. Proposing a change
 
-1. Search existing [Issues](https://github.com/tinklehq/syntra/issues)
-   and [RFCs](https://github.com/tinklehq/syntra/pulls) (use the `rfc`
+1. Search existing [Issues](https://github.com/tinkle-org/syntra/issues)
+   and [RFCs](https://github.com/tinkle-org/syntra/pulls) (use the `rfc`
    label where applied) to avoid duplicates.
 2. For normative work: copy `rfcs/template.md` to
    `rfcs/NNNN-short-title.md` (see `rfcs/README.md`) and open a PR

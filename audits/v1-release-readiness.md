@@ -1,6 +1,7 @@
 # Syntra v1 release readiness — current assessment
 
-Date: 2026-10-28. Scope: current specification-only repository and selected
+Assessment refreshed: 2026-10-30 from accepted specification and merged implementation source state; historical test commands were not rerun.
+Scope: current specification-only repository and selected
 mobile v1 target. Overall verdict: **BLOCKED**. This is not a tag, maintainer
 approval, conformance declaration or independent security certification.
 The [October 19 snapshot](history/v1-release-readiness-2026-10-19.md) is retained
@@ -9,22 +10,29 @@ do not override current sources.
 
 ## Selected target and authority
 
-The user selected SC1 and standardized update recovery as required release
-deliverables. Core-only interoperability is still valid for its own claim but
-does not complete this target. [RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md)
-and the [delivery record](../docs/mobile-v1-delivery.md) define the proposed
-dependency order. RFCs 0001–0008 remain Draft and ADR-011 remains Proposed.
-Selected alternatives are not accepted normative changes: real reviewers,
-maintainer quorum, security review and explicit compatibility designation are
-still required by [governance](../GOVERNANCE.md).
+The first stable bundle requires SC1/WSS, standardized update recovery and
+applicable mobile lifecycle evidence. Recovery is a **Syntra-owned, optional,
+post-ACTIVE negotiated profile** required for this specific release bundle;
+a Core-only conformance claim remains valid on its own terms. [RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
+accepted this release scope and the one-active-maintainer governance transition;
+the public ratification and roster are [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md)
+and [MAINTAINERS.md](../MAINTAINERS.md).
 
-Planning update (2026-10-29): [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-proposes public owner-ratified bootstrap governance and the exact SC1/WSS-first
-stable scope. The [acceptance package](../docs/v1-acceptance-package.md) and
-[decision-record template](../docs/decision-record-template.md) prepare the
-next approval/activation work. No transition, RFC acceptance, independent review,
-wire/profile change or release authorization is recorded by those proposals.
-The BLOCKED verdict and historical verification record below are unchanged.
+[RFC 0007](../rfcs/0007-secure-channel-device-authorization.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+are **Accepted**; canonical `syntra.sc1.v1` on verified direct TLS 1.3 WSS
+has an accepted owner contract and registered `SNTR-SC1-WSS-V1` profile
+(`CONF-SCW-001`–`024`). Those registrations are not executable PASS results.
+The Rust implementation merged [PR #15](https://github.com/tinkle-org/syntra-rs/pull/15)
+to `main` at `73f9775043ba2625a823f5cca3fbe92cdf345293` and documents
+partial case coverage; no independent Go/Rust interop verdict follows.
+
+RFCs 0001–0006 and 0008 remain Draft and need separate decisions and
+synchronized owner/schema/conformance edits. No draft behavior becomes
+normative merely because it exists in Rust. The [acceptance package](../docs/v1-acceptance-package.md)
+and [recovery placement rationale](../docs/recovery-profile-boundary.md)
+identify the remaining review decisions. **Overall BLOCKED** refers to
+the selected stable release, not to the already accepted SC1 specification.
 
 ## Current area assessment
 
@@ -36,12 +44,12 @@ The BLOCKED verdict and historical verification record below are unchanged.
 | Negotiation/bounds | BLOCKED | RFC 0005 selects RFC 0006 negotiation, concrete bounds and serialized-byte fixture correction; owning clauses/cases not synchronized before acceptance |
 | Schema tooling | STRUCTURAL PASS ONLY | Buf format/lint/build/FILE and 13 schema tests pass; no schema edits. Legacy `go_package` remains; its proposed downstream path needs explicit FILE/source migration |
 | Baseline profile identifiers | CONSISTENT | Current transport specs/suite agree: `SNTR-HTTP-V1`, `SNTR-WS-V1`, `SNTR-WSS-H1-V1`; no alias/rename needed |
-| SC1 | BLOCKED | Rust local-1 and Go draft-1 have different context/prologue/mode/carrier/subprotocol bytes. RFC 0007 §11 selects a new contract; downstream alignment, Noise vectors, independent sockets and security review pending |
+| SC1 | SPEC ACCEPTED / RELEASE BLOCKED | RFC 0007/ADR-011 accepted; `SNTR-SC1-WSS-V1` and 24 cases registered. Rust merged canonical v1. Full case execution, independently derived Noise vectors, Go/Rust interop and external security review remain pending |
 | Authorization lifecycle | BLOCKED | Same-principal/current-enrollment gate, provisioning/rotation crash contracts, pins, fail-closed store behavior and verified deployment revocation bounds still need acceptance and execution |
 | Update recovery | BLOCKED | Required target: RFC 0006 §11 selects fresh rounds, local overflow isolation, scoped generations, snapshot and durable state/checkpoint semantics; owner/IDL synchronization and independent crash tests pending |
 | Mobile/runtime bounds | BLOCKED | RFC 0008 selects suspension/queue deadlines, connection generations, reconnect, active-execution accounting and bounded drain; downstream/mobile implementation tests pending |
-| Transport/proxy security | BLOCKED | Initial public target SC1/WSS retains verified TLS; every claimed carrier and at least one accepted proxy topology require applicable independent tests; no new raw public transport exception |
-| Conformance/interop | BLOCKED | CI validates definitions/vectors, not complete IUT runs. Registered suite unchanged; no SC1 profiles activated and no independent results added |
+| Transport/proxy security | SC1 DIRECT TOPOLOGY ACCEPTED / DEPLOYMENT BLOCKED | Accepted initial public topology is direct verified TLS 1.3 WSS termination at the host. Proxy termination is deferred, not an initial-release requirement; accepted topology deployment evidence remains pending |
+| Conformance/interop | BLOCKED | Structural checks register 24 SC1/WSS cases but do not execute them. Independent SC1, recovery, mobile and Go/Rust results are not established |
 | Operational/mobile assurance | BLOCKED | Declared budgets and iOS/Android lifecycle, weak-network, idle-cost and soak evidence required; simulated/compile evidence alone insufficient |
 | License | PRESENT | Apache-2.0 LICENSE present and full-text regression test passes |
 | Distribution | CURRENT MODEL DOCUMENTED | Document/schema-provenance releases via release-please Git tags; language artifacts downstream. BSR schema publication/GHCR gates retired, not open blockers |
@@ -73,9 +81,10 @@ reconciliation and automatic mutation replay. Required update recovery is not
 among the deferrals. Classical SC1 makes no post-quantum or application-E2EE
 claim. Every future supported feature needs its own accepted contract/evidence.
 
-## Verification record for this branch
+## Historical verification record (2026-10-28; not rerun here)
 
-Executed locally in this repository during this change:
+The following was executed during the earlier audit change, not on this
+2026-10-30 documentation refresh:
 
 | Command | Result | What it establishes |
 |---|---|---|
@@ -87,12 +96,23 @@ The new context test first failed with the fixture absent, then passed after
 the public JSON was added. It checks exact context/prologue bytes, mode/carrier
 coverage and negative-recipe traceability. It does not execute negative peer
 rejections, Noise operations, or a transport. No schema baseline/generator
-output was changed. These are structural results, not 141 executed peer cases.
+output was changed. These are historical structural results, not 141 executed peer cases.
 
 Not executed: downstream Rust/Go alignment, deterministic Noise generation,
 live bidirectional interoperability, deployment lifecycle/proxy/revocation tests,
 mobile bridge/device tests, performance/soak or an independent external security
 review. Specialist proposal review is advisory, not independent release approval.
+
+## Latest known repository state (not an execution rerun)
+
+At SDD `main` commit `0e8b0f8a4a789cb3d6d00b993e281867d2325e06`,
+the merged PR #18 reports successful repository validation with **555 requirement
+definitions/rows, 164 registered cases and 206 checked documents**. These
+figures supersede the preceding snapshot for current *definitions*, but do
+not establish that this documentation change reran those commands. The 164
+cases include 24 SC1/WSS cases; no formal implementation verdict is implied.
+The separately merged Rust `main` commit `73f9775` reports local test
+evidence in its implementation ledger, not independent cross-language proof.
 
 ## Remaining release sequence
 
@@ -108,5 +128,5 @@ review. Specialist proposal review is advisory, not independent release approval
 5. Complete security review and mobile/operational gates, then finalize guides,
    declaration/profile claims and maintainer-authorized release notes.
 
-No tag, commit, push, production release or conformance verdict is created by
-this assessment.
+This assessment does not authorize a stable tag, assert a conformance verdict,
+or replace the required public maintainer and security review records.

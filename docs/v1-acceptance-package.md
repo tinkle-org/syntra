@@ -3,7 +3,9 @@
 Status: active work plan. Governance, RFC 0009 and RFC 0007/SC1 are accepted;
 core, recovery and release-scope work remains in progress. This is not a
 specification freeze or release approval.
-Baseline: `94404d7378136d8b6c88ece28bf945c88d1653ba`. Scope is
+Current accepted SDD baseline: `0e8b0f8a4a789cb3d6d00b993e281867d2325e06`.
+Earlier proposal-review baseline: `94404d7378136d8b6c88ece28bf945c88d1653ba`.
+Scope is
 specification-first, canonical SC1 over verified WSS first, standardized update
 recovery and applicable mobile lifecycle. One active maintainer is the public
 roster; the bootstrap ratification is
@@ -24,10 +26,45 @@ and direct-TLS topology are activated in the owning security/transport docs.
 case specifications in [`sc1-wss.yaml`](../conformance/manifest/sc1-wss.yaml).
 Registration is not execution.
 
-RFCs 0001, 0003, 0004, 0005, 0006 and 0008 remain Draft. Their owning
+RFCs 0001–0006 and 0008 remain Draft. Their owning
 specifications still contain the conflicting text identified below; no core,
 recovery or mobile activation is claimed. The schema source migration, evidence
 tooling, freeze and stable promotion are also outstanding.
+
+## Selected recovery ownership (Option A)
+
+The initial release retains the standardized, explicitly negotiated
+`syntra.update-recovery/1` profile **inside Syntra**. This is already the
+accepted RFC 0009 release scope. Recovery is optional for Core-only peers,
+but required to claim the selected stable release bundle. It is not a new
+mandatory `Frame` variant and does not make Syntra own application objects,
+database transactions, content-specific APIs, or a universal server update feed.
+Generic host/provider adapters supply authorized stream histories and snapshot
+bindings; the application controls domain semantics and durable effects.
+[RFC 0006](../rfcs/0006-update-recovery-profile.md) §11 remains a Draft
+behavioral proposal pending its own acceptance. See [recovery/profile
+boundary](recovery-profile-boundary.md) for the design rationale and external
+precedent distinction.
+
+## RFC decision triage — specification acceptance, not Rust readiness
+
+| RFC | Current status | Recommendation before normative acceptance |
+|---|---|---|
+| 0001 — IDL/parser | Draft | Retain resolved `proto/syntra/v1` layout; settle raw-wire B1–B8/B10 via 0003/0004/0005/0008, then reconcile owners and fixtures |
+| 0002 — auth/session | Draft | Clarify current baseline and formally retain or supersede overlapping draft decisions; no pre-ACTIVE mechanism or session resumption is assumed |
+| 0003 — handshake | Draft; **acceptance candidate** | Review failure carrier, pre-ACTIVE behavior, version mismatch, phase timers and owner/case activation |
+| 0004 — RPC identity/races | Draft; **acceptance candidate** | Review monotonic emission IDs, fatal high-water reuse, terminal/deadline precedence and RFC 0008 clock coupling |
+| 0005 — negotiation/bounds | Draft | Resolve recovery negotiation and per-profile bounds; separate unrelated Go FILE/source migration decision |
+| 0006 — recovery | Draft; selected inclusion | Consolidate §11 over conflicting earlier text, adopt P/S/G and fresh handles, validate durable and snapshot crash safety; keep negotiated optional wire behavior |
+| 0007 — SC1 | Accepted | No new design approval; implementation conformance, issuance/revocation integration and independent security review are separate |
+| 0008 — mobile/runtime | Draft | Align terminal clock with 0004, raw validator with 0001 and resource/shutdown evidence with 0005 |
+| 0009 — governance/bundle | Accepted | No new scope vote needed unless the selected bundle changes |
+
+No table entry accepts a draft RFC by implication. A public owner decision
+under current [governance](../GOVERNANCE.md) §3, the security review,
+compatibility disposition and synchronized owning files are still required.
+A specification may be accepted before Rust implementation or independent
+interop; a stable release may not claim unexecuted evidence.
 
 ## Dependency-ordered follow-up changes
 
@@ -51,8 +88,8 @@ inferred from a registered case.
 Increments 1 and 5 have landed at the SC1 scope recorded here. Increment 2 is
 partial: RFC 0009 and RFC 0007 are accepted; RFCs 0001/0003/0004/0005/0006/0008
 still need their own decisions. Increments 3, 4 and 6–9 remain open. The Rust
-implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
-reviewed SC1 proposal; its local evidence does not close the registered cases,
+implementation at `tinkle-org/syntra-rs` main (`73f9775`, merged PR #15)
+implements the accepted SC1 profile; its local evidence does not close the registered cases,
 independent interoperability or release gates.
 
 ## Specific tooling and consistency work
@@ -109,7 +146,8 @@ Executed locally on 2026-10-29 using Python 3.14.7 and Buf 1.59.0:
 | `python3 -m unittest discover -s tests -p 'test_*.py' -v` | Passed: all four existing tests | License and proposed public SC1 context-fixture lint, not cryptographic execution |
 | `git diff --check` | Passed | Tracked-diff whitespace checks; new documents also covered by repository Markdown validation |
 
-No public ratification, normative acceptance, independent security approval,
-Go/Rust execution, mobile-device run, commit, push or release was performed
-as part of this verification. Decision-record negative checks in RFC 0009
-remain planned human/tooling acceptance work; no machine validator was added.
+That **historical** 2026-10-29 verification did not include the subsequently
+merged public ratification or RFC 0007 acceptance. The current accepted status
+is recorded above. No commands were rerun as part of the 2026-10-30
+source-state refresh; independent security/interop and release claims remain
+unexecuted. Decision-record negative checks remain pending tooling work.

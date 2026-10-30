@@ -1031,6 +1031,30 @@ capability-gated recovery placeholders. No new release-bundle profile ID is
 invented. Formal release-scope approval belongs to maintainers; other release
 work, including RFC 0008, Core, and SC1, retains its own decision process.
 
+### 11.1A Architecture decision and inspiration (informative)
+
+**Selected placement for review: Option A.** The accepted RFC 0009 initial
+bundle includes a Syntra-owned, standardized update/recovery profile.
+Its *wire capability remains optional and per-connection negotiated*;
+mandatory Core framing and opaque application payload semantics are unchanged.
+The final recovery behavioral contract is **not accepted by this selection**.
+The profile defines generic stream/checkpoint continuity, bounded replay,
+recovery completion, snapshot transfer and persistence/confirmation interfaces.
+An embedding provider supplies authorized history and snapshot bindings,
+and an application owns durable effects, domain content and idempotency
+semantics. It is not a promise of a universal server-generated update feed.
+
+The comparison with Telegram is **functional inspiration, not identical
+protocol-layer placement**: Telegram's `updates.getDifference` and
+`updates.getChannelDifference` are application API methods above MTProto,
+whereas this proposal intentionally specifies a generic optional Syntra
+extension. Matrix `/sync` is another example of application-level
+incremental state delivery, not evidence that generic transports are required
+to define recovery. See [recovery boundary rationale](../docs/recovery-profile-boundary.md)
+and the publicly documented
+[Telegram update recovery](https://core.telegram.org/api/updates) and
+[Matrix sync API](https://spec.matrix.org/latest/client-server-api/#syncing).
+
 ### 11.2 Identity and generation scope
 
 Proposed replacement for `SYN-URP-003`, `006`, `012`, `013`, `019`, `026`:

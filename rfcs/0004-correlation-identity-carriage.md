@@ -346,8 +346,10 @@ non-execution or automatic retry safety.
 | D5 | Credentials per profile; no implicit principal replacement | Unapproved |
 
 1. **TBD — blocker:** assign actual owner/author and protocol/security reviewers.
-2. **TBD — blocker:** two maintainer approvals, security review, and resolution
-   of normative objections under governance §3.
+2. **TBD — blocker:** public approval under the active roster in
+   `MAINTAINERS.md` and `GOVERNANCE.md` §3 (disclose sole-maintainer
+   self-approval where applicable), security review, and resolution of
+   normative objections.
 3. **TBD — blocker:** explicit pre-stable freeze/version and migration decision
    for correlation, duplicate handling, race semantics, and queue timer changes.
 4. **TBD — blocker:** review synchronized §4/RFC 0008 admission/receipt clocks,

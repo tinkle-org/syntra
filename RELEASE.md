@@ -40,10 +40,14 @@ initial permitted topology is direct TLS termination by the host; proxy
 termination is deferred.
 
 The accepted first stable bundle is SC1/WSS, standardized recovery and
-applicable mobile lifecycle evidence. Baseline transports remain independently
+applicable mobile lifecycle evidence. Recovery remains Syntra-owned as an
+explicitly negotiated, optional-on-wire profile (RFC 0006 still Draft),
+required for the selected release bundle but not for Core-only claims.
+The [profile boundary rationale](docs/recovery-profile-boundary.md) does
+not change any currently accepted wire/schema rule. Baseline transports remain independently
 claimable but are not all required for the initial bundle. The Rust
-implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
-reviewed proposal; its local evidence does not execute the registered
+implementation at `tinkle-org/syntra-rs` main (`73f9775`, merged PR #15)
+targets the accepted SC1 profile; its local evidence does not execute the registered
 `CONF-SCW-*` cases or close independent interoperability, recovery, mobile,
 topology or security-review gates. Host policy must independently verify root
 identity, current enrollment and same-principal admission before `ready`.

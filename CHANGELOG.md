@@ -22,6 +22,11 @@ development, changes land under `Unreleased`.
 
 ### Changed
 
+- Reconciled v1 readiness and release documentation with the accepted
+  RFC 0007/0009 state and merged Rust PR #15, without claiming execution.
+- Reaffirmed Syntra ownership of the optional negotiated recovery profile
+  required by the initial stable bundle, documenting its application boundary
+  and correcting outdated RFC approval/SC1 source-state references.
 - Replaced the experimental `syntra.sc1.draft1` carrier documentation with the
   accepted v1 WSS mapping. Draft-1 and local-revision-1 remain historical and
   are not aliases.

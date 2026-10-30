@@ -241,8 +241,10 @@ Independent budgets add configuration that reviewers must check together.
 | D4 | Core timer starts after profile establishment; setup budget separate | Unapproved |
 
 1. **TBD — blocker:** assign actual author/owner and protocol/security reviewers.
-2. **TBD — blocker:** record two maintainer approvals, security review, and
-   resolution of normative objections; selected text is not acceptance.
+2. **TBD — blocker:** record explicit approval under the active roster in
+   `MAINTAINERS.md` and `GOVERNANCE.md` §3 (one active maintainer may
+   self-approve with public disclosure), security review, and resolution
+   of normative objections; selected text is not acceptance.
 3. **TBD — blocker:** record the pre-stable freeze/version and migration decision
    in §6, including the changed remote-reporting promise and WS timeout mapping.
 4. **TBD — blocker:** reconcile the forthcoming RFC 0008 queue/suspend clock
