@@ -210,7 +210,9 @@ local regression coverage, not a container matrix case. Same-library Noise
 checks, same-implementation Docker peers, native-core tests and independent
 wire interoperability are different evidence.
 
-No formal SC1 `CONF-*` cases or active profiles are registered. The
+The accepted `SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are
+registered; registration is not execution, and no `CONF-*` verdict is
+claimed. The
 [acceptance plan](../conformance/plans/secure-channel.md) maps this executed
 implementation evidence separately from portable acceptance cases and their
 remaining verification work.

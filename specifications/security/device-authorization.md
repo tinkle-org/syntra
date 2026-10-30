@@ -180,5 +180,6 @@ cross-carrier separation and trusted authentication integration. The evidence
 ledger separately records executed local and same-implementation integration
 tests with their limited scope. Enrollment and rotation execution, independent
 vectors/interoperability, deployment certification and independent security
-review are not established by those results. No formal SC1 `CONF-*` cases or
-profiles are registered.
+review are not established by those results. The accepted
+`SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are registered;
+registration is not execution, and no `CONF-*` verdict is claimed.

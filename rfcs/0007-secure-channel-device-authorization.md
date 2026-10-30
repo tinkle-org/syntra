@@ -278,8 +278,10 @@ No raw secrets or attacker-controlled private diagnostics belong in errors.
 ## 8. Test plan and acceptance criteria
 
 The [acceptance plan](../conformance/plans/secure-channel.md) traces every
-proposed requirement to planned positive and negative cases. No formal SC1
-`CONF-*` cases or profiles are registered. Separately, the
+proposed requirement to planned positive and negative cases. The accepted
+`SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are registered;
+registration is not execution, and no `CONF-*` verdict is claimed.
+Separately, the
 [implementation evidence ledger](../docs/sc1-implementation.md) records executed
 local unit, race and native-core tests and six Docker integration groups:
 TCP/WS/WSS × NK/NKpsk0. Those groups exercise echo, 64 KiB and near-1 MiB
