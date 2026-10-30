@@ -20,7 +20,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-EVENT-004** — Subscription lifecycle: subscriptions are established ONLY via generic RPC after ACTIVE, modified/cancelled via generic RPC (or `cancel` of the subscribing RPC if the subscription is bound to it — application-defined and documented). Host termination of a subscription MUST be signaled by an application-defined terminal event or RPC error, never by silent cessation, except on connection loss.
 
-**SNTR-EVENT-005** — Emission rules: hosts MUST NOT emit `notification` before ACTIVE or after CLOSING; initiators MUST ignore-or-reject (per negotiated stream spec, default: ignore with diagnostic) pre-ACTIVE notifications without failing the handshake. `notification` MUST use `request_id == 0` and MUST NOT complete any RPC.
+**SNTR-EVENT-005** — Emission rules: hosts MUST NOT emit `notification` before ACTIVE or after CLOSING. A `notification` received while the connection is pre-ACTIVE (CONNECTED/NEGOTIATING/AUTHENTICATING) is a protocol violation: the initiator MUST fail the handshake by fail-close (per `handshake.md` SNTR-HS-012 and accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) D2) — it records a local `FAILED_PRECONDITION`, discards the notification without application delivery, proceeds to CLOSING→CLOSED, and MUST NOT queue the event for later delivery nor treat it as establishing a subscription. `notification` MUST use `request_id == 0` and MUST NOT complete any RPC.
 
 **SNTR-EVENT-006** — Ordering scope: the core guarantees NO cross-stream ordering and NO cross-connection ordering. Within one connection, `notification`s from one subscription SHOULD preserve send order where the transport preserves order (TCP/TLS/WS); where it does not (HTTP bindings), order is undefined unless the stream spec adds sequence metadata in the payload. Applications needing order MUST embed sequence data in payloads.
 
@@ -123,7 +123,7 @@ A stream specification MAY define application-level confirmation inside payloads
 
 ## 4. Failure handling
 
-Pre-ACTIVE event → ignore + diagnostic (initiator) / protocol violation (host sending). Unknown stream → `UNIMPLEMENTED`. Expired cursor → `FAILED_PRECONDITION` or `NOT_FOUND` (application-defined, documented). Overload → `RESOURCE_EXHAUSTED` on subscribe or documented drop policy for live streams.
+Pre-ACTIVE event → protocol violation + handshake failure (both directions context: a host sending one is a host-side violation; an initiator receiving one is an initiator-detected violation → local `FAILED_PRECONDITION`, fail-close per `handshake.md`/accepted RFC 0003 D2 — no delivery, no queueing). Unknown stream → `UNIMPLEMENTED`. Expired cursor → `FAILED_PRECONDITION` or `NOT_FOUND` (application-defined, documented). Overload → `RESOURCE_EXHAUSTED` on subscribe or documented drop policy for live streams.
 
 ## 1I. Replay (capability-gated; no core replay store)
 
@@ -191,7 +191,7 @@ New stream types are additive capabilities. Changing default delivery (e.g., to 
 
 ## 7. Conformance requirements
 
-- **SNTR-EVENT-900** — Fixtures: no-stream host rejects subscribe with `UNIMPLEMENTED`; subscribe→events→cancel lifecycle with generic payloads; pre-ACTIVE notification ignored; duplicate tolerance; reconnect requires re-subscribe; cursor expiry mapping.
+- **SNTR-EVENT-900** — Fixtures: no-stream host rejects subscribe with `UNIMPLEMENTED`; subscribe→events→cancel lifecycle with generic payloads; pre-ACTIVE notification MUST be rejected by fail-close — the fixture asserts the handshake failure (local `FAILED_PRECONDITION`, CLOSING/CLOSED, no delivery, no subscription state; accepted RFC 0003 D2); duplicate tolerance; reconnect requires re-subscribe; cursor expiry mapping.
 - **SNTR-EVENT-901** — Generic-proof: fixtures MUST use neutral payloads (e.g., `{"seq":N, "data":"..."}` as opaque bytes) and MUST NOT reference chat/typing/domain types. No fixture uses chat updates, message delivery/read receipts, presence, or typing events.
 
 ## 8. Sequence diagrams (views of §1; no new behavior)

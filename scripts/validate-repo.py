@@ -30,9 +30,17 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = []
 
-REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+\b|\bSYN-ARCH-\d+\b")
-REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+)$")
-BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+)\b")
+REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+\b|\bSYN-ARCH-\d+\b|\bSYN-URP-\d+\b")
+# Naming pattern for structured references (manifest rows, defined IDs).
+# Prose mentions keep the freeform REQ_PATTERN below. Reserved SYN-URP-008/009
+# are excluded from structured naming and rejected explicitly by the checks.
+REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+"
+                       r"|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$")
+BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+|SYN-URP-\d+)\b")
+# Reserved recovery IDs (RFC 0006): SYN-URP-008/009 stay unassigned and are
+# intentionally NOT registered in requirements.yaml, but the conversation and
+# schema text may mention them as reserved.
+RESERVED_REQUIREMENTS = {"SYN-URP-008", "SYN-URP-009"}
 # Directories that are tool output, vendored deps, or agent config — never
 # normative content. Markdown/link checks are scoped to repository content.
 # Specification-first policy: no implementation code and no generated language
@@ -217,6 +225,9 @@ def check_requirements():
         seen_ids.add(rid)
         if not REQ_NAMING.match(rid or ""):
             err("conformance/manifest/requirements.yaml", f"bad requirement_id format: {rid}")
+        if rid in RESERVED_REQUIREMENTS:
+            err("conformance/manifest/requirements.yaml",
+                f"requirement_id {rid} is reserved and MUST NOT be registered")
         if rid not in defined:
             err("conformance/manifest/requirements.yaml",
                 f"requirement_id {rid} has no bold definition in specifications/")
@@ -264,6 +275,8 @@ def check_manifests():
                                for p in profiles):
             err(mf, f"case {cid} references unknown profile {case.get('profile')}")
         for r in case.get("requirement", []) or []:
+            if r in RESERVED_REQUIREMENTS:
+                err(mf, f"case {cid} references reserved requirement {r}")
             if r not in req_ids:
                 err(mf, f"case {cid} references unknown requirement {r}")
             if not REQ_NAMING.match(r):
@@ -710,6 +723,8 @@ def check_links():
             continue
         in_scope = str(rel).startswith(REF_EXISTENCE_SCOPE)
         for m in REQ_PATTERN.finditer(text):
+            if m.group(0) in RESERVED_REQUIREMENTS:
+                continue
             if m.group(0) not in defined and in_scope:
                 err(rel, f"references undefined requirement {m.group(0)}")
         for m in PROFILE_PATTERN.finditer(text):

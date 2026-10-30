@@ -1,9 +1,15 @@
 # v1 specification acceptance package
 
-Status: active work plan. Governance, RFC 0009 and RFC 0007/SC1 are accepted;
-core, recovery and release-scope work remains in progress. This is not a
+Status: active work plan. Governance, RFCs 0001–0010 and ADR-011 are accepted;
+execution, freeze and release-scope work remains in progress. This is not a
 specification freeze or release approval.
-Baseline: `94404d7378136d8b6c88ece28bf945c88d1653ba`. Scope is
+Baseline: `94404d7378136d8b6c88ece28bf945c88d1653ba` (2026-10-29 working tree),
+with the acceptance wave reviewed against `0e8b0f8`. Approved revisions: RFC
+0007 and RFC 0009 accepted 2026-10-29; RFCs 0001, 0002, 0003, 0004, 0005, 0006,
+0008 and 0010 accepted 2026-10-30 via
+[Decision 0002](decisions/0002-sdd-acceptance-wave.md), which applied the owner
+files and normalized the recovery manifest; RFC 0005 D5 (`go_package`) is
+explicitly deferred with a tracked FILE/source follow-up. Scope is
 specification-first, canonical SC1 over verified WSS first, standardized update
 recovery and applicable mobile lifecycle. One active maintainer is the public
 roster; the bootstrap ratification is
@@ -15,19 +21,21 @@ roster; the bootstrap ratification is
 accepted. The public bootstrap record, active roster, roster-based quorum and
 acceptance/freeze/release separation are in
 [`GOVERNANCE.md`](../GOVERNANCE.md), [`MAINTAINERS.md`](../MAINTAINERS.md) and
-[`CONTRIBUTING.md`](../CONTRIBUTING.md). [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md)
-and [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
+[`CONTRIBUTING.md`](../CONTRIBUTING.md). [RFC 0007](../rfcs/0007-secure-channel-device-authorization.md),
+[RFC 0010](../rfcs/0010-sc1-host-authorization-lifecycle.md) and
+[ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md)
 are accepted; the canonical v1 mapping, first-envelope rule, Upgrade admission
-and direct-TLS topology are activated in the owning security/transport docs.
+and direct-TLS topology are activated in the owning security/transport docs,
+and RFC 0010's lifecycle contract `SNTR-DAUTH-011`–`024` is active in
+`device-authorization.md` §5, normative now that RFC 0008 is accepted via
+Decision 0002 along with RFC 0010's lifecycle contracts already noted above.
 `SNTR-SC1-WSS-V1` is registered in
 [`conformance/profiles.yaml`](../conformance/profiles.yaml) with executable
-case specifications in [`sc1-wss.yaml`](../conformance/manifest/sc1-wss.yaml).
-Registration is not execution.
-
-RFCs 0001, 0003, 0004, 0005, 0006 and 0008 remain Draft. Their owning
-specifications still contain the conflicting text identified below; no core,
-recovery or mobile activation is claimed. The schema source migration, evidence
-tooling, freeze and stable promotion are also outstanding.
+case specifications in [`sc1-wss.yaml`](../conformance/manifest/sc1-wss.yaml)
+(`CONF-SCW-025`–`042` including the registered lifecycle rows). Registration
+is not execution: no core, recovery or mobile execution result is claimed,
+no release approval is implied, and the schema source migration, evidence
+tooling, freeze and stable promotion remain outstanding gates.
 
 ## Dependency-ordered follow-up changes
 
@@ -48,28 +56,43 @@ inferred from a registered case.
 | 8. Freeze and handoff | Pin accepted specification/suite revision; update guides, migrations and readiness assessment; give Go/Rust exact implementation and execution tasks | No in-scope owner contradictions or undecided contracts; explicit unexecuted downstream gates |
 | 9. Stable promotion | Review independent pure-Go/Rust, mobile/operational, lifecycle and independent security evidence; authorize reviewed release notes/revision | All applicable selected gates pass; only then approve stable release configuration/tagging |
 
-Increments 1 and 5 have landed at the SC1 scope recorded here. Increment 2 is
-partial: RFC 0009 and RFC 0007 are accepted; RFCs 0001/0003/0004/0005/0006/0008
-still need their own decisions. Increments 3, 4 and 6–9 remain open. The Rust
+Increments 1–5 have landed through the recorded decisions. Increment 1 landed
+via [Decision 0001](decisions/0001-bootstrap-ratification.md). Decision 0002
+completed increment 2 (one accepted contract per RFC, with individual
+dispositions recorded for RFCs 0001, 0002, 0003, 0004, 0005, 0006, 0008 and
+0010), landed increment 3 (core/parser/mobile owning files activated; the
+RFC 0001, 0005 and 0008 contract set consolidated), increment 4 (RFC 0006
+owner/IDL-comment map applied, `CONF-URP` cases corrected to the §11
+shapes, `SYN-URP-*` requirement rows registered with 008/009 reserved) and
+increment 5 (SC1 canonical contract with RFC 0010 lifecycle requirements and
+the registered `CONF-SCW-025`–`038` planned rows). Increments 6–9 remain
+open: schema source migration (RFC 0005 D5 deferred), evidence tooling,
+specification freeze, stable promotion and release authorization. The Rust
 implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
-reviewed SC1 proposal; its local evidence does not close the registered cases,
-independent interoperability or release gates.
+reviewed SC1 proposal; the canonical-contract activation in Decision 0002
+replaced draft-1 alignment targets, and the implementation's local evidence
+does not close the registered cases, independent interoperability or release
+gates.
 
 ## Specific tooling and consistency work
 
-- Recovery already has an IDL and registered placeholder cases. Update them;
-  do not invent another envelope or replace their identities without trace.
-  The manifest schema and Python requirement patterns currently exclude the
-  recovery owner's `SYN-URP-*` family; extend them deliberately and register
-  the actual obligations, preserving reserved recovery requirement numbers.
+- Resolved: recovery's IDL and registered cases were reconciled to RFC 0006
+  §11 in the acceptance wave — owner/IDL-comment map applied, `CONF-URP`
+  cases corrected to the §11 shapes, and the manifest schema plus Python
+  requirement patterns extended to admit the recovery owner's `SYN-URP-*`
+  family (008/009 intentionally reserved and unassigned) with the actual
+  obligations registered. Preserved recovery requirement numbering; no new
+  envelope was invented and the existing case identities were kept.
 - Declarations already have PASS, FAIL, SKIP, UNSUPPORTED and NOT_EXECUTED.
   Add specification/implementation/suite provenance, evidence references and
   complete role/mode/case selection instead of creating a second verdict model.
 - RFC 0009 D4 scoped the two-transport proof: a claim may be made on one named
   transport profile, including SC1 scoped to `SNTR-SC1-WSS-V1`; a proof across
   two named transports is required only when a claim asserts transport
-  independence. Apply this scoped rule consistently across owners and selection
-  rules together.
+  independence. This scoped rule is accepted and applied in the claim docs
+  ([specifications/core/conformance.md](../specifications/core/conformance.md),
+  [conformance/claims.md](../conformance/claims.md)); keep it as the rule for
+  new owner documents.
 - The Go package change fails current FILE checks and exact-option schema
   tests. Its intentional source migration needs its own reviewed transition;
   keep STANDARD/FILE and immutable initial/historical evidence.
@@ -98,18 +121,34 @@ Validation commands and actual outcomes belong in the change's review record.
 The [readiness audit](../audits/v1-release-readiness.md) remains blocked until
 its required gates are actually complete; this work plan is not their closure.
 
-## First-increment verification record
+## Verification record
 
-Executed locally on 2026-10-29 using Python 3.14.7 and Buf 1.59.0:
+First-increment verification record, executed locally on 2026-10-29 using
+Python 3.14.7 and Buf 1.59.0:
 
 | Command | Actual result | Evidence scope |
 |---|---|---|
 | `python3 scripts/validate-repo.py all` | Passed: 543 requirement rows/definitions, 141 registered cases, 204 Markdown files checked | Requirement/manifest/vector/link/RFC/Markdown/boundary consistency only |
-| `python3 scripts/validate-schema.py` | Passed: format/lint/build/initial FILE gate and all 13 schema regression tests | Unchanged schema declarations and archived compatibility evidence |
+| `python3 scripts/validate-schema.py` | Passed: format/lint/build/initial FILE gate and all 13 schema regression tests | Unchanged schema declarations and archived compatibility evidence; executed against the current reviewed revision, covering the seven pinned initial files plus the documented eighth file `recovery_profile.proto` (MIGRATION.md §8 post-baseline addition) |
 | `python3 -m unittest discover -s tests -p 'test_*.py' -v` | Passed: all four existing tests | License and proposed public SC1 context-fixture lint, not cryptographic execution |
 | `git diff --check` | Passed | Tracked-diff whitespace checks; new documents also covered by repository Markdown validation |
 
-No public ratification, normative acceptance, independent security approval,
-Go/Rust execution, mobile-device run, commit, push or release was performed
-as part of this verification. Decision-record negative checks in RFC 0009
+2026-10-30 acceptance-wave recount (manifest integration pass, executed
+locally): `python3 scripts/validate-repo.py requirements manifests` passed
+with 593 requirement rows/definitions and 185 registered `CONF-*` cases across
+the suite manifests (593 unique requirement IDs; `CONF-SCW-025`–`038` added
+one-to-one with `SNTR-DAUTH-011`–`024`), and 209 Markdown files in the working
+tree by recount. `validate-schema.py` (13 tests against the current revision, including `recovery_profile.proto` per MIGRATION.md §8) and the four unit tests
+passed on this revision. The whole-run `validate-repo.py all` currently
+surfaces 8 pre-existing stale RFC 0006 §11 anchor references in recovery
+owner files plus one trailing-whitespace line in RFC 0006 — open owner
+corrections, not introduced by this pass — so this record asserts the scoped
+checks above rather than re-running the historical whole-run "Passed" claim.
+Registration is not execution: these numbers are structural, not executed
+verdicts.
+
+No Go/Rust conformance execution, mobile-device run, independent security
+approval, commit, push or release was performed as part of these verification
+records; ratification and normative acceptance here refer only to the
+recorded Decisions 0001/0002. Decision-record negative checks in RFC 0009
 remain planned human/tooling acceptance work; no machine validator was added.

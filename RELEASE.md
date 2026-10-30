@@ -29,7 +29,8 @@ Sec. 5). Known unresolved blockers MUST be listed in
 
 ## Accepted SC1 profile and release scope
 
-[RFC 0007](rfcs/0007-secure-channel-device-authorization.md) and
+[RFC 0007](rfcs/0007-secure-channel-device-authorization.md),
+[RFC 0010](rfcs/0010-sc1-host-authorization-lifecycle.md) and
 [ADR-011](specifications/decisions/ADR-011-noise-device-authorization.md) are
 accepted. `SNTR-SC1-WSS-V1` is an additional secure profile: canonical
 `syntra.sc1.v1` context inside verified TLS 1.3 WSS at `/syntra/v1/sc1/ws`.
@@ -40,7 +41,14 @@ initial permitted topology is direct TLS termination by the host; proxy
 termination is deferred.
 
 The accepted first stable bundle is SC1/WSS, standardized recovery and
-applicable mobile lifecycle evidence. Baseline transports remain independently
+applicable mobile lifecycle evidence (Option A per
+[RFC 0006](rfcs/0006-update-recovery-profile.md) §11.1: recovery cannot be
+omitted from that bundle and relabeled as optional; a Core-only pass is not
+sufficient evidence for the recovery-inclusive bundle). SC1 includes the
+export of the accepted host lifecycle obligations of
+[RFC 0010](rfcs/0010-sc1-host-authorization-lifecycle.md)
+(`SNTR-DAUTH-011`–`024`) with its registered, planned-not-executed
+`CONF-SCW-025`–`038` rows. Baseline transports remain independently
 claimable but are not all required for the initial bundle. The Rust
 implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
 reviewed proposal; its local evidence does not execute the registered
@@ -76,8 +84,10 @@ attestation, independent SC1 wire interoperability or formal `CONF-*` verdicts.
 Native-core linkage still uses the Go SC1 carriers.
 
 Release promotion still needs the [remaining work](docs/sc1-implementation.md#remaining-work):
-independent review, independent vectors/interoperability, accepted wire/policy
-decisions and the applicable conformance declaration. Native ABI v1 lacks a
+independent review, independent vectors/interoperability and the applicable
+conformance declaration; the wire/policy decisions are accepted (Decisions
+0001/0002), so the remaining items are executed evidence, not contract
+decisions. Native ABI v1 lacks a
 completion-timestamp input and explicit post-hello credential release; Go and
 library cleanup do not guarantee erasure of all secret copies. Existing profile
 passes, generation checks and document tags do not close these gaps. The
@@ -88,9 +98,9 @@ planning; no new executable-profile release gate is implied by this record.
 
 The subsequent [mobile v1 delivery target](docs/mobile-v1-delivery.md) requires
 SC1, standardized recovery and mobile lifecycle evidence for stable promotion.
-Its selected proposals are RFCs 0006–0008 and the core decision set, not new
-accepted profile gates. Before promotion, maintainers accept and activate the
-owning contracts/cases, then review independent pure-Go/Rust results in both
+Its contract set is RFCs 0006–0008 and the core decision set, accepted via
+Decision 0002. Before promotion, maintainers review the activated
+owning contracts/cases, independent pure-Go/Rust results in both
 roles, host lifecycle/security evidence, and iOS/Android lifecycle/operational
 results from the [acceptance plan](conformance/plans/mobile-v1.md). Core-only
 or same-implementation passes cannot satisfy this target. This supplement
@@ -152,6 +162,53 @@ Evidence mapping (where each box is verified):
 | License present | Apache-2.0 `LICENSE` file present per `GOVERNANCE.md` Sec. 7 |
 | Security process documented | `SECURITY.md` private reporting channel live; embargo handling per `GOVERNANCE.md` Sec. 3 |
 | CHANGELOG updated | `## [v1.0.0-rc.1]` section with Added/Changed/Deprecated/Removed/Security; every wire-affecting change has migration notes |
+
+### Specification freeze at pinned revision
+
+A stable release MUST pin the exact accepted specification revision it
+claims: the accepted RFC set and ADR-011, the owning specification documents,
+`conformance/manifest/*` and `conformance/profiles.yaml` at one repository
+revision, and the conformance suite at that same revision. Release notes and
+claims MUST cite these revision SHAs. A release prepared against a revision
+that cannot be reproduced to these pins is not freeze-complete, and any
+post-pin behavior change requires renewed approval of the affected scope (see
+`docs/decision-record-template.md` §Compatibility and activation).
+
+### Production-release evidence gates (stable promotion)
+
+The following rows are required for a **production/stable release**, distinct
+from the structural RC boxes above — registration is not execution, and
+registered, not-executed rows never substitute for these:
+
+- [ ] Executed `CONF-SCW` rows, including the RFC 0010 lifecycle rows
+      `CONF-SCW-025`–`038` (enrollment authority, AK/handle issuance, staged
+      provisioning and idempotency, pre-`ready` sequence and principal
+      binding, revocation enforcement/bounded staleness/fail-closed, rotation
+      and epoch integrity, compromise recovery, disposal hygiene, pin
+      rotation), in both roles, with per-case verdicts and logs
+- [ ] Executed recovery cases (`CONF-URP-*`): fresh-handle rounds, scoped
+      generation fencing, local overflow isolation, snapshot install,
+      same-G install and durable progress/crash cuts
+- [ ] Both-role independent results (Rust + Go): Go initiator/Rust host and
+      Rust initiator/Go host; FFI-backed Go is not the independent Go lane
+- [ ] Independently derived Noise ciphertext vectors (not implementation
+      self-generated fixtures), covering both bootstrap and returning modes
+- [ ] Mobile gates: supported iOS/Android lifecycle/operational evidence from
+      [conformance/plans/mobile-v1.md](conformance/plans/mobile-v1.md),
+      including destination/resource budgets and declared operational bounds
+- [ ] Independent human security review (crypto/composition review of SC1,
+      the RFC 0010 lifecycle and recovery persistence) recorded per
+      `GOVERNANCE.md` Sec. 3
+- [ ] Specification freeze at the pinned revision recorded per the freeze
+      subsection above
+
+### Claims wiring rule
+
+Release notes, claims and declaration summaries MUST be generated from
+executed registered cases at the pinned revision — the cited case IDs MUST
+exist in `conformance/manifest/*` at that revision and carry executed
+verdicts. Asserted-in-advance results, planned-only rows, and structural or
+implementation-local evidence MUST NOT be rendered as release claims.
 
 ## 2. Version freeze (RC)
 

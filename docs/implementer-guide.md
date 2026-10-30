@@ -54,9 +54,17 @@ TLS policy. [ADR-011](../specifications/decisions/ADR-011-noise-device-authoriza
 is accepted; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
 distinguishes registered cases from implementation tests.
 
-Only authenticated out-of-band provisioning is supported. Enrollment RPCs,
-complete issuance/delivery/ack recovery, secure storage and rotation are open
-integration work. Independent review, independent vectors/wire interoperability
+Authenticated out-of-band provisioning is the enrollment function delivered
+in this guide; authorized bootstrap enrollment also stays permitted as a
+designated authority path under the lifecycle contract. Accepted RFC 0007
+owns the SC1 credential levels; accepted RFC 0010 fixes the host operational
+contract for
+enrollment authority, issuance, staged durable provisioning with
+idempotent retries, principal binding, revocation propagation (at most a
+300-second hard profile maximum with a 60-second operational target,
+fail-closed), rotation, and compromise recovery. The contract is
+registered, not yet executed; conformance runs and independent review
+remain open gate work. Independent review, independent vectors/wire interoperability
 and native ABI completion-time/credential-release gaps remain
 [unresolved](sc1-implementation.md#remaining-work).
 
@@ -117,7 +125,7 @@ vectors (logical equality, never byte equality).
 
 Propose your supported range as `[min_version, max_version]` (both nonzero,
 `min ≤ max`) in `ClientHello`; select, as host, the highest overlap or fail
-the handshake with `UNIMPLEMENTED`/`FAILED_PRECONDITION` + close
+the handshake with `UNIMPLEMENTED` + close on version mismatch
 (`SNTR-HS-003/010`, `SNTR-VER-002`). Record the selected version and stamp
 it on every post-handshake `Frame`. Never negotiate below the highest
 mutual version without explicit application consent (`SNTR-VER-007`).

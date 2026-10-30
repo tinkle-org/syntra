@@ -19,9 +19,52 @@ development, changes land under `Unreleased`.
   with `CONF-SCW-001`–`CONF-SCW-024` case specifications.
 - Added public SC1 context/prologue vectors under
   `conformance/test-vectors/sc1/`.
+- Accepted the 2026-10-30 SDD acceptance wave per
+  `docs/decisions/0002-sdd-acceptance-wave.md` (Option A: standardized
+  recovery stays in Syntra): RFC 0001, 0002 (dependency record), 0003,
+  0004, 0005 (protocol contract; Go `go_package` migration deferred),
+  0006 (with §11 governing), 0008; new RFC 0010 (SC1 host enrollment and
+  authorization lifecycle). Self-approval disclosed; executed conformance
+  evidence remains a release gate.
+- Added `SNTR-DAUTH-011`–`SNTR-DAUTH-024` (host enrollment/lifecycle
+  obligations incl. the decided revocation propagation: new-connection
+  immediate enforcement, 300 s hard maximum, 60 s operational target,
+  fail-closed) and their planned `PLAN-DAUTH-*` case coverage.
+- Registered `SYN-URP-001`–`007`/`010`–`026` requirement rows (reserved
+  `008/009`) with the reconciled `CONF-URP-001`–`CONF-URP-017` recovery
+  cases; the manifest schema and repository validation now admit
+  `SYN-URP-*`.
 
 ### Changed
 
+- Handshake failures no longer promise a wire-typed code to the peer:
+  detecting-side typed causes plus transport-native close signals
+  (RFC 0003 D1/D3/D4; owner files updated).
+- Request identifiers are strictly increasing, connection-scoped and never
+  reused; duplicate/replayed IDs are ordered-admission violations
+  (RFC 0004 D1/D2). Single serialized terminal gate: cancel/deadline ties
+  select `DEADLINE_EXCEEDED`; clocks start at initiator admission and host
+  bounded-frame receipt (reconciled with RFC 0008 D2).
+- Pre-ACTIVE notifications are protocol violations — deterministic
+  fail-close (RFC 0003 D2), replacing the ignore-with-diagnostic default.
+- Capability/session extension binds post-ACTIVE per accepted profile
+  contracts only; no generic capability enumeration (RFC 0005 D1). Bounds
+  recorded: 8 KiB raw credential, 128-byte connection ID, 4 KiB diagnostic,
+  ≥16 concurrency; 1 MiB applies to the total serialized Frame (RFC 0005
+  D2/D3, fixtures corrected).
+- Raw-wire validation is now the accepted contract: reserved 16/17
+  rejected in frame/body position; future-body variants 18–31 rejected
+  with `UNIMPLEMENTED`; duplicate `Frame.body` alternatives rejected
+  regardless of codec merge behavior (RFC 0008 D1).
+- Update/Recovery semantics compacted to RFC 0006 §11: local overflow
+  ends only the affected subscription with `terminated=true` +
+  `local-queue-exhausted` at the unchanged generation (no
+  initiator-manufactured `next_generation`); generations bind to the
+  authenticated principal scope (P, S, G) and change only on true
+  provider loss or explicit shared rebase; every round uses a fresh
+  handle and freshly captured boundary; snapshot installation is
+  same-generation with no wire carrier for completion; resume anchors to
+  the durable known-safe checkpoint.
 - Replaced the experimental `syntra.sc1.draft1` carrier documentation with the
   accepted v1 WSS mapping. Draft-1 and local-revision-1 remain historical and
   are not aliases.

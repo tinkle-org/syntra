@@ -1,10 +1,16 @@
 # Mobile v1 specification-driven delivery
 
 Status: selected delivery target, not a release verdict. SC1/WSS is accepted;
-[RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) remains Draft,
-so the mobile lifecycle and recovery portions are not yet normative.
-[Release readiness](../audits/v1-release-readiness.md) records remaining
-gates. Formal normative acceptance remains governed by `GOVERNANCE.md` §3.
+[RFC 0008](../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) is accepted
+(2026-10-30, [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)),
+so the mobile lifecycle and recovery contracts are normative: owning
+specification files are activated per the [acceptance
+package](v1-acceptance-package.md), and the lifecycle rows
+`CONF-SCW-025`–`CONF-SCW-042` are registered (registration is not
+execution). Executed-evidence release
+[readiness](../audits/v1-release-readiness.md) gates remain open and stay
+distinct from normative acceptance: accepted contract texts do not imply
+executed runs, and failed runs would still fail those gates.
 
 ## Scope and boundaries
 
@@ -29,19 +35,22 @@ here. No production secrets or private infrastructure are prerequisites.
 
 The selected first increment is specification-only, with SC1 over verified WSS
 as the initial production release target rather than certification of all
-baseline transports. A sole active maintainer needs an explicit governance
-transition, not an invented second approval. [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-proposes that transition and the exact scope; the
-[acceptance package](v1-acceptance-package.md) maps the follow-up changes.
-Current quorum, baseline profile meanings and release gates remain unchanged
-until the applicable decisions and owner edits are recorded.
+baseline transports. A sole active maintainer needed an explicit governance
+transition, not an invented second approval; accepted
+[RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md) and
+[Decision 0001](../docs/decisions/0001-bootstrap-ratification.md) recorded
+it on 2026-10-29, and the 2026-10-30 acceptance wave recorded the RFC
+contracts via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md);
+the [acceptance package](v1-acceptance-package.md) maps the remaining
+follow-up changes. Executed-evidence release gates remain unchanged until
+runs are recorded.
 
 ## Dependency-ordered work and exit criteria
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
 | 0. Approval process | RFC 0009 governance/scope proposal and decision-record format; actual owner ratification/roster and authorized process edits next | Verifiable public transition or existing quorum; no retroactive protocol/security approval |
-| 1. Decisions | RFCs 0001–0005 core/parser/identity/bounds; RFC 0006 recovery amendment; RFC 0007 canonical SC1; RFC 0008 mobile lifecycle | Explicit compatibility designation, protocol/security reviews, maintainer acceptance |
+| 1. Decisions | RFCs 0001–0005 core/parser/identity/bounds; RFC 0006 recovery amendment; RFC 0007 canonical SC1; RFC 0008 mobile lifecycle; RFC 0009 governance; RFC 0010 host lifecycle | Accepted and recorded ([Decision 0001](../docs/decisions/0001-bootstrap-ratification.md), [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)) with compatibility designations and disclosed self-approval; the roster/signing step remains as documented |
 | 2. Normative activation | Synchronize owning specifications, authorized schema edits, permanent requirement IDs, profile/case definitions and positive/negative fixtures | No contradictory owner text; structural/Buf checks pass; reviewed requirement-to-case mapping |
 | 3. Downstream alignment | Both independent implementations pin the same accepted revision; generated types refreshed where authorized; TDD fixes and host-policy/lifecycle examples | Package/runtime/adapter/security tests; ABI/mobile builds and bridge lifecycle tests where applicable |
 | 4. Independent execution | Pure Go ↔ Rust in both roles; SC1 bootstrap/returning, required recovery, faults and deployment contracts | Exact commits, commands, bounds, vectors, logs and per-case verdicts; no mandatory omissions |

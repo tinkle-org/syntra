@@ -2,12 +2,12 @@
 
 - RFC: 0005
 - Title: RFC-defined post-ACTIVE profile negotiation, concrete bounds, stable profile IDs, and downstream Go package identity
-- Status: Draft (v1 consistency audit findings F-01, F-05, F-06, F-11, F-12, F-17, F-18)
+- Status: Accepted for the protocol contract (closes findings F-01, F-06, F-11, F-12, F-17, F-18 at the specification level); D5 Go migration deferred
 - Date: 2026-10-28
 - Target version: pre-stable v1 contract proposal plus RFC-defined optional profiles; explicit freeze/version and FILE/source-break decisions required (§6)
 - Relates to: `specifications/core/capabilities.md`, `rpc.md`, `framing.md`, `authentication.md`, `sessions.md`, `errors.md`, `events.md`, core/security open questions, transport profile identifiers, `proto/syntra/v1/*.proto` (`go_package`), schema generation/compatibility, `conformance/profiles.yaml`, `claims.md`; RFC 0001 B7/B8; RFC 0002 §10 items 4–11; RFC 0006
-- Author(s): TBD — blocker (maintainer assignment)
-- Reviewers: TBD — blocker (protocol + security maintainers)
+- Author(s): oscarlaw
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
 > Draft proposal, not acceptance or shipping authority. The selections below
 > replace open decision menus for review only. They allocate no new active
@@ -336,24 +336,30 @@ downstream ownership, even though wire fields are unchanged.
 
 | Proposal choice | Selection for review | Approval status |
 |---|---|---|
-| D1 | RFC-defined post-ACTIVE profile RPC; RFC 0006 recovery required for release target | Unapproved; RFC 0006 acceptance/evidence pending |
-| D2 | 8 KiB raw credential, 128 UTF-8 byte connection ID, 4 KiB diagnostic, ≥16 concurrency, grace default 5 s/max 30 s; method bound stays with owner | Unapproved |
-| D3 | 1 MiB total encoded frame, not payload | Unapproved fixture/spec alignment |
-| D4 | Preserve current matching profile IDs | Selected; consistency verification is not normative approval |
-| D5 | Downstream `syntra-go/gen/syntra/v1;syntrav1` Go option | Unapproved; downstream ownership/layout and FILE/source-break review pending |
+| D1 | RFC-defined post-ACTIVE profile RPC; RFC 0006 recovery required for release target | Accepted 2026-10-30 (RFC 0006 accepted in the same wave) |
+| D2 | 8 KiB raw credential, 128 UTF-8 byte connection ID, 4 KiB diagnostic, ≥16 concurrency, grace default 5 s/max 30 s; method bound stays with owner | Accepted 2026-10-30 |
+| D3 | 1 MiB total encoded frame, not payload | Accepted 2026-10-30 (fixture/spec alignment applied) |
+| D4 | Preserve current matching profile IDs | Accepted 2026-10-30 |
+| D5 | Downstream `syntra-go/gen/syntra/v1;syntrav1` Go option | **Deferred — out of scope for the 2026-10-30 acceptance**; tracked follow-up pending downstream owner confirmation of module/output/import layout and release ordering |
 
-1. **TBD — blocker:** assign real owner/author and protocol/security reviewers.
-2. **TBD — blocker:** record maintainer quorum, security review, and resolution
-   of normative objections for these selected proposals.
-3. **TBD — blocker:** accept RFC 0006's exact binding, bounded payload semantics,
-   and recovery release scope; no generic capability probing in the interim.
-4. **TBD — blocker:** explicit pre-stable freeze/version/migration decision for
-   changed bounds and behavior, plus the independent Go FILE/source-break review.
-5. **TBD — blocker:** downstream owner confirms the actual module/output/import
-   layout and migration evidence. No BSR publication blocker is reinstated.
-6. **TBD — blocker:** accepted owning spec/case updates, RFC 0008 timing alignment,
-   and independent behavioral evidence. Selecting Draft text does not close the
-   original F-01/F-05/F-06/F-11/F-12/F-17/F-18 acceptance findings.
+Acceptance was recorded 2026-10-30 via
+[Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md):
+1. Owner/reviewers: oscarlaw (self-review disclosed per `GOVERNANCE.md` Sec. 3).
+2. Approvals: recorded in Decision 0002 (D1–D4); security scope acknowledged;
+   independent security review remains a release gate.
+3. Satisfied: RFC 0006 is accepted in the same wave; the post-ACTIVE binding is
+   the accepted negotiation form; no generic capability probing is authorized.
+4. The specification-freeze decision that follows records the pre-stable
+   version/migration disposition for the accepted bounds. **The Go
+   FILE/source-break decision is explicitly excluded from this wave
+   (D5 deferred)**; normative specification text stays implementation-neutral
+   and free of SDK details.
+5. The downstream `syntra-go` owner must confirm the module/output/import
+   layout before the deferred go_package migration lands. No BSR publication
+   blocker is reinstated (retired as drafted).
+6. Owner updates (capabilities, framing, authentication, http credential
+   caps, reference doc) and the RFC clocks alignment were applied in the
+   acceptance PR; executed behavioral evidence remains a release gate.
 
 ## Appendix: References
 

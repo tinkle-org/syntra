@@ -1,10 +1,12 @@
 # Public decision record template
 
 Status: informative preparation format, not an approval or an implemented
-validation schema. [Draft RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
-proposes its use for bootstrap ratification, RFC acceptance, specification
-freeze and release authorization. Current [governance](../GOVERNANCE.md)
-still determines authority and quorum until a real transition is recorded.
+validation schema. [RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)
+(accepted) adopted this format for the bootstrap ratification, RFC
+acceptance, specification freeze and release authorization records;
+[governance](../GOVERNANCE.md) and the recorded decisions ([Decision 0001](decisions/0001-bootstrap-ratification.md),
+[Decision 0002](decisions/0002-sdd-acceptance-wave.md)) determine authority
+and quorum.
 
 Copy the record below into the relevant public RFC/PR discussion and retain
 a repository copy or an immutable link when the decision is recorded. Fill

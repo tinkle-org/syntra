@@ -19,7 +19,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-ASEC-002** — Channel binding: credentials MUST traverse only secure profiles in public deployments (see `transport-security.md` SNTR-TSEC-009) or loopback-restricted plaintext for development. If a negotiated channel-binding mechanism is defined by a future RFC (e.g., TLS exporter binding), its use MUST be explicit and versioned; absent such an RFC, implementations MUST NOT claim channel binding and MUST NOT improvise binding by mixing transport bytes into credential comparison.
 
-**SNTR-ASEC-003** — Carriage: credentials MUST appear only in `ClientHello.credential` (initial) and, for multi-round mechanisms, in explicitly documented follow-up RPC payloads after ACTIVE. Credentials MUST NOT appear in URLs (no query-string, path, or fragment carriage), in `connection_id`, `request_id`, method strings, error messages, or event payloads as protocol metadata. This rule holds even if the application encodes its own references inside opaque payloads — the Syntra layer MUST NOT require URL carriage.
+**SNTR-ASEC-003** — Carriage (per accepted RFC 0004 §3 D5): initial credential bytes appear ONLY in `ClientHello.credential` on persistent frame-carrying profiles — where WS/WSS Upgrade `Authorization`/`Cookie` headers, when used for documented transport admission, do not establish or merge Syntra identity — and ONLY through `Authorization: Syntra <base64>` for that exchange on HTTP/HTTPS request-response profiles (or by deliberate omission for an anonymous attempt). Base64 is a byte-preserving binding for the header channel, not a second credential format or an added confidentiality mechanism; the header channel carries the same opaque sensitive bytes under the same obligations as `ClientHello.credential` (SNTR-ASEC-001). Explicitly documented follow-up authentication RPC payloads after `ACTIVE` remain subject to the owning authentication policy and do not implicitly authorize changing the connection principal or inventing mechanism negotiation (SNTR-AUTH-010). Credentials MUST NOT appear in URLs (no query-string, path, or fragment carriage), environment variables, logs, diagnostics, metrics labels, traces, `connection_id`, `request_id`, method strings, error messages, or event payloads as protocol metadata. Public deployments still require a permitted secure profile (charter SYN-ARCH-030; SNTR-ASEC-002). This rule holds even if the application encodes its own references inside opaque payloads — the Syntra layer MUST NOT require URL carriage.
 
 **SNTR-ASEC-004** — Principal identity handling: principals MUST be opaque handles bound at `ServerReady` for exactly one connection (see `core/authentication.md` SNTR-AUTH-007). Implementations MUST NOT assume user accounts; authorization policy MUST treat service/device/key/anonymous principals uniformly through the same hooks. Principal identifiers in logs MUST be redacted or pseudonymized unless the deployment documents otherwise.
 
@@ -142,8 +142,15 @@ sequenceDiagram
   alt valid
     H-->>C: ready (principal bound, fresh connection_id)
   else expired/revoked/invalid
-    H-->>C: handshake error UNAUTHENTICATED
+    H->>H: local typed cause UNAUTHENTICATED
+    H-xC: native close signal only (WS/WSS Close 1008; TCP/TLS close)
   else valid but unauthorized
-    H-->>C: handshake error PERMISSION_DENIED
+    H->>H: local typed cause PERMISSION_DENIED
+    H-xC: native close signal only (per profile)
   end
 ```
+
+Per accepted RFC 0003, handshake failures never travel as wire error
+frames: the detecting side records the locally typed cause; the peer
+observes only the transport-native close signal and may conclude at most
+the generic per-profile failure report.

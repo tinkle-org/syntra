@@ -2,31 +2,30 @@
 
 - RFC: 0006
 - Title: Negotiated Update/Recovery Profile for ordered delivery, replay, snapshot recovery, and committed progress
-- Author(s): TBD — blocker
-- Status: Draft
+- Author(s): Pending — assigned via the acceptance PR (disclosed self-approval per GOVERNANCE.md Sec. 3)
+- Status: Accepted
 - Date: 2026-10-21
 - Target version: v1 minor (required in the proposed release bundle; optional negotiated wire profile; no envelope changes)
-- Decision amendment: 2026-10-28, §11 (Draft, proposed replacement decisions)
+- Decision amendment: 2026-10-28, §11 (adoptive); consolidated into §§1–10 at acceptance 2026-10-30
 - Relates to: `specifications/core/events.md` (§§1, 1A–1J, 1L–1M), `specifications/core/reliability.md` (SNTR-REL-001–010), `specifications/core/capabilities.md` (SNTR-CAP-001–007), `specifications/architecture.md` (SYN-ARCH-001/002/010–013/020/021/030–035/040–045/050/051/060–062), `specifications/core/open-questions.md` (blockers 1–3, deferred items 5–7), `rfcs/0005-negotiation-bounds-identifiers.md` (D1 binding), `proto/syntra/v1/envelope.proto` (`Frame`, reserved values)
-- Reviewers: TBD — blocker (assigned by maintainers)
+- Reviewers: Pending — assigned via the acceptance PR (disclosed self-approval per GOVERNANCE.md Sec. 3)
 
-> Draft per `rfcs/README.md` Lifecycle. Only an Accepted RFC may modify
-> normative behavior. This Draft is a proposal: implementations MUST NOT
-> ship behavior from it, and no test, claim, or release may cite it as
-> authority. Fill-every-section rule applies; unknowns are marked
-> "TBD — blocker". BCP 14 keywords carry normative force only where
-> capitalized. Examples are neutral only: echo, generic key/value,
-> generic subscription.
+> Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+> (disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3),
+> with §11 as the governing decision amendment and §§1–10 consolidated to
+> agree with it. Implementation MUST remain conformance evidence under the
+> frozen revision; release authorization additionally requires the §11.9
+> gates, which stay open. BCP 14 keywords carry normative force. Examples
+> are neutral only: echo, generic key/value, generic subscription.
 
-> Amendment reading rule: §11 is the current proposal for the decisions it
-> enumerates and replaces conflicting pre-amendment wording in §§1–10,
-> including their requirement text, tables, diagrams, acceptance criteria,
-> and blocker descriptions. That earlier wording is retained as review
-> context, not a second implementation option. Neither version is accepted
-> authority. The owning profile and IDL still contain the earlier draft;
-> §11.8 lists the exact follow-up edits proposed after acceptance. The
-> [acceptance plan](../conformance/plans/update-recovery.md) is prose only,
-> not an executable or registered conformance manifest.
+> Amendment reading rule: §11 records the decision amendment (2026-10-28).
+> At acceptance, §§1–10 have been consolidated so their body text agrees with
+> §11 wherever they overlapped; §11 remains the audited decision history for
+> each change. The owning profile, IDL comments, and registered recovery
+> manifest cases have been aligned to §11 in the acceptance PR (registration
+> is not execution). The
+> [acceptance plan](../conformance/plans/update-recovery.md) remains prose:
+> not an executable or registered conformance-manifest run.
 
 ## 1. Summary
 
@@ -125,14 +124,25 @@ changes.
       down only the targeted subscription on a per-stream terminal
       signal, and MUST re-establish subscriptions explicitly after the
       connection ends with a fresh connection-scoped handle and no
-      implicit continuity, carrying forward only the last confirmed
-      checkpoint bytes bound to the same stable stream identity where
-      the stream specification permits.
+      implicit continuity, resuming only from its locally durable
+      known-safe checkpoint bytes (which may be newer than the last
+      peer-acknowledged checkpoint; §11.6) bound to the same stable
+      stream identity where the stream specification permits. The host
+      MAY accept a valid checkpoint without a previous confirmation
+      record; validation of an issued checkpoint is distinct from
+      accepting an unoffered confirm (§11.6).
     - `SYN-URP-007` — The initiator MUST enforce its bounds (pending
       calls, subscriptions, queued bytes, page sizes), MUST back off on
-      `RESOURCE_EXHAUSTED`, MUST accept an explicit continuity-loss
-      signal with a new generation as the only overflow path, and MUST
-      NOT silently accept truncated history as complete.
+      `RESOURCE_EXHAUSTED`, MUST treat subscriber-local saturation as a
+      subscriber-local failure per §11.4 — ending the affected
+      subscription / reporting local recovery-needed via
+      `RecoveryBatchTrailer{terminated=true}` with ASCII
+      `terminate_reason=local-queue-exhausted` at the UNCHANGED current
+      generation, without manufacturing a provider `next_generation` —
+      and MUST NOT silently accept truncated history as complete. Local
+      saturation MUST NOT increment the shared generation: it cannot
+      rebase the provider or invalidate another subscriber's
+      checkpoint.
 
   - Host obligations:
     - `SYN-URP-010` — The host MUST confirm the profile only where it
@@ -156,18 +166,24 @@ changes.
       profile operations with `UNIMPLEMENTED`. Full wire policy is in
       `SYN-URP-021`.
     - `SYN-URP-012` — The host MUST maintain independent logical streams
-      per confirmed subscription, MUST assign one continuity generation
-      per stream, MUST increment the generation on every continuity loss
-      (overflow, retention expiry, revocation-driven reset, or snapshot
-      rebase), and MUST bind every checkpoint to exactly one stable
-      stream identity and generation pair. The stable stream identity
+      per confirmed subscription within the authenticated principal
+      scope P, MUST assign one continuity generation G per stable stream
+      identity S within that scope, MUST increment G only on a true
+      provider history loss for (P, S) or an explicit shared rebase
+      (§11.2) — NOT on subscriber-local saturation (§11.4), NOT on
+      ordinary retention-window pruning, and NOT on revocation alone
+      (§11.2) — and MUST bind every checkpoint C to exactly the
+      principal-scope, stable stream identity, and generation tuple
+      (P, S, G). The stable stream identity
       is the stream selected by the stream selector and persists across
       reconnects, separate from the connection-scoped subscription
       handle which is fresh per subscription. A checkpoint from a prior
-      subscription for the same stable identity MAY resume when the
-      generation is still valid; checkpoints from a prior generation
-      MUST be rejected with `FAILED_PRECONDITION`, never reinterpreted
-      under the new generation.
+      subscription for the same stable identity MAY resume while the
+      generation is still valid — including through §11.6 reconnect
+      with a fresh handle — and the host MAY accept it without a prior
+      confirmation record; checkpoints whose generation no longer
+      matches the current (P, S, G) binding MUST be rejected with
+      `FAILED_PRECONDITION`, never reinterpreted under the new generation.
     - `SYN-URP-013` — The host MUST emit opaque checkpoints with explicit
       predecessor/result semantics on every batch: each batch states the
       predecessor checkpoint it continues from and the result checkpoint
@@ -218,10 +234,16 @@ changes.
       queued `Notification` bytes per stream and per connection,
       maximum replay page batches and bytes, maximum snapshot page bytes
       and total pages, and effective deadlines for profile RPCs. On
-      saturation the host MUST apply the documented policy — reject new
-      work with `RESOURCE_EXHAUSTED` and/or end the affected stream with
-      an explicit continuity-loss signal carrying a new generation —
-      never queue without bound and never deadlock silently.
+      subscriber-local saturation the host MUST apply §11.4: reject new
+      work with `RESOURCE_EXHAUSTED` before or after subscription
+      acceptance, and for a saturated accepted subscription end ONLY the
+      affected subscription with `RecoveryBatchTrailer{terminated=true}`
+      and ASCII `terminate_reason=local-queue-exhausted` at the CURRENT
+      generation, carrying NO `next_generation` — the initiator cannot
+      manufacture a provider `next_generation` — while provider-side
+      history loss invalidates the scoped (P, S, G) binding itself via a
+      next_generation trailer per §11.2. The host MUST NOT queue without
+      bound and never deadlock silently.
     - `SYN-URP-019` — The host MUST authorize the bound principal at
       every profile authorization hook: subscribe, replay, snapshot
       offer/transfer, and continuation/catch-up/confirm. The host MUST
@@ -265,8 +287,9 @@ changes.
       subscribed boundary B on completion (or follow the snapshot path
       if signaled). For resumption, the initiator MUST send an empty
       `continuation_marker` on the first `RecoveryReplayRequest` with
-      `from_checkpoint` set to the last confirmed checkpoint
-      (non-empty), and MUST echo the previous page's marker verbatim
+      `from_checkpoint` set to its locally durable known-safe checkpoint
+      per §11.6 (non-empty; it may be newer than the last peer-acknowledged
+      checkpoint), and MUST echo the previous page's marker verbatim
       with `from_checkpoint` equal to the previous page's
       `result_checkpoint` on each continuation. The host MUST reject a
       request whose marker does not match the last issued marker for the
@@ -294,76 +317,116 @@ changes.
       boundary and MUST NOT release held live batches on mismatch;
       mismatch MUST be rejected with `FAILED_PRECONDITION` (or treated
       locally as recovery-needed) without releasing held batches.
-    - `SYN-URP-024` — Initial live-baseline bootstrap, repeated recovery
-      rounds, and lost completion handling: initial subscriptions with an
-      empty `start_checkpoint` MUST skip `Replay` and start live at the
-      subscribed boundary B on validated completion (or follow the
-      snapshot path if `snapshot_required` is signaled); resumption with a
-      non-empty `start_checkpoint` MUST replay from the last confirmed
-      checkpoint per `SYN-URP-022` while holding live batches until the
-      validated completion signal at B. After a round completes, a new gap
-      or loss triggers a new independent round from the current confirmed
-      checkpoint with the same rules; B stays fixed per subscription and
-      MUST NOT advance during paging. The initiator MUST NOT treat idle as
-      caught-up; on loss-counter movement, timeout without completion, or
-      boundary mismatch the initiator MUST start a new recovery round
-      (`Replay` or `CatchUp` from the last confirmed checkpoint) and MUST
-      NOT release held batches without a validated completion signal.
-      Duplicate completion signals with equal boundary bytes are tolerated
-      idempotently; mismatched completion MUST NOT release held batches.
-    - `SYN-URP-025` — Snapshot generation transition and confirm-retry
-      fencing: snapshot installation MUST move the stream to a new
-      generation greater than the pre-install generation, bind subsequent
-      checkpoints to the new generation and stable stream identity, and
-      reject old-generation checkpoints with `FAILED_PRECONDITION`. The
-      snapshot offer is bound to `subscription_handle` plus current
-      generation plus exact `boundary_checkpoint` equality; in-flight
-      `SnapshotFetch` under a superseded `snapshot_handle` MUST fail with
+    - `SYN-URP-024` — Initial live-baseline bootstrap, fresh-handle
+      recovery rounds, and lost-completion handling: initial
+      subscriptions with an empty `start_checkpoint` MUST skip `Replay`
+      and start live at the newly captured boundary B on validated
+      completion (or follow the snapshot path if `snapshot_required` is
+      signaled); resumption with a non-empty `start_checkpoint` (the
+      initiator's durable known-safe checkpoint, §11.6) MUST replay
+      from that checkpoint per `SYN-URP-022` while holding live batches
+      until the validated completion signal at B. Every round binds to
+      exactly one connection-scoped handle H and the boundary B captured
+      by its Subscribe; the host does not reuse a retired handle within
+      a connection, and boundary equality does not identify a round.
+      After a round completes, a new gap or loss means the initiator
+      retires H locally, clears its held queue, and calls Subscribe for
+      a fresh handle and newly captured boundary — never replaying
+      toward the obsolete boundary; held batches release only after a
+      validated completion matching connection, handle, generation,
+      version, and the exact boundary B of the round. On a lost
+      completion (unknown RPC outcome, `UNAVAILABLE`,
+      `DEADLINE_EXCEEDED`, or loss per `SNTR-REL-003`/`SNTR-REL-009`)
+      the initiator performs bounded exact retries with fresh
+      `request_id` against the same round; the host re-emits the same
+      completion with no new side effects. On exhaustion the initiator
+      retires H and starts a fresh round from its durable known-safe
+      checkpoint; no same-handle second round or marker reset is
+      permitted. A round chooses `Replay` or `CatchUp`, never both
+      concurrently; `CatchUp` streams from the start checkpoint already
+      bound by Subscribe and its request carries no new checkpoint
+      field. The initiator MUST NOT treat idle as caught-up; the
+      initiator MUST NOT release held batches without a validated
+      completion signal. Duplicate completion signals with equal
+      boundary bytes are tolerated idempotently; mismatched completion
+      MUST NOT release held batches.
+    - `SYN-URP-025` — Snapshot transfer/installation and confirm-retry
+      fencing: the snapshot descriptor binds the offered snapshot X to
+      (P, S, H, G, S0) — the subscribed principal scope, stable stream
+      identity, subscription handle, current generation, and the exact
+      offered boundary checkpoint; at most one distinct snapshot is
+      offered under H, and superseding an offer retires H and requires a
+      fresh Subscribe before a new snapshot is issued, even if the new
+      boundary equals S0 and G is unchanged. In-flight `SnapshotFetch`
+      under a superseded `snapshot_handle` MUST fail with
       `FAILED_PRECONDITION`, and the initiator MUST discard prior pages on
-      supersede and MUST NOT install across boundaries. Confirm is
+      supersede and MUST NOT install across boundaries. The
+      `RecoverySnapshotComplete` record has NO wire transmission — the
+      amendment defines no method, result slot, or `RecoveryNotification`
+      arm for it; completion is a peer-local transfer/installation
+      record (§11.5). Installation is application-local: it occurs at
+      the SAME generation G, does NOT rebase the shared provider stream,
+      and does NOT change G; subsequent checkpoints chain from the
+      installed S0 within the same generation, and
+      `RecoverySnapshotInstalled` carries the current generation with
+      no replacement token. Confirm is
       idempotent with stop-and-wait fencing: re-presenting the same batch
       checkpoint bytes in the same generation (`RecoveryConfirmRequest`)
       MUST return `RecoveryConfirmResponse` without new side effects or
       generation change. Snapshot-boundary confirmation uses the distinct
-      `/syntra.v1.UpdateRecovery/SnapshotConfirm` method. Its first install
-      requires the current pre-install generation and exact offered boundary.
-      An exact duplicate `RecoverySnapshotConfirmRequest` for the same
-      authorized subscription and profile version, carrying that pre-install
+      `/syntra.v1.UpdateRecovery/SnapshotConfirm` method. First install
+      requires the exact offered S0 and the CURRENT generation. An exact
+      duplicate `RecoverySnapshotConfirmRequest` for the same
+      authorized subscription and profile version, carrying the CURRENT
       generation and installed boundary bytes, MUST return the original
       retained `RecoverySnapshotInstalled` without reinstalling or further
-      generation change, only while the response is retained and the current
-      generation equals its installed generation. Supersede, termination,
-      later continuity change, or retention expiry invalidates this narrow
-      exception; other stale-generation requests MUST fail with
+      generation change, only while the response is retained. Supersede
+      (which retires H), termination, a later continuity change that
+      increments G, or retention expiry invalidates this narrow
+      exception: on expiry or exhaustion the initiator reconnects per
+      §11.6 (fresh authenticated connection, re-negotiation, fresh
+      handle and boundary) — it MUST NOT fabricate a pre-install or
+      otherwise obsolete-generation retry. Other stale-generation
+      requests MUST fail with
       `FAILED_PRECONDITION`. Boundary equality alone does not establish
       retry eligibility. Retention is bounded in count, bytes, and lifetime
-      and documented by the deployment; this draft sets no implicit minimum.
+      and documented by the deployment; the accepted contract sets no implicit minimum.
       A checkpoint never returned as committable MUST be rejected with
       `FAILED_PRECONDITION`
-      without advancing; gap, continuity-loss, and continuation-expiry
-      reports invalidate any pending offer.
+      without advancing; gap, true provider continuity loss, and continuation-expiry
+      reports invalidate any pending offer. Snapshot-held batches release
+      only after the same validated round completion as replay-held
+      batches: old replay completions cannot release snapshot-held
+      batches; if catch-up is still needed after installation, it uses a
+      fresh handle and freshly captured boundary via a new Subscribe
+      (§11.3/§11.5).
     - `SYN-URP-026` — Subscriber-local versus shared generation
-      invalidation and revocation behavior: a generation increment signals
-      a shared continuity change for the stable stream identity (overflow,
-      retention expiry, revocation-driven reset, or snapshot rebase) and
-      invalidates prior checkpoints across subscriptions for that identity;
-      subscriber-local failures (batch validation failure, offer or persist
-      failure, confirm retry, per-stream terminal signal, connection end
-      with explicit re-subscription under a fresh handle) MUST NOT
-      increment the generation. The host MUST re-evaluate the bound
+      invalidation and revocation behavior: a generation increment G→G′
+      for a stable stream identity S in principal scope P signals ONLY
+      a true provider history loss for (P, S) or an explicit shared
+      rebase (§11.2), streamed to affected subscribers with a trailer
+      carrying the old generation and the `next_generation`; ordinary
+      retention-window pruning does not increment G, subscriber-local
+      saturation does not increment G (§11.4), and revocation alone is
+      targeted termination, not a reset. A provider loss spanning
+      several principal scopes invalidates every affected scope
+      explicitly. The host MUST re-evaluate the bound
       principal at every authorization hook, MUST NOT emit batches for a
-      revoked or expired principal, MUST terminate affected subscriptions
+      revoked or expired principal, and MUST terminate affected subscriptions
       with a typed signal (`RecoveryBatchTrailer{terminated=true}` with
-      `terminate_reason` or a typed invocation error) where possible, MUST
-      increment the generation on revocation-driven reset so stale
-      checkpoints fail loudly with `FAILED_PRECONDITION`, and MUST NOT
+      `terminate_reason` or a typed invocation error) where possible. A
+      revocation is targeted termination: it MUST NOT manufacture a
+      generation increment, and the host MUST NOT
       leak other principals' stream state or place credentials in error
-      detail.
+      detail; if deployment policy also invalidates the revoked
+      principal's recovery history, the host changes only that scoped
+      (P, S, G) binding — a regrant never revives an invalidated
+      binding.
 
-- Methods and payload mapping (proposed, no normative force):
-  Provisional draft only: this table carries no normative force and
-  lands only after acceptance, consistent with the Draft notice above.
-  All versioned profile payloads travel inside the existing
+- Methods and payload mapping (accepted mapping; §11 confirmation):
+  At acceptance the operations, method strings, payload mapping, and
+  per-field semantics below are the accepted contract for the
+  negotiated profile. All versioned profile payloads travel inside the existing
   `RpcRequest` / `RpcResult` / `Notification` envelopes with no
   `Frame` changes. Neutral examples only: echo, generic key/value,
   generic subscription. Stream selectors name generic subscriptions;
@@ -377,19 +440,21 @@ changes.
   | Replay | `/syntra.v1.UpdateRecovery/Replay` | `RecoveryReplayRequest` (`profile_version`, `subscription_handle`, `from_checkpoint`, `max_batches` 1..64, `max_bytes` 1..262144, `continuation_marker` empty on first request, echo of previous page's marker thereafter) | exactly one `RecoveryReplayPage` per `RpcResult` plus continuation marker; completion as `RecoveryReplayComplete` or `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload |
   | CatchUp | `/syntra.v1.UpdateRecovery/CatchUp` | `RecoveryCatchUpRequest` (`profile_version`, `subscription_handle`) | `RecoveryCatchUpAccepted` in the terminal `RpcResult`; `RecoveryBatch` plus `RecoveryBatchTrailer{catchup_complete=true}` streamed as `Notification` payloads over the existing connection |
   | Confirm (batch) | `/syntra.v1.UpdateRecovery/Confirm` | `RecoveryConfirmRequest` (`profile_version`, `subscription_handle`, `generation`, `checkpoint` batch result) | `RecoveryConfirmResponse` (`confirmed_checkpoint`, `generation` unchanged; idempotent retry echoes same bytes) |
-  | Confirm (snapshot boundary) | `/syntra.v1.UpdateRecovery/SnapshotConfirm` | `RecoverySnapshotConfirmRequest` (`profile_version`, `subscription_handle`, `generation` pre-install, `boundary_checkpoint` must equal offered boundary; exact retained-install retry per `SYN-URP-025`) | `RecoverySnapshotInstalled` (`boundary_checkpoint`, new `generation` after install; original retained response on retry) |
+  | Confirm (snapshot boundary) | `/syntra.v1.UpdateRecovery/SnapshotConfirm` | `RecoverySnapshotConfirmRequest` (`profile_version`, `subscription_handle`, CURRENT `generation`, `boundary_checkpoint` must equal offered S0; exact retained-install retry per `SYN-URP-025`) | `RecoverySnapshotInstalled` (`boundary_checkpoint`, the unchanged CURRENT generation after install; original retained response on retry) |
   | SnapshotOffer | `/syntra.v1.UpdateRecovery/SnapshotOffer` | `RecoverySnapshotOfferRequest` (`profile_version`, `subscription_handle`, `generation` at offer time) | `RecoverySnapshotDescriptor` (`snapshot_handle`, provider-proven `boundary_checkpoint`, `total_pages` 1..256, `page_bytes_max` 1..262144) |
-  | SnapshotFetch | `/syntra.v1.UpdateRecovery/SnapshotFetch` | `RecoverySnapshotFetchRequest` (`profile_version`, `snapshot_handle`, `page_index` 0..255) | exactly one `RecoverySnapshotChunk` per `RpcResult` with `page_index` correlation plus `boundary_checkpoint` equality; completion as `RecoverySnapshotComplete` (`total_pages`, `total_bytes` 1..67108864) |
+  | SnapshotFetch | `/syntra.v1.UpdateRecovery/SnapshotFetch` | `RecoverySnapshotFetchRequest` (`profile_version`, `snapshot_handle`, `page_index` 0..255) | exactly one `RecoverySnapshotChunk` per `RpcResult` with `page_index` correlation plus `boundary_checkpoint` equality. `RecoverySnapshotComplete` has NO wire transmission (§11.5): completion is a peer-local transfer/installation record with no method, result slot, or `RecoveryNotification` arm |
   | Unsubscribe | `/syntra.v1.UpdateRecovery/Unsubscribe` | `RecoveryUnsubscribeRequest` (`profile_version`, `subscription_handle`) | `RecoveryUnsubscribeResponse` (`profile_version`, `subscription_handle`, `generation` at termination); targeted `RecoveryBatchTrailer{terminated=true}` with `terminate_reason` where applicable |
 
-  Response framing rule (proposed, no normative force): each Replay
+  Response framing rule (accepted; §11.3): each Replay
   call returns exactly one `RecoveryReplayPage` in its `RpcResult` plus
-  its continuation marker; the initiator paginates with the same
+  its continuation marker — NEVER a page `Notification` — and the
+  initiator paginates with the same
   `/syntra.v1.UpdateRecovery/Replay` method until the marker is empty.
   Replay is sent only for resumption; initial subscriptions (empty
   `start_checkpoint`) skip Replay and start live at B on completion.
   The first `RecoveryReplayRequest` carries an empty `continuation_marker`
-  with `from_checkpoint` set to the last confirmed checkpoint (non-empty); each
+  with `from_checkpoint` set to the initiator's durable known-safe
+  checkpoint per §11.6 (non-empty); each
   continuation carries `continuation_marker` equal verbatim to the previous
   page's marker with `from_checkpoint` equal to the previous page's
   `result_checkpoint` (`SYN-URP-022`). The host MUST reject a non-empty marker that does
@@ -406,7 +471,7 @@ changes.
   `RpcResult` with `page_index` correlation; the same one-response-per-call
   rule applies to both Replay and SnapshotFetch.
 
-  Notification discriminator rule (proposed, no normative force): every
+  Notification discriminator rule (accepted): every
   profile `Notification.payload` carries exactly one versioned
   `RecoveryNotification` (`profile_version=1` outer must equal inner
   payload version) with exactly one of `batch` (`RecoveryBatch`),
@@ -414,15 +479,15 @@ changes.
   (`RecoveryBatchTrailer`) selected. An unset `notification` outcome is
   representable by codecs but is not valid and MUST be rejected with
   `FAILED_PRECONDITION`. `RpcResult` payloads stay bare typed messages
-  per the table above. No `Frame` field is added or renumbered; reserved
+  per the table above — including replay pages (§11.3). No `Frame` field
+  is added or renumbered; reserved
   16, 17 and `event`, `resume`, `ack` are preserved. All nine method
   strings are canonical `/package.Service/Method` paths with exactly two
   slashes per `SNTR-RPC-001`; any other shape MUST be rejected with
   `INVALID_ARGUMENT` before dispatch and MUST NOT be treated as a profile
   operation.
 
-  Version negotiation rule (proposed, no normative force,
-  `SYN-URP-020`/`SYN-URP-021`): every profile payload carries
+  Version negotiation rule (accepted; `SYN-URP-020`/`SYN-URP-021`): every profile payload carries
   `profile_version=1` in this draft. The Negotiate invocation carries
   `RecoveryNegotiateRequest` offering min and max versions (proposing
   1/1) with `capability` `syntra.update-recovery/1`; the host selects
@@ -444,12 +509,11 @@ changes.
   silently applied.
 
 - Schema diff (`.proto` snippet, field numbers, reserved handling):
-  Provisional draft only: the IDL
-  (`proto/syntra/v1/recovery_profile.proto`), generated code, and
-  conformance fixtures in this PR are provisional drafts, carry no
-  normative force, and land only after acceptance, consistent with the
-  Draft notice above that implementations MUST NOT ship behavior from
-  this proposal. The proposed change is additive and envelope-neutral:
+  The IDL
+  (`proto/syntra/v1/recovery_profile.proto`) is complete in the tree;
+  acceptance covers its message set and semantic comments as aligned to
+  §11.8 in the acceptance PR (registration is not execution; generated
+  codecs alone do not enforce the contract). The change is additive and envelope-neutral:
   `proto/syntra/v1/recovery_profile.proto` adds profile payload messages
   carried inside the existing `request`
   (field 12), `result` (field 13), and `notification` (field 15) variants
@@ -467,7 +531,7 @@ changes.
   - `SUBSCRIBED → CATCHING_UP` on subscribe confirm with fixed
     catch-up boundary B captured at subscribe accept and carried in
     `RecoverySubscribeResponse.catchup_boundary`; for resumption the initiator replays
-    from its last confirmed checkpoint via
+    from its durable known-safe checkpoint via
     `RecoveryReplayRequest.from_checkpoint` (non-empty; initial subscriptions with empty
     `start_checkpoint` skip replay and start live at B on completion)
     and validates each `RecoveryReplayPage.catchup_boundary` and each
@@ -475,23 +539,38 @@ changes.
     live `Notification`
     batches for the stream held until the catch-up completion signal
     under bounded holding per the documented overflow policy
-    (while held during CATCHING_UP, saturation MUST end the stream
-    with explicit continuity loss carrying a new generation and a
-    CATCHING_UP -> CONTINUITY_LOST transition clearing the held queue,
-    never a bare `RESOURCE_EXHAUSTED` that stalls waiting for an
+    (while held during CATCHING_UP, subscriber-local saturation MUST
+    end ONLY the affected subscription with
+    `RecoveryBatchTrailer{terminated=true}` and ASCII
+    `terminate_reason=local-queue-exhausted` at the UNCHANGED current
+    generation - no `next_generation`, no shared rebase, and no other
+    subscriber's checkpoint is invalidated (11.4) - never a bare
+    `RESOURCE_EXHAUSTED` that stalls waiting for an
     unreachable completion signal; outside holding, reject with
-    `RESOURCE_EXHAUSTED` and/or continuity loss, never silent drop);
+     `RESOURCE_EXHAUSTED` and/or a targeted `terminated=true`
+     trailer with ASCII `terminate_reason` (§11.4), never silent drop);
     `CATCHING_UP → LIVE` on catch-up
     completion signal with held then new live batches chaining from B;
     `CATCHING_UP → SNAPSHOT_REQUIRED` on
      snapshot-required signal; `SNAPSHOT_REQUIRED → INSTALLING` on
-    accepted snapshot offer; `INSTALLING → LIVE` on boundary confirm;
-    any streamed state → `TERMINATED(targeted)` on per-stream terminal
+    accepted snapshot offer; `INSTALLING → LIVE` on boundary confirm
+    (installation is application-local at the same generation G;
+    §11.5); any streamed state → `TERMINATED(targeted)` on per-stream terminal
      signal or terminate operation; `cancel` applies to the invoking RPC
-     only and does not by itself terminate the stream unless the confirmed
-     stream binding states so; any streamed state → `CONTINUITY_LOST(new
-    generation)` on overflow/expiry/revocation reset, then re-entry via
-    fresh subscribe or replay-from-confirmed-checkpoint where offered.
+    only and does not by itself terminate the stream unless the confirmed
+    stream binding states so; any streamed state → `PROVIDER_LOST(old
+    generation G, next_generation G′)` ONLY on a trailer streamed by the
+    host for a true provider history loss of (P, S) or an explicit
+    shared rebase (§11.2), then re-entry via a fresh Subscribe (fresh
+    handle H′ and newly captured boundary) from the initiator's durable
+    known-safe checkpoint where valid under G′. Subscriber-local
+    saturation is NOT a provider-loss transition (§11.4): it uses the
+    targeted `terminated` path with `local-queue-exhausted` at the
+    unchanged generation. A lost completion does not itself transition
+    the stream: the initiator either performs its bounded exact retries
+    of the round's completion or exhausts them, retires the handle, and
+    runs a fresh Subscribe/round from its durable known-safe checkpoint
+    (§11.3).
   - Failure transitions are terminal for the affected RPC or stream,
     not the connection, unless the connection itself is exhausted,
     violated, or revoked: unknown operation → `UNIMPLEMENTED`;
@@ -503,10 +582,10 @@ changes.
     unknown outcome; deadline expiry → `DEADLINE_EXCEEDED`.
 
 - Configuration and defaults (timeouts, limits, sizes):
-  Every bound is deployment-documented; the following are the proposed
+  Every bound is deployment-documented; the following are the accepted
   profile defaults matching `proto/syntra/v1/recovery_profile.proto`
-  header defaults (still Draft, see §10; carry no normative force until
-  acceptance):
+  header defaults (adopted at acceptance; §10 items 1–2 record the
+  adoption):
   - Maximum subscriptions per connection: 64; per principal: 256.
   - Maximum pending profile RPCs per connection: 16.
   - Maximum queued `Notification` bytes per stream: 256 KiB; per
@@ -530,16 +609,17 @@ Initiator                              Host
     |--- request{negotiate profile v1} -->|
     |<-- result{confirmed v1 + bounds} ----|
     |--- request{subscribe generic} ----->|
-    |<-- result{opaque handle, gen 7,     |
-    |         fixed B} -------------------|
+    |<-- result{opaque handle H, gen 7,   |
+    |         newly captured fixed B} ----|
     |         (live batches held until    |
     |          catch-up done; bounded      |
-    |          holding per documented      |
-    |          overflow policy)            |
-    |--- request{replay from last confirmed}|
+    |          holding; saturation ends    |
+    |          only the subscription with  |
+    |          terminated trailer at gen 7)|
+    |--- request{replay from durable CDC} |
     |                                   -->|
-    |<-- notification{page 1, cont C} -----|
-    |<-- notification{page 2, cont end} ---|
+    |<-- result{one replay page + marker} -|
+    |<-- result{one replay page + marker} -|
     |<-- notification{catch-up done} ------|
     |<-- notification{held then new live  |
     |         batch from B} ---------------|
@@ -551,12 +631,15 @@ Initiator                              Host
     |<-- notification{catch-up done} ------|
     |<-- notification{live batch from B} --|
     |<-- notification{snapshot-required} --|
-    |--- request{snapshot offer accept} -->|
-    |<-- result{snapshot page 1 / boundary||
-    |         checkpoint proven by          |
+    |--- request{snapshot offer} --------->|
+    |<-- result{snapshot descriptor binds  |
+    |         (P,S,H,G,S0), proven by      |
     |         provider} -------------------|
-    |--- request{confirm boundary} ------->|
-    |<-- result{installed, gen 8} ---------|
+    |--- request{snapshot fetch page} ---->|
+    |<-- result{one chunk per call} -------|
+    |--- request{confirm boundary at gen 7}|
+    |<-- result{installed at gen 7; no G   |
+    |         change (11.5)} --------------|
 ```
 
 ## 4. Detailed design
@@ -778,8 +861,11 @@ echo, generic key/value, generic subscription):
     subscription; per-stream termination does not end the connection;
     reconnect requires explicit re-establishment.
   - Bounds: subscription, pending-RPC, queue-byte, page-byte, and
-    deadline fixtures at exactly-MAX and MAX+1; overflow yields explicit
-    continuity loss with a new generation.
+    deadline fixtures at exactly-MAX and MAX+1; subscriber-local
+    saturation yields the targeted `terminated` trailer with ASCII
+    `local-queue-exhausted` at the UNCHANGED generation (no
+    `next_generation`), while a true provider loss yields the scoped
+    next_generation trailer (§11.2/§11.4).
   - Authorization hooks: subscribe/replay/snapshot/continuation each
     re-evaluated; revoked/expired principal stops delivery with a typed
     signal; rejections leak no credentials.
@@ -809,17 +895,22 @@ echo, generic key/value, generic subscription):
   preceding completed request returns the retained page);
   `SYN-URP-023` → subscribe-boundary fixtures (empty boundary rejected,
   pages validated against the subscribed boundary);
-  `SYN-URP-024` → bootstrap/repeated-rounds/lost-completion fixtures
-  (initial skip-replay, fixed-B validation, new round from last confirmed,
-  no idle-as-caught-up); `SYN-URP-025` → snapshot-generation and
-  confirm-fencing fixtures (new generation on install, exact pre-install
-  generation retry returns the original retained installed response,
-  different subscription/version/boundary rejected, later generation or
-  supersede/termination/retention expiry rejects the old request,
-  un-offered confirm rejected, supersede discards pages);
-  `SYN-URP-026` → invalidation-scope and revocation fixtures
-  (shared vs subscriber-local, revoked principal stops with typed signal
-  and generation increment).
+  `SYN-URP-024` → fresh-handle round / lost-completion fixtures
+  (initial skip-replay, fixed-B validation in correlated `RpcResult`
+  pages, fresh Subscribe with H2/B2 after a second gap, bounded exact
+  retries plus re-emitted completion on lost outcome, retire-H on
+  exhaustion, no same-handle second round, no idle-as-caught-up);
+  `SYN-URP-025` → snapshot transfer/install and
+  confirm-fencing fixtures (same-generation install with no G change,
+  current-generation retained-install retry returns the original
+  retained installed response, different subscription/version/boundary
+  rejected, supersede retires H even at equal boundary, later
+  generation/termination/retention expiry rejects the stale request,
+  un-offered confirm rejected, no wire carrier for the completion
+  record); `SYN-URP-026` → invalidation-scope and revocation fixtures
+  (scoped provider loss vs subscriber-local saturation, revoked
+  principal stops with typed signal, no automatic generation increment
+  on revocation unless policy resets the scope).
 - [ ] Interop check (implementations or fixtures): at least two
   independent profile implementations (or recorded fixtures from two
   sources) demonstrating mandatory-only interop plus confirmed-profile
@@ -845,21 +936,24 @@ What gets harder, what could go wrong, and mitigations.
 - Bound tuning risk: overly tight defaults throttle legitimate
   catch-up; overly loose bounds weaken denial-of-service posture.
   Mitigation: bounds are documented per deployment, fixtures assert
-  exactly-MAX/MAX+1, and overflow always carries an explicit
-  continuity-loss signal with a new generation.
+  exactly-MAX/MAX+1, and subscriber-local saturation always produces
+  the observable targeted termination (§11.4) rather than silent loss.
 - Generation-management defects could strand streams on stale
   checkpoints. Mitigation: stale checkpoints fail loudly with
-  `FAILED_PRECONDITION`, recovery is always explicit re-subscribe or
-  snapshot rebase, never silent reinterpretation.
+  `FAILED_PRECONDITION`, recovery is always an explicit fresh-handle
+  re-subscribe or a scoped provider loss transition, never silent
+  reinterpretation or a manufactured generation.
 
 ## 10. Unresolved questions and blockers
 
-Proposed values below are still Draft, not Accepted. Maintainers must
-confirm or replace with rationale; implementations MUST NOT ship
-behavior from this proposal and no test, claim, or release may cite it
-as authority.
+All six items below were proposals (Draft). At acceptance (2026-10-30)
+each adopted value/record is marked **Adopted**; the acceptance decision
+record carries the approval. Implementation validation and Rust/Go
+conformance evidence remain pending and are explicitly NOT satisfied by
+this acceptance.
 
-1. Proposed numeric bounds (from `proto/syntra/v1/recovery_profile.proto`
+1. **Adopted at acceptance.** Numeric bounds (from
+   `proto/syntra/v1/recovery_profile.proto`
    header defaults): maximum subscriptions per connection 64; maximum
    subscriptions per principal 256; maximum pending profile RPCs per
    connection 16; maximum queued `Notification` bytes per stream 262144
@@ -871,9 +965,11 @@ as authority.
    262144 bytes; maximum pages per snapshot offer 256
    (`RecoverySnapshotDescriptor{total_pages}` 1..256,
    `page_bytes_max` 1..262144, `RecoverySnapshotChunk{page_index}`
-   0..255, `page_bytes` non-empty at most 262144,
+   0..255,    `page_bytes` non-empty at most 262144,
    `RecoverySnapshotComplete{total_pages}` 1..256, `total_bytes`
-   1..67108864); effective deadline default for profile RPCs 5 s where
+   1..67108864 — field caps that apply to the peer-local
+   installation record, which per §11.5 has NO wire transmission);
+   effective deadline default for profile RPCs 5 s where
    the `RpcRequest` carries no explicit bounded deadline, with every
    profile RPC having an effective deadline and expiry surfaced as
    `DEADLINE_EXCEEDED`. Opaque field caps: `stream_selector` non-empty
@@ -895,7 +991,7 @@ as authority.
    value 1; `checkpoint` and `confirmed_checkpoint` non-empty at most
    4096 bytes; `RecoveryNegotiateResponse` confirmed bounds are
    `uint32` deployment values.
- 2. Proposed method strings, canonical payloads, and version
+ 2. **Adopted at acceptance.** Method strings, canonical payloads, and version
    negotiation rule (`SYN-URP-002`/`SYN-URP-020`/`SYN-URP-021`): exact
    standardized generic RPC methods are
    `/syntra.v1.UpdateRecovery/Negotiate`,
@@ -947,22 +1043,28 @@ as authority.
    boundary, and marker emptiness is per-field (`SYN-URP-021`), not blanket;
    unknown profile operations MUST be rejected with `UNIMPLEMENTED`, never
    silently applied.
-3. Proposed retention rule: retention stays deployment-documented with
+3. **Adopted at acceptance.** Retention rule: retention stays deployment-documented with
    no implicit minimum assumed by initiators. Each deployment offering
    replay documents its retention minimum. A replay or catch-up request
    for a checkpoint outside retention MUST fail with
    `FAILED_PRECONDITION` in `RpcResult` while emitting
    `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification`
    payload, per `SYN-URP-015`.
-4. Proposed snapshot offer lifetime and supersede rule: an offer is
-   valid from its `RecoverySnapshotDescriptor` until transfer completes
-   with `RecoverySnapshotComplete` plus boundary confirm, or until
-   targeted termination, continuity loss with a new generation, or
-   supersede. Invalidation flows through the snapshot handle and RPC
+4. **Adopted at acceptance (per §11.5).** Snapshot offer lifetime and
+   supersede rule: an offer is valid from its `RecoverySnapshotDescriptor`
+   until transfer completes — which per §11.5 produces only the
+   peer-local `RecoverySnapshotComplete` installation record with NO
+   wire transmission — plus boundary confirm, or until
+   targeted termination, a true provider continuity change incrementing
+   G, or supersede. Superseding an offer RETIRES the subscription handle
+   H, even when the new boundary equals S0 and G is unchanged, and
+   requires a fresh Subscribe before a further snapshot may be issued.
+   Invalidation flows through the snapshot handle and RPC
    outcome without ordering checkpoint bytes: in-flight
    `SnapshotFetch` under a superseded `snapshot_handle` fails with
    `FAILED_PRECONDITION` (superseded), and/or the host emits an
-   explicit continuity-loss/new-offer signal; the initiator MUST
+   explicit continuity signal for a genuine provider loss per §11.2;
+   the initiator MUST
    discard prior pages on supersede and MUST NOT install across
    boundaries. A `RecoverySnapshotChunk` is associated only when its
    `boundary_checkpoint` bytes equal the currently offered descriptor
@@ -970,45 +1072,54 @@ as authority.
    recency comes only from the explicit supersede signal or RPC
    outcome. Completion requires matching `total_pages` and
    `total_bytes`, and installation completes only when the initiator
-   confirms that exact boundary checkpoint through
+   confirms that exact boundary checkpoint — the offered S0 — through
    `/syntra.v1.UpdateRecovery/SnapshotConfirm`, yielding
-   `RecoverySnapshotInstalled` with the new generation per
-   `SYN-URP-016`.
-   Exact retained-install retries use the original pre-install generation
-   only under the `SYN-URP-025` exception, returning the original installed
-   response. They do not reopen an offer or authorize old-generation work.
+   `RecoverySnapshotInstalled` carrying the UNCHANGED CURRENT
+   generation per `SYN-URP-025`/§11.5.
+   Exact retained-install retries carry the CURRENT generation and the
+   installed boundary bytes under the `SYN-URP-025` exception, returning
+   the original installed response; they do not reopen an offer,
+   authorize old-generation work, or fabricate a pre-install generation.
    Retained responses are bounded by deployment-documented count, bytes,
    and lifetime and invalidated on supersede, termination, or later
-   continuity change; no implicit retry-retention minimum is proposed.
-5. Proposed fixture hosting note: conformance fixtures for this profile
+   continuity change; no implicit retry-retention minimum is set.
+5. **Adopted at acceptance.** Fixture hosting note: conformance fixtures for this profile
    live in the conformance suite as additive fixtures using neutral
    payloads only (echo, generic key/value, generic subscription),
    tracing to §8 acceptance criteria and `SYN-URP` IDs. Interop evidence
    requires two independent profile implementations or recorded
    fixtures from two sources demonstrating mandatory-only interop plus
    confirmed-profile recovery interop; placeholders are tracked where
-   implementations do not yet exist.
+    implementations do not yet exist. Registered case identities live in
+   `conformance/manifest/recovery.yaml` (`CONF-URP-001…017`, §11-reconciled
+   in the acceptance PR); registration is not execution.
+6. **Adopted at acceptance; review synchronization applied.** The separate
+   SnapshotConfirm method, per-field empty sentinels, and the
+   current-generation retained-install retry (the pre-amendment
+   pre-install-generation exception is removed by §11.5) align the
+   contract with the profile/IDL intent, and the owning profile, IDL
+   comments, and registered cases have been synchronized in the
+   acceptance PR (registration is not execution). Generated codecs still
+   do not enforce these validation rules; implementation validation and
+   deterministic positive and negative retained-install tests must be
+   verified before any conformance claim. Shipping authority remains
+   gated on the required maintainer acceptance (recorded via the
+   acceptance decision record) and protocol/security review, and on
+   independent implementation/conformance evidence, which is pending.
 
-6. Review synchronization (Draft only): the separate SnapshotConfirm method,
-   per-field empty sentinels, and narrow retained-install retry exception
-   above align the proposal with the draft profile/IDL intent. They are not
-   accepted normative changes. Generated codecs do not enforce these
-   validation rules; implementation validation and deterministic positive and
-   negative retained-install tests must be verified before any conformance
-   claim. Shipping authority remains blocked on maintainer acceptance and
-   protocol/security review; this edit records neither approval nor interop
-   evidence.
+## 11. Decision amendment — release inclusion and recovery safety
 
-## 11. Draft decision amendment — release inclusion and recovery safety
-
-All decisions in this section are **proposals for formal approval**. They
-resolve the design choices below for review; approval, synchronized owner
-edits, and acceptance evidence remain blockers, rather than implementation
-design TBDs. Existing `SYN-URP` IDs are retained; no IDs are allocated here.
+The decisions in this section were recorded by the 2026-10-28 amendment
+and are adopted by this acceptance; the acceptance decision record
+carries the approval. They resolve the design choices below for review;
+owner-file synchronization, and the conformance and release evidence
+trails were applied in the acceptance PR, while implementation evidence
+remains outstanding. Existing `SYN-URP` IDs are retained; no IDs are
+allocated here.
 
 ### 11.1 Release bundle versus wire optionality
 
-Proposed decision (`SYN-URP-001`, `002`, `010`, `011`, `020`, `021`):
+Adopted decision (`SYN-URP-001`, `002`, `010`, `011`, `020`, `021`):
 standardized recovery is required in the target release bundle. A release
 presented as meeting that target includes the accepted recovery contract,
 matching schema documentation, and independent Rust/Go acceptance evidence
@@ -1025,15 +1136,17 @@ evidence for the recovery-inclusive release bundle. A release participant
 still interoperates with Core-only peers using mandatory-only behavior;
 fallback supplies no recovery guarantee and is recorded as such.
 
-This is a proposed release acceptance obligation, not a change to current
-profile registration or claim selection. `SNTR-EVENTS-V1` currently discovers
-capability-gated recovery placeholders. No new release-bundle profile ID is
-invented. Formal release-scope approval belongs to maintainers; other release
+This is an adopted release acceptance obligation per RFC 0009's accepted
+release scope (Option A: standardized recovery stays in Syntra), recorded
+through the acceptance decision record. `SNTR-EVENTS-V1` registers
+capability-gated recovery cases (registered, not executed). No new release-bundle profile ID is
+invented. Release-scope governance already belongs to maintainers via
+accepted RFC 0009; other release
 work, including RFC 0008, Core, and SC1, retains its own decision process.
 
 ### 11.2 Identity and generation scope
 
-Proposed replacement for `SYN-URP-003`, `006`, `012`, `013`, `019`, `026`:
+Adopted replacement for `SYN-URP-003`, `006`, `012`, `013`, `019`, `026`:
 
 - A subscription is a delivery instance, routed by a fresh connection-scoped
   handle H. A stable stream identity S is provider-resolved from the selector
@@ -1068,7 +1181,7 @@ Proposed replacement for `SYN-URP-003`, `006`, `012`, `013`, `019`, `026`:
 
 ### 11.3 One fresh handle and fixed boundary per recovery round
 
-Proposed replacement for `SYN-URP-004`, `006`, `014`, `015`, `022`–`024`:
+Adopted replacement for `SYN-URP-004`, `006`, `014`, `015`, `022`–`024`:
 
 1. Each new round begins with Subscribe and receives a fresh H and a newly
    captured non-empty fixed B at host acceptance. B never moves during that
@@ -1119,7 +1232,7 @@ Replay returns one page in its correlated `RpcResult`, not a page Notification.
 
 ### 11.4 Subscriber-local saturation does not rebase the provider
 
-Proposed replacement for `SYN-URP-007`, `017`, `018`, `026`: a host or
+Adopted replacement for `SYN-URP-007`, `017`, `018`, `026`: a host or
 initiator delivery/holding queue overflow is subscriber-local. End the
 affected subscription or report an explicit local recovery-needed event,
 clear its held queue, fence H, and begin a fresh round using §11.3. It does
@@ -1142,7 +1255,7 @@ because its queues filled. True history loss is separately handled by §11.2.
 
 ### 11.5 Snapshot transfer, local installation, and coordinated binding
 
-Proposed replacement for `SYN-URP-016`, `021`, `025`, `026`:
+Adopted replacement for `SYN-URP-016`, `021`, `025`, `026`:
 
 - SnapshotOffer returns `RecoverySnapshotDescriptor` with H, snapshot handle
   X, provider-proven boundary S0, page count N and page byte bound. G is the
@@ -1200,7 +1313,7 @@ Proposed replacement for `SYN-URP-016`, `021`, `025`, `026`:
 
 ### 11.6 Persistence, confirmation, and reconnect
 
-Proposed replacement for `SYN-URP-005`, `006`, `013`, `016`, `022`, `025`:
+Adopted replacement for `SYN-URP-005`, `006`, `013`, `016`, `022`, `025`:
 
 `receive → validate → offer → persist → confirm` includes the application
 effects represented by a checkpoint, not just saving opaque checkpoint bytes.
@@ -1229,7 +1342,7 @@ Reconnect always establishes a new authenticated connection, negotiates again,
 and subscribes with a fresh H and captured B. It transfers neither capability
 state nor pagination/snapshot handles. Recovery cases are explicit:
 
-| Durable evidence on restart | Proposed action and host check |
+| Durable evidence on restart | Required action and host check |
 |---|---|
 | No durable application progress | Use prior known-safe C with reconciliation/fence; if none exists, explicitly choose initial live-only baseline or snapshot according to application intent. Never label initial live-only as restored historical state. |
 | Effects + C durable, Confirm never sent | Subscribe with C under the same P/S/G; host validates issued checkpoint and current authority, binding and retention even though it never received Confirm. |
@@ -1253,7 +1366,7 @@ Syntra supplies neither a storage transaction nor exactly-once application
 effects. Retries can repeat delivery; crash safety comes from the application's
 atomic persistence or explicit idempotent recovery fence.
 
-### 11.7 Proposed event sequence
+### 11.7 Event sequence
 
 ```text
 Initiator/application                         Host/provider
@@ -1283,11 +1396,13 @@ Initiator/application                         Host/provider
   bounded exact retry; then reconnect from S0       |
 ```
 
-### 11.8 Exact acceptance follow-up edit map (not applied here)
+### 11.8 Acceptance edit map (applied in the acceptance PR)
 
 In this table, **owner** means `specifications/profiles/recovery.md` and
-**IDL** means `proto/syntra/v1/recovery_profile.proto`. Edits are conditional
-on acceptance of this amendment; current owner/schema/manifests remain as-is.
+**IDL** means `proto/syntra/v1/recovery_profile.proto`. These edits are
+specified by the amendment and were applied in the acceptance PR
+(registration is not execution; codecs alone still do not enforce the
+contract).
 
 | Decision / existing IDs | Exact required owner edits | Exact required IDL edits |
 |---|---|---|
@@ -1299,39 +1414,49 @@ on acceptance of this amendment; current owner/schema/manifests remain as-is.
 | §11.6; `005`, `006`, `013`, `016`, `022`, `025` | §2 IDs listed; §§4, 5/5.1/5.2, 6/6.1, 7: add atomic effects+checkpoint or explicit durable fence, three progress observations, finite retries and the reconnect table; replace blanket “last confirmed” with durable known-safe resume where applicable. | Header; `RecoverySubscribeRequest.start_checkpoint`, `RecoveryReplayRequest.from_checkpoint`, `RecoveryConfirmRequest/Response`, `RecoverySnapshotConfirmRequest/Installed`: clarify persistence precondition, issued-checkpoint resume versus offered Confirm, sent versus acknowledged, same-G snapshot resume. No transaction/fence field. |
 
 Requirement numbers in the table use the `SYN-URP-` prefix. The acceptance
-plan maps every decision to planned observations. After acceptance, reconcile
-this RFC's pre-amendment §§3–10 with these replacements, synchronize owner
-prose and IDL comments, and update the conformance prose companion and
-registered recovery cases. In particular, existing `CONF-URP-009/010` encode
-the old shared-overflow/same-handle recovery choices, and `CONF-URP-004/011`
-need response-shape review. They are not evidence for this amendment.
+plan maps every decision to planned observations. The §11 synchronization
+called for at acceptance has been applied: owner prose and IDL comments
+were aligned to §11, the conformance prose companion and registered
+recovery cases were reconciled (CONF-URP-009/010 replaced with the
+§11.2/§11.4 dispositions; CONF-URP-004/011 response shapes corrected),
+all recorded in the acceptance PR. Registration is not execution: none of
+this is evidence of conformance runs.
 
-Registration also requires explicit review of
-`conformance/manifest/schema.yaml`: its requirement-reference patterns do not
-currently admit `SYN-URP-*`. Do not insert those IDs into manifests without
-an accepted schema/registry disposition. Preserve reserved `008/009`, existing
-case identities where appropriate, and truthful planned/not-executed status.
+The registry disposition was also recorded: `conformance/manifest/schema.yaml`
+and the repository validation tooling now admit `SYN-URP-*` requirement
+references explicitly. Reserved `008/009` are preserved as reserved;
+existing case identities were reconciled or replaced where the amendment
+changed their meaning; and case/status wording remains truthful
+(registered, not executed).
 
-### 11.9 Formal approval and evidence blockers
+### 11.9 Formal approval and evidence record
 
-- Author and assigned protocol/security reviewers: TBD — blocker, to be
-  assigned by maintainers. Design decisions in §§11.1–11.6 are specified
-  proposals, not delegated runtime choices.
-- Public maintainer acceptance with quorum and no unresolved normative
-  objection per `GOVERNANCE.md` §3; explicit release-scope, compatibility,
-  persistence, resource-limit and principal-isolation review are pending.
-  Snapshot same-generation semantics change earlier draft meaning despite
-  unchanged tags; codec compatibility alone cannot approve that semantic change.
-- Acceptance of numeric bounds/methods/version and bounded retry/retention
-  policy (§10, as amended): pending. Each deployment documents finite retry
-  attempts, absolute time budget, backoff and reply-cache count/bytes/lifetime;
-  no implicit guaranteed minimum retention is introduced.
-- Accepted owner/IDL-comment and registry synchronization, release notes and
-  migration documentation: pending follow-up under the approved decision.
-- Independent Rust and Go both-role acceptance observations, crash/fault
-  evidence, application persistence-contract review and release authorization:
-  pending. The linked plan is non-executable and entirely not executed; static
-  repository validation establishes neither behavior nor release readiness.
+- Author and assigned protocol/security reviewers: assigned via the
+  acceptance PR with disclosed self-approval (single active maintainer,
+  owner-ratified bootstrap authority per `GOVERNANCE.md` Sec. 3).
+  Design decisions in §§11.1–11.6 are specified decisions, not delegated
+  runtime choices.
+- Public maintainer acceptance was recorded via the acceptance decision
+  record per `GOVERNANCE.md` Sec. 3 (self-approval disclosed); release-scope,
+  compatibility, persistence, resource-limit and principal-isolation review
+  rationale are carried in that record. Snapshot same-generation semantics
+  change earlier draft meaning despite unchanged tags; codec compatibility
+  alone cannot establish that semantic change — the §11 review is the
+  authority.
+- Numeric bounds/methods/version and bounded retry/retention policy
+  (§10, as amended) are adopted at acceptance. Each deployment documents
+  finite retry attempts, absolute time budget, backoff and
+  reply-cache count/bytes/lifetime; no implicit guaranteed minimum
+  retention is introduced.
+- Done in the acceptance PR: owner/IDL-comment and registry
+  synchronization. Release notes and migration documentation land under
+  the accepted decision via `CHANGELOG.md`/`MIGRATION.md`.
+- Explicitly still pending, and NOT satisfied by this acceptance:
+  independent Rust and Go both-role acceptance observations, crash/fault
+  evidence, application persistence-contract review and final release
+  authorization. The linked plan is non-executable and entirely not
+  executed; static repository validation establishes neither behavior nor
+  release readiness.
 
 ## Appendix: References
 

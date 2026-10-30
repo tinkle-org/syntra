@@ -43,7 +43,11 @@ schema:
     optional: [notes, vector_refs]
     fields:
       id: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" }
-      requirement: { type: list, item: { type: string, pattern: "^SNTR-[A-Z]+-[0-9]+$" }, min_items: 1 }
+      # Requirement refs admit the SNTR-* core families and the RFC 0006
+      # recovery family SYN-URP-nnn except the reserved unassigned IDs
+      # SYN-URP-008 and SYN-URP-009, which the pattern rejects outright
+      # (they MUST NOT appear as case refs or registrations).
+      requirement: { type: list, item: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }, min_items: 1 }
       profile: { $ref: "#/schema/profile_selection" }
       roles: { type: list, item: { enum: [client, server] }, min_items: 1 }
       capabilities: { type: list, item: { type: string } }
@@ -85,7 +89,12 @@ schema:
     required: [requirement_id, specification, section, test_ids, automation_status]
     optional: [notes]
     fields:
-      requirement_id: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+|SYN-ARCH-[0-9]+)$" }
+      # Requirement IDs admit the SNTR-* core families, the SYN-ARCH-*
+      # charter family, and the RFC 0006 recovery family SYN-URP-nnn except
+      # the reserved unassigned IDs SYN-URP-008 and SYN-URP-009, which the
+      # pattern rejects outright (they MUST NOT be registered as requirement
+      # rows).
+      requirement_id: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }
       specification: { type: string }
       section: { type: string }
       test_ids: { type: list, item: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" } }

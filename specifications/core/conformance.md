@@ -32,7 +32,7 @@ Optional (only if claimed): event subscribe→events→cancel, replay/cursor, re
 
 ## Reporting
 
-Claims MUST list: implementation + transport profiles supported (secure/insecure labeling per SYN-ARCH-050), wire version(s), capabilities with IDs, bounds/defaults, and per-ID pass/fail with logs. “Pass” MUST NOT be reported unless executed.
+Claims MUST list: implementation + transport profiles supported (secure/insecure labeling per SYN-ARCH-050), wire version(s), capabilities with IDs, bounds/defaults, and per-ID pass/fail with logs. Every result-bearing claim MUST additionally be machine-verifiable: it names the executed manifest case IDs (`CONF-*`), the runner/tool, the specification and suite revision pinned at execution, and the per-case results (suite verdict vocabulary; missing execution is NOT_EXECUTED, never PASS). Registered, planned rows with no run are not reportable as results. Core-only claims on one named profile remain permitted, but they cannot satisfy the recovery-inclusive stable bundle (RFC 0006 §11.1), which requires the recovery contract's own accepted requirements and evidence.
 
 ## Trace (requirement → fixture group)
 

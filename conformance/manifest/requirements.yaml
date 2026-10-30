@@ -995,3 +995,82 @@ requirements:
       notes: "Replayed M1 and generic refusal are executable; store timing, enumeration resistance and rate limits remain host evidence." }
   - { requirement_id: SNTR-DAUTH-009, specification: specifications/security/device-authorization.md, section: "§4", test_ids: [CONF-SCW-012], automation_status: automated }
   - { requirement_id: SNTR-DAUTH-010, specification: specifications/security/device-authorization.md, section: "§4", test_ids: [CONF-SCW-011, CONF-SCW-016, CONF-SCW-018], automation_status: automated }
+
+  # ---- RFC 0006 accepted update/recovery profile: SYN-URP-* families ----
+  # RFC 0006 is accepted with the §11 decision amendment authoritative. Rows
+  # trace the accepted SYN-URP requirements to CONF-URP-* cases registered in
+  # manifest/recovery.yaml. SYN-URP-008/009 are RESERVED and unassigned: they
+  # are intentionally NOT registered here. Registered cases are planned,
+  # not-executed executable specifications; registration is not an execution
+  # result.
+  - { requirement_id: SYN-URP-001, specification: specifications/profiles/recovery.md, section: "§2.1", test_ids: [CONF-URP-001], automation_status: automated }
+  - { requirement_id: SYN-URP-002, specification: specifications/profiles/recovery.md, section: "§2.1", test_ids: [CONF-URP-001, CONF-URP-014], automation_status: automated }
+  - requirement_id: SYN-URP-003
+    specification: specifications/profiles/recovery.md
+    section: "§2.1"
+    test_ids: [CONF-URP-002, CONF-URP-003, CONF-URP-005, CONF-URP-009]
+    automation_status: partially_automated
+    notes: "Scoped (P, S, G) binding and provider-resolved identity are exercised by the registered cases; asserting the host's resolved identity needs the plan's two-subscriber/two-scope fixtures under PLAN-URP-05/06 before execution."
+  - { requirement_id: SYN-URP-004, specification: specifications/profiles/recovery.md, section: "§2.1", test_ids: [CONF-URP-002, CONF-URP-003, CONF-URP-004, CONF-URP-011, CONF-URP-012], automation_status: automated }
+  - requirement_id: SYN-URP-005
+    specification: specifications/profiles/recovery.md
+    section: "§2.1"
+    test_ids: [CONF-URP-015]
+    automation_status: partially_automated
+    notes: "Atomic effects+checkpoint or declared fence contract is exercised by CONF-URP-015; persistence-contract review (fence variants, crash cuts) awaits PLAN-URP-09 execution and stays unclaimed until then."
+  - { requirement_id: SYN-URP-006, specification: specifications/profiles/recovery.md, section: "§2.1", test_ids: [CONF-URP-007, CONF-URP-011, CONF-URP-012, CONF-URP-015], automation_status: automated }
+  - { requirement_id: SYN-URP-007, specification: specifications/profiles/recovery.md, section: "§2.1", test_ids: [CONF-URP-008, CONF-URP-010], automation_status: automated }
+  - { requirement_id: SYN-URP-010, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-001, CONF-URP-007], automation_status: automated }
+  - { requirement_id: SYN-URP-011, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-001, CONF-URP-014], automation_status: automated }
+  - { requirement_id: SYN-URP-012, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-003, CONF-URP-005, CONF-URP-009, CONF-URP-017], automation_status: automated }
+  - { requirement_id: SYN-URP-013, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-009, CONF-URP-015, CONF-URP-016], automation_status: automated }
+  - { requirement_id: SYN-URP-014, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-004, CONF-URP-011, CONF-URP-012], automation_status: automated }
+  - { requirement_id: SYN-URP-015, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-005, CONF-URP-012], automation_status: automated }
+  - { requirement_id: SYN-URP-016, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-006, CONF-URP-013, CONF-URP-014, CONF-URP-017], automation_status: automated }
+  - { requirement_id: SYN-URP-017, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-010], automation_status: automated }
+  - { requirement_id: SYN-URP-018, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-008, CONF-URP-010], automation_status: automated }
+  - requirement_id: SYN-URP-019
+    specification: specifications/profiles/recovery.md
+    section: "§2.2"
+    test_ids: []
+    automation_status: manual
+    notes: "Authorization hooks and the scoped revocation split are planned under PLAN-URP-11 (principal revocation and hook races); no revocation case is registered yet, so this row is human-review pending that execution."
+  - { requirement_id: SYN-URP-020, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-001], automation_status: automated }
+  - { requirement_id: SYN-URP-021, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-001, CONF-URP-004, CONF-URP-006, CONF-URP-014], automation_status: automated }
+  - { requirement_id: SYN-URP-022, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-004, CONF-URP-011, CONF-URP-012], automation_status: automated }
+  - { requirement_id: SYN-URP-023, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-004, CONF-URP-011], automation_status: automated }
+  - { requirement_id: SYN-URP-024, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-011, CONF-URP-012], automation_status: automated }
+  - { requirement_id: SYN-URP-025, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-006, CONF-URP-013, CONF-URP-016, CONF-URP-017], automation_status: automated }
+  - { requirement_id: SYN-URP-026, specification: specifications/profiles/recovery.md, section: "§2.2", test_ids: [CONF-URP-009, CONF-URP-010], automation_status: automated }
+
+  # ---- RFC 0010 accepted device authorization lifecycle: SNTR-DAUTH-011…024 ----
+  # RFC 0010 is accepted (2026-10-30 via docs/decisions/0002-sdd-acceptance-wave.md)
+  # with the host enrollment/authorization lifecycle contract in
+  # specifications/security/device-authorization.md §5 (SNTR-DAUTH-001…010 and
+  # §§1–4 unchanged). Each row is one-to-one with its registered
+  # CONF-SCW-025–038 case in manifest/sc1-wss.yaml, which mirrors
+  # conformance/plans/secure-channel.md §§7–8 (PLAN-DAUTH-011–024 plus the §8
+  # fault matrices and revocation time budgets). Registered cases are planned,
+  # not-executed executable specifications; registration is not an execution
+  # result, and host-store/device inspection surfaces keep several rows
+  # partially automated until the runner integration pass records executed
+  # verdicts.
+  - { requirement_id: SNTR-DAUTH-011, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-025, CONF-SCW-039, CONF-SCW-040, CONF-SCW-041], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-012, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-026], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-013, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-027], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-014, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-028], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-015, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-029], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-016, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-030, CONF-SCW-042], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-017, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-031], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-018, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-032], automation_status: partially_automated,
+      notes: "Latency observation uses injected clocks anchored at the authoritative revocation commit; the deployment's cache-staleness/propagation/check-close budget sum remains host-documented and no configured watchdog interval proves enforcement." }
+  - { requirement_id: SNTR-DAUTH-019, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-033], automation_status: partially_automated,
+      notes: "Fail-closed denial and bounded closure are executable with store fault injection; the freshness bound itself is deployment-declared and honored per deployment review." }
+  - { requirement_id: SNTR-DAUTH-020, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-034], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-021, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-035], automation_status: automated }
+  - { requirement_id: SNTR-DAUTH-022, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-036], automation_status: partially_automated,
+      notes: "Universal denial rows are executable with compromised-credential fixtures; designating and reviewing the independent recovery authority path is deployment-owned evidence (RFC 0010 §3.7)." }
+  - { requirement_id: SNTR-DAUTH-023, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-037], automation_status: partially_automated,
+      notes: "Synthetic-marker hygiene inspection is automated; storage access control and disposal assurance remain host-owned review items consistent with SNTR-DAUTH-004." }
+  - { requirement_id: SNTR-DAUTH-024, specification: specifications/security/device-authorization.md, section: "§5", test_ids: [CONF-SCW-038], automation_status: partially_automated,
+      notes: "Peer-taught/stale/replayed pin refusal rows are executable; pin store format and distribution remain host-owned per RFC 0007 §11.2." }

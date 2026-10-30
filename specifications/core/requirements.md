@@ -13,7 +13,7 @@
 | ID | Defining document | Concern | Mandatory/Optional |
 |----|-------------------|---------|--------------------|
 | SNTR-CORE-001…006, 010–012, 020–022, 030–031, 900–901 | `protocol.md` | General model, layering, roles | Mandatory |
-| SNTR-SER-001…008, 010–011, 020–021, 900–901 | `serialization.md` | Protobuf encoding, unknown fields, bounds, malformed input, non-canonical | Mandatory |
+| SNTR-SER-001…008A, 010–011, 020–021, 900–901 | `serialization.md` | Protobuf encoding, unknown fields, bounded raw-wire validation, bounds, malformed input, non-canonical | Mandatory |
 | SNTR-WIRE-001…008, 010–011, 020–021, 900–901 | `framing.md` | Envelope variants, validation, size, empty payloads, reserved, transport-independence | Mandatory |
 | SNTR-HS-001…006, 010–015, 020–021, 030–031, 040, 900–902 | `handshake.md` | Six-state machine, negotiation, timeouts, close/loss; reliable attachment (optional, no state change) | Mandatory (+ optional reliable) |
 | SNTR-AUTH-001…010, 020–021, 030–031, 900–901 | `authentication.md` | Pluggable auth, credential rules, principal binding, expiry, re-auth | Mandatory interface; mechanisms application-defined |

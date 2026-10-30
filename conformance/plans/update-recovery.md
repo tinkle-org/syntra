@@ -1,10 +1,13 @@
 # Update/recovery acceptance plan
 
-- Status: Draft, non-executable acceptance plan for RFC 0006 §11.
-- Proposal: [RFC 0006 decision amendment](../../rfcs/0006-update-recovery-profile.md#11-draft-decision-amendment--release-inclusion-and-recovery-safety).
+- Status: non-executable acceptance plan for RFC 0006 §11. RFC 0006 is
+  accepted per this wave's acceptance decision record; the plan itself
+  remains prose, and the §11.8/§11.10 execution gates are pending.
+- Proposal: [RFC 0006 decision amendment](../../rfcs/0006-update-recovery-profile.md#11-decision-amendment--release-inclusion-and-recovery-safety).
 - Current draft owner: `specifications/profiles/recovery.md`.
 - Representation inspected: `proto/syntra/v1/recovery_profile.proto`.
-- Authority: `GOVERNANCE.md` §§3–5 and `rfcs/README.md`; acceptance is pending.
+- Authority: `GOVERNANCE.md` §§3–5 and `rfcs/README.md`; acceptance is
+  recorded by the acceptance decision record; no execution is claimed.
 - Execution: **NOT EXECUTED** for every observation below. No runtime tests,
   interop results, conformance verdicts, or release readiness are asserted.
 

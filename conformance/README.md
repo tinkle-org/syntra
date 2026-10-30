@@ -123,7 +123,7 @@ Full definitions: `conformance/profiles.yaml`. Summary:
 | `SNTR-CORE-V1`  | MANDATORY CORE       | Envelope, serialization, handshake machine, RPC, errors, auth interface, bounds, security, capability-free event handling | **every** conformance claim |
 | `SNTR-SESS-V1`  | MANDATORY CORE       | Session = connection, close/loss, expiry, no-implicit-resumption | every claim (runs over any claimed transport) |
 | `SNTR-RPC-V1`   | MANDATORY CORE       | Correlation, concurrency, deadlines, cancel, idempotency discipline | every claim |
-| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery placeholder pending RFC 0006; must not be claimed until accepted) |
+| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery: accepted RFC 0006 §11 — `CONF-URP-001…017` cases and `SYN-URP-*` requirements are registered, not executed; a supported claim still requires executed verdicts) |
 | `SNTR-TCP-V1`   | TRANSPORT PROFILE    | Plaintext TCP framing (restricted development only)         | only TCP claims; never sufficient for production |
 | `SNTR-TLS-TCP-V1` | TRANSPORT PROFILE  | Same framing over TLS 1.3                                   | TLS/TCP claims |
 | `SNTR-HTTP-V1` | TRANSPORT PROFILE    | HTTP/1.1 request/response RPC binding (restricted dev only) | HTTP/1.1 claims |
@@ -151,6 +151,13 @@ Rules:
   selection does not enable any capability-gated event case.
 - Resume-accept cases are Optional and gated on `resume-v1` (no such RFC
   exists; in default v1 only resume-**rejection** cases are Mandatory).
+- The accepted update/recovery profile (`syntra.update-recovery/1`,
+  [RFC 0006](../rfcs/0006-update-recovery-profile.md) §11) is registered in
+  `manifest/recovery.yaml` with `CONF-URP-001…017` cases and `SYN-URP-*`
+  requirement rows; registration is not execution, so no recovery verdict is
+  claimed today. A Core-only conformance result stays valid as a per-profile
+  claim, but Core-only cannot satisfy the stable release bundle, which is
+  recovery-inclusive (RFC 0006 §11.1).
 
 ### 2.1 Manifest and case selection
 
@@ -219,7 +226,8 @@ conformance/
     core.yaml                — CONF-CORE-* portable cases (§E envelope/core)
     session.yaml             — CONF-SESS-* portable cases (§F)
     rpc.yaml                 — CONF-RPC-* portable cases (§G)
-    events.yaml              — CONF-EVT-* portable cases (§H)
+    events.yaml            — CONF-EVT-* portable cases (§H)
+    recovery.yaml            — CONF-URP-* update/recovery cases (registered per accepted RFC 0006 §11; execution pending)
     transport-tcp.yaml       — CONF-TCP-* (§I TCP)
     transport-tls.yaml       — CONF-TLS-* (§I TLS)
     transport-http.yaml      — CONF-HTTP-* (§I HTTP/1.1)

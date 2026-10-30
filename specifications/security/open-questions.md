@@ -10,8 +10,15 @@
 ## Blockers for stable v1
 
 1. **Channel-binding mechanism (blocker if claimed).** `authentication-security.md` SNTR-ASEC-002 explicitly does not claim channel binding. If stable v1 claims binding (e.g., TLS exporter to credential), the exporter construction, negotiation, and failure semantics REQUIRE a dedicated RFC. Until then, “channel bound” MUST NOT appear in conformance claims.
-2. **Revocation-propagation bound (blocker).** Maximum staleness (time from revocation to enforcement) is deployment-documented but has no suite-wide upper bound. Stable v1 MUST set a default maximum (candidate: ≤5 minutes for public deployments, tighter for high-risk applications) or explicitly allow deployment-defined values with test verification of the documented value.
-3. **Revocation/expiry transport for offline hosts (blocker if offline operation claimed).** How hosts without fresh revocation data fail closed (deny vs cached-allow with short TTL) MUST be specified before any “offline-capable” conformance claim.
+2. **Revocation-propagation bound (blocker) — RESOLVED (2026-10-30, RFC 0010).** The staleness maximum is now a decided policy: [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) records it as requirements `SNTR-DAUTH-017`–`SNTR-DAUTH-019` in [device-authorization.md](device-authorization.md) (which assign the keyword force); the candidate “≤5 minutes” bound of this entry is adopted as the default public production profile 300-second hard maximum. Recording it verbatim:
+   - New connections: immediate enforcement — a revoked enrollment MUST NOT authenticate on a newly established connection.
+   - Existing connections: maximum 300 seconds from authoritative revocation commit to enforcement (hard profile maximum).
+   - Operational target: enforce within 60 seconds, preferably immediately through push invalidation.
+   - After the deadline: deny new protected operations and delivery; close affected channels.
+   - Revocation-store unavailable: fail closed when current validity cannot be established or the permitted freshness window expires.
+   - High-security deployments may enforce shorter bounds or zero grace; longer grace is NOT permitted under the default public production profile.
+   - Wording notes: the 300-second figure is a maximum tolerated stale-authorization window, not a mandatory waiting period; hosts should revoke immediately when possible; already-committed application effects cannot be retroactively undone; a nominal watchdog interval does not prove propagation.
+3. **Revocation/expiry transport for offline hosts (blocker if offline operation claimed) — RESOLVED (2026-10-30, RFC 0010).** Decided: fail closed, cached-allow is refused. When current validity cannot be established — a failed or timed-out authorization-store read, a cache beyond the deployment's declared freshness bound, or an unresolved revocation state — hosts deny new admissions and close established channels no later than the last successful validity check plus the deployment's declared bound, within RFC 0010's 300-second profile maximum (`SNTR-DAUTH-019`, bound owner `SNTR-DAUTH-018`). Availability is not bought by admitting under stale or unverifiable revocation state. Any conformance claim about “offline-capable” authorization still requires its own accepted profile and executed tests.
 4. **Proxy identity propagation format (blocker if proxied public deployments claimed).** SNI/Host/ALPN consistency is REQUIRED, but the exact backend-propagation field (header, mTLS identity, or private-network attestation) is transport-profile work. At least one proxied topology MUST be fully specified and tested before stable.
 5. **Resume-token standard (blocker only if resumption claimed).** Default v1 has no resumption. Any resumption RFC MUST define token format, entropy, audience binding, lifetime, rotation, and replay windows before a resumption conformance claim.
 
@@ -32,7 +39,13 @@
 Its [shared channel](secure-channel.md), [device authorization](device-authorization.md)
 and [carrier profile](../transports/noise-bindings.md) are normative for
 `SNTR-SC1-WSS-V1`. The profile is additive: it does not weaken transport
-security above or replace the baseline TLS profiles.
+security above or replace the baseline TLS profiles. The host lifecycle
+companion contract is [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md):
+it fixes revocation-propagation bounds, staged provisioning, rotation and
+compromise-recovery obligations as `SNTR-DAUTH-011`–`SNTR-DAUTH-024`, closing
+items 2–3 of `Blockers for stable v1`; it introduces no wire change and
+standardizes no online enrollment RPC (a portable online enrollment RPC may
+become a separate explicitly negotiated profile later).
 
 ### Accepted definitions
 
@@ -87,13 +100,23 @@ security above or replace the baseline TLS profiles.
    version/deprecation decision and migration window. SC1/WSS is additive and
    does not replace the baseline TLS profiles.
 2. **Enrollment and storage.** Only out-of-band preprovisioning is delivered.
-   Authorized issuance, protected transfer/storage, durable commit/acknowledgment,
-   bounded RPC contract, retries/idempotency and interrupted-enrollment recovery
-   remain absent. NK bootstrap support alone grants no enrollment authority.
-3. **Credential lifecycle/privacy.** Rotation issuance/overlap, persistence and
-   crash/concurrency flows, server-key provisioning/rotation, deployment revocation
-   guarantees and enumeration/correlation controls require complete contracts and
-   independent verification. Nonzero AK validation does not establish entropy.
+   [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) now
+   specifies the required lifecycle transaction (`SNTR-DAUTH-011`–`SNTR-DAUTH-014`):
+   enrollment authority, host-generated AK/handle issuance, the staged
+   provision/deliver/ack/commit flow with idempotent retries, activation
+   timeouts and interrupted-enrollment recovery. Delivering that transaction
+   and its evidence remains host implementation work, and no online
+   enrollment RPC is introduced by it. NK bootstrap support alone grants no
+   enrollment authority.
+3. **Credential lifecycle/privacy.** Rotation (`SNTR-DAUTH-020`/`SNTR-DAUTH-021`),
+   compromise recovery (`SNTR-DAUTH-022`), secret hygiene and disposal
+   (`SNTR-DAUTH-023`), server-key pin rotation (`SNTR-DAUTH-024`) and the
+   revocation-propagation bound (`SNTR-DAUTH-017`–`SNTR-DAUTH-019`) now
+   require complete contracts from [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md);
+   delivering them, executing their planned `PLAN-DAUTH-*` cases and obtaining
+   independent verification remain open. Nonzero AK validation does not
+   establish entropy. Handle enumeration/correlation
+   controls beyond `SNTR-DAUTH-008` are review items, not blockers.
 4. **UDP.** A complete reviewed and accepted binding must cover demux,
    counters/replay window, path validation, anti-amplification, reliability and
    bounded fragmentation. UDP remains deferred, not inferred from stream tests.

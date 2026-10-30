@@ -30,15 +30,25 @@ Send exactly one `ClientHello` as the first envelope
 empty means anonymous attempt), then await `ServerReady` or a terminal
 error before any `request`, `cancel`, or application payload. Never send a
 second `hello`; never pipeline Syntra RPCs before `ACTIVE` (transport
-negotiation bytes may pipeline only where the profile allows). On
-handshake error: surface the typed code, close the transport, and do not
+negotiation bytes may pipeline only where the profile allows). Syntra timing
+rule (accepted RFC 0003 D4, SNTR-HS-002): start the core handshake timer only
+at the local `CONNECTED` boundary for frame-carrying profiles — established
+TCP for TCP; successfully completed and verified TLS for TLS/TCP; a validated
+Upgrade for WS; verified TLS plus a validated Upgrade for WSS — never during
+socket/Upgrade establishment, which has its own separate bounded setup budget.
+HTTP/HTTPS carries no frame carriage: every exchange synthesizes the sequence
+under its own request deadline, and there is no connection-level Syntra
+handshake timer at all. On
+handshake error (accepted RFC 0003): the detecting side records a locally
+typed cause; the peer observes only the transport-native close signal;
+there is no typed wire error to surface. Close the transport and do not
 retry with downgraded versions unless the application explicitly
 re-negotiates.
 
-The pre-`ACTIVE` typed-error carrier is still unresolved. In delivered SC1,
-host policy rejection closes the connection and the client can observe
-`UNAVAILABLE`; that does not establish receipt of a typed authentication
-denial. Do not retry automatically with bootstrap or another carrier.
+In delivered SC1, host policy rejection closes the connection and the
+client observes `UNAVAILABLE`; that does not establish receipt of a typed
+authentication denial. Do not retry automatically with bootstrap or
+another carrier.
 
 ## Authentication
 

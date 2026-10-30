@@ -3,12 +3,25 @@
 These rules are normative for any public statement that cites this suite.
 A technically passing run with non-conformant wording is a non-conformant claim.
 
-RFC 0007 is accepted and `SNTR-SC1-WSS-V1` is registered with case
-specifications. Registration is not execution: no `CONF-SCW-*` PASS or
+Evidence reporting is machine-verifiable: a claim naming conformance results
+MUST name the executed manifest case IDs (`CONF-*`), the runner/tool that
+executed them, the exact specification and suite revision pinned at
+execution, and the per-case results. Results use the suite verdict
+vocabulary only (PASS, FAIL, SKIP, UNSUPPORTED, NOT_EXECUTED); missing
+execution is NOT_EXECUTED, never PASS. Registered, planned, not-executed
+rows (such as the RFC 0010 `CONF-SCW-025`–`038` lifecycle rows) must not be
+cited as passing or as satisfied.
+
+RFC 0007 and RFC 0010 are accepted and `SNTR-SC1-WSS-V1` is registered with
+case specifications. Registration is not execution: no `CONF-SCW-*` PASS or
 claimable SC1 result exists yet, and stable-release authorization remains
 separate. The claim rules below retain their existing scope and add the
 SC1/WSS profile only for an implementation that actually passes its applicable
-cases and release gates.
+cases and release gates. A single-transport Core claim on one named secure
+profile is permitted and self-contained (see the allowed forms and
+`specifications/core/conformance.md`), but a Core-only claim cannot satisfy
+the recovery-inclusive stable bundle (RFC 0006 §11.1: the target release
+bundle requires the recovery contract and its own evidence).
 
 ## Allowed forms
 

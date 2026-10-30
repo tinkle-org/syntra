@@ -2,22 +2,24 @@
 
 - RFC: 0002
 - Title: Auth/session lifecycle precision without new wire types
-- Author(s): TBD — blocker (maintainer assignment)
-- Status: Draft
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-19
 - Target version: v1 clarification (no wire change)
 - Relates to: `specifications/core/handshake.md`, `authentication.md`, `sessions.md`, `capabilities.md`, `errors.md`, `versioning.md`, `reliability.md`; `specifications/security/authentication-security.md`, `replay-protection.md`, `threat-model.md`; `proto/syntra/v1/handshake.proto`, `session.proto`, `capabilities.proto`, `errors.proto`; ADR-005, ADR-009; RFC 0001 (B1–B11); core `open-questions.md` blockers 1–4; security `open-questions.md` items 1, 5
-- Reviewers: TBD — blocker (protocol + security maintainers)
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
 > This RFC resolves NO behavioral conflict by fiat. It records where the task glossary differs from approvals, proposes keeping the approved six-state machine and existing wire types, and lists the capability/binding RFCs still required. No `.proto` change is proposed.
 
-Current decision package: RFCs 0003–0005 select core/HTTP/bounds proposals,
-RFC 0006 §11 selects required update-recovery corrections, RFC 0007 §11
-selects canonical SC1 migration, and [RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md)
-selects mobile lifecycle/parser/resource behavior. All remain Draft. Historical
-references to approvals in this document are not evidence of acceptance of
-those proposals. Logical-session resumption remains deferred and distinct from
-required durable update recovery; no new core session identifier is introduced.
+Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+as a **dependency record** (disclosed self-approval). The decision package
+this document depends on is accepted: RFCs 0003–0005 (core/HTTP/bounds),
+RFC 0006 §11 (update-recovery), RFC 0007 §11 (SC1 migration),
+[RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md) (mobile lifecycle),
+and new RFC 0010 (revocation lifecycle). The §11 supersession map below
+records which of this RFC's carried items each accepted contract resolves.
+Logical-session resumption remains deferred and distinct from required
+durable update recovery; no new core session identifier is introduced.
 
 ## 1. Summary
 
@@ -91,7 +93,13 @@ Clarification-only RFCs can be mistaken for approval of the deferred features. M
 
 ## 10. Unresolved questions and blockers
 
-Carried forward; MUST be resolved before stable, never by implementation choice:
+**Historical review context (2026-10).** The items below were the draft
+RFC's snapshot. The accepted dispositions are recorded in §11's supersession
+map and fold into the accepted RFC decisions cited there; the wording must
+not be read as leaving any superseded item awaiting resolution. Items marked
+"Still tracked (deferred)" in §11 are the ones whose status genuinely
+remains open; every superseded item was resolved through its accepted
+authorizing RFC, never by implementation choice:
 
 1. **B1 typed pre-`ACTIVE` error carrier** (which `Frame`, if any, carries handshake errors; zero-`request_id` `result` forbidden).
 2. **B2 pre-`ACTIVE` notification conflict** (ignore vs fail).
@@ -109,8 +117,9 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
     `reliability.md` §1C and the reliable-delivery coverage in §7
     (e.g. SNTR-REL-902) remain proposals without an accepted authorizing
     RFC. SNTR-REL-900/901 remain shipping baseline. This RFC does not
-    authorize them; RFC 0006 is a separate Draft
-    update/recovery proposal. Canonical negotiation/control methods,
+    authorize them. Update/recovery sits outside this open item: RFC 0006 is
+    accepted and its §11 amendment governs it. For reliable delivery, canonical
+    negotiation/control methods,
     versioned binary schemas, delivery-ID carriage, confirmation/fallback,
     and deterministic fixtures are still required. Former `CONF-RS-001..005`
     wire rows have been withdrawn from executable cases; the IDs and
@@ -124,6 +133,26 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
     cannot prove execution stopped. Maintainer protocol/security review
     and acceptance are outstanding. Existing implementation unit tests
     remain useful local checks, not wire-conformance or shipping approval.
+
+## 11. Supersession map (accepted 2026-10-30)
+
+| This RFC's §10 item | Disposition | Resolved by (accepted) |
+|---|---|---|
+| 1 — B1 typed pre-`ACTIVE` error carrier | Superseded | RFC 0003 D1 (no error `Frame`; local typed cause + native signal) |
+| 2 — B2 pre-`ACTIVE` notification conflict | Superseded | RFC 0003 D2 (fail-close) |
+| 3 — B3 stale `request_id` reuse | Superseded | RFC 0004 D1/D2 (permanent non-reuse; high-water ordered admission) |
+| 4/5/7 — capability binding, bounds, mechanism negotiation | Superseded | RFC 0005 D1/D2 (post-ACTIVE profile contracts; no generic probing; concrete bounds); each profile's accepted RFC defines its mechanism (RFC 0006 for update-recovery) |
+| 6 — B10 cancel/deadline/loss races | Superseded | RFC 0004 D4 (+ RFC 0008 D2 clocks) |
+| 10 — HTTP profile bindings | Partially superseded | RFC 0004 D3/D5 (per-exchange independence, credential carriage); transport-profile RFCs still embody §1E principles |
+| 11 — revocation propagation / channel binding / proxy | Partially superseded | RFC 0010 (revocation propagation bound: immediate new connections, 300 s hard max, 60 s target, fail-closed). Channel-binding construction and proxy propagation format remain open |
+| 8 — resumption standard | Still tracked (deferred) | No accepted resumption RFC; fail-closed default stands |
+| 9 — cross-transport binding | Still tracked (deferred) | Not authorized in v1 |
+| 12 — reliable-session/reliable-delivery shipping authority | Still tracked (deferred) | No authorizing RFC; SNTR-CAP-008/902 and related coverage remain proposals |
+
+None of this record's items authorizes new wire types. Where an accepted RFC
+defines a rule, that RFC is the normative authority; where an item remains
+tracked, `SESSION-OPEN-QUESTIONS.md` and the core/security open-questions
+lists own it.
 
 ## Appendix: References
 

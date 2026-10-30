@@ -6,7 +6,7 @@
 - Version: 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/errors.proto` (`ErrorCode`, `RpcError` — authoritative); `protocol.md`; `framing.md`; `rpc.md`; `handshake.md`; `reliability.md`
 - Scope: The single shared error vocabulary, when each code is used, what `message` may contain, and how transport/handshake failures map to codes. Application domain errors belong inside opaque payloads or mapped to these codes without leaking internals.
-- Terminology: Per `protocol.md`. **Typed error** = `RpcResult{error{code,message}}` or handshake failure carrying a code.
+- Terminology: Per `protocol.md`. **Typed error** = `RpcResult{error{code,message}}`, or a connection-failure local cause recorded by the detecting side (e.g., a pre-`ACTIVE` handshake failure code per `handshake.md` §5); a failed handshake does not carry a wire error `Frame`.
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
@@ -28,13 +28,13 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 - `OUT_OF_RANGE (11)`: value outside supported range.
 - `UNIMPLEMENTED (12)`: unknown method, unknown `Frame.body` variant, unsupported capability/transport feature.
 - `INTERNAL (13)`: host-internal failure; message MUST be generic.
-- `UNAVAILABLE (14)`: transport loss, host shutdown, or transient unavailability; reports unknown handler outcome for loss/shutdown. `DEADLINE_EXCEEDED`, `INTERNAL`, and `UNKNOWN` equally leave execution unknown (see RFC 0004 D3; `SyntraError::is_unknown_outcome` covers all four). No single code proves non-execution or idempotency by itself.
+- `UNAVAILABLE (14)`: transport loss, host shutdown, or transient unavailability; reports unknown handler outcome for loss/shutdown. `DEADLINE_EXCEEDED`, `INTERNAL`, and `UNKNOWN` equally leave execution unknown (accepted [RFC 0004](../../rfcs/0004-correlation-identity-carriage.md) — its §4 records that `UNAVAILABLE` is not the only unknown-execution report; "unknown-outcome" reporting covers this code family). No single code proves non-execution or idempotency by itself.
 - `DATA_LOSS (15)`: unrecoverable corruption/loss detected.
 - `UNAUTHENTICATED (16)`: credential missing/invalid/expired/revoked or auth required.
 
 **SNTR-ERR-003** — `RpcError.message` MUST be a human-readable public description, MUST NOT contain credentials, tokens, private backend diagnostics, stack traces, or raw untrusted bytes. Locales/verbosity are implementation-defined; codes are the interoperable signal.
 
-**SNTR-ERR-004** — Every RPC MUST end with exactly one terminal outcome; handshake failures MUST carry a code per `handshake.md` table; transport loss maps to `UNAVAILABLE` to in-flight RPCs. No silent failures.
+**SNTR-ERR-004** — Every RPC offered under a lawful request context MUST end with exactly one terminal outcome. Handshake failures do not carry a wire code `Frame` (accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) D1): the detecting side records a locally typed cause per the `handshake.md` §5 table, while the peer observes only the transport-native signal (close/status/HTTP status/WS close code). Transport loss maps to `UNAVAILABLE` to in-flight RPCs. No silent failures — the detecting side always yields a local typed cause or terminal outcome, and no error `Frame`, zero-ID result, or error-bearing `ready` is invented.
 
 **SNTR-ERR-005** — Unknown codes on receipt (future enum values from a newer minor peer): implementations MUST map them to `UNKNOWN` for application reporting while preserving the numeric value in diagnostics where possible, and MUST NOT crash or treat them as success.
 
@@ -54,7 +54,7 @@ The candidate category names below are documentation labels. They are NOT wire v
 | TIMEOUT_ERROR | `DEADLINE_EXCEEDED` | Call or handshake budget expiry, not rollback | UNKNOWN_OUTCOME; retry only idempotent/with-key | None (handshake timeout closes the attempt) | Usable for calls; handshake timeout closes |
 | SERVER_ERROR | `INTERNAL`, `UNKNOWN`, `CANCELLED`, `UNAVAILABLE` | Internal/unclassified faults, cancellation, transient unavailability | `UNAVAILABLE`: CONDITIONALLY_RETRYABLE (idempotent/with-key); `CANCELLED`: NOT_SAFE_TO_RETRY without re-evaluation; `INTERNAL`/`UNKNOWN`: UNKNOWN_OUTCOME | None, except shutdown-mapped `UNAVAILABLE` ends the session | Usable, except loss/shutdown |
 
-Candidate wire names from the task (`PROTOCOL_VERSION_UNSUPPORTED`, `CAPABILITY_UNSUPPORTED`, `AUTHENTICATION_REQUIRED`, `AUTHENTICATION_FAILED`, `METHOD_NOT_FOUND`, `SESSION_EXPIRED`, `PROTOCOL_VIOLATION`) are NOT allocated as enum values. Their mappings are: version-unsupported → `UNIMPLEMENTED`/`FAILED_PRECONDITION` (handshake table); capability-unsupported → `UNIMPLEMENTED`; authentication-required/failed → `UNAUTHENTICATED`; method-not-found → `UNIMPLEMENTED` (unknown method) with application-missing targets as `NOT_FOUND`; session-expired → `UNAUTHENTICATED` (`UNAVAILABLE` for host shutdown); protocol-violation → shape/state/variant codes per row above. No duplicate aliases exist on the wire.
+Candidate wire names from the task (`PROTOCOL_VERSION_UNSUPPORTED`, `CAPABILITY_UNSUPPORTED`, `AUTHENTICATION_REQUIRED`, `AUTHENTICATION_FAILED`, `METHOD_NOT_FOUND`, `SESSION_EXPIRED`, `PROTOCOL_VIOLATION`) are NOT allocated as enum values. Their mappings are: version-unsupported → `UNIMPLEMENTED` (handshake §5; accepted RFC 0003 D3 — version mismatch has exactly this code); capability-unsupported → `UNIMPLEMENTED`; authentication-required/failed → `UNAUTHENTICATED`; method-not-found → `UNIMPLEMENTED` (unknown method) with application-missing targets as `NOT_FOUND`; session-expired → `UNAUTHENTICATED` (`UNAVAILABLE` for host shutdown); protocol-violation → shape/state/variant codes per row above. No duplicate aliases exist on the wire.
 
 ## 1B. Error detail limits (clarifies SNTR-ERR-003/020/021)
 
@@ -71,7 +71,7 @@ A protocol error means the envelope or handshake itself is unusable; an RPC erro
 
 | Condition | Classification | Code | Connection |
 |---|---|---|---|
-| Empty `body`; `request_id` misuse; version mismatch; pre-`ACTIVE` `request`/`cancel`/`notification`; second `hello`; `hello` outside handshake states | Protocol error | `INVALID_ARGUMENT` (shape), `FAILED_PRECONDITION` (state), `UNIMPLEMENTED` (unknown variant/version), `RESOURCE_EXHAUSTED` (oversize), `UNAUTHENTICATED` (pre-ready access) | Handshake-phase: close (SNTR-HS-040). `ACTIVE`-phase framing violations: reject the affected unit; close only if exhausted/misbehaving per documented policy |
+| Empty `body`; `request_id` misuse; version mismatch (→`UNIMPLEMENTED` only per RFC 0003 D3); pre-`ACTIVE` `request`/`cancel`/`notification`; second `hello`; `hello` outside handshake states | Protocol error | `INVALID_ARGUMENT` (shape), `FAILED_PRECONDITION` (state — fail-close for pre-`ACTIVE` frames per RFC 0003 D2), `UNIMPLEMENTED` (unknown variant; version mismatch), `RESOURCE_EXHAUSTED` (oversize), `UNAUTHENTICATED` (pre-ready access) | Handshake-phase: fail-close — the detecting side records the cause and the connection terminates through the native signal (SNTR-HS-040, RFC 0003 D1). `ACTIVE`-phase framing violations: reject the affected unit; close only if exhausted/misbehaving per documented policy |
 | Unknown `Frame.body` variant | Protocol error | `UNIMPLEMENTED` (or close during handshake) | Per row above; never silently dropped (SYN-ARCH-021) |
 | Malformed method path | RPC error | `INVALID_ARGUMENT` | Usable; no dispatch occurred |
 | Unknown method | RPC error | `UNIMPLEMENTED` | Usable |
@@ -90,7 +90,19 @@ HTTP transport errors and Syntra RPC errors are different layers and MUST NOT be
 
 - A Syntra RPC error travels inside the envelope as `RpcResult{error}`. `HTTP 200` carrying a valid envelope that contains `RpcResult{error{...}}` is correct layering where the transport profile defines it — the HTTP layer succeeded while the application declined the call.
 - HTTP-level failures (non-2xx, truncated bodies, TLS failures) are transport outcomes, not RPC verdicts. Adapters MUST surface them locally as connection/transport failures (mapped to `UNAVAILABLE` for affected in-flight RPCs where no Syntra `result` exists), never synthesize a `RpcResult` the host did not send.
-- Adapters MUST NOT map `ErrorCode` values to HTTP statuses as a protocol signal, and peers MUST NOT infer Syntra outcomes from HTTP statuses. Exact status bindings (if any) belong to the future transport specifications, not to this document; no mapping is finalized here.
+- Adapters MUST NOT map `ErrorCode` values to HTTP statuses as a protocol signal, and peers MUST NOT infer Syntra outcomes from HTTP statuses.
+- Concrete binding per accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) D1/D3, native-signal table (full table in `handshake.md` §5): a detecting host rejecting a malformed binding or with no version overlap closes with `400` and no Syntra envelope — locally these are `INVALID_ARGUMENT` (malformed binding) and `UNIMPLEMENTED` (no version overlap) at the detecting side; an authentication rejection closes with `401`/`403`. A receiving peer reports the generic binding failure locally: `400` maps to local `INVALID_ARGUMENT` per SNTR-HTTP-041, `401`/`403` to the corresponding generic authentication/authorization report without a sub-reason, and any other non-2xx or transport outcome to `UNAVAILABLE` (adapter default). Non-`200` statuses never synthesize `RpcResult` and never claim the host's precise rejection cause. HTTP profile size/status limits keep their owning profile rules and are not extended here.
+
+## 1E. Detecting-side cause vs peer-visible signal (accepted RFC 0003 D1)
+
+Handshake failure reporting has two axes and they MUST NOT be conflated:
+
+- **Detecting side** (the endpoint that rejects): records the applicable locally typed cause from the `handshake.md` §5 table and terminates the attempt. Its local waiter receives that cause, subject to public diagnostic hygiene (no privileged rejection detail serialized — SNTR-ASEC-001/011/024).
+- **Peer side** (the endpoint that observes the teardown): reports only the transport-native signal it actually observed (TCP close/TLS shutdown, HTTP status, WS close code), marked as a transport/binding failure rather than a received `RpcResult`. Where the signal cannot distinguish causes — a close status/code shared by several causes — the report stays generic and MUST NOT claim the detecting endpoint's precise code.
+- No pre-`ACTIVE` error channel exists: no error `Frame`, zero-ID `result`, error-bearing `ready`, second `hello`, invented handshake record, or error inside a `notification` is ever sent (RFC 0003 D1), and a pre-`ACTIVE` `notification` fails the connection on receipt (RFC 0003 D2).
+- SNTR-ERR-004's "no silent failures" therefore means: every handshake failure yields a typed local cause at one endpoint and an observable native signal at the other — never a mutually exchanged typed code over an invented carrier.
+
+The full condition → local cause → native-signal → peer-conclusion table is normative in `handshake.md` §5 (mirroring RFC 0003 §4) and is not duplicated here.
 
 ## 2. Client behavior
 
@@ -117,4 +129,4 @@ New codes are minor-additive (with SNTR-ERR-005 tolerance) but SHOULD be rare; r
 ## 7. Conformance requirements
 
 - **SNTR-ERR-900** — Fixtures: each of the 16 nonzero codes produced at least once via neutral operations; `UNSPECIFIED`-as-failure rejected; unknown future code mapped to `UNKNOWN`; `message` hygiene (negative grep for credential/diagnostic patterns); code-not-text branching proof.
-- **SNTR-ERR-901** — Mapping proof: handshake table (`handshake.md` §5) + transport-loss→`UNAVAILABLE` + oversize→`RESOURCE_EXHAUSTED` all demonstrated.
+- **SNTR-ERR-901** — Mapping proof: handshake table (`handshake.md` §5) + transport-loss→`UNAVAILABLE` + oversize→`RESOURCE_EXHAUSTED` all demonstrated, with the detecting-side cause and the peer-observed native signal asserted separately (many-to-one signals never claim the exact remote cause; accepted RFC 0003).
