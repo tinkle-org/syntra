@@ -1,0 +1,55 @@
+specifications/core/rpc.md
+  s_4e696f0c562dd0::t_17157a36c29e51 29
+  s_4e696f0c562dd0::t_b29a84d49c8db1 85-86
+conformance/manifest/core.yaml
+  s_4e696f0c562dd0::t_7f7344b444c1da 91-97
+conformance/manifest/schema.yaml
+  s_4e696f0c562dd0::t_09e13ea0728698 50
+  s_4e696f0c562dd0::t_07f44d7d86400c 41-49,51-59,66
+  s_4e696f0c562dd0::t_6480b5ca9c9c4a 87-94
+scripts/validate-repo.py
+  s_4e696f0c562dd0::t_ee4bf1311d0c4c 257-258,260-336
+  s_4e696f0c562dd0::t_8a7fd05d6fd398 259
+  s_4e696f0c562dd0::t_a104f6fd6343c0 391
+  s_4e696f0c562dd0::t_f066eeb1d74c89 473-475,482-489
+  s_4e696f0c562dd0::t_1fd1b5c7b1f5c7 466
+  s_4e696f0c562dd0::t_f198251104b8d8 337-339
+  s_4e696f0c562dd0::t_361f2424bf308f 490-492
+conformance/manifest/rpc.yaml
+  s_4e696f0c562dd0::t_395524d6b8e57e 74-75,79-80
+  s_4e696f0c562dd0::t_26b4537877a2f5 41
+  s_4e696f0c562dd0::t_4c2b81ee46b175 81
+conformance/rpc/rpc.md
+  s_4e696f0c562dd0::t_b73842135c8c92 107,109-114
+  s_4e696f0c562dd0::t_d69a90fd467adf 152
+  s_4e696f0c562dd0::t_272e02a9cc10e9 39-42
+  s_4e696f0c562dd0::t_31e552bd65cf22 24
+  s_4e696f0c562dd0::t_e812676804d3a7 132,136
+conformance/manifest/transport-http.yaml
+  s_4e696f0c562dd0::t_35c4017e35f433 127-128
+conformance/manifest/README.md
+  s_4e696f0c562dd0::t_9fd00fe4b5067c 53
+  s_4e696f0c562dd0::t_48c43b32d059ff 74-108,133-138
+  s_4e696f0c562dd0::t_12f3e9d816c28e 54
+  s_4e696f0c562dd0::t_21ed3047bd1232 109-132
+specifications/schema/reference.md
+  s_4e696f0c562dd0::t_8d1fa9323dd597 237
+CHANGELOG.md
+  s_4e696f0c562dd0::t_e91c8f6889ac3c 88-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e553000ac24f93e156aefddcd5a976effe8cafbd",
+  "prompts": {},
+  "sessions": {
+    "s_4e696f0c562dd0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c94569dffenVxecHPJSZepMq",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
