@@ -31,7 +31,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-RPL-011** — Class 2 (resume-token replay): if resumption is defined, tokens MUST be single-use-or-rotated (SNTR-ASEC-008), audience/principal/time-bound (SNTR-ASEC-007), and reuse of a rotated/consumed token MUST be rejected as suspected replay (`UNAUTHENTICATED` or `FAILED_PRECONDITION` + close). Absent a resumption RFC, any presented “resume” data MUST be rejected per `sessions.md` SNTR-SESS-006.
 
-**SNTR-RPL-012** — Class 3 (repeated `request_id`): `request_id` is connection-scoped correlation only (SNTR-RPC-010). A duplicate `request_id` for an outstanding RPC MUST be rejected (`FAILED_PRECONDITION`); a `request_id` arriving after its terminal `result` MUST be treated as a new-RPC attempt with a stale ID and rejected (not executed), because the initiator MUST NOT reuse IDs before completion. `request_id` MUST NOT be used for cross-connection dedup.
+**SNTR-RPL-012** — Class 3 (repeated `request_id`): `request_id` is connection-scoped correlation only (SNTR-RPC-010). Per accepted RFC 0004 §3 D2, same-connection replay of a repeated request identifier — for an outstanding RPC, after its terminal result, or any otherwise retired ID — is primarily an ordering violation detected by the host's committed connection high-water mark: the host records local `FAILED_PRECONDITION`, dispatches nothing for the offending frame, and terminates the connection through its native profile, sending no `RpcResult` under the offending identifier and no zero-ID error. The host is not required to continue the original RPC on the now-failed connection; already committed outcomes stay committed, and closure is not rollback. Whatever the disposition, a stale identifier MUST NOT execute a new or replayed attempt: the rejection is never converted into duplicate dispatch or re-execution. HTTP/HTTPS request-response exchanges are exempt per accepted RFC 0004 §3 D3: each exchange is an independent logical connection with one nonzero request ID echoed by its result, reusing a number in a different exchange is not a host replay violation, and authentication is evaluated on every exchange. `request_id` MUST NOT be used for cross-connection dedup, and these anti-replay guarantees stay distinct from (a) SC1 channel-record replay protection (see §2 accepted-channel defenses) and (b) application idempotency (SNTR-RPL-013).
 
 **SNTR-RPL-013** — Class 4 (repeated idempotency keys): the core provides NO interpretation. Applications requiring safe retry MUST embed operation keys in opaque payloads and MUST implement server-side dedup windows (key retention, duplicate response, conflict handling). Syntra conformance for this class means (a) preserving key bytes bit-exact through the core and (b) documenting whether the application implements dedup — the core MUST NOT claim it.
 
@@ -75,7 +75,7 @@ SNTR-RPL-900/901 and the existing TLS-based tests after acceptance.
 
 ## 5. Failure handling
 
-Credential/token replay → `UNAUTHENTICATED` (+ close for handshake/resumption). Stale `request_id` → `FAILED_PRECONDITION`. Duplicate operation keys → application-defined (success-with-same-result or conflict error, documented). Duplicate events → tolerated, no error.
+Credential/token replay → `UNAUTHENTICATED` (+ close for handshake/resumption). Stale/reused `request_id` on a persistent connection → connection-failure ordering violation per accepted RFC 0004 §3 D2: local host-side `FAILED_PRECONDITION`, nothing dispatched, native profile close; no per-frame result is owed for the offending frame (disposition changed from a per-RPC `FAILED_PRECONDITION` to the RFC 0004 connection violation). Duplicate operation keys → application-defined (success-with-same-result or conflict error, documented). Duplicate events → tolerated, no error.
 
 ## 6. Security considerations
 
@@ -87,7 +87,7 @@ Adding per-class mechanisms (nonces, windows, new token types) is minor-additive
 
 ## 8. Conformance requirements
 
-- **SNTR-RPL-900** — Fixtures: captured-`hello` retransmit re-evaluated (expired → denied); rotated-token reuse denied; duplicate outstanding `request_id` rejected; stale-ID-after-completion rejected; operation-key bytes preserved with documented dedup behavior; duplicate-event tolerance; TLS-delivered-but-retried RPC does not double-apply without application dedup (negative proof).
+- **SNTR-RPL-900** — Fixtures: captured-`hello` retransmit re-evaluated (expired → denied); rotated-token reuse denied; duplicate outstanding `request_id` rejected; stale-ID-after-completion rejected as a connection-fatal ordering violation with no per-frame result (accepted RFC 0004 §3 D2); operation-key bytes preserved with documented dedup behavior; duplicate-event tolerance; TLS-delivered-but-retried RPC does not double-apply without application dedup (negative proof).
 - **SNTR-RPL-901** — Distinction proof: test log shows all five classes exercised independently with different defenses; no single “replay test” claimed as covering multiple classes.
 
 ```mermaid

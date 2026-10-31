@@ -30,17 +30,24 @@ undocumented unbounded behavior is non-conformant (`SNTR-REL-031`).
 Validate in order before any policy lookup: framing/size/depth bounds,
 `hello` shape (`min_version ≤ max_version`, both nonzero, credential
 within the documented length bound), then version overlap (highest overlap
-wins, else `UNIMPLEMENTED`/`FAILED_PRECONDITION` + close), then credential
+wins; no overlap → `UNIMPLEMENTED` + close, the only version-mismatch
+outcome), then credential
 evaluation. Enforce concurrent-handshake caps and rate limits (excess →
-`RESOURCE_EXHAUSTED` + close). Emit exactly one terminal outcome per
-connection — `ServerReady` (→`ACTIVE`) or a handshake error (→`CLOSING`) —
+`RESOURCE_EXHAUSTED` + close). The server emits no handshake error Frame:
+each detecting side records its locally typed cause and the peer's only
+peer-visible outcome is the transport-native close signal (accepted RFC
+0003). Emit exactly one terminal outcome per
+connection — `ServerReady` (→`ACTIVE`) or a locally recorded fail cause
+(→`CLOSING`) —
 never both, never a re-handshake on the same transport.
 
-The pre-`ACTIVE` typed-error carrier remains unresolved (B1 in
-`SESSION-OPEN-QUESTIONS.md`). In delivered SC1, policy rejection reports a
-local error and closes the transport; the client can observe `UNAVAILABLE`
-rather than a remotely delivered authentication code. Do not invent a
-zero-ID result or claim the denial was delivered as a typed wire error.
+The pre-`ACTIVE` typed-error carrier question is resolved by accepted
+RFC 0003: no error `Frame` crosses the wire; the detecting side records a
+local typed cause and the peer observes only the transport-native close
+signal. In SC1, policy rejection reports a local error and closes the
+transport; the client observes `UNAVAILABLE` rather than a remotely
+delivered authentication code. Never invent a zero-ID result and never
+claim the denial was delivered as a typed wire error.
 
 ## Authentication integration
 

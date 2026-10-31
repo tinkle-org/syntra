@@ -15,8 +15,12 @@
 
 Sections 1–7 preserve the Phase A inventory, classification and plan as
 historical context. Section 8 records the subsequent migration. No new
-wire types or protocol semantics are introduced by the layout change;
-remaining protocol blockers are pending.
+wire types or protocol semantics are introduced by the layout change.
+
+Section 13 records the 2026-10-30 SDD acceptance wave
+([Decision 0002](docs/decisions/0002-sdd-acceptance-wave.md)): accepted
+contracts that change semantics without changing the binary wire, plus the
+explicitly deferred Go `go_package` migration.
 
 Section 9 preserves the selected SC1 design record as of 2026-10-27; it
 introduced no implementation at that date. Section 11 records delivered
@@ -461,3 +465,51 @@ changes. The first stable bundle requires SC1/WSS, recovery and applicable
 mobile evidence; baseline transports remain independently claimable. Independent
 interoperability, mobile/recovery execution and independent security review are
 release gates, not consequences of acceptance.
+
+## 13. 2026-10-30 acceptance wave (semantics without wire change)
+
+Accepted 2026-10-30 via [Decision 0002](docs/decisions/0002-sdd-acceptance-wave.md).
+Caveat: these are accepted specification contracts; implementations conform
+to them from the frozen revision on. No executed conformance result is
+claimed here.
+
+Behavioral changes adopters must honor in implementing builds:
+
+1. Handshake failures: detecting side records typed causes; peers observe
+   only transport-native close signals (RFC 0003). Version mismatch is
+   `UNIMPLEMENTED`; WS core-deadline close is `1001`; HTTP auth is
+   `401`/`403`; oversize is `1009`.
+2. Request identifiers: strictly increasing, connection-scoped, never
+   reused (RFC 0004). Reuse/replay is a connection-fatal ordered-admission
+   violation (local `FAILED_PRECONDITION`, native close; other calls
+   `UNAVAILABLE`).
+3. Clocks (RFC 0004 + RFC 0008 D2): initiator deadlines start at local call
+   admission; host deadlines at bounded-frame receipt (validation and queue
+   time consume the budget); single serialized terminal gate;
+   cancel/deadline ties select `DEADLINE_EXCEEDED`.
+4. Pre-ACTIVE notifications fail the handshake (RFC 0003 D2).
+5. Raw-wire validation (RFC 0008 D1): reserved 16/17 rejected;
+   18–31 future-body variants rejected with `UNIMPLEMENTED`; no body is
+   `INVALID_ARGUMENT`; duplicate `Frame.body` alternatives rejected at
+   validation, not by codec semantics. The 1 MiB bound measures the total
+   serialized Frame (RFC 0005 D3).
+6. Negotiation: post-ACTIVE per-profile contracts only; no generic
+   capability enumeration (RFC 0005 D1). Bounds: 8 KiB raw credential,
+   128-byte connection ID, 4 KiB diagnostic, ≥16 concurrency (RFC 0005 D2).
+7. Update/Recovery (RFC 0006 §11): fresh handle + captured boundary per
+   round; scoped (P, S, G) generations; local overflow is
+   `terminated`/`local-queue-exhausted` at unchanged generation; same-G
+   snapshot install with no wire `RecoverySnapshotComplete`; durable
+   known-safe resume; atomic persist-and-checkpoint or durable fence.
+8. SC1 host lifecycle (RFC 0010): enrollment authority, issuance, staged
+   durable provisioning, principal binding before `ready`, revocation
+   propagation (immediate on new connections; 300 s hard maximum; 60 s
+   operational target; fail-closed), rotation epochs, compromise recovery.
+   `SNTR-DAUTH-011`–`024` registered; execution pending.
+
+Deferred and tracked (not merged in this wave):
+
+- RFC 0005 D5: `go_package` to `github.com/tinkle-org/syntra-go/gen/syntra/v1;syntrav1`
+  — a Protobuf FILE/source break awaiting downstream `syntra-go` owner
+  confirmation and coordinated release ordering. The accepted spec text
+  stays implementation-neutral.

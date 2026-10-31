@@ -62,7 +62,7 @@ Payload formats are application-versioned, never Syntra-versioned. Core evolutio
 
 ## 7. Conformance requirements
 
-- **SNTR-OPQ-900** — Fixtures: arbitrary-byte round-trip (empty, binary, 1 MiB, simulated-ciphertext random bytes) bit-preserved across a secure profile; oversize-ciphertext rejected identically to oversize-plaintext; no E2EE fields present in envelope traces (negative check).
+- **SNTR-OPQ-900** — Fixtures: arbitrary-byte round-trip (empty, binary, a maximum-payload fixture sized so the TOTAL serialized `Frame` stays within `DEFAULT_MAX_FRAME_BYTES` per accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D3 — a MAX-sized total frame is within the bound and `MAX+1` is rejected pre-dispatch, so a 1 MiB payload alone does NOT fit — simulated-ciphertext random bytes) bit-preserved across a secure profile; oversize-ciphertext rejected identically to oversize-plaintext; no E2EE fields present in envelope traces (negative check).
 - **SNTR-OPQ-901** — Scope proof: implementation documentation states E2EE (if any) lives above Syntra and transport security remains enforced.
 
 ```mermaid

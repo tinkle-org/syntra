@@ -19,13 +19,13 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 - Extension revision versions an OPTIONAL capability (`capabilities.md`); negotiated per capability.
 - Implementation release versions code; it NEVER versions the protocol (ADR-010).
 
-**SNTR-VER-002** — Wire negotiation: initiator proposes `[min_version, max_version]` (both nonzero, `min ≤ max`); host selects highest overlap or fails with `UNIMPLEMENTED`/`FAILED_PRECONDITION` + close. Post-handshake, `Frame.version` MUST equal the selected version for the connection lifetime.
+**SNTR-VER-002** — Wire negotiation: initiator proposes `[min_version, max_version]` (both nonzero, `min ≤ max`); host selects highest overlap or fails the handshake with `UNIMPLEMENTED` + close when there is no overlap; `FAILED_PRECONDITION` is not a version-mismatch outcome. Post-handshake, `Frame.version` MUST equal the selected version for the connection lifetime.
 
 **SNTR-VER-003** — Compatibility classes:
 - *Additive/minor*: new OPTIONAL `oneof` member + capability, new OPTIONAL field, new error-code value (with SNTR-ERR-005 tolerance), new transport/extension, relaxed validation that accepts strictly more peers. MUST remain backward compatible; old peers MUST interoperate (ignoring unknowns / `UNIMPLEMENTED` for optionals).
 - *Breaking/major*: repurposed field number/name, changed field type, new REQUIRED field or behavior, altered state machine, weakened security, changed failure semantics, `reserved` reuse. REQUIRES a new wire major version, major RFC, migration notes, and `CHANGELOG.md` entry per `GOVERNANCE.md` §4.
 
-**SNTR-VER-004** — Unknown tolerance (frozen): unknown Protobuf fields MUST be ignored; unknown `Frame.body` variants MUST be rejected with `UNIMPLEMENTED` (SYN-ARCH-021). Changing either rule is major.
+**SNTR-VER-004** — Unknown tolerance (frozen, per accepted RFC 0008 §3 D1): unknown metadata Protobuf fields (ordinary unknown fields; `Frame` fields 3..9 and 32+) MUST be ignored within the same byte, depth, and encoded-size limits; future-body variant tags (`Frame.body` 18..31, where 10..15 are the known v1 bodies and 16/17 are permanently rejected) are recognized as unknown-body variants and rejected with `UNIMPLEMENTED` semantics at the request-validation layer (SYN-ARCH-021). The raw-wire partition and validation order for `Frame.body` and `RpcResult.outcome` are normative in `serialization.md` and `framing.md`; this document aligns its cross-references with those rules and does not duplicate them. Changing either tolerance (ignoring unknown metadata or rejecting unknown-body variants) is major.
 
 **SNTR-VER-005** — Reserved preservation: `reserved 16,17` + `reserved "event","resume","ack"` MUST be preserved across all v1 minors; reuse REQUIRES a major version + RFC.
 
@@ -45,7 +45,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 ## 4. Failure handling
 
-Version mismatch → handshake failure (table in `handshake.md`). Mid-connection version change attempt → `FAILED_PRECONDITION` + close. Unknown-variant from a newer minor → `UNIMPLEMENTED` (not downgrade).
+Version mismatch → handshake failure (table in `handshake.md`). Mid-connection version change attempt → `FAILED_PRECONDITION` + close. Unknown-variant from a newer minor → `UNIMPLEMENTED` (not downgrade); per accepted RFC 0008 §3 D1, a sole structurally valid future-body tag (`Frame.body` 18..31) is `UNIMPLEMENTED` at the request-validation layer (SNTR-VER-004; raw-wire rules normative in `serialization.md`/`framing.md`).
 
 ## 5. Security considerations
 

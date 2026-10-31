@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/transports/http.md`
 - Title: HTTP/1.1 Request/Response Mapping and Plaintext Profile
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Accepted (2026-10-30) — the HTTP/1.1 exchange mapping and binding rules are accepted via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md) ([RFC 0004](../../rfcs/0004-correlation-identity-carriage.md) D3/D5 carriage, [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) native-signal status mapping, [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2/D3 bounds); release-activation of additional transport profiles remains governed by [RFC 0009](../../rfcs/0009-v1-bootstrap-governance-and-release-scope.md) and release records
+- Version: 1.0.0 (2026-10-30) — accepted lineage of 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; RFC 9110, RFC 9112 (HTTP/1.1); RFC 4648 §4 (base64); `proto/syntra/v1/envelope.proto` (`Frame`), `rpc.proto`, `errors.proto`, `handshake.proto`
 - Core dependencies: `specifications/core/protocol.md` (SNTR-CORE-*), `framing.md` (SNTR-WIRE-*), `serialization.md` (SNTR-SER-*), `rpc.md` (SNTR-RPC-*), `errors.md` (SNTR-ERR-*), `handshake.md` (SNTR-HS-*), `authentication.md` (SNTR-AUTH-*), `sessions.md` (SNTR-SESS-*), `events.md` (SNTR-EVENT-*), `reliability.md` (SNTR-REL-*), `versioning.md` (SNTR-VER-*)
 - Security dependencies: `specifications/security/transport-security.md` (SNTR-TSEC-*), `authentication-security.md` (SNTR-ASEC-*), `replay-protection.md` (SNTR-RPL-*), `opaque-payloads.md` (SNTR-OPQ-*), `threat-model.md` (SNTR-TMOD-*)
@@ -242,16 +242,16 @@ claims rest on response authenticity, which holds on the secure profiles
 | Status | When the server sends it | Body | Local code (adapter report) | Handler executed? |
 |---|---|---|---|---|
 | `200 OK` | Binding valid; envelope dispatched (or handler rejected it as an RPC error) | REQUIRED: one `result` envelope (§1C); `Content-Type` + `Syntra-Version` + `Cache-Control: no-store` | The envelope's own outcome | Decided by the envelope |
-| `400 Bad Request` | Malformed binding: bad target/query (§1A), bad version headers or no overlap (§1D), undecodable body, envelope validation failure (empty body, ID misuse, unknown variant, reserved), oversize headers beyond §1N, `Upgrade` on the endpoint (§1P), credential material outside `Authorization` (§1A) | SHOULD be empty; MUST be ignored | `INVALID_ARGUMENT` | No — rejected before dispatch |
+| `400 Bad Request` | Malformed binding: bad target/query (§1A), bad version headers or no overlap (§1D), undecodable body, envelope validation failure (empty body, ID misuse, unknown variant, reserved), `Upgrade` on the endpoint (§1P), credential material outside `Authorization` (§1A) | SHOULD be empty; MUST be ignored | `INVALID_ARGUMENT` | No — rejected before dispatch |
 | `401 Unauthorized` | Handshake auth failure: missing, malformed, invalid, expired, or revoked credential; unknown auth scheme (§1H) | SHOULD be empty; MUST be ignored; MUST include `WWW-Authenticate: Syntra realm="<deployment>"` | `UNAUTHENTICATED` | No — rejected before dispatch |
 | `403 Forbidden` | Handshake authz failure: credential valid but the principal is denied all access at binding time (§1H) | SHOULD be empty; MUST be ignored | `PERMISSION_DENIED` | No — rejected before dispatch |
 | `404 Not Found` | Unknown path (incl. trailing-slash variant) | SHOULD be empty; MUST be ignored | `UNIMPLEMENTED` (no such binding) | No |
 | `405 Method Not Allowed` | Non-`POST` method on the endpoint | SHOULD be empty; MUST include `Allow: POST`; MUST be ignored | `UNIMPLEMENTED` | No |
-| `408 Request Timeout` | Server gave up waiting for the complete request (slow headers/body past §1N windows) | SHOULD be empty; MUST be ignored; server SHOULD close the connection | `UNAVAILABLE` (outcome unknown) | No dispatch occurred, but the exchange is reported unknown so a racing dispatch can never be misread as proof |
-| `413 Content Too Large` | Body exceeds §1N bounds (early `Content-Length` check or streaming cap) | SHOULD be empty; MUST be ignored | `RESOURCE_EXHAUSTED` | No — rejected before dispatch |
+| `408 Request Timeout` | Server gave up waiting for the complete request (slow headers/body past §1F windows) | SHOULD be empty; MUST be ignored; server SHOULD close the connection | `UNAVAILABLE` (outcome unknown) | No dispatch occurred, but the exchange is reported unknown so a racing dispatch can never be misread as proof |
+| `413 Content Too Large` | Body exceeds §1M bounds (early `Content-Length` check or streaming cap) | SHOULD be empty; MUST be ignored | `RESOURCE_EXHAUSTED` | No — rejected before dispatch |
 | `415 Unsupported Media Type` | Wrong/missing request `Content-Type` (§1B), or non-`identity` `Content-Encoding` where compression is not documented (§1O) | SHOULD be empty; MUST be ignored | `INVALID_ARGUMENT` | No |
 | `429 Too Many Requests` | Pre-dispatch rate/concurrency/queue rejection | SHOULD be empty; MAY carry `Retry-After` as a transport hint (bounded jittered backoff REQUIRED regardless; the header is not a Syntra signal) | `RESOURCE_EXHAUSTED` | No — rejected before dispatch |
-| `431 Request Header Fields Too Large` | Headers (incl. `Authorization`) exceed §1N bounds | SHOULD be empty; MUST be ignored | `RESOURCE_EXHAUSTED` | No |
+| `431 Request Header Fields Too Large` | Headers (incl. `Authorization`) exceed §1M bounds (SNTR-HTTP-113) | SHOULD be empty; MUST be ignored | `RESOURCE_EXHAUSTED` | No |
 | `500 Internal Server Error` | ONLY unexpected adapter/host failure with no Syntra verdict (crash before dispatch or during response encoding). MUST NOT carry handler failures. | SHOULD be empty; MUST be ignored | `UNAVAILABLE` (outcome unknown) | Unknown |
 | `502 Bad Gateway` | Proxy/backend inconsistency (proxied deployments; see `https.md`) | Ignored | `UNAVAILABLE` (outcome unknown) | Unknown |
 | `503 Service Unavailable` | Pre-dispatch overload or host shutdown | Ignored; MAY carry `Retry-After` as a hint | `UNAVAILABLE` (outcome unknown) | Unknown unless the deployment documents pre-dispatch rejection, in which case not executed |
@@ -329,9 +329,13 @@ persist, echo, or interpret them.
 **SNTR-HTTP-061** — Absent `Authorization` means an anonymous attempt
 (empty credential, SNTR-AUTH-003); acceptance is host policy and binds a
 least-privilege anonymous principal for that exchange only. A present
-header with an undecodable, empty, or oversize parameter → `401`
+header with an undecodable or empty parameter → `401`
 (malformed credential material is evaluated as invalid, never as
-anonymous, to avoid oracle/downgrade ambiguity). Any `Authorization`
+anonymous, to avoid oracle/downgrade ambiguity). An oversize credential
+parameter (beyond the decoded bound of SNTR-HTTP-113) → `431`
+(header-carried, oversize; no Syntra envelope is emitted), per accepted
+[RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) §4/D2 —
+never `401`. Any `Authorization`
 scheme other than `Syntra` (e.g. `Bearer`, `Basic`) on this endpoint →
 `401` with `WWW-Authenticate: Syntra ...`; the adapter MUST NOT attempt
 to interpret foreign schemes as Syntra credentials.
@@ -494,10 +498,12 @@ change, and plaintext downgrade are T2/T10 threats (SNTR-TMOD-030).
 fit `DEFAULT_MAX_FRAME_BYTES` (1 MiB, SNTR-WIRE-006) unless the
 deployment documents a different bound for this endpoint; the bound
 covers the whole serialized envelope including method, payload,
-credential-adjacent overhead, tags, and lengths — a 1 MiB application
-payload alone therefore does NOT fit (open conflict B8; implementations
-MUST enforce the envelope bound on serialized bytes and MUST NOT
-silently raise it).
+credential-adjacent overhead, tags, and lengths — the application
+payload alone MUST therefore stay strictly smaller than the bound (a
+1 MiB payload alone does NOT fit; resolved by accepted
+[RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) §3 D3).
+Implementations MUST enforce the envelope bound on serialized bytes and
+MUST NOT silently raise it.
 
 **SNTR-HTTP-111** — `Content-Length` behavior: servers MUST validate
 `Content-Length` before allocating. A declared length exceeding the bound
@@ -516,10 +522,16 @@ credentials, versions, or session hints — §1A/§1H).
 
 **SNTR-HTTP-113** — Header bounds: deployments MUST document maxima for
 request headers (recommended defaults: 8 KiB per field, 16 KiB total).
-Exceeding them → `431`. The decoded credential MUST additionally fit a
-documented credential bound not exceeding the envelope bound (default
-ceiling 64 KiB); larger → `431` (header-carried, oversize). All bounds
-MUST be enforced before allocation and before any credential comparison
+The `Authorization` field allowance MUST be sized above that generic
+per-field default to carry the maximum encoded credential per accepted
+[RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2 (8,192
+raw bytes expand to 10,924 base64 characters; 10,931 bytes including the
+`Syntra` scheme, its separating space, and the value). Exceeding the header maxima → `431`. The
+decoded credential MUST additionally fit a documented credential bound
+not exceeding the envelope bound (default ceiling 8 KiB decoded bytes,
+consistent with the raw `ClientHello.credential` bound of the same RFC);
+larger → `431` (header-carried, oversize). All bounds MUST be enforced
+before allocation and before any credential comparison
 (SNTR-ASEC-020/040).
 
 **SNTR-HTTP-114** — Early rejection and allocation: servers MUST reject

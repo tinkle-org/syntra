@@ -1,19 +1,25 @@
-# RFC 0003: Handshake failure signaling (proposal)
+# RFC 0003: Handshake failure signaling (accepted)
 
 - RFC: 0003
 - Title: Local typed handshake causes, transport-native rejection, pre-ACTIVE handling, and timer binding
-- Status: Draft (v1 consistency audit findings F-03, F-07, F-08, F-09, F-16, F-19)
+- Status: Accepted (closes audit findings F-03, F-07, F-08, F-09, F-16, F-19 at the specification level)
 - Date: 2026-10-28
 - Target version: pre-stable v1 contract proposal; explicit freeze/version decision required (§6)
 - Relates to: `specifications/core/handshake.md` (§1B, §2A, §5), `errors.md` (§§1C–1D), `events.md` (SNTR-EVENT-005/900), `framing.md`, `specifications/architecture.md` §12.1, ADR-007, transport profiles; RFC 0001 B1/B2; RFC 0002 §10 items 1–2
-- Author(s): TBD — blocker (maintainer assignment)
-- Reviewers: TBD — blocker (protocol + security maintainers)
+- Author(s): oscarlaw
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
-> Draft proposal, not acceptance or shipping authority. The choices below
-> are selected for review; they do not amend specifications, schemas, or
-> conformance expectations. No new active requirement IDs are allocated.
-> Approval remains subject to [governance](../GOVERNANCE.md) §3 and the
-> [RFC process](README.md).
+> Accepted (2026-10-30, [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md);
+> disclosed self-approval per [governance](../GOVERNANCE.md) §3). D1–D4 are
+> normative: the owner edits in `handshake.md`, `errors.md`, `events.md`,
+> `framing.md` and the transport tables are applied and are the operative
+> contract (no error `Frame` pre-`ACTIVE`; local typed cause plus
+> transport-native peer signal; D4 per-profile establishment boundary).
+> Sections 3–4 document the accepted native-signal rules in the same
+> vocabulary as those owner files; any residual intra-section wording that
+> reads as proposal-only is superseded by §10 and the owner files. No new
+> active requirement IDs are allocated by this record itself. Executed
+> conformance evidence remains a separate release gate.
 
 ## 1. Summary
 
@@ -235,20 +241,28 @@ Independent budgets add configuration that reviewers must check together.
 
 | Proposal choice | Selection for review | Approval status |
 |---|---|---|
-| D1 | Local typed cause plus native peer signal; no error Frame | Unapproved |
-| D2 | Fail-close pre-ACTIVE notification | Unapproved |
-| D3 | `UNIMPLEMENTED` for no version overlap | Unapproved |
-| D4 | Core timer starts after profile establishment; setup budget separate | Unapproved |
+| D1 | Local typed cause plus native peer signal; no error Frame | Accepted 2026-10-30 |
+| D2 | Fail-close pre-ACTIVE notification | Accepted 2026-10-30 |
+| D3 | `UNIMPLEMENTED` for no version overlap | Accepted 2026-10-30 |
+| D4 | Core timer starts after profile establishment; setup budget separate | Accepted 2026-10-30; clocks reconciled with RFC 0008 D2 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md) |
 
-1. **TBD — blocker:** assign actual author/owner and protocol/security reviewers.
-2. **TBD — blocker:** record two maintainer approvals, security review, and
-   resolution of normative objections; selected text is not acceptance.
-3. **TBD — blocker:** record the pre-stable freeze/version and migration decision
-   in §6, including the changed remote-reporting promise and WS timeout mapping.
-4. **TBD — blocker:** reconcile the forthcoming RFC 0008 queue/suspend clock
-   contract and related RFC 0007 setup budgets without combining timer phases.
-5. **TBD — blocker:** accepted spec/diagram/case updates and independent evidence
-   are still required; F-03/F-07/F-09/F-19 are not closed by this Draft.
+Acceptance was recorded 2026-10-30 via
+[Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+(disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3):
+1. Author/reviewers: oscarlaw (self-review disclosed).
+2. Approvals: recorded in Decision 0002; security scope acknowledged
+   (handshake + errors); independent human security review remains a
+   release gate.
+3. Freeze: the specification-freeze decision that follows this wave records
+   the pre-stable version and migration disposition in §6; the WS core-deadline
+   close mapping stands at `1001`, HTTP at `400`/`401`/`403`, oversize at `1009`.
+4. Clocks: reconciled with accepted RFC 0008 D2 via Decision 0002 (one
+   controlling wording; RFC 0004 owns the terminal gate, RFC 0008 owns
+   queue/suspend). RFC 0007's independent setup budgets are preserved.
+5. Owner updates: `handshake.md`, `errors.md`, `events.md`, plus the
+   transport-native tables, were applied in the acceptance PR.
+   Executed conformance evidence (two implementations) remains a release
+   gate and is NOT satisfied by acceptance.
 
 ## Appendix: References
 

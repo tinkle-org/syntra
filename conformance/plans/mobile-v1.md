@@ -1,10 +1,18 @@
 # Mobile v1 acceptance plan
 
-Status: proposal-only, non-executable. Owner: [RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md),
-with [SC1 RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#11-accepted-interoperability-contract-2026-10-29)
-and [recovery plan](update-recovery.md). These scenario labels are planning
-labels, not registered conformance IDs. All behavioral outcomes below are
-proposed expectations awaiting acceptance; none is an execution verdict.
+Status: planned but not executed. Owner: [RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md),
+with [SC1 RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#11-accepted-interoperability-contract-2026-10-29),
+the host authorization lifecycle of [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md)
+and the accepted [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md)
+wave, plus the [recovery plan](update-recovery.md). Acceptance anchoring:
+RFCs 0007 §11, 0008, 0010 and 0004 are accepted, so the behavioral
+outcomes below derive from accepted normative requirements — unlike the
+pre-acceptance draft, they are no longer bare proposals awaiting
+acceptance. Each executed outcome still cites the owning requirement ID
+at run time. The `MV-*` entries are scenario labels, not registered
+conformance IDs; registered `CONF-*` cases live in the manifests.
+Execution of this plan is a release gate, and none of the outcomes below
+is an execution verdict.
 
 ## Required matrix and provenance
 
@@ -25,7 +33,7 @@ and traffic secrets out of retained traces; test-only vector inputs are public.
 
 ## Scenarios
 
-| Label | Ordered input / fault | Required proposed observations |
+| Label | Ordered input / fault | Required observations (cite owning accepted requirements at execution) |
 |---|---|---|
 | MV-WIRE | Raw known/same/unknown body alternatives; reserved 16/17; ordinary metadata reordered; wrong types for nested known fields including wrong-type then valid timeout; malformed lengths; every short-frame split point | D1 precedence, unknown metadata accepted, no malformed dispatch, same logical result across codecs |
 | MV-SC-CONTEXT | All public context fixtures plus negative mutation recipes; wrong configured carrier/scope/key selector; legacy endpoints/subprotocols | Exact prologue/context; bounded pre-Noise rejection of malformed context; no format sniff/fallback |

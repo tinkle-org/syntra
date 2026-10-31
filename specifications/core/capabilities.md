@@ -2,10 +2,10 @@
 
 - Identifier: `specifications/core/capabilities.md`
 - Title: Mandatory vs Optional Capabilities and Extension Rules
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Partially accepted (2026-10-30) — negotiation-mechanics owner file for accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D1/D2/D4 per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); reliable-session shipping authority (`SNTR-CAP-008`/`SNTR-CAP-902`, marked proposal-only inline) remains pending a future RFC
+- Version: 1.0.0-draft.1 (2026-10-19, accepted-paragraph corrections 2026-10-30)
 - Normative references: BCP 14; `protocol.md` (SNTR-CORE-004); `handshake.md`; `versioning.md`; `GOVERNANCE.md`; ADR-009
-- Scope: How peers advertise, negotiate, and use OPTIONAL behavior (event streams, resumption, extensions) without breaking mandatory interop. Capability identifiers and extension payloads themselves are defined by their respective RFCs; this document defines only the negotiation mechanics and rules.
+- Scope: How peers negotiate and use OPTIONAL behavior (e.g., event streams, resumption, extension payloads) without breaking mandatory interop. Capability identifiers and extension payloads themselves are defined by their respective RFCs; this document defines only the negotiation mechanics and rules.
 - Terminology: Per `protocol.md`. **Mandatory** = required for interop (handshake, RPC, cancel, errors, versioning). **Optional** = negotiated (streams, resumption, extensions). **Extension** = RFC-defined optional addition.
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
@@ -14,7 +14,9 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-CAP-001** — Every optional behavior MUST have a stable capability identifier (ASCII, e.g., `syntra.events/1`, `syntra.resume/1`) defined by its RFC. Identifiers MUST be versioned; unversioned or ambiguous identifiers MUST be rejected.
 
-**SNTR-CAP-002** — Negotiation MUST be explicit. A peer MUST NOT assume support, MUST NOT probe by sending optional frames, and MUST NOT require an unnegotiated option. Initiators advertise desired capabilities; hosts confirm only those they support (binding mechanism: handshake extensions when defined, otherwise application-level negotiation RPC — the capability's RFC MUST state which; probing via optional `Frame` variants without prior agreement is FORBIDDEN). No resumption, session-extension, multi-round-auth, event-stream, or replay capability exists in default v1: any such identifier — including the `syntra.events/1` and `syntra.events.replay/1` names proposed (not allocated) in `events.md` §1A — is unnegotiated until its RFC defines the binding, confirmation, bounds, and failure semantics (see `sessions.md` §1C–§1E, `authentication.md` §1A, `events.md` §1A/§1I, `open-questions.md` blockers 1–2, `rfcs/0002-auth-session-lifecycle.md`).
+**SNTR-CAP-002** — Negotiation MUST be explicit. A peer MUST NOT assume support, MUST NOT probe by sending optional frames, and MUST NOT require an unnegotiated option. Per accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D1, there is NO generic core capability enumeration, hello-extension list, or optional-frame probing mechanism in scope: capability/session extension for a profile is negotiated as part of that profile's own accepted contract — post-ACTIVE, via an ordinary RPC defined by the profile's accepted RFC, which owns the exact method, versioned payloads, bounds, confirmation, and unknown-input handling (e.g., the accepted [RFC 0006](../../rfcs/0006-update-recovery-profile.md) defines `syntra.update-recovery/1` negotiation via `/syntra.v1.UpdateRecovery/Negotiate`). Only the defined negotiation call is exempt from prior confirmation of its own profile; no other unconfirmed profile operation is permitted. Confirmation never resumes a session, enables another connection, or authorizes a different principal. No resumption, session-extension, multi-round-auth, event-stream, or replay capability exists in default v1: any such identifier — including the `syntra.events/1` and `syntra.events.replay/1` names proposed (not allocated) in `events.md` §1A — is unnegotiated until its RFC defines the binding, confirmation, bounds, and failure semantics (see `sessions.md` §1C–§1E, `authentication.md` §1A, `events.md` §1A/§1I, `rfcs/0002-auth-session-lifecycle.md`).
+
+Negotiated limit overrides follow the same mechanism rule (accepted RFC 0005 D2): any bound-value override (concurrency, envelope size, grace, credential/diagnostic limits) MUST bind to explicit accepted negotiation under a profile's own contract — there is no negotiated escape below a core floor and no silent override of core limits. Core floors and defaults (e.g., the ≥16 supported-concurrent-RPC floor, the 1 MiB default envelope, the 4 KiB public diagnostic bound) hold via their owning documents; this section states the mechanism, not the numerics.
 
 **SNTR-CAP-003** — Mandatory interop MUST NOT depend on any optional capability. A minimal implementation supporting only mandatory behavior MUST interoperate (with reduced functionality) against a full implementation.
 
@@ -32,8 +34,12 @@ No accepted reliable-session negotiation method or payload schema is
 recorded. The identifier above is proposed, not an allocation or shipping
 authorization. The `CONF-RS-*` plans in `sessions.md` §7.1 are not executable
 wire fixtures. Local implementation APIs/unit tests and runner aggregates
-do not establish negotiation conformance. RFC 0002 still defers resumption;
-the separate Draft recovery RFC 0006 does not resolve this blocker.
+do not establish negotiation conformance. Shipping authority for reliable
+sessions remains deliberately deferred — the RFC 0002 disposition (§10,
+reliable-session authority) keeps it open for a future RFC; the current
+acceptance wave does not activate this offer.
+`syntra.reliable-session/1` is proposal-only until a future RFC grants that
+authority.
 
 ## 2. Client behavior
 
@@ -67,8 +73,10 @@ Capabilities are the minor-evolution path (ADR-009). New mandatory behavior is n
 sequenceDiagram
   participant C as Initiator
   participant H as Host
-  C->>H: advertise {events/1, resume/1(optional)}
-  H-->>C: confirm {events/1} (resume unsupported)
-  C->>H: use events/1 (allowed)
-  C->>H: use resume/1 (FORBIDDEN → FAILED_PRECONDITION)
+  Note over C,H: handshake (hello/ready) → ACTIVE; core available mandatory-only
+  Note over C,H: no generic advertisement/probe channel exists
+  C->>H: request{profile negotiation method per its accepted RFC}
+  H-->>C: result{confirmed version + bounds for THIS connection}
+  C->>H: use an option without confirmation (FORBIDDEN → FAILED_PRECONDITION)
+  C->>H: require an unsupported option (→ UNIMPLEMENTED)
 ```

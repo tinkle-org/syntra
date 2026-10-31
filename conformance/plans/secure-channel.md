@@ -5,7 +5,8 @@
 - Requirement owners: `specifications/security/secure-channel.md`
   (`SNTR-SC-001` through `SNTR-SC-015`),
   `specifications/security/device-authorization.md`
-  (`SNTR-DAUTH-001` through `SNTR-DAUTH-010`) and
+  (`SNTR-DAUTH-001` through `SNTR-DAUTH-010`, RFC 0007;
+  `SNTR-DAUTH-011` through `SNTR-DAUTH-024`, RFC 0010) and
   `specifications/transports/noise-bindings.md`
   (`SNTR-SCW-001` through `SNTR-SCW-012`).
 - Profile: `SNTR-SC1-WSS-V1`; see [`../profiles.yaml`](../profiles.yaml).
@@ -19,9 +20,18 @@
 This document retains the manual-observation plan and its historical
 draft-1 evidence. The normative v1 contract is RFC 0007 §11.4 and
 `specifications/transports/noise-bindings.md`; the executable case
-specifications are `../manifest/sc1-wss.yaml`. All 33 `PLAN-*` references below
-are local planning references, not registered `CONF-*` tests or executed
-results. The `CONF-SCW-*` cases are registered; no verdict is implied.
+specifications are `../manifest/sc1-wss.yaml`. All 47 `PLAN-*` identifiers
+in this document are local planning references, not registered `CONF-*`
+tests or executed results. The `CONF-SCW-*` cases are registered; no verdict
+is implied. Sections 7–8 are RFC 0010's planned lifecycle cases, transaction
+fault matrices and revocation time-budget checks.
+[RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) is accepted
+(2026-10-30 via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md));
+its registry rows are registered in the same wave —
+`CONF-SCW-025`–`CONF-SCW-042` in `conformance/manifest/sc1-wss.yaml` (with
+`039`–`042` as the registration splits of `025`/`030`) and
+requirement rows `SNTR-DAUTH-011`–`SNTR-DAUTH-024` in
+`conformance/manifest/requirements.yaml` (registration is not execution).
 
 RFC 0007 is accepted, but acceptance does not authorize a stable release or
 establish secure-channel, device-authorization or UDP conformance. The existing
@@ -550,8 +560,290 @@ Maps `SNTR-SC-001` through `SNTR-SC-014` and `SNTR-DAUTH-001` through
   Self-loopback, shared fixtures alone, and a structural validator pass are not
   independent interoperability evidence.
 
+## 7. Host lifecycle requirement cases (planned under RFC 0010; all manual / planned, not executed)
+
+These cases map the host enrollment and authorization lifecycle contract of
+[RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md)
+(`SNTR-DAUTH-011`–`SNTR-DAUTH-024`). [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) is accepted
+(2026-10-30 via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md));
+the `CONF-SCW-025`–`CONF-SCW-042` rows for these cases are registered in
+`conformance/manifest/sc1-wss.yaml` (`039`–`042` are registration splits of
+025/030: the equivalent out-of-band path, valid-but-unauthorized cross-principal
+and out-of-scope enrollment, and mid-connection rebinding; registration is
+not execution). The
+cases use the §2 observation method with injected clocks, crash/restart
+oracles and synthetic secret markers; execution and verdicts remain pending.
+
+### PLAN-DAUTH-011 — enrollment authority
+
+Maps `SNTR-DAUTH-011`.
+
+- Success: enroll devices only through the deployment-designated authority
+  paths (authorized bootstrap enrollment policy or equivalently authenticated
+  out-of-band provisioning); record that each issuance decision validated the
+  enroller identity, target principal and intended scope before material was
+  issued.
+- Negatives: unauthorized, anonymous, bootstrap-only, cross-principal and
+  out-of-scope enrollment attempts are denied before anything is issued or
+  durably recorded; a denied attempt leaves no device state that later
+  authenticates and produces no protected effect.
+
+### PLAN-DAUTH-012 — AK and handle issuance
+
+Maps `SNTR-DAUTH-012`.
+
+- Success: the host generates a 256-bit uniformly random AK from a secure
+  source and allocates an independent uniformly random eight-byte handle;
+  the issued record is immutable within its (handle, epoch) scope.
+- Negatives: injected entropy-source failure aborts before any staged record;
+  all-zero or otherwise degenerate AK candidates are refused; a forced
+  handle collision is rejected or redrawn through the bounded procedure
+  without overwriting another principal's record; duplicate or concurrent
+  issuance against a live (handle, epoch) tuple is refused, with no second
+  authorization minted and no in-place substitution of key material or
+  principal.
+
+### PLAN-DAUTH-013 — staged provisioning transaction
+
+Maps `SNTR-DAUTH-013`.
+
+- Success: drive stage → encrypted delivery → device secure-storage
+  persistence plus acknowledgment → durable host commit; authorization
+  materializes only after commit; the activation timeout expires
+  never-committed attempts through bounded cleanup.
+- Negatives: a staged, undelivered or unacknowledged record cannot satisfy
+  returning-device validation, presents no valid enrollment to admission and
+  authorizes no protected effect; delivery attempted through an unverified
+  channel, URL or error/echo path never conveys or re-echoes AK material.
+  See the §8.1 fault matrix.
+
+### PLAN-DAUTH-014 — transaction idempotency and interrupted enrollment
+
+Maps `SNTR-DAUTH-014`.
+
+- Success: crash or restart between any two transaction steps, then retry
+  identically; the same attempt completes or recognizes its own record and
+  at most one authorized enrollment exists.
+- Negatives: withhold or duplicate every delivery response and device
+  acknowledgment; crash after each commit boundary; expire the activation
+  timeout. Never observe a double-issued AK, an unauthorized active
+  enrollment, a permanently inconsistent store, resurrection of an expired
+  or aborted attempt, or unbounded staged state. See the §8.1 fault matrix
+  for the per-step outcomes and invariants.
+
+### PLAN-DAUTH-015 — protected pre-`ready` authorization sequence
+
+Maps `SNTR-DAUTH-015`.
+
+- Success: the recorded order (verified WSS + Noise handshake → fresh client
+  confirmation + encrypted ClientHello → validate current enrollment, trusted
+  identity and same-principal policy → `ServerReady` → authorized RPC
+  dispatch) completes with exactly one bound principal and only authorized
+  effects.
+- Negatives: a replayed first flight offered as fresh confirmation, missing
+  confirmation, a stale or missing enrollment record, an unverified identity
+  claim and a pre-`ready` protected request each produce no `ServerReady`
+  principal, no dispatch and no queued early-effect replay. A no-credential
+  policy is exercised only with its explicitly authenticated variant.
+
+### PLAN-DAUTH-016 — enrollment-to-principal binding
+
+Maps `SNTR-DAUTH-016`.
+
+- Success: the verified channel identity binds to the current enrollment
+  record, an independently verified trusted application identity, the
+  intended endpoint scope and the enrollment principal before `ready`'s
+  principal is fixed.
+- Negatives: returning with application principal B against an enrollment
+  whose principal is A, and the reverse substitution, both fail authorization
+  before `ready` with no privilege union, remapping or protected effect;
+  mid-connection rebinding attempts are refused under the fixed principal
+  rule.
+
+### PLAN-DAUTH-017 — revocation and expiry on new connections
+
+Maps `SNTR-DAUTH-017`.
+
+- Success: revoked and expired enrollments are denied at admission and again
+  before `ready` on every newly established connection, across all
+  deployment-permitted carriers.
+- Negatives: revoked-epoch reconnects via replayed context flights, a second
+  carrier or stale store state never authenticate; no affected channel
+  produces any protected effect. Timing bound cases are checked in §8.3.
+
+### PLAN-DAUTH-018 — active-channel revocation propagation
+
+Maps `SNTR-DAUTH-018`.
+
+- Success: injected clocks and store-latency probes measure committed
+  revocation enforcement latency on established channels within the
+  300-second hard profile maximum; a deployment using push invalidation
+  observes enforcement against the 60-second operational target. The
+  deployment's documented cache-staleness, propagation and check/close
+  budgets sum inside the declared bound.
+- Negatives: a configured watchdog or tick interval alone is never accepted
+  as propagation evidence; past the hard deadline the plan observes denial
+  of new protected operations, protected-delivery cutoff and channel
+  closure; already-committed application effects are recorded as history,
+  not rolled back and not hidden.
+
+### PLAN-DAUTH-019 — fail closed without current validity
+
+Maps `SNTR-DAUTH-019`.
+
+- Success: authorization-store failure, store-read timeout and
+  stale-cache profiles deny new admissions; established channels whose
+  binding cannot be re-validated close no later than the last successful
+  check plus the deployment's declared bound, inside the 300-second profile
+  maximum.
+- Negatives: no admission on stale or unverifiable revocation state and no
+  cached-allow extension; the degraded store surfaces as reduced
+  availability with authorization integrity intact.
+
+### PLAN-DAUTH-020 — rotation transaction
+
+Maps `SNTR-DAUTH-020`.
+
+- Success: rotation issues a fresh independent AK and handle with a strictly
+  increasing epoch through the staged transaction; durable device
+  installation precedes normal retirement; the overlap window is finite and
+  documented; the hard cutoff invalidates the superseded credential even
+  while installation or acknowledgment remains outstanding.
+- Negatives: a lost acknowledgment after durable installation reconciles
+  without resurrecting the old credential; revocation, expiry, compromise
+  response and the cutoff never wait for installation or acknowledgment;
+  the device never claims an acknowledgment for unpersisted material; the
+  superseded credential is not usable at or after the cutoff. See the §8.2
+  fault matrix.
+
+### PLAN-DAUTH-021 — epoch integrity and rollback prevention
+
+Maps `SNTR-DAUTH-021`.
+
+- Success: epochs increase strictly across rotations; concurrent reconnects
+  during rotation settle each attempt against the durable epoch record at
+  that moment (within the overlap window, or denied after the cutoff).
+- Negatives: lower or equal epochs, rolled-back snapshots, fabricated
+  earlier-epoch records and injected epoch exhaustion are all refused; no
+  epoch wraps, rewinds or reuses; previously revoked or retired epochs stay
+  invalid; a lost device returning on a stale epoch is denied once its
+  overlap has lapsed, with re-entry only through independently authorized
+  re-enrollment.
+
+### PLAN-DAUTH-022 — compromise recovery through an independent authority
+
+Maps `SNTR-DAUTH-022`.
+
+- Success: re-enrollment after compromise proceeds only through an authority
+  verified independently of the compromised credential, as designated by the
+  deployment's enrollment policy; the replacement carries a fresh tuple (new
+  handle and epoch).
+- Negatives: compromised and revoked credential material attempting to
+  re-issue, extend its own validity or epoch, authorize the recovery channel
+  or supply trust evidence for its replacement is denied on every path;
+  recovery decisions rely on nothing derived from possession of the
+  compromised secret or device state.
+
+### PLAN-DAUTH-023 — lifecycle storage control and secret disposal
+
+Maps `SNTR-DAUTH-023`; extends `PLAN-DAUTH-004`.
+
+- Success: access control confines usable AK material to the deployment's
+  lifecycle control plane; disposal following expiry, retirement, revocation
+  and transaction timeout leaves no recoverable copy outside the documented
+  boundary; device disposal uses the earliest mechanism the platform
+  supports, checked with synthetic markers.
+- Negatives: synthetic AK markers are absent from logs, traces, metrics,
+  error text and durable telemetry at every lifecycle step; restored or
+  copied authorization-store backups outside the documented boundary fail
+  the case rather than restore access.
+
+### PLAN-DAUTH-024 — server-key pin rotation
+
+Maps `SNTR-DAUTH-024`.
+
+- Success: bounded pin sets activate, overlap and retire through a channel
+  independently authenticated at the deployment's trust boundary; a retired
+  pin's identity cannot become usable again; a stale or replayed
+  configuration does not silently substitute the active pin.
+- Negatives: peer-taught or otherwise unauthenticated pin updates are
+  refused; rollback of a retired pin is refused; bound-set and
+  activation/retirement semantics keep the change controlled; a connecting
+  peer cannot make the initiator adopt a trust anchor.
+
 After RFC acceptance and blocker resolution, register reviewed executable cases
 and any separately approved profiles through the normal conformance process.
-Only actual executions can populate verdicts and evidence references. Until then,
-all 25 requirement rows retain empty `test_ids` and manual acceptance dispositions,
-with scoped implementation evidence recorded in their notes and the ledger.
+Only actual executions can populate verdicts and evidence references. Until executions are recorded, verdicts stay absent by design. The
+manifest requirement rows for `SNTR-SC-*` and `SNTR-DAUTH-001`–`010` trace
+their `CONF-SCW-*` cases in `requirements.yaml` per the activation pass;
+scoped implementation evidence is recorded in their notes and the ledger.
+The RFC 0010 lifecycle rows `SNTR-DAUTH-011`–`SNTR-DAUTH-024` trace
+`CONF-SCW-025`–`CONF-SCW-042` (with `039`–`042` the registration splits of
+`025`/`030`), the prose cases `PLAN-DAUTH-011`–`024`
+remain planned and unexecuted, and registration still implies no verdicts.
+
+## 8. Lifecycle fault matrices and revocation time budgets (planned under RFC 0010; not executed)
+
+### 8.1 Enrollment transaction fault matrix
+
+Refines `PLAN-DAUTH-013` and `PLAN-DAUTH-014`. Drive one attempt through the
+staged transaction, inject one fault per row, and observe role-visible
+outcomes and store state. Invariants asserted after every row: at most one
+enabled (handle, epoch, AK) authorization for the attempt; zero double-issued
+AKs; no unauthorized active record; staged-state footprint bounded and
+released by the activation timeout; no permanently inconsistent store; no
+resurrection of an expired or aborted attempt.
+
+| # | Transaction point | Injected fault | Expected observable outcome |
+|---|---|---|---|
+| F1 | before host staging | crash or restart | no material issued, no record survives; a retried attempt starts clean |
+| F2 | during encrypted delivery | drop, partial write, or corrupted delivery | no device persistence; staged record expires by activation timeout; retry is idempotent against the same attempt |
+| F3 | device persisted, acknowledgment not yet sent | crash on device or host | staged record remains unauthorized while uncommitted; a retried same-attempt delivery resumes it idempotently and may still commit, or the activation timeout expires it; authorization materializes only at commit; never a double-issued AK or second record |
+| F4 | device acknowledgment lost in transit | withhold or duplicate the response drop | host reconciles to at most one authorized enrollment without recreation |
+| F5 | host after device persistence, before durable commit | crash | staged record expires or resumes idempotently; no unauthorized state observed |
+| F6 | commit recorded, delivery response lost to device | withhold response | device retries idempotently; no second AK; no duplicate authorization |
+| F7 | post-commit acknowledgment lost | withhold response | enrollment remains valid; reconciliation never rolls the record back into staged state |
+| F8 | activation timeout expires | never-committed attempt | bounded cleanup releases staged state; the next legitimate attempt re-provisions from scratch |
+| F9 | delivery via unverified channel or echo path | injected delivery | delivery refused; record stays uncommitted; no authorization, no AK echo observable |
+
+### 8.2 Rotation transaction fault matrix
+
+Refines `PLAN-DAUTH-020` and `PLAN-DAUTH-021`. Invariants asserted after
+every row: the epoch never decreases in any admissible state; no revoked or
+retired epoch reappears; the overlap never extends beyond its declared bound;
+routine retirement happens only after durable installation; superseded
+credentials are unusable at or after the hard cutoff.
+
+| # | Rotation point | Injected fault | Expected observable outcome |
+|---|---|---|---|
+| R1 | before replacement staging | crash or restart | the old credential remains valid; no half-issued new tuple exists |
+| R2 | during replacement delivery | drop, partial write, or corruption | the old record stays valid; retry is idempotent; the staged new tuple authorizes nothing before installation and commit |
+| R3 | device installed replacement, acknowledgment outstanding | crash or lost acknowledgment | neither credential prematurely invalidated; the overlap applies; reconciliation follows the documented outcome without resurrecting the old credential past the cutoff |
+| R4 | replacement committed at the host | crash after commit | the new tuple is active; the old tuple remains inside its declared overlap only, never beyond the cutoff |
+| R5 | overlap window expiry | clock advance | the superseded credential is denied; the replacement continues unaffected |
+| R6 | hard cutoff while installation or acknowledgment is outstanding | clock fault or loss injection | the superseded credential is invalidated regardless of state; the device is left fail-closed, re-entering only via independently authorized recovery |
+| R7 | revocation during rotation | authoritative revoke commit | neither installation nor the device acknowledgment delays enforcement; the affected tuple is invalid within §8.3's bound |
+| R8 | epoch exhaustion | injected overflow attempt | the enrollment retires through rotation or a new enrollment; no wrap, rewind or reuse |
+| R9 | rollback to a pre-rotation or pre-revocation snapshot | store restore | the rolled-back epoch is refused; no revival; the durable epoch record remains authoritative |
+| R10 | concurrent reconnect across the rotation boundary | race connections | each attempt settles against the durable epoch at that moment: within the live overlap window it succeeds, after the cutoff it is denied; no hybrid or cross-epoch admission |
+| R11 | device loss across rotation | returning stale-epoch device | denied once its overlap lapsed or its enrollment fate applied; re-entrance permitted only through independently authorized re-enrollment |
+
+### 8.3 Revocation time-budget checks
+
+Refines `PLAN-DAUTH-017`–`PLAN-DAUTH-019`. Use injected clocks and store
+latency; measurement anchors at the authoritative revocation commit, never
+at the operator request or a configured interval.
+
+| # | Deployment profile under test | Observation |
+|---|---|---|
+| B1 | default public production profile | a revoked enrollment fails admission on every newly established connection immediately after commit |
+| B2 | default public production profile | established-channel enforcement measured within the 300-second hard profile maximum from commit; post-deadline rows observe denial of new protected operations, delivery cutoff and channel closure |
+| B3 | deployment using push invalidation | enforcement observed against the 60-second operational target; the configured push or tick mechanism itself is never accepted as evidence, only observed latency is |
+| B4 | high-security declared profile | the declared shorter bound or zero grace is observed, never exceeding the default profile maximum |
+| B5 | degraded availability state | store-unavailable and stale-cache profiles deny new admissions and close affected channels within the declared freshness bound; no cached-allow outcome is observed |
+| B6 | committed-effect policy | effects committed before enforcement remain history; the plan records them as non-roll-backable and observes no retroactive undo |
+
+Depth requirement: every row above is exercised through real reconnection and
+revocation flows with injected clocks, not by inspecting configuration values.
+Assertions never accept a nominal watchdog interval, a nominal overlap value
+or a computed budget in place of observed outcomes.

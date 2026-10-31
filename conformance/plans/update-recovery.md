@@ -1,10 +1,13 @@
 # Update/recovery acceptance plan
 
-- Status: Draft, non-executable acceptance plan for RFC 0006 §11.
-- Proposal: [RFC 0006 decision amendment](../../rfcs/0006-update-recovery-profile.md#11-draft-decision-amendment--release-inclusion-and-recovery-safety).
+- Status: non-executable acceptance plan for RFC 0006 §11. RFC 0006 is
+  accepted per this wave's acceptance decision record; the plan itself
+  remains prose, and the §11.8/§11.10 execution gates are pending.
+- Proposal: [RFC 0006 decision amendment](../../rfcs/0006-update-recovery-profile.md#11-decision-amendment--release-inclusion-and-recovery-safety).
 - Current draft owner: `specifications/profiles/recovery.md`.
 - Representation inspected: `proto/syntra/v1/recovery_profile.proto`.
-- Authority: `GOVERNANCE.md` §§3–5 and `rfcs/README.md`; acceptance is pending.
+- Authority: `GOVERNANCE.md` §§3–5 and `rfcs/README.md`; acceptance is
+  recorded by the acceptance decision record; no execution is claimed.
 - Execution: **NOT EXECUTED** for every observation below. No runtime tests,
   interop results, conformance verdicts, or release readiness are asserted.
 
@@ -13,9 +16,12 @@
 `PLAN-URP-*` labels are document-local planning references, not registered
 `CONF-*` cases or requirement IDs. This file introduces no runner syntax,
 profile, manifest, schema, generated type, or normative owner change. The
-existing recovery manifest is a draft precursor, not an executable definition
-of the amendment. Where it disagrees, record the required follow-up; never
-declare an old fixture passing as evidence for the replacement decision.
+recovery manifest (`conformance/manifest/recovery.yaml`) is the registered
+definition of the reconciled `CONF-URP-001…017` cases, normalized in the
+acceptance PR; registration is not execution, and implementers target those
+registered cases. Where this plan and the manifest disagree, the manifest and
+owning specifications hold; never declare an old fixture passing as
+execution evidence for the replacement decision.
 
 The target release bundle includes standardized recovery and independent
 Rust/Go evidence after acceptance. Wire use remains optional and negotiated
