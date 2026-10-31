@@ -1,0 +1,86 @@
+conformance/manifest/events.yaml
+  s_b52c85fd6e474e::t_59b211a9d7fc58 185-186
+specifications/security/device-authorization.md
+  s_b52c85fd6e474e::t_9ee7538e4ecc97 473-477
+  s_b52c85fd6e474e::t_5ebd15edc9b72e 445
+  s_b52c85fd6e474e::t_198695efa4e339 447-453
+  s_b52c85fd6e474e::t_411e2424ef34f4 493-494
+  s_b52c85fd6e474e::t_eddd262dcadc3b 478
+audits/v1-release-readiness.md
+  s_b52c85fd6e474e::t_b48a4049113fb5 83
+  s_b52c85fd6e474e::t_cb18c1ec799219 127,130
+  s_b52c85fd6e474e::t_1606e01d27fc4a 18
+  s_b52c85fd6e474e::t_5eb30019e8e6b6 56
+  s_b52c85fd6e474e::t_337bd6f92906ca 55
+  s_b52c85fd6e474e::t_0e7cfbf5f69927 13
+  s_b52c85fd6e474e::t_aa33f87ec9f6b2 103-107,109
+  s_b52c85fd6e474e::t_9c2f9d631f7ce8 98
+  s_b52c85fd6e474e::t_9927355fd76bc1 59
+docs/v1-acceptance-package.md
+  s_b52c85fd6e474e::t_bd765a7362b434 138,146-150
+  s_b52c85fd6e474e::t_4a94b1d622ddd5 139-144
+  s_b52c85fd6e474e::t_c4bb00ba8b6a80 68
+SESSION-OPEN-QUESTIONS.md
+  s_b52c85fd6e474e::t_d00a77397df56c 27
+  s_b52c85fd6e474e::t_ce6361efc908dc 98
+rfcs/0006-update-recovery-profile.md
+  s_b52c85fd6e474e::t_b1a23073d286f4 994
+specifications/core/handshake.md
+  s_b52c85fd6e474e::t_242b5c20e27e5f 237
+  s_b52c85fd6e474e::t_8be16cbec444f4 160
+  s_b52c85fd6e474e::t_91305f0d686901 217
+  s_b52c85fd6e474e::t_5a0b00d229167a 79
+  s_b52c85fd6e474e::t_b1bfcbaff394e6 34
+conformance/manifest/recovery.yaml
+  s_b52c85fd6e474e::t_b079abfa44476b 36
+  s_b52c85fd6e474e::t_738fa3efb21b8f 31
+rfcs/0010-sc1-host-authorization-lifecycle.md
+  s_b52c85fd6e474e::t_5e7020856e940e 428-429
+  s_b52c85fd6e474e::t_d56cb71445c697 408-412
+  s_b52c85fd6e474e::t_abf212d328929a 413
+  s_b52c85fd6e474e::t_131088ae1773aa 380-381
+  s_b52c85fd6e474e::t_f628d608cfe300 382-388
+docs/client-implementation.md
+  s_b52c85fd6e474e::t_b6a0eced19c361 119-129
+conformance/plans/secure-channel.md
+  s_b52c85fd6e474e::t_8e0331724638c4 781
+  s_b52c85fd6e474e::t_d5d403f0a2ef16 782
+  s_b52c85fd6e474e::t_90f46e12ed549f 31-32
+docs/decisions/0002-sdd-acceptance-wave.md
+  s_b52c85fd6e474e::t_809eab0815f3c2 17-18
+conformance/events/events.md
+  s_b52c85fd6e474e::t_a649f693686be4 142-144
+RELEASE.md
+  s_b52c85fd6e474e::t_f74ed3362b99fb 184-186,188-189
+  s_b52c85fd6e474e::t_96fe39ff22e547 51
+conformance/plans/update-recovery.md
+  s_b52c85fd6e474e::t_0107bcfc3547ac 19-24
+docs/implementer-guide.md
+  s_b52c85fd6e474e::t_4050c5bd7a1e2b 159-162
+proto/syntra/v1/recovery_profile.proto
+  s_b52c85fd6e474e::t_f84b5dbf67d051 11-12,15-18
+rfcs/0002-auth-session-lifecycle.md
+  s_b52c85fd6e474e::t_1ef196c4ed60c5 43
+  s_b52c85fd6e474e::t_daa60bfe318b81 37
+docs/mobile-v1-delivery.md
+  s_b52c85fd6e474e::t_53fb8185bee30b 52,54
+  s_b52c85fd6e474e::t_3458ec001147a5 94-100
+conformance/claims.md
+  s_b52c85fd6e474e::t_f7670aa86537fc 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3f52c0a11c6c427f58d7c811e37fd405c86d711",
+  "prompts": {},
+  "sessions": {
+    "s_b52c85fd6e474e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72e2f5c7ffeEh9X2Me78imjgO",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
