@@ -1,0 +1,74 @@
+conformance/requirements/https.md
+  s_356307e6731cb3::t_cf632441e3f25a 24-25
+conformance/manifest/rpc.yaml
+  s_356307e6731cb3::t_cf4e850699cdba 102,111,118
+  s_356307e6731cb3::t_8a57622d74f4bc 52,64
+  s_356307e6731cb3::t_9f88c41aa4fd11 94
+  s_356307e6731cb3::t_2280f506a943ae 172,181
+  s_356307e6731cb3::t_f0cfd106d5b92c 22
+  s_356307e6731cb3::t_c626b78bb0db7e 136,145
+  s_356307e6731cb3::t_31035e80d5ee09 154
+  s_356307e6731cb3::t_ead19f07021712 163
+  s_356307e6731cb3::t_e8cb4bbe47578c 189,198
+  s_356307e6731cb3::t_4c11e5f2dcd3c2 127
+  s_356307e6731cb3::t_e527fcbb7b5539 220
+  s_356307e6731cb3::t_711a5dad602280 211
+  s_356307e6731cb3::t_8a43506734dcea 227
+  s_356307e6731cb3::t_0fffc1b751bad2 13
+conformance/requirements/http.md
+  s_356307e6731cb3::t_53774c9fd7e776 96
+  s_3802c8f6c87f93::t_646a75f28e8ae5 95
+conformance/manifest/README.md
+  s_356307e6731cb3::t_f16c716a5b1935 120-121
+  s_356307e6731cb3::t_eec5baacb1164b 152-163
+conformance/rpc/rpc.md
+  s_356307e6731cb3::t_07fc21239fab00 35
+conformance/manifest/transport-http.yaml
+  s_3802c8f6c87f93::t_07062bca936e2a 224
+  s_3802c8f6c87f93::t_e0cfe819942c03 255
+  s_3802c8f6c87f93::t_dfa5cb2c1c5d55 234-254
+  s_356307e6731cb3::t_1fc95338a49476 202-205,229
+  s_3802c8f6c87f93::t_c05e4dfc18cb0c 206-221,223,225-228
+  s_3802c8f6c87f93::t_0a3a1383c7d30d 222,230-233
+conformance/manifest/transport-https.yaml
+  s_3802c8f6c87f93::t_7a81952325a21c 68-87
+  s_356307e6731cb3::t_d569730d644acd 47-65,67,88
+CHANGELOG.md
+  s_356307e6731cb3::t_020abedced23f2 43-60
+conformance/manifest/core.yaml
+  s_356307e6731cb3::t_86efa9f8f53ecf 171,180,186
+  s_356307e6731cb3::t_a7d49e8a908975 36
+  s_356307e6731cb3::t_c899b08c26620e 127
+  s_356307e6731cb3::t_3fdc9a346b675c 63,72
+  s_356307e6731cb3::t_bd603d027d2ef4 80
+  s_356307e6731cb3::t_d3d284a748e342 162
+  s_356307e6731cb3::t_1e6977ba9af20f 153
+  s_356307e6731cb3::t_7e59c924356c8b 13
+  s_356307e6731cb3::t_654b3993b8a568 26
+  s_356307e6731cb3::t_5d10dae7c44bfe 45,54
+  s_356307e6731cb3::t_3b4ccabb515203 145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8dd3670f56d77da15a8ed36a255513c2df534522",
+  "prompts": {},
+  "sessions": {
+    "s_356307e6731cb3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c641eedffeH2y4KyadyXqDoQ",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_3802c8f6c87f93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c26ce62ffegvsMIVLDiSGrbp",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
