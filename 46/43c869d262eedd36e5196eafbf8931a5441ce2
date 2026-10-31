@@ -1,0 +1,27 @@
+CHANGELOG.md
+  s_2b6297f6bb093d::t_7a0cd608d494b4 40-47
+conformance/recovery_profile/recovery.md
+  s_2b6297f6bb093d::t_6776dc55704b73 204-206
+conformance/manifest/recovery.yaml
+  s_2b6297f6bb093d::t_557195f34b3414 280,283-284,290-293
+conformance/rpc/rpc.md
+  s_2b6297f6bb093d::t_e7e027d1238b40 131-132
+conformance/manifest/rpc.yaml
+  s_2b6297f6bb093d::t_5afaef19941295 226-241,248-264
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4643c869d262eedd36e5196eafbf8931a5441ce2",
+  "prompts": {},
+  "sessions": {
+    "s_2b6297f6bb093d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c75d2b2ffeXg28VEAnktaH3b",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
