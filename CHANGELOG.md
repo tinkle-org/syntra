@@ -40,14 +40,24 @@ development, changes land under `Unreleased`.
 - Added machine-readable transport applicability: cases MAY declare
   `applicable_transports` (peer-observation family vocabulary) to encode
   transport-scoped requirements such as the RFC 0004 D3 persistent-carrier
-  exemptions; `CONF-RPC-004` and `CONF-RPC-013` now declare
-  `[tcp_tls, ws_wss]`, so do the wire-`hello` cases `CONF-CORE-005` /
-  `CONF-CORE-006` and the per-connection concurrency floor `CONF-RPC-002`
-  (HTTP floor coverage lives in `CONF-HTTP-013` and `CONF-HTTPS-003`),
-  while `CONF-RPC-003` stays unrestricted — on HTTP/HTTPS its two requests
-  map to two independent concurrent exchanges (RFC 0004 D3). An
-  HTTP/HTTPS-only claim reports a valid `SKIP` citing the key (§6
-  exception to the no-SKIP-for-mandatory rule).
+  exemptions; `CONF-RPC-004`, `CONF-RPC-013`, and `CONF-RPC-002` declare
+  `[tcp_tls, ws_wss]`, as do the wire-`hello` cases `CONF-CORE-005` /
+  `CONF-CORE-006` and every frame-based `CONF-CORE-*` / `CONF-RPC-*` case
+  whose fixture holds an ACTIVE session (each note names its per-exchange
+  analogue where the transport profiles own one), and so does
+  `CONF-RPC-003` — on HTTP/HTTPS its ordering coverage is transport-owned
+  by `CONF-HTTP-013` / `CONF-HTTPS-003`. An HTTP/HTTPS-only claim reports
+  a valid `SKIP` citing the key (§6 exception to the
+  no-SKIP-for-mandatory rule).
+- Expanded the transport-owned HTTP/HTTPS concurrency floor fixtures so
+  they actually prove the floor: `CONF-HTTP-013` now drives SIXTEEN
+  simultaneously outstanding exchanges (SNTR-HTTP-072) and
+  `CONF-HTTPS-003` SIXTEEN simultaneously outstanding H2 streams on one
+  connection (SNTR-HTTPS-041), both coordinated with the documented
+  `reverse_completion_order: {barrier: all_admitted}` fault, asserting
+  descending completion order, request-ID-only correlation, and the
+  distinct-payload identical-echo assertion (no state merge, no
+  cross-exchange ID memory, per SNTR-HTTP-071/073 and SNTR-HTTPS-042/043).
 - Manifest validation now rejects present-but-null `expected.error` /
   `expected.transport` maps (case-level and `control_connection`) while
   absent keys stay allowed; clarified the `expected.frames: []` semantics

@@ -10,6 +10,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGVsbG8=", timeout_ms: 500 }
@@ -22,7 +23,7 @@ cases:
         - { request_id: 7, body: result, payload_b64: "aGVsbG8=" }
         - { request_id: 8, body: result, payload_b64: "" }
         - { request_id: 9, body: result, payload_b64: "AAEC//8=" }
-    notes: "Valid envelope per variant (request path shown; ready/notification/hello validity asserted in CONF-SESS-001 and CONF-EVT-003). Empty and arbitrary non-UTF-8 payloads are meaningful, not errors."
+    notes: "Valid envelope per variant (request path shown; ready/notification/hello validity asserted in CONF-SESS-001 and CONF-EVT-003). Empty and arbitrary non-UTF-8 payloads are meaningful, not errors. Persistent-carrier scope (one active session carries all rows): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue is CONF-HTTP-001 / CONF-HTTPS-001; an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6)."
     vector_refs: ["protobuf/GOLD-PROT-REQ-01", "protobuf/GOLD-PROT-RES-OK-01"]
 
   - id: CONF-CORE-002
@@ -32,6 +33,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { raw_b64: "CAEQBA==" }  # Frame{version:1, request_id:4} with no body set (bodyless envelope)
@@ -40,7 +42,7 @@ cases:
       session_state: unchanged
       error: { code: INVALID_ARGUMENT }
       hygiene: { absent_from: [credential, token, stack, ".pem", SELECT] }
-    notes: "Invalid envelope (empty body) rejected before dispatch; connection stays usable in ACTIVE."
+    notes: "Invalid envelope (empty body) rejected before dispatch; connection stays usable in ACTIVE. Persistent-carrier scope (connection stays usable): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue is CONF-HTTP-006 (malformed body is 400 with no dispatch); an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-CORE-003
     requirement: [SNTR-SER-003, SNTR-SER-004, SNTR-SER-900]
@@ -49,6 +51,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500, unknown_fields: [{ number: 90, wire_type: 2, value_b64: "eA==" }] }
@@ -57,7 +60,7 @@ cases:
       session_state: unchanged
       frames:
         - { request_id: 7, body: result, payload_b64: "aGk=" }
-    notes: "Unknown Protobuf field (90, never allocated) tolerated and skipped; mandatory interop unaffected. Sender never emits unknown fields."
+    notes: "Unknown Protobuf field (90, never allocated) tolerated and skipped; mandatory interop unaffected. Sender never emits unknown fields. Persistent-carrier scope (one active session): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; no dedicated per-exchange analogue exists on HTTP/HTTPS yet (the canonical envelope decode is CONF-HTTP-001) — an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-CORE-004
     requirement: [SNTR-ERR-005, SNTR-ERR-010]
@@ -66,6 +69,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { inject_raw_result_error_code: 99, request_id: 7 }
@@ -73,7 +77,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: UNKNOWN, message_pattern: "NEGATIVE:panic" }
-    notes: "Codec-level fixture: synthetic RpcError with future numeric code 99 MUST map to UNKNOWN for application reporting, preserve the number diagnostically where possible, and MUST NOT crash or report success."
+    notes: "Codec-level fixture: synthetic RpcError with future numeric code 99 MUST map to UNKNOWN for application reporting, preserve the number diagnostically where possible, and MUST NOT crash or report success. Persistent-carrier scope (one active session): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; no dedicated per-exchange analogue exists on HTTP/HTTPS yet — an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-CORE-005
     requirement: [SNTR-HS-003, SNTR-HS-010, SNTR-VER-002]
@@ -120,6 +124,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 500 }
@@ -137,6 +142,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [handshake_started]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
@@ -144,7 +150,7 @@ cases:
       connection_state: CLOSED
       session_state: none
       error: { code: FAILED_PRECONDITION, message_pattern: "NEGATIVE:result" }
-    notes: "Invalid handshake ordering: request before ACTIVE. Handshake failure + close; no dispatch; MUST NOT emit a zero-request_id result. Variants: second hello, cancel/notification pre-ACTIVE."
+    notes: "Invalid handshake ordering: request before ACTIVE. Handshake failure + close; no dispatch; MUST NOT emit a zero-request_id result. Variants: second hello, cancel/notification pre-ACTIVE. Persistent-carrier scope (wire handshake ordering on one connection): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue (credential evaluation before any dispatch on every exchange) is CONF-HTTP-009 / CONF-HTTP-010; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-CORE-009
     requirement: [SNTR-CORE-030, SNTR-WIRE-003, SNTR-RPC-001]
@@ -153,6 +159,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 0, body: request, method: "/example.Echo/Echo", payload_b64: "aGk=", timeout_ms: 500 }
@@ -161,7 +168,7 @@ cases:
       connection_state: CLOSED
       session_state: terminated_abnormally
       error: { code: INVALID_ARGUMENT }
-    notes: "Protocol errors: zero request_id with request is connection-level (close); malformed method shape is per-RPC INVALID_ARGUMENT. Harness runs both rows; the zero-ID row determines the terminal state."
+    notes: "Protocol errors: zero request_id with request is connection-level (close); malformed method shape is per-RPC INVALID_ARGUMENT. Harness runs both rows; the zero-ID row determines the terminal state. Persistent-carrier scope (connection-level protocol framing on one session): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; no dedicated per-exchange analogue exists on HTTP/HTTPS yet (per-exchange decode rejections are CONF-HTTP-006) — an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-CORE-010
     requirement: [SNTR-HS-006, SNTR-HS-013, SNTR-SESS-004]
@@ -170,9 +177,10 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       transport: { action: graceful_close, stop_new_rpcs: true }
     expected:
       connection_state: CLOSED
       session_state: terminated_normally
-    notes: "Graceful close: no new RPCs, observe profile grace period, teardown CLOSING->CLOSED, in-flight RPCs get UNAVAILABLE or CANCELLED, per-connection state discarded."
+    notes: "Graceful close: no new RPCs, observe profile grace period, teardown CLOSING->CLOSED, in-flight RPCs get UNAVAILABLE or CANCELLED, per-connection state discarded. Persistent-carrier scope: machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; on HTTP/HTTPS the per-exchange close is inherent (one terminal outcome per exchange, no kept state — CONF-HTTP-001), so no close-timeout mapping exists; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."

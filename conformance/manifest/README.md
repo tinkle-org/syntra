@@ -117,7 +117,8 @@ Race-sensitive cases MUST coordinate through structured `input.faults`
 maps, never through wall-clock sleeps or prose-only assumptions. The
 documented coordination faults follow the established
 `reverse_completion_order: {barrier: ...}` shape (see `rpc.yaml`
-`CONF-RPC-013`):
+`CONF-RPC-013`, and its transport-manifest cousins `CONF-HTTP-013` /
+`CONF-HTTPS-003`, the per-exchange and per-stream floor fixtures):
 
 - `duplicate_while_pending: {barrier: first_terminal_result,
   release_after: violation_and_closure}` — used by the persistent-carrier
@@ -148,11 +149,18 @@ carriers for the same reason (one RPC per HTTP exchange; SNTR-HTTP-070)
 and declares `applicable_transports: [tcp_tls, ws_wss]`; an
 HTTP/HTTPS-only claim reports `SKIP` for it and cites the key. Its
 HTTP/HTTPS floor coverage is transport-owned instead: `CONF-HTTP-013`
-(SNTR-HTTP-072) and `CONF-HTTPS-003` (SNTR-HTTPS-041). `CONF-RPC-003`
-(out-of-order correlation) is deliberately unrestricted: its semantics
-apply on every carrier — on HTTP/HTTPS the two requests map to two
-independent concurrent exchanges (SNTR-HTTP-072; SNTR-HTTPS-041), each
-correlated by request ID (RFC 0004 D3, SNTR-HTTP-073).
+(SNTR-HTTP-072) and `CONF-HTTPS-003` (SNTR-HTTPS-041), which run the
+16-concurrent fixture with the same reverse-completion barrier and
+distinct-payload identical-echo assertions as `CONF-RPC-013`.
+`CONF-RPC-003` (out-of-order correlation) is likewise persistent-carrier
+scoped (`applicable_transports: [tcp_tls, ws_wss]`): its connection holds
+an ACTIVE session, which the per-exchange HTTP model never provides, and
+its HTTP/HTTPS ordering coverage is transport-owned by `CONF-HTTP-013` /
+`CONF-HTTPS-003` (RFC 0004 D3). The remaining frame-based `CONF-CORE-*`
+and `CONF-RPC-*` cases with `active_session`/ACTIVE expectations are
+persistent-carrier scoped for the same consistency reason; each manifest
+note names the per-exchange analogue owned by the transport profiles
+where one exists.
 
 ## Base64 and hex conventions
 

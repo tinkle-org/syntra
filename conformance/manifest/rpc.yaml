@@ -10,6 +10,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "aGVsbG8=", timeout_ms: 500 }
@@ -18,7 +19,7 @@ cases:
       session_state: unchanged
       frames:
         - { request_id: 7, body: result, payload_b64: "aGVsbG8=" }
-    notes: "Request/response correlation with bit-identical payload. Repeat with empty and arbitrary non-UTF-8 payloads."
+    notes: "Request/response correlation with bit-identical payload. Repeat with empty and arbitrary non-UTF-8 payloads. Persistent-carrier scope (one active session): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue is CONF-HTTP-001 / CONF-HTTPS-001; an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6)."
     vector_refs: ["protobuf/GOLD-PROT-REQ-01", "protobuf/GOLD-PROT-RES-OK-01"]
 
   - id: CONF-RPC-002
@@ -48,6 +49,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "c2xvdy0=", timeout_ms: 5000 }
@@ -59,7 +61,7 @@ cases:
       frames:
         - { request_id: 8, body: result }
         - { request_id: 7, body: result }
-    notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO. Transport execution mapping: persistent carriers run the two requests as outstanding RPCs on one Syntra connection; HTTP/HTTPS (RFC 0004 D3) map them to two INDEPENDENT concurrent exchanges (ordering: none, SNTR-HTTP-072; H2 streams: SNTR-HTTPS-041), with complete_second_first asserting exchange 8 completes before exchange 7 — correlation discipline (SNTR-RPC-002 by request_id only, no FIFO assumption, no cross-exchange shared state per SNTR-HTTP-073) is carrier-independent, so this case declares no applicable_transports restriction and applies on every claimed transport."
+    notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO. Persistent-carrier scope: machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; on HTTP/HTTPS (RFC 0004 D3) the ordering-none and reverse-completion coverage is transport-owned — CONF-HTTP-013 (SNTR-HTTP-072) and CONF-HTTPS-003 (SNTR-HTTPS-042/041) run it at scale over independent exchanges/streams — so an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6)."
 
   - id: CONF-RPC-004
     requirement: [SNTR-RPC-002, SNTR-RPL-012]
@@ -89,6 +91,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 11, body: request, method: "/example.Unknown/Call", payload_b64: "eA==", timeout_ms: 500 }
@@ -96,7 +99,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: UNIMPLEMENTED, message_pattern: "NEGATIVE:panic" }
-    notes: "Unknown method: RPC error (connection stays usable), no handler dispatch. Distinct from malformed-method INVALID_ARGUMENT."
+    notes: "Unknown method: RPC error (connection stays usable), no handler dispatch. Distinct from malformed-method INVALID_ARGUMENT. Persistent-carrier scope (connection stays usable): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue (application error inside the 200 envelope) is CONF-HTTP-011 / vector X-HTTP-02; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-006
     requirement: [SNTR-RPC-002]
@@ -105,13 +108,14 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 99, body: result, payload_b64: "b3JwaGFu" }
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Result for unknown ID: locally ignored with a diagnostic; no error storm, no state change, no completion signaled."
+    notes: "Result for unknown ID: locally ignored with a diagnostic; no error storm, no state change, no completion signaled. Persistent-carrier scope (outstanding-initiator state): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6) — cross-exchange response handling is transport-owned (SNTR-HTTP-073)."
 
   - id: CONF-RPC-007
     requirement: [SNTR-RPC-004, SNTR-REL-006]
@@ -120,6 +124,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 9, body: request, method: "/example.Echo/Echo", payload_b64: "c2xvdy0=", timeout_ms: 100 }
@@ -128,7 +133,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: DEADLINE_EXCEEDED }
-    notes: "Deadline: responder enforces the effective deadline; initiator timer <= requested budget; expiry surfaces DEADLINE_EXCEEDED; handler effects unknown."
+    notes: "Deadline: responder enforces the effective deadline; initiator timer <= requested budget; expiry surfaces DEADLINE_EXCEEDED; handler effects unknown. Persistent-carrier scope (one outstanding RPC on one connection): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; no dedicated per-exchange analogue exists on HTTP/HTTPS yet — an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-008
     requirement: [SNTR-RPC-005, SNTR-RPC-021, SNTR-RPC-031]
@@ -137,6 +142,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 12, body: request, method: "/example.Echo/Echo", payload_b64: "Y2FuY2VsLW1l", timeout_ms: 5000 }
@@ -145,7 +151,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: CANCELLED }
-    notes: "Cancellation supported (best-effort): cancel-before-completion yields CANCELLED; completion-wins and unknown-ID-ignore rows run as sub-cases; exactly one terminal result in every run; cancel-vs-deadline tie-break is NOT asserted (open tie-break B10)."
+    notes: "Cancellation supported (best-effort): cancel-before-completion yields CANCELLED; completion-wins and unknown-ID-ignore rows run as sub-cases; exactly one terminal result in every run; cancel-vs-deadline tie-break is NOT asserted (open tie-break B10). Persistent-carrier scope (best-effort mid-flight cancel on one connection): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; no dedicated per-exchange analogue exists on HTTP/HTTPS yet — an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-009
     requirement: [SNTR-RPC-006, SNTR-ERR-002, SNTR-ERR-003]
@@ -154,6 +160,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 13, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 500 }
@@ -162,7 +169,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: INTERNAL, message_pattern: "NEGATIVE:SELECT" }
-    notes: "RpcError propagation: failures use result{error{code,message}} with known nonzero code and generic message. ProtocolError (connection-level, e.g. zero-ID request) is asserted in CONF-CORE-009."
+    notes: "RpcError propagation: failures use result{error{code,message}} with known nonzero code and generic message. ProtocolError (connection-level, e.g. zero-ID request) is asserted in CONF-CORE-009. Persistent-carrier scope: machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange analogue (application error inside the 200 envelope) is CONF-HTTP-011 / vector X-HTTP-02; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-010
     requirement: [SNTR-RPC-002, SNTR-ERR-004]
@@ -171,6 +178,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 14, body: result }
@@ -178,7 +186,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       error: { code: INVALID_ARGUMENT }
-    notes: "Harness first establishes outstanding RPC 14, then the responder emits this result with neither payload nor error selected. The client MUST report local INVALID_ARGUMENT for that RPC, never success; no error response on the wire is required."
+    notes: "Harness first establishes outstanding RPC 14, then the responder emits this result with neither payload nor error selected. The client MUST report local INVALID_ARGUMENT for that RPC, never success; no error response on the wire is required. Persistent-carrier scope (established outstanding RPC on one connection): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-011
     requirement: [SNTR-RPC-007, SNTR-RPC-010, SNTR-REL-003, SNTR-REL-004]
@@ -187,6 +195,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 100, body: request, method: "/example.Echo/Echo", payload_b64: "b3AtQUJD", timeout_ms: 2000 }
@@ -199,7 +208,7 @@ cases:
       connection_state: ACTIVE
       session_state: active
       retry: "request_ids differ (201 != 100); operation-key bytes bit-preserved; server behavior matches its documented dedup policy; core never deduplicates by request_id"
-    notes: "Idempotent retry: fresh request_id on the new connection, same application operation key inside the opaque payload. Unknown-outcome loss retries only idempotent/with-key operations."
+    notes: "Idempotent retry: fresh request_id on the new connection, same application operation key inside the opaque payload. Unknown-outcome loss retries only idempotent/with-key operations. Persistent-carrier scope (loss across a connection boundary with session loss): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange retry analogue is CONF-HTTP-014 (SNTR-HTTP-080–082); an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-012
     requirement: [SNTR-HS-014, SNTR-REL-009, SNTR-CORE-005]
@@ -208,13 +217,14 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       faults: { abrupt_transport_loss: true, in_flight_request_ids: [7, 8] }
     expected:
       connection_state: CLOSED
       session_state: terminated_abnormally
       error: { code: UNAVAILABLE, message_pattern: "NEGATIVE:success" }
-    notes: "Ambiguous transport failure: loss before any result maps to UNAVAILABLE with unknown outcome; MUST NOT be reported as success or as proof of non-execution."
+    notes: "Ambiguous transport failure: loss before any result maps to UNAVAILABLE with unknown outcome; MUST NOT be reported as success or as proof of non-execution. Persistent-carrier scope (connection-loss session mapping): machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; the per-exchange unknown-outcome analogue is CONF-HTTP-012's corrupted-200 row (local UNAVAILABLE, never success); an HTTP/HTTPS-only claim reports SKIP citing the key (conformance README §6)."
 
   - id: CONF-RPC-013
     requirement: [SNTR-RPC-002, SNTR-RPC-008]

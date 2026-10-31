@@ -32,7 +32,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
-- Scope: correlation discipline applies on every carrier — this case declares no transport restriction. On persistent connections the two requests are outstanding RPCs on one Syntra connection; on HTTP/HTTPS (RFC 0004 D3) the harness maps them to two INDEPENDENT concurrent exchanges (ordering: none, SNTR-HTTP-072; H2 streams: SNTR-HTTPS-041) and asserts exchange 8 completes before exchange 7. No cross-exchange request-ID memory or shared state is implied on HTTP (SNTR-HTTP-073).
+- Scope: persistent-carrier correlation case (TCP/TLS, WS/WSS, SC1), machine-readable via its manifest `applicable_transports: [tcp_tls, ws_wss]`; an HTTP/HTTPS-only claim reports `SKIP` for this case citing the key (conformance README §6). On HTTP/HTTPS the ordering-none and reverse-completion coverage is transport-owned: `CONF-HTTP-013` (SNTR-HTTP-072) and `CONF-HTTPS-003` (SNTR-HTTPS-042/041) run it at scale across independent exchanges/streams (RFC 0004 D3).
 
 ## CONF-RPC-004 duplicate request ID
 
