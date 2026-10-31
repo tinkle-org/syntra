@@ -1,0 +1,45 @@
+scripts/validate-repo.py
+  s_9e476660298c96::t_f07681f422cdf3 310,317-331,335,366-386
+  s_9e476660298c96::t_9094588421169a 332-334,336-342,351-352,359-360,365
+  s_9e476660298c96::t_c735233c4c8134 309,311-316
+  s_9e476660298c96::t_11c7fa1cf01a94 343-344,346-347,353-358
+  s_9e476660298c96::t_cb3b81acd3d1af 345,348-349,361-363
+  s_9e476660298c96::t_aca8426e79abb9 350,364
+specifications/core/events.md
+  s_9e476660298c96::t_f05fbce6e7df5c 15
+  s_9e476660298c96::t_dac2d256d169c4 87
+conformance/manifest/recovery.yaml
+  s_9e476660298c96::t_160d7098d696a5 25
+  s_9e476660298c96::t_e32f36844fb4b7 35-48
+conformance/manifest/README.md
+  s_9e476660298c96::t_a6b65f00a43598 55
+conformance/manifest/schema.yaml
+  s_9e476660298c96::t_c9d24ab8e0c9f7 77-88,90,92-93,95-98
+  s_9e476660298c96::t_3805edda19670b 40-50,54
+CHANGELOG.md
+  s_9e476660298c96::t_99fb4989ce3844 68-78
+conformance/recovery_profile/recovery.md
+  s_9e476660298c96::t_7ff52a2517a927 64,66
+  s_9e476660298c96::t_3c6960d2b74472 65
+specifications/profiles/recovery.md
+  s_9e476660298c96::t_7d1ee0758c5f57 309,311
+  s_9e476660298c96::t_d18c6a543a572f 71
+specifications/core/capabilities.md
+  s_9e476660298c96::t_7ccb12be9572b9 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1d0b2b6c4f65537fa43b0c12c93df37a33fa1bc7",
+  "prompts": {},
+  "sessions": {
+    "s_9e476660298c96": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6d81f9caffeIemqT07CbBjJfE",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
