@@ -1,0 +1,44 @@
+specifications/transports/https.md
+  s_d39bce3fe63d40::t_ec6fcc887bcab6 155
+  s_d39bce3fe63d40::t_2b86fd9f786af0 156-158
+conformance/README.md
+  s_d39bce3fe63d40::t_b388ff9bdfe703 81-88,92
+conformance/manifest/core.yaml
+  s_d39bce3fe63d40::t_80606b14731986 107
+  s_d39bce3fe63d40::t_76917cf2931bc5 118,122-124
+specifications/core/capabilities.md
+  s_d39bce3fe63d40::t_88dd9b847bb6ad 56
+  s_d39bce3fe63d40::t_48ec29d9dee080 23
+  s_d39bce3fe63d40::t_344e7c8cbb30ae 51
+  s_d39bce3fe63d40::t_e960ec4010a463 82
+  s_d39bce3fe63d40::t_f9c6c85d4ce100 46
+conformance/manifest/rpc.yaml
+  s_d39bce3fe63d40::t_7177a3ef7e1e49 41
+specifications/transports/http.md
+  s_d39bce3fe63d40::t_567444de1ee442 404
+  s_d39bce3fe63d40::t_f42a3bc96450bd 403
+specifications/core/handshake.md
+  s_d39bce3fe63d40::t_f77963658f5b68 160
+specifications/core/rpc.md
+  s_d39bce3fe63d40::t_e35a9255ff1968 29
+  s_d39bce3fe63d40::t_8e96ec8863d66a 83
+conformance/manifest/requirements.yaml
+  s_d39bce3fe63d40::t_f0ba1a279218e6 272
+  s_d39bce3fe63d40::t_f7ddf5ed51ebb6 270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "263311cfaf752fc58bc568449985f1a0652bb112",
+  "prompts": {},
+  "sessions": {
+    "s_d39bce3fe63d40": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6cd54002ffe00R2jz4G55ui0y",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
