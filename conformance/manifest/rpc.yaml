@@ -38,7 +38,7 @@ cases:
       frames:
         - { request_id: 7, body: result }
         - { request_id: 8, body: result }
-    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs unless a lower bound was negotiated."
+    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs; no lower bound may be negotiated (RFC 0005 D2)."
 
   - id: CONF-RPC-003
     requirement: [SNTR-RPC-002]

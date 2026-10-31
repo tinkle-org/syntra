@@ -267,9 +267,9 @@ requirements:
     test_ids: [CONF-EVT-002]
     automation_status: manual
     notes: "No optional capability has been withdrawn in v1; verified by human review of the capability registry and RFC history."
-  - { requirement_id: SNTR-CAP-010, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-010, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-EVT-001, CONF-URP-001], automation_status: automated }
   - { requirement_id: SNTR-CAP-011, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-CORE-007], automation_status: automated }
-  - { requirement_id: SNTR-CAP-020, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001], automation_status: automated }
+  - { requirement_id: SNTR-CAP-020, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001, CONF-URP-001], automation_status: automated }
   - { requirement_id: SNTR-CAP-021, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001], automation_status: automated }
   - { requirement_id: SNTR-CAP-900, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-CORE-006, CONF-EVT-002], automation_status: automated }
   - requirement_id: SNTR-CAP-901

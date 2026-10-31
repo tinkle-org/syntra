@@ -400,7 +400,8 @@ keep-alive requests outstanding via pipelining, parallel pooled
 connections) are independent RPCs; responses MAY arrive in any order and
 initiators MUST correlate solely by echoed `request_id`
 (SNTR-RPC-002/§1E). Hosts MUST support at least 16 concurrent RPCs per
-listener endpoint group unless a lower bound was negotiated, and MUST
+listener endpoint group; no lower bound may be negotiated below the
+floor (accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2), and MUST
 reject excess pre-dispatch with `429` (or `200` +
 `RESOURCE_EXHAUSTED` where the request was already accepted for
 dispatch), per SNTR-RPC-008.

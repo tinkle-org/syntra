@@ -78,14 +78,18 @@ a full-stack IUT runs both plus loopback self-interop.
 
 ### 1.5 Capability
 
-A named optional behavior (for example `events-v1`) that MUST be explicitly
-negotiated per `specifications/core/capabilities.md` (SNTR-CAP-001/002).
-Capabilities are never assumed. A capability-gated test is evaluated only when
-the IUT advertises the capability; otherwise the runner reports `UNSUPPORTED`
+A named optional behavior (for example `syntra.update-recovery/1`) that MUST
+be explicitly negotiated per `specifications/core/capabilities.md`
+(SNTR-CAP-001/002). Capabilities are never assumed. There is no generic
+capability advertisement carrier (accepted RFC 0005 D1): a capability is
+declared per profile and confirmed per connection through that profile's own
+accepted post-`ACTIVE` negotiation RPC. A capability-gated test is evaluated
+only when the IUT declares support for the capability and follows that
+profile's negotiation contract; otherwise the runner reports `UNSUPPORTED`
 or `SKIP` (see §6), never `FAIL`. No event, resumption, or replay capability
 identifier is allocated in default v1; the names in manifests
 (`events-v1`, `events-replay-v1`, `resume-v1`) are **placeholders for the
-future RFC binding** and MUST NOT be advertised until that RFC is accepted.
+future RFC binding** and MUST NOT be negotiated until that RFC is accepted.
 
 ### 1.6 Mandatory Test
 

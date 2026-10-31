@@ -20,7 +20,7 @@ Negotiated limit overrides follow the same mechanism rule (accepted RFC 0005 D2)
 
 **SNTR-CAP-003** — Mandatory interop MUST NOT depend on any optional capability. A minimal implementation supporting only mandatory behavior MUST interoperate (with reduced functionality) against a full implementation.
 
-**SNTR-CAP-004** — There is no generic capability advertisement carrier (accepted RFC 0005 D1; SNTR-CAP-002): the handshake carries no capability or profile terms, and a host MUST NOT fail a handshake over optional-capability state, including an initiator that never negotiates any optional profile. Unknown or unsupported optional-profile state is handled only inside an accepted profile's own negotiation RPC, under that profile's own rules — unknown operations and unknown profile input to the negotiation RPC are rejected by the profile's contract (the accepted recovery profile, for example, answers unknown operations with `UNIMPLEMENTED`, `SYN-URP-010`).
+**SNTR-CAP-004** — There is no generic capability advertisement carrier (accepted RFC 0005 D1; SNTR-CAP-002): the handshake carries no capability or profile terms, and a host MUST NOT fail a handshake over optional-capability state, including an initiator that never negotiates any optional profile. Unknown or unsupported optional-profile state is handled only inside an accepted profile's own negotiation RPC, under that profile's own rules — unknown operations and unknown non-ignorable profile input to the negotiation RPC are rejected by the profile's contract, while unknown Protobuf fields the profile marks ignorable are skipped (the accepted recovery profile, for example, answers unknown operations with `UNIMPLEMENTED` (`SYN-URP-010`), fails unsupported negotiated versions with `FAILED_PRECONDITION` (`SYN-URP-020`), and ignores unknown Protobuf fields inside profile payloads (`SYN-URP-021`)).
 
 **SNTR-CAP-005** — Extensions MUST NOT alter mandatory state machines, envelope validation (SNTR-WIRE-*), or error semantics. They MAY add new `Frame.body` variants (minor, with capability gating), new methods, or new transports — each via RFC.
 
@@ -43,17 +43,17 @@ authority.
 
 ## 2. Client behavior
 
-- **SNTR-CAP-010** — The client MUST negotiate optional behavior only through each profile's own accepted post-`ACTIVE` negotiation RPC (no advertisement, hello-extension, or probe mechanism exists), MUST NOT assume support or send profile operations before that profile is confirmed on the connection, MUST handle partial acceptance (subset confirmed) as that profile's contract defines, and MUST fall back to mandatory-only operation when an option is unavailable.
+- **SNTR-CAP-010** — The client MUST negotiate optional behavior only through each profile's own accepted post-`ACTIVE` negotiation RPC (no advertisement, hello-extension, or probe mechanism exists), MUST NOT assume support or send profile operations before that profile is confirmed on the connection (that profile's own negotiation RPC is the only permitted pre-confirmation profile operation, per §1 and the profile's contract), MUST handle partial acceptance (subset confirmed) as that profile's contract defines, and MUST fall back to mandatory-only operation when an option is unavailable.
 - **SNTR-CAP-011** — The client MUST NOT send extension frames for unconfirmed capabilities.
 
 ## 3. Server behavior
 
-- **SNTR-CAP-020** — The server MUST confirm capabilities only through each profile's own accepted negotiation RPC, only for what it implements for the bound principal and this connection, and MUST apply that profile's own confirmation and failure rules (§4): required-but-unsupported profile behavior and unknown profile input fail under the profile's contract (e.g., `UNIMPLEMENTED` for the accepted recovery profile, `SYN-URP-010`). The server MUST document supported capability profiles per deployment.
+- **SNTR-CAP-020** — The server MUST confirm capabilities only through each profile's own accepted negotiation RPC, only for what it implements for the bound principal and this connection, and MUST apply that profile's own confirmation and failure rules (§4): required-but-unsupported profile behavior and unknown profile operations fail under the profile's contract, while unknown fields the profile marks ignorable are skipped (for the accepted recovery profile: `UNIMPLEMENTED` for unknown operations, `SYN-URP-010`; `FAILED_PRECONDITION` for unsupported negotiated versions, `SYN-URP-020`; unknown ignorable Protobuf fields inside profile payloads skipped, `SYN-URP-021`). The server MUST document supported capability profiles per deployment.
 - **SNTR-CAP-021** — The server MUST isolate capability state per connection; negotiation on one connection MUST NOT enable options on another.
 
 ## 4. Failure handling
 
-Required-but-unsupported → `UNIMPLEMENTED` (RPC context) or handshake failure (if handshake-gated). Use of an unconfirmed option → `FAILED_PRECONDITION` for a connection whose capability context is otherwise confirmed; a profile's own pre-confirmation operation handling is owned by that profile's accepted contract per §1 (SNTR-CAP-002) — the accepted recovery profile, for example, refuses profile operations on a connection that has not confirmed the profile with `UNIMPLEMENTED` and reserves `FAILED_PRECONDITION` for an unconfirmed option on a confirmed connection (`SYN-URP-010` in RFC 0006). Unknown optional advertisement → ignored with diagnostic.
+Required-but-unsupported → `UNIMPLEMENTED` (RPC context). No handshake-gated capability carrier exists in default v1 (SNTR-CAP-004, accepted RFC 0005 D1); a future handshake-gated capability REQUIRES an RFC that defines its carrier, negotiation, and failure mapping. Use of an unconfirmed option → `FAILED_PRECONDITION` for a connection whose capability context is otherwise confirmed; a profile's own pre-confirmation operation handling is owned by that profile's accepted contract per §1 (SNTR-CAP-002) — the accepted recovery profile, for example, refuses profile operations on a connection that has not confirmed the profile with `UNIMPLEMENTED` and reserves `FAILED_PRECONDITION` for an unconfirmed option on a confirmed connection (`SYN-URP-010` in RFC 0006). Unknown optional-profile state is never handshake-mapped; profile contracts distinguish unknown operations (`UNIMPLEMENTED`, e.g. `SYN-URP-010`), unsupported negotiated versions (`FAILED_PRECONDITION`, e.g. `SYN-URP-020`), and unknown Protobuf fields marked ignorable inside profile payloads (skipped per the profile's wire rules, e.g. `SYN-URP-021`).
 
 ## 5. Security considerations
 
@@ -79,5 +79,5 @@ sequenceDiagram
   H-->>C: result{confirmed version + bounds for THIS connection}
   C->>H: profile operation before confirmation (→ UNIMPLEMENTED under that profile's rules, e.g. SYN-URP-010)
   C->>H: use an unconfirmed option on an otherwise-confirmed connection (→ FAILED_PRECONDITION)
-  C->>H: require an unsupported profile or unknown profile input (→ UNIMPLEMENTED under that profile's rules)
+  C->>H: require an unsupported profile or unknown profile operation (→ UNIMPLEMENTED under that profile's rules)
 ```

@@ -26,7 +26,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-RPC-007** — Optional idempotency metadata: Syntra defines no core idempotency field. Applications needing safe retry MUST embed their own operation key inside the opaque payload. Implementations MUST NOT treat `request_id` as an idempotency key across connections — `request_id` is connection-scoped correlation only (see SNTR-RPC-010).
 
-**SNTR-RPC-008** — Concurrency: peers MUST support at least 16 concurrent RPCs per connection unless a lower bound was negotiated; they MUST enforce a documented max and reject excess with `RESOURCE_EXHAUSTED`.
+**SNTR-RPC-008** — Concurrency: peers MUST support at least 16 concurrent RPCs per connection; no lower bound may be negotiated below this floor (accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2). They MUST enforce a documented max and reject excess with `RESOURCE_EXHAUSTED`.
 
 **SNTR-RPC-010** — Request ID vs operation ID: `request_id` (transport, connection-scoped, initiator-chosen, never reused within the connection — RFC 0004 D1) and application operation IDs (durable, cross-connection, application-scoped) are distinct namespaces. The core MUST NOT map one to the other; deduplication on operation IDs belongs to the application (see `reliability.md`).
 
@@ -80,7 +80,7 @@ The dotted forms in task examples (`example.echo`, `example.add`) are informal s
 
 ## 1E. Concurrent requests (clarifies SNTR-RPC-002/008)
 
-Multiple in-flight RPCs on one connection are permitted and expected. Responses MAY complete and arrive out of request order; correlation is solely by `request_id`, and initiators MUST NOT assume FIFO completion. Peers MUST support at least 16 concurrent RPCs per connection unless a lower bound was negotiated, MUST enforce a documented maximum, and MUST reject excess with `RESOURCE_EXHAUSTED` (SNTR-RPC-008). Independent RPCs MUST progress independently (no head-of-line blocking imposed by the core); backpressure and isolation follow SNTR-REL-007/008 and SNTR-ASEC-020.
+Multiple in-flight RPCs on one connection are permitted and expected. Responses MAY complete and arrive out of request order; correlation is solely by `request_id`, and initiators MUST NOT assume FIFO completion. Peers MUST support at least 16 concurrent RPCs per connection; no lower bound may be negotiated below the floor (accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2). They MUST enforce a documented maximum, and MUST reject excess with `RESOURCE_EXHAUSTED` (SNTR-RPC-008). Independent RPCs MUST progress independently (no head-of-line blocking imposed by the core); backpressure and isolation follow SNTR-REL-007/008 and SNTR-ASEC-020.
 
 ## 1F. Request deadlines (clarifies SNTR-RPC-004, SNTR-REL-006, SNTR-ASEC-021)
 

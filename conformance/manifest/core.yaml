@@ -104,7 +104,7 @@ cases:
     expected:
       connection_state: ACTIVE
       session_state: active
-    notes: "Handshake carries no capability or profile terms (accepted RFC 0005 D1): a mandatory-only hello against a full host reaches ACTIVE; no capability field exists on the wire, so a host MUST NOT fail a handshake over optional-capability state (SNTR-CAP-004). Accepted-profile negotiation positive/negative coverage is owned by that profile's own registered cases (recovery: CONF-URP-001). Contrast CONF-CORE-007."
+    notes: "Handshake carries no capability or profile terms (accepted RFC 0005 D1): a mandatory-only hello against a full host reaches ACTIVE; no capability field exists on the wire, so a host MUST NOT fail a handshake over optional-capability state (SNTR-CAP-004). Harness host configuration: the authentication policy permits the supplied hello credentials. Accepted-profile negotiation positive/negative coverage is owned by that profile's own registered cases (recovery: CONF-URP-001). Contrast CONF-CORE-007."
 
   - id: CONF-CORE-007
     requirement: [SNTR-CAP-002, SNTR-CAP-011]
@@ -115,11 +115,13 @@ cases:
     preconditions: [active_session]
     input:
       frames:
-        - { request_id: 21, body: request, method: "/example.KV/Get", payload_b64: "eA==", timeout_ms: 500 }
+        - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 500 }
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-    notes: "Mandatory-only RPC proceeds normally on a connection with no confirmed optional profile: no capability or profile terms exist on the wire (accepted RFC 0005 D1), support is never assumed or probed (SNTR-CAP-002), and no extension frames are sent (SNTR-CAP-011). Sending profile operations before that profile's confirmation on the connection is refused with UNIMPLEMENTED under the profile's own contract (recovery: CONF-URP-001, SYN-URP-010); FAILED_PRECONDITION is reserved for use of an unconfirmed option on an otherwise-confirmed connection (capabilities.md §4) and has no v1 wire carrier until an accepted RFC defines one. Contrast CONF-CORE-006."
+      frames:
+        - { request_id: 21, body: result, payload_b64: "eA==" }
+    notes: "Mandatory-only RPC completes with a correlated successful RpcResult (echoed payload asserted) on a connection with no confirmed optional profile: no capability or profile terms exist on the wire (accepted RFC 0005 D1), support is never assumed or probed (SNTR-CAP-002), and no extension frames are sent (SNTR-CAP-011). Sending profile operations other than that profile's own negotiation RPC before confirmation is refused with UNIMPLEMENTED under the profile's own contract (recovery: CONF-URP-001, SYN-URP-010); FAILED_PRECONDITION is reserved for use of an unconfirmed option on an otherwise-confirmed connection (capabilities.md §4) and has no v1 wire carrier until an accepted RFC defines one. Contrast CONF-CORE-006."
 
   - id: CONF-CORE-008
     requirement: [SNTR-HS-012, SNTR-CORE-011, SNTR-WIRE-003]
