@@ -1,5 +1,5 @@
 # Portable RPC cases (Section G). Profile: SNTR-RPC-V1. All Mandatory.
-# Prose companion: conformance/rpc/rpc.md (CONF-RPC-001…012).
+# Prose companion: conformance/rpc/rpc.md (CONF-RPC-001…013).
 format_version: "1.0"
 profile: SNTR-RPC-V1
 cases:
@@ -61,7 +61,7 @@ cases:
     notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO."
 
   - id: CONF-RPC-004
-    requirement: [SNTR-RPC-002, SNTR-ERR-003]
+    requirement: [SNTR-RPC-002, SNTR-RPL-012]
     profile: SNTR-RPC-V1
     roles: [client, server]
     capabilities: []
@@ -69,15 +69,13 @@ cases:
     preconditions: [active_session]
     input:
       frames:
-        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "Zmlyc3Q=", timeout_ms: 5000 }
-        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "c2Vjb25k", timeout_ms: 5000 }
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "Zmlyc3Q=", timeout_ms: 2000 }
+        - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "c2Vjb25k", timeout_ms: 2000 }
     expected:
-      connection_state: ACTIVE
-      session_state: unchanged
+      connection_state: CLOSED
+      session_state: terminated_abnormally
       error: { code: FAILED_PRECONDITION }
-      frames:
-        - { request_id: 7, body: result }
-    notes: "Duplicate request ID: new attempt rejected with FAILED_PRECONDITION; the original continues to exactly one terminal result; no double dispatch."
+    notes: "Duplicate request ID on a persistent connection (SNTR-RPC-002, SNTR-RPL-012; accepted RFC 0004 D2): the host records a local FAILED_PRECONDITION for the duplicate (N <= high-water mark H), dispatches nothing for the offending frame, sends no result under ID 7 (no duplicate-dispatch attempt and no zero-ID error), and terminates the connection. The original RPC's peer-visible outcome becomes unknown (connection-loss mapping, e.g. UNAVAILABLE) and MUST NOT be reported as success; already committed outcomes stay committed; closure is not rollback. RFC 0004 D3 exemption: independent HTTP/HTTPS exchanges are not persistent connection-scoped carriers, so per-exchange HTTP/HTTPS profiles skip this case (a reused number in a different exchange is not a replay violation; authentication is evaluated per exchange). Ambiguous-loss shape coverage: CONF-RPC-012."
 
   - id: CONF-RPC-005
     requirement: [SNTR-RPC-001, SNTR-RPC-030, SNTR-ERR-003]
@@ -238,7 +236,8 @@ cases:
         - { request_id: 34, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
         - { request_id: 35, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
         - { request_id: 36, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-      faults: { reverse_completion_order: true }
+      faults:
+        reverse_completion_order: { barrier: all_admitted }
     expected:
       connection_state: ACTIVE
       session_state: unchanged
@@ -259,4 +258,4 @@ cases:
         - { request_id: 23, body: result, payload_b64: "eA==" }
         - { request_id: 22, body: result, payload_b64: "eA==" }
         - { request_id: 21, body: result, payload_b64: "eA==" }
-    notes: "Concurrency floor (SNTR-RPC-008): 16 simultaneously outstanding RPCs, exactly one correlated terminal result per request with the echoed payload asserted. The harness completes results deliberately out of request order (strictly descending request_id: reverse_completion_order) to prove non-FIFO delivery at floor capacity (SNTR-RPC-002); initiators correlate solely by request_id. The floor is supported capacity: no lower bound may be negotiated (RFC 0005 D2); excess above the documented maximum is rejected with RESOURCE_EXHAUSTED (SNTR-RPC-008)."
+    notes: "Concurrency floor (SNTR-RPC-008): 16 simultaneously outstanding RPCs, exactly one correlated terminal result per request with the echoed payload asserted. Harness semantics: the initiator sends all 16 requests without waiting for responses; the host runs the reverse_completion_order fault with barrier=all_admitted, releasing NO result until every request is admitted (all 16 outstanding simultaneously from the initiator's view), then releasing results in strictly descending request_id order (SNTR-RPC-002 non-FIFO correlation); initiators correlate solely by request_id. The floor is supported capacity: no lower bound may be negotiated (RFC 0005 D2); excess above the documented maximum is rejected with RESOURCE_EXHAUSTED (SNTR-RPC-008)."

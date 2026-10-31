@@ -1,4 +1,4 @@
-# RFC 0005: Negotiation binding, bounds, and identifiers (proposal)
+# RFC 0005: Negotiation binding, bounds, and identifiers
 
 - RFC: 0005
 - Title: RFC-defined post-ACTIVE profile negotiation, concrete bounds, stable profile IDs, and downstream Go package identity
@@ -30,7 +30,7 @@ for this release target.
 ## 2. Motivation
 
 The core describes explicit capability confirmation but supplies no universal
-wire advertisement channel. RFC 0006 already proposes one bounded, versioned
+wire advertisement channel. RFC 0006 defines one bounded, versioned
 recovery negotiation RPC after ACTIVE; treating all negotiation as deferred
 would leave the required recovery release contract impossible to complete.
 Generic probing without an accepted binding would be equally ambiguous.
@@ -46,10 +46,10 @@ layout rather than a removed in-tree binding path. Schema publication to BSR
 is retired; importing from a published BSR module is not a release acceptance
 condition. Remote generator use is a separate downstream tooling dependency.
 
-## 3. Proposal
+## 3. Selections
 
-All obligations below are proposed acceptance text, with existing IDs tracing
-the owning clauses to revise only after approval.
+All obligations below are accepted text (Decision 0002), with existing IDs tracing
+the owning clauses; later changes go through the RFC process.
 
 ### D1 — Select RFC-defined post-ACTIVE profile negotiation
 
@@ -60,13 +60,13 @@ bounds, confirmation, unknown-input handling, and failure/fallback contract.
 Only that defined negotiation call is exempt from prior confirmation of its
 own profile; no other unconfirmed profile operation is permitted.
 
-For the required Update/Recovery release target, select the binding proposed
+For the required Update/Recovery release target, select the binding defined
 by [RFC 0006](0006-update-recovery-profile.md):
 
 - Method `/syntra.v1.UpdateRecovery/Negotiate`, capability
   `syntra.update-recovery/1`, `RecoveryNegotiateRequest` and
   `RecoveryNegotiateResponse` inside existing request/result payloads.
-- The proposal offers `profile_version=1` and `min_version=max_version=1`;
+- RFC 0006 offers `profile_version=1` and `min_version=max_version=1`;
   the host selects the greatest supported version in the offered range and
   explicitly confirms selected version and bounded parameters for this
   connection and bound principal. No overlap returns `FAILED_PRECONDITION` in
@@ -80,21 +80,22 @@ by [RFC 0006](0006-update-recovery-profile.md):
   a different principal, or negotiate a lower baseline security/resource floor.
   Profile bounds cannot override core/frame/profile hard limits implicitly.
 
-Before RFC 0006 is accepted, its method/identifier/messages are proposals, not
-permission to advertise, probe, or ship. There is no general capabilities
-probing channel, no invented `Capabilities` method, no hello extension list,
+RFC 0006 is accepted ([Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)):
+its method/identifier/messages may be confirmed and used only through the
+profile's own negotiation RPC; there is no general advertisement channel, no
+invented `Capabilities` method, no hello extension list,
 and no optional-frame probe. A future generic negotiation binding requires
 its own accepted contract. RFC 0006's optionality at the core layer and the
-release target's requirement for recovery are distinct decisions; its current
-Draft does not grant either acceptance or a conformance verdict.
+release target's requirement for recovery are distinct decisions; registration
+of its cases is not execution, and conformance verdicts await executed evidence.
 
 ### D2 — Select concrete bounds and defaults
 
-KiB/MiB below mean powers of 1024. These are proposed protocol ceilings/floors,
+KiB/MiB below mean powers of 1024. These are accepted protocol ceilings/floors,
 not schema-enforced annotations. Producers check before sending; receivers
 bound before allocation/dispatch and enforce the same units.
 
-| Item | Selected proposal | Owning existing clause / scope |
+| Item | Selected bound | Owning existing clause / scope |
 |---|---|---|
 | Encoded envelope | Default maximum 1,048,576 bytes of the complete serialized `Frame` | SNTR-WIRE-006, SNTR-SER-006; payload plus envelope overhead, not payload alone |
 | Initial credential | Maximum 8 KiB (8,192) raw credential bytes | SNTR-AUTH-003/030, SNTR-SER-020, SNTR-ASEC-040; HTTP counts decoded bytes |
@@ -110,7 +111,7 @@ before the HTTP header name/framing. HTTP/HTTPS header budgets and intermediary
 configuration need to accommodate this expansion plus other required headers
 to support the selected raw ceiling. SNTR-HTTP-113 currently recommends 8 KiB
 per header field and 16 KiB total, with a separate default decoded credential
-ceiling of 64 KiB. This proposal replaces that decoded ceiling with 8 KiB and
+ceiling of 64 KiB. This RFC replaces that decoded ceiling with 8 KiB and
 requires adjusting the Authorization field allowance above its current 8 KiB
 recommendation; otherwise a maximum-size raw credential cannot fit. Total
 headers remain separately bounded and deployment-documented, not silently
@@ -182,7 +183,7 @@ This repository continues to own only authoritative schemas, documentation,
 and validation. It neither restores an in-tree `bindings/`/`gen/` directory
 nor owns generated language artifacts. Downstream projects regenerate with the
 recorded pins and review source/import changes. No `.proto` file, baseline,
-generation template, or generated output is changed by this Draft.
+generation template, or generated output is changed by this acceptance.
 
 The option change is FILE/source-breaking even if Protobuf wire fields remain
 identical. Review it against both the current initial FILE baseline and the
@@ -216,13 +217,13 @@ Ordinary unknown envelope fields retain existing serialization rules; unknown
 body variants are not capability advertisements.
 
 Bounds failures keep lawful scope: oversize hello or `ready` terminates the
-handshake with a local typed cause/native failure as proposed in RFC 0003;
+handshake with a local typed cause/native failure as accepted in [RFC 0003](0003-handshake-failure-signaling.md);
 there is no zero-ID error carrier. An oversized public diagnostic is rejected
 as a protocol validation failure, with no reflected error storm. A valid
 nonzero-ID request exceeding a call resource limit can receive
 `RESOURCE_EXHAUSTED` once, while pre-dispatch HTTP header/body rejection uses
 its native `431`/`413` table. Oversized decoded credential maps to local
-`RESOURCE_EXHAUSTED`; the proposed HTTP binding rejection uses `431` without a
+`RESOURCE_EXHAUSTED`; the HTTP binding rejection uses `431` without a
 Syntra envelope, whereas malformed base64 retains `401` handling. Acceptance
 would align the oversize-parameter wording in SNTR-HTTP-061 with the `431`
 decoded-size rule in SNTR-HTTP-113; a present empty parameter remains `401`,
@@ -260,8 +261,8 @@ do not change bytes. Numeric credential/text caps, a non-negotiable concurrency
 floor, and bounded grace can reject or alter behavior previously allowed by
 draft/deployment policy. Required recovery for a release is a stronger release
 selection than core optionality; it does not silently make recovery mandatory
-for every v1 peer. RFC 0006's envelope-neutral negotiation alone does not prove
-all proposed baseline changes compatible.
+for every v1 peer. RFC 0006's envelope-neutral negotiation alone does not
+prove all recorded baseline changes compatible.
 
 Maintainers must explicitly record the pre-stable v1 contract freeze/version
 decision and downstream impact inventory. If existing frozen behavior is
@@ -297,9 +298,10 @@ or schema registry publication becomes a protocol trust requirement.
 
 ## 8. Test plan and acceptance criteria
 
-Planned evidence only: this Draft makes no behavioral PASS or new conformance
-claim. Existing traces locate affected coverage; RFC 0006's own proposed IDs
-and cases remain Draft and are not activated by this RFC.
+Binding evidence only: this acceptance makes no behavioral PASS or new
+conformance claim (registration is not execution). Existing traces locate
+affected coverage; RFC 0006's accepted registered cases require executed
+conformance evidence before any verdict.
 
 | Existing requirement trace | Planned positive/negative evidence |
 |---|---|
@@ -317,7 +319,7 @@ and cases remain Draft and are not activated by this RFC.
   independent evidence recorded, and recovery required for this release target.
 - [ ] Protocol/security reviewers validate raw/encoded limits and native failure
   mappings, especially HTTP credential overflow and WS Close text size.
-- [ ] RFC 0008 queue/suspend proposal aligned with grace and terminal semantics.
+- [ ] RFC 0008 queue/suspend semantics aligned with grace and terminal failure flow.
 - [ ] At acceptance, revise owning requirements/cases and migration records;
   verify independent implementations or governance's bootstrap alternative.
 - [ ] For the later schema option change: separate Buf format/lint/build/FILE

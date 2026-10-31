@@ -114,7 +114,7 @@ remain manual in `requirements.yaml` rather than being marked automated.
 |---|---|---|
 | `core.yaml` | CONF-CORE-001…010 | §E valid/invalid envelope, unknown field/enum, version, capability, ordering, protocol error, close |
 | `session.yaml` | CONF-SESS-001…010 + CONF-SESS-R01 (Optional resume-accept) | §F |
-| `rpc.yaml` | CONF-RPC-001…012 | §G |
+| `rpc.yaml` | CONF-RPC-001…013 | §G |
 | `events.yaml` | CONF-EVT-001…015 | §H (Optional rows gated) |
 | `transport-tcp.yaml` | CONF-TCP-001…008 | §I TCP |
 | `transport-tls.yaml` | CONF-TLS-001…004 | §I TLS |

@@ -122,8 +122,8 @@ precedent in [event manifest](../manifest/events.yaml).
 
 - Related normative requirement: SYN-URP-006, SYN-URP-010, SNTR-SESS-008, SNTR-EVENT-020.
 - Preconditions: new transport connected with no prior subscription.
-- Input: new transport and handshake; attempt to receive without re-subscribing.
-- Expected output: no batches arrive; reconnect always establishes a fresh authenticated connection, renegotiates again, and subscribes with a fresh connection-scoped handle and newly captured boundary; neither capability state nor pagination or snapshot handles transfer; stale handles carry no continuity and only a validated durable known-safe checkpoint can resume.
+- Input: new transport and handshake; explicit reconnect driver — confirmed `/syntra.v1.UpdateRecovery/Negotiate` on the fresh connection, then the recovery `/syntra.v1.UpdateRecovery/Subscribe` invocation with a fresh connection-scoped handle and newly captured boundary before any other profile operation (SYN-URP-010 client-side ordering, RFC 0006 §11.6) — plus the stale-handle receive-without-re-subscribe hygiene probe.
+- Expected output: the Negotiate returns the confirmed version and deployment bounds; the recovery Subscribe returns a fresh connection-scoped handle with newly captured boundary; the stale-handle subscription attempt carries no continuity and no checkpoint transfer; no batches arrive; reconnect always establishes a fresh authenticated connection, renegotiates again, and subscribes with a fresh connection-scoped handle and newly captured boundary; neither capability state nor pagination or snapshot handles transfer; stale handles carry no continuity and only a validated durable known-safe checkpoint can resume.
 - Expected connection state: ACTIVE.
 - Expected session state: active.
 - Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (SKIP when unclaimed). Registered; not yet executed.

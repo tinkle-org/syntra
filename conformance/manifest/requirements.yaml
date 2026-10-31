@@ -165,7 +165,7 @@ requirements:
 
   # ---- RPC: specifications/core/rpc.md ----
   - { requirement_id: SNTR-RPC-001, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-005], automation_status: automated }
-  - { requirement_id: SNTR-RPC-002, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-001, CONF-RPC-002, CONF-RPC-003, CONF-RPC-013], automation_status: automated }
+  - { requirement_id: SNTR-RPC-002, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-001, CONF-RPC-002, CONF-RPC-003, CONF-RPC-004, CONF-RPC-013], automation_status: automated }
   - { requirement_id: SNTR-RPC-003, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
   - { requirement_id: SNTR-RPC-004, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-007], automation_status: partially_automated,
       notes: "Deadline expiry uses injected-slow handlers or generous margins with explicit DEADLINE_EXCEEDED assertion; never flaky wall-clock races." }

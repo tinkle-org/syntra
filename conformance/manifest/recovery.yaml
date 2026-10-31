@@ -137,13 +137,18 @@ cases:
     input:
       frames:
         - {request_id: 0, body: hello, min_version: 1, max_version: 1}
+        - {request_id: 1, body: request, method: "/syntra.v1.UpdateRecovery/Negotiate", payload_b64: "CAEQARgBIhhzeW50cmEudXBkYXRlLXJlY292ZXJ5LzE="}
+        - {request_id: 3, body: request, method: "/syntra.v1.UpdateRecovery/Subscribe", payload_b64: "CAESDnN1YnNjcmlwdGlvbi1h"}
       subscriptions:
         - {method: "/example.Events/Subscribe", filter_b64: "ZmlsdGVyLWE=", handle_b64: "c3RhbGUtaGFuZGxl"}
     expected:
       connection_state: ACTIVE
       session_state: active
+      frames:
+        - {request_id: 1, body: result, shape: RecoveryNegotiateResponse, note: "selected_version 1 confirmed with the deployment bounds on this fresh connection; the fresh profile confirmation does NOT transfer any prior connection's capability state (SNTR-SESS-008)"}
+        - {request_id: 3, body: result, shape: RecoverySubscribeResponse, note: "fresh connection-scoped handle with a newly captured boundary (RFC 0006 §11.6); stale handles carry no continuity"}
       hygiene: {absent_from: [notification, capability_leak]}
-    notes: "Reconnect re-subscribe: recovery reconnects with a fresh authenticated connection, renegotiates again, and subscribes to a fresh handle with a newly captured boundary; neither capability state nor pagination or snapshot handles transfer (RFC 0006 §11.6). New connection carries no batches without explicit re-subscribe; stale-handle subscribe attempt carries no checkpoint continuity without a validated durable known-safe checkpoint. Expected hygiene forbids notification batches. SKIP when unclaimed. Registered; not yet executed."
+    notes: "Reconnect re-subscribe: recovery reconnects with a fresh authenticated connection, renegotiates again, and subscribes to a fresh handle with a newly captured boundary; the input explicitly drives the reconnect sequence Negotiate (request_id 1) -> confirmed profile -> recovery Subscribe (request_id 3) on the fresh connection before any other profile operation (SYN-URP-010 client-side negotiation ordering), matching RFC 0006 §11.6. Neither capability state nor pagination or snapshot handles transfer; the new connection carries no batches without explicit re-subscribe; the stale-handle events subscription remains the receive-without-re-subscribe hygiene negative (SNTR-EVENT-020). Expected hygiene forbids notification batches. SKIP when unclaimed. Registered; not yet executed."
 
   - id: CONF-URP-008
     requirement: [SYN-URP-007, SYN-URP-018, SNTR-EVENT-030, SNTR-REL-007]

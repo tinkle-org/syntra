@@ -1,4 +1,4 @@
-# Conformance — RPC correlation, deadlines, cancellation, idempotency (`CONF-RPC-001…012`)
+# Conformance — RPC correlation, deadlines, cancellation, idempotency (`CONF-RPC-001…013`)
 
 Related normative requirements are cited per case; test IDs are not normative. All cases Mandatory. Neutral fixtures only (`/example.Echo/Echo`, `/example.KV/Get`).
 
@@ -34,12 +34,12 @@ Related normative requirements are cited per case; test IDs are not normative. A
 
 ## CONF-RPC-004 duplicate request ID
 
-- Related normative requirement: SNTR-RPC-002, SNTR-RPC-§4, SNTR-ERR-002 (`FAILED_PRECONDITION`).
-- Preconditions: ACTIVE; `id=7` outstanding (no terminal result yet).
+- Related normative requirement: SNTR-RPC-002, SNTR-RPL-012 (accepted RFC 0004 D2).
+- Preconditions: ACTIVE; `id=7` outstanding (no terminal result yet). Persistent connection carriers (TCP, WS, H2 streams); RFC 0004 D3 exempts independent HTTP/HTTPS exchanges (per-exchange profiles skip this case).
 - Input: second `Frame{id=7, request{...}}` while the first is outstanding.
-- Expected output: new attempt rejected with `FAILED_PRECONDITION`; the original continues to exactly one terminal result; no double dispatch observable to the caller.
-- Expected connection state: ACTIVE.
-- Expected session state: unchanged.
+- Expected output: local `FAILED_PRECONDITION` recorded for the duplicate; nothing dispatched and no result sent under the offending ID (no duplicate attempt and no zero-ID error); the connection terminates through the native profile. The original RPC's peer-visible outcome becomes unknown (connection-loss mapping, e.g. `UNAVAILABLE`; MUST NOT be reported as success); already committed outcomes stay committed, and closure is not rollback.
+- Expected connection state: CLOSED (via violation).
+- Expected session state: terminated abnormally.
 - Mandatory/optional: Mandatory.
 
 ## CONF-RPC-005 unknown response ID
@@ -126,7 +126,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 
 - Related normative requirement: SNTR-RPC-002, SNTR-RPC-008, SNTR-REL-007.
 - Preconditions: ACTIVE; host supports the ≥16 floor (SNTR-RPC-008; no negotiated mode below 16 — RFC 0005 D2).
-- Input: 16 simultaneously outstanding `Echo` requests with ids 21–36; harness completes results in strictly descending id order (`reverse_completion_order`).
+- Input: 16 simultaneously outstanding `Echo` requests with ids 21–36; the initiator sends all of them without waiting. Harness barrier semantics (`reverse_completion_order: {barrier: all_admitted}`): the host releases no result until every request is admitted (all 16 outstanding simultaneously), then completes them in strictly descending id order.
 - Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO.
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
@@ -139,7 +139,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 | CONF-RPC-001 | RPC-001/002/003/006, WIRE-001/002 (model, correlation) |
 | CONF-RPC-002 | RPC-002/008, REL-007 (concurrency) |
 | CONF-RPC-003 | RPC-002 (ordering by ID) |
-| CONF-RPC-004 | RPC-002/§4 (duplicate outstanding ID) |
+| CONF-RPC-004 | RPC-002, RPL-012 (duplicate ID connection violation) |
 | CONF-RPC-005 | RPC-§4 (unknown result ID) |
 | CONF-RPC-006 | RPC-001/030, ERR-002 (unknown method) |
 | CONF-RPC-007 | RPC-001/030, WIRE-005/006, SER-007 (validation, bounds) |
