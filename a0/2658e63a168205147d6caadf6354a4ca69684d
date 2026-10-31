@@ -1,0 +1,32 @@
+rfcs/0001-public-idl-layout.md
+  s_a493d51f8d5d30::t_76acfcd325c53a 138
+  s_a493d51f8d5d30::t_27e412aeca7e81 151-152
+conformance/manifest/core.yaml
+  s_a493d51f8d5d30::t_e9e7ab8ffaefc3 118,122
+  s_a493d51f8d5d30::t_d7039f45e5061d 103,107
+specifications/core/capabilities.md
+  s_a493d51f8d5d30::t_3e8c67fb4bd01b 80-82
+  s_a493d51f8d5d30::t_2b5039bea63b0a 46
+  s_a493d51f8d5d30::t_7ed49f92e0ab97 23
+  s_a493d51f8d5d30::t_4744a68e2ff8c8 6
+  s_a493d51f8d5d30::t_1506b07004f520 51
+  s_a493d51f8d5d30::t_622e221afe5bfb 68
+specifications/core/conformance.md
+  s_a493d51f8d5d30::t_65ee138c1830d0 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a02658e63a168205147d6caadf6354a4ca69684d",
+  "prompts": {},
+  "sessions": {
+    "s_a493d51f8d5d30": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6cf68cfaffeL7fCROYgfQp0HX",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
