@@ -88,8 +88,13 @@ cases:
     expected:
       connection_state: CLOSED
       session_state: none
-      error: { code: UNIMPLEMENTED }
-    notes: "Unsupported protocol version (disjoint range against v1-only host): detecting-side negotiation failure records a local UNIMPLEMENTED cause and closes (SNTR-HS-003, accepted RFC 0003 D3; no wire error Frame is sent); no credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
+      error: { code: UNIMPLEMENTED, observer: detecting_host, carriage: local_only }
+      frames: []
+      transport:
+        peer_observation:
+          tcp_tls: { signal: transport_close, local_report: UNAVAILABLE }
+          ws_wss: { signal: ws_close, close_code: 1002, local_report: generic_protocol_rejection }
+    notes: "Unsupported protocol version (disjoint range against v1-only host). Two observers, one rejection: the detecting host records a local UNIMPLEMENTED cause and closes (SNTR-HS-003, accepted RFC 0003 D3); `observer: detecting_host` binds that error assertion to the host's local record, `carriage: local_only` asserts that zero Syntra Frames leave the host (no RpcResult, no error-bearing ready, no zero-ID error Frame — the RFC 0003 D1 no-invented-carrier rule, executable here as `frames: []`), and `transport.peer_observation` asserts the initiator's transport-specific native signal (handshake.md §5: TCP/TLS = native close, initiator reports UNAVAILABLE absent better local evidence; WS/WSS = Close 1002, initiator reports a generic protocol rejection and MUST NOT infer the host's exact ErrorCode). The HTTP/HTTPS legs are bound separately: header synthesis replaces the wire hello Frame, and their version-mismatch case is CONF-HTTP-008 (400, no Syntra envelope, adapter local report INVALID_ARGUMENT) — never an ordinary hello-frame exchange. No credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
 
   - id: CONF-CORE-006
     requirement: [SNTR-CAP-002, SNTR-CAP-004, SNTR-CAP-011]

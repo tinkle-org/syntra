@@ -38,13 +38,32 @@ schema:
         type: list
         item: { $ref: "#/schema/test_case" }
   expected_map:
+    # Two-observer handshake-failure vocabulary (accepted RFC 0003 D1):
+    # `error.observer` targets the detecting side's local record
+    # (detecting_host | detecting_peer; absent = the initiator's normally
+    # received terminal result in the exchange context), `error.carriage`
+    # declares whether the cause crosses the wire (wire | local_only;
+    # absent = wire). `carriage: local_only` is executable: together with
+    # `frames: []` (an empty frames list asserts zero Syntra Frame
+    # envelopes) it forbids every invented error carrier.
+    # `transport.peer_observation` asserts the peer's transport-native
+    # signal per transport family (tcp_tls | ws_wss | http_1_1 |
+    # https_h2), each entry optionally asserting `signal`
+    # (transport_close | ws_close | http_status | connection_loss),
+    # `close_code` (RFC 6455 application code), `status` (integer HTTP
+    # status) and `local_report` (a known ErrorCode or the documented
+    # generic marks generic_protocol_rejection | generic_policy_rejection
+    # when the signal cannot distinguish causes). `transport.result_envelope`
+    # (absent | present) is the HTTP binding's no-invented-envelope
+    # assertion. Unknown transport-family keys or unknown local_report
+    # values fail validation.
     type: map
     optional: [connection_state, session_state, frames, error, transport, hygiene, retry]
     fields:
       connection_state: { type: string, enum: [CONNECTED, NEGOTIATING, AUTHENTICATING, ACTIVE, CLOSING, CLOSED] }
       session_state: { type: string, enum: [none, active, unchanged, terminated_normally, terminated_abnormally, withdrawn] }
       frames: { type: list, item: { type: map } }
-      error: { type: map, optional: [code, message_pattern, message_absent] }
+      error: { type: map, optional: [code, message_pattern, message_absent, observer, carriage] }
       transport: { type: map }
       hygiene: { type: map, optional: [absent_from] }
       retry: { type: string }
@@ -65,6 +84,14 @@ schema:
       mandatory: { type: boolean }
       preconditions: { type: list, item: { type: string }, min_items: 1 }
       input:
+        # `faults` maps are free-form per case (loss/delay/tamper), but
+        # race-sensitive coordination MUST use the documented structured
+        # barrier faults (see conformance/manifest/README.md): e.g.
+        # `duplicate_while_pending: {barrier: first_terminal_result,
+        # release_after: violation_and_closure}` — required, validated, on
+        # CONF-RPC-004 — and `reverse_completion_order: {barrier:
+        # all_admitted}`. Sleeps and prose-only coordination are not
+        # executable specifications.
         type: map
         optional: [frames, transport, faults, credentials, subscriptions, replay]
         fields:
@@ -84,6 +111,7 @@ schema:
       # addition to the case-level outcomes. Prose-only controls are not
       # executable specifications.
       control_connection:
+        type: map
         required: [preconditions, expected]
         optional: [frames, subscriptions, replay, transport, faults, credentials, notes]
         fields:

@@ -85,6 +85,32 @@ development, changes land under `Unreleased`.
 - Marked the Go draft-1 implementation ledger historical; current Rust
   implementation evidence is recorded downstream and is not a conformance
   result.
+- Clarified the two-observer handshake-failure representation in
+  `CONF-CORE-005` and `CONF-HTTP-008` (RFC 0003 D1): `error.observer` /
+  `error.carriage` bind the detecting host's local `UNIMPLEMENTED` cause
+  to a no-invented-carrier assertion (`carriage: local_only`, zero
+  Syntra Frames), and `transport.peer_observation` asserts the
+  initiator's transport-native signal (TCP/TLS close → `UNAVAILABLE`
+  absent better evidence; WS/WSS Close 1002 → generic protocol
+  rejection; HTTP 400 → no envelope + adapter `INVALID_ARGUMENT`),
+  documented and validated (`schema.yaml`, manifest README,
+  `scripts/validate-repo.py`).
+- Made `CONF-RPC-004` duplicate-ID detection deterministic with the
+  validated structured barrier fault `duplicate_while_pending:
+  {barrier: first_terminal_result, release_after: violation_and_closure}`
+  (no sleeps; harness-injected duplicate; rejection at admission never
+  dispatches, barrier released only after the violation and closure; no
+  result under ID 7), synchronized its prose companion, and fixed a
+  prose/manifest divergence where prose `CONF-RPC-011` still described
+  the retired exhaustion case instead of the manifest's idempotent-retry
+  case (exhaustion coverage remains under `CONF-RPC-013`).
+- Clarified `SNTR-RPC-008`/§1E scope: the ≥16 floor binds to persistent
+  Syntra connections (TCP/TLS, WS/WSS, SC1); HTTP/HTTPS exchanges are
+  independent logical connections carrying one RPC (SNTR-HTTP-070, RFC
+  0004 D3) with transport-owned minimums preserved (SNTR-HTTP-072
+  listener endpoint groups; SNTR-HTTPS-041 HTTP/2 streams). Synced
+  `CONF-RPC-002`/`CONF-RPC-013` notes and prose, and
+  `specifications/schema/reference.md`.
 
 ## [v1.0.0-rc.1] - 2026-10-22 (release candidate, not stable)
 

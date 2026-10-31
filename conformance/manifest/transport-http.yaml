@@ -124,8 +124,8 @@ cases:
     expected:
       connection_state: CLOSED
       session_state: none
-      transport: { status: 400 }
-    notes: "Version mismatch/bad headers (disjoint, inverted, missing, envelope-disagree rows): 400 without credential evaluation or dispatch."
+      transport: { status: 400, result_envelope: absent, local_report: INVALID_ARGUMENT }
+    notes: "Version mismatch/bad headers (disjoint, inverted, missing, envelope-disagree rows): 400 without credential evaluation or dispatch; no Syntra result envelope (handshake.md §5 HTTP/HTTPS no-overlap row). The initiator's adapter reports the local binding failure INVALID_ARGUMENT per SNTR-HTTP-041 and MUST NOT infer the host's precise typed cause (RFC 0003 D1: HTTP synthesizes the handshake from headers, not a wire hello Frame); this is the HTTP-profile counterpart to CONF-CORE-005."
 
   - id: CONF-HTTP-009
     requirement: [SNTR-HTTP-060, SNTR-HTTP-061, SNTR-HTTP-064]

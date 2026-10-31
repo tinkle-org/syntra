@@ -254,6 +254,95 @@ def check_requirements():
 # Check: manifests
 # --------------------------------------------------------------------------
 
+# Documented two-observer expectation vocabulary (conformance/manifest/
+# README.md "Two-observer handshake-failure vocabulary"): detecting-side
+# error discriminators and transport-native peer-observation entries.
+TRANSPORT_FAMILIES = {"tcp_tls", "ws_wss", "http_1_1", "https_h2"}
+PEER_SIGNALS = {"transport_close", "ws_close", "http_status", "connection_loss"}
+WS_CLOSE_CODES = {1000, 1001, 1002, 1003, 1007, 1008, 1009, 1011}
+GENERIC_LOCAL_REPORTS = {"generic_protocol_rejection", "generic_policy_rejection"}
+ERROR_OBSERVERS = {"detecting_host", "detecting_peer"}
+ERROR_CARRIAGE = {"local_only", "wire"}
+
+
+def _is_allowed_string(value, allowed):
+    """Accept only YAML strings in a known vocabulary; lists/maps are invalid."""
+    return isinstance(value, str) and value in allowed
+
+
+def _is_local_report(value, error_codes):
+    return (_is_allowed_string(value, error_codes)
+            or _is_allowed_string(value, GENERIC_LOCAL_REPORTS))
+
+
+def check_transport_expectation(mf, cid, tmap, error_codes):
+    """Validate the documented two-observer keys inside an ``expected.transport``
+    map; unrelated transport-specific keys stay free-form as before."""
+    if not isinstance(tmap, dict):
+        if tmap is not None:
+            err(mf, f"case {cid} expected.transport must be a map")
+        return
+    peer = tmap.get("peer_observation")
+    if peer is not None:
+        if not isinstance(peer, dict) or not all(
+                isinstance(v, dict) for v in peer.values()):
+            err(mf, f"case {cid} expected.transport.peer_observation "
+                    "must be a map of transport-family maps")
+        else:
+            for fam in sorted(peer, key=str):
+                obs = peer[fam]
+                if not _is_allowed_string(fam, TRANSPORT_FAMILIES):
+                    err(mf, f"case {cid} peer_observation references "
+                            f"unknown transport family {fam}")
+                unknown = set(obs) - {"signal", "close_code", "status",
+                                      "local_report"}
+                if unknown:
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"keys {sorted(unknown, key=str)}")
+                if "signal" in obs and not _is_allowed_string(obs["signal"], PEER_SIGNALS):
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"signal {obs['signal']}")
+                cc = obs.get("close_code")
+                if cc is not None and (isinstance(cc, bool)
+                                       or not isinstance(cc, int)
+                                       or cc not in WS_CLOSE_CODES):
+                    err(mf, f"case {cid} peer_observation[{fam}] has invalid "
+                            f"close_code {cc}")
+                st = obs.get("status")
+                if st is not None and (isinstance(st, bool)
+                                       or not isinstance(st, int)):
+                    err(mf, f"case {cid} peer_observation[{fam}] has invalid "
+                            f"status {st}")
+                lr = obs.get("local_report")
+                if "local_report" in obs and not _is_local_report(lr, error_codes):
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"local_report {lr}")
+    lr = tmap.get("local_report")
+    if "local_report" in tmap and not _is_local_report(lr, error_codes):
+        err(mf, f"case {cid} expected.transport has unknown local_report {lr}")
+    renv = tmap.get("result_envelope")
+    if "result_envelope" in tmap and not _is_allowed_string(renv, {"absent", "present"}):
+        err(mf, f"case {cid} expected.transport has invalid result_envelope "
+                f"{renv}")
+
+
+def check_error_expectation(err_prefix, cid, emap, error_codes, mf):
+    """Validate the documented detecting-side discriminators inside an
+    ``expected.error`` map (observer / carriage)."""
+    if not isinstance(emap, dict):
+        if emap is not None:
+            err(mf, f"case {cid} {err_prefix} must be a map")
+        return
+    obs = emap.get("observer")
+    if "observer" in emap and not _is_allowed_string(obs, ERROR_OBSERVERS):
+        err(mf, f"case {cid} has unknown error observer {obs} "
+                f"({err_prefix}; allowed: {sorted(ERROR_OBSERVERS)})")
+    car = emap.get("carriage")
+    if "carriage" in emap and not _is_allowed_string(car, ERROR_CARRIAGE):
+        err(mf, f"case {cid} has unknown error carriage {car} "
+                f"({err_prefix}; allowed: {sorted(ERROR_CARRIAGE)})")
+
+
 def check_manifests():
     messages, enums = parse_proto_model()
     # Manifests use short code names (UNIMPLEMENTED); the IDL uses
@@ -299,13 +388,16 @@ def check_manifests():
             if key not in ("connection_state", "session_state", "frames",
                            "error", "transport", "hygiene", "retry"):
                 err(mf, f"case {cid} has unknown expected key {key}")
-        if "connection_state" in exp and exp["connection_state"] not in KNOWN_CONN_STATES:
+        if "connection_state" in exp and not _is_allowed_string(exp["connection_state"], KNOWN_CONN_STATES):
             err(mf, f"case {cid} has invalid connection_state {exp['connection_state']}")
-        if "session_state" in exp and exp["session_state"] not in KNOWN_SESS_STATES:
+        if "session_state" in exp and not _is_allowed_string(exp["session_state"], KNOWN_SESS_STATES):
             err(mf, f"case {cid} has invalid session_state {exp['session_state']}")
         if "error" in exp and isinstance(exp["error"], dict) and "code" in exp["error"]:
-            if exp["error"]["code"] not in error_codes:
+            if not _is_allowed_string(exp["error"]["code"], error_codes):
                 err(mf, f"case {cid} has unknown error code {exp['error']['code']}")
+        check_error_expectation("(expected.error observer/carriage)", cid,
+                                exp.get("error"), error_codes, mf)
+        check_transport_expectation(mf, cid, exp.get("transport"), error_codes)
         ctl_specified = "control_connection" in case
         ctl = case.get("control_connection")
         if ctl_specified and not isinstance(ctl, dict):
@@ -371,19 +463,39 @@ def check_manifests():
                     if key not in ("connection_state", "session_state", "frames",
                                    "error", "transport", "hygiene", "retry"):
                         err(mf, f"case {cid} has unknown control_connection expected key {key}")
-                if "connection_state" in cexp and cexp["connection_state"] not in KNOWN_CONN_STATES:
+                if "connection_state" in cexp and not _is_allowed_string(cexp["connection_state"], KNOWN_CONN_STATES):
                     err(mf, f"case {cid} control_connection has invalid connection_state {cexp['connection_state']}")
-                if "session_state" in cexp and cexp["session_state"] not in KNOWN_SESS_STATES:
+                if "session_state" in cexp and not _is_allowed_string(cexp["session_state"], KNOWN_SESS_STATES):
                     err(mf, f"case {cid} control_connection has invalid session_state {cexp['session_state']}")
                 if "error" in cexp and isinstance(cexp["error"], dict) and "code" in cexp["error"]:
-                    if cexp["error"]["code"] not in error_codes:
+                    if not _is_allowed_string(cexp["error"]["code"], error_codes):
                         err(mf, f"case {cid} control_connection has unknown error code {cexp['error']['code']}")
+                check_error_expectation("(control_connection expected.error observer/carriage)", cid,
+                                        cexp.get("error"), error_codes, mf)
+                check_transport_expectation(mf, cid, cexp.get("transport"), error_codes)
         elif cid == "CONF-URP-001":
             # Gate attribution for the negotiation-isolation case depends on
             # executing its declared paired control connection, so the control
             # must be a structured, runner-executable scenario rather than
             # prose-only notes.
             err(mf, f"case {cid} requires a structured control_connection")
+        if cid == "CONF-RPC-004":
+            # Duplicate-ID detection must be deterministic at race level: the
+            # structured barrier fault is mandatory and must use the documented
+            # semantics. Prose-only coordination or sleeps do not qualify.
+            inp = case.get("input") or {}
+            faults = inp.get("faults") if isinstance(inp, dict) else None
+            dwp = faults.get("duplicate_while_pending") \
+                if isinstance(faults, dict) else None
+            if not isinstance(dwp, dict) \
+                    or set(dwp) != {"barrier", "release_after"} \
+                    or dwp["barrier"] != "first_terminal_result" \
+                    or dwp["release_after"] != "violation_and_closure":
+                err(mf, f"case {cid} must declare the structured harness fault "
+                        "duplicate_while_pending: {barrier: "
+                        "first_terminal_result, release_after: "
+                        "violation_and_closure} for deterministic duplicate "
+                        "injection (no sleeps, no prose-only assumptions)")
     for r, mf, cid in req_refs:
         if not REQ_NAMING.match(r):
             err(mf, f"case {cid} has malformed requirement ref {r}")

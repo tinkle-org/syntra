@@ -21,6 +21,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
+- Scope: persistent-carrier concurrency (SNTR-RPC-008) — this case runs on persistent Syntra connections (TCP/TLS, WS/WSS, SC1). HTTP/HTTPS exchanges are independent logical connections each carrying one RPC (SNTR-HTTP-070); their minimum concurrency is transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041).
 
 ## CONF-RPC-003 reversed response order
 
@@ -35,9 +36,10 @@ Related normative requirements are cited per case; test IDs are not normative. A
 ## CONF-RPC-004 duplicate request ID
 
 - Related normative requirement: SNTR-RPC-002, SNTR-RPL-012 (accepted RFC 0004 D2).
-- Preconditions: ACTIVE; `id=7` outstanding (no terminal result yet). Persistent connection carriers (TCP, WS, H2 streams); RFC 0004 D3 exempts independent HTTP/HTTPS exchanges (per-exchange profiles skip this case).
-- Input: second `Frame{id=7, request{...}}` while the first is outstanding.
-- Expected output: local `FAILED_PRECONDITION` recorded for the duplicate; nothing dispatched and no result sent under the offending ID (no duplicate attempt and no zero-ID error); the connection terminates through the native profile. The original RPC's peer-visible outcome becomes unknown (connection-loss mapping, e.g. `UNAVAILABLE`; MUST NOT be reported as success); already committed outcomes stay committed, and closure is not rollback.
+- Preconditions: ACTIVE; `id=7` outstanding (no terminal result yet). Applicable persistent Syntra carriers (TCP/TLS, WS/WSS, SC1); RFC 0004 D3 exempts independent HTTP/HTTPS exchanges — including every HTTP/2 stream, which is a per-exchange carrier (SNTR-HTTPS-041) — so per-exchange transport profiles skip this case.
+- Input: the harness admits the first `Frame{id=7, request{...}}` and starts its Echo handler with the terminal-result commitment held behind a test-controlled barrier, then injects a second `Frame{id=7, request{...}}` while the first is outstanding. The invalid duplicate stimulus is harness-injected; a conforming client never generates a duplicate ID, and the initiator-side discipline (RFC 0004 D1) stays a separate client obligation.
+- Deterministic coordination (manifest `duplicate_while_pending: {barrier: first_terminal_result, release_after: violation_and_closure}`): the barrier is released only after the host detects the duplicate through the high-water rule, records the local violation, and termination of the connection is processed. No timing sleeps and no prose-only assumptions; without the barrier the first Echo could commit before detection, making "no result under ID 7" a scheduling prediction instead of a testable assertion.
+- Expected output: the duplicate is detected and rejected at admission (`N <= high-water H`) — never dispatched, never admitted — so nothing executes for it and no result is sent under the offending ID (no duplicate attempt and no zero-ID error). The manifest asserts `error.carriage: local_only` and `expected.frames: []`: the host records `FAILED_PRECONDITION` locally, with no Syntra response Frame emitted in this controlled scenario. The original RPC's peer-visible outcome becomes unknown (connection-loss mapping, e.g. `UNAVAILABLE`; MUST NOT be reported as success); already committed outcomes stay committed — the barrier guarantees none was, and closure is not rollback, so it retracts nothing. This fixture deliberately controls the race; it does not strengthen RFC 0004 D2 for implementations outside the fixture.
 - Expected connection state: CLOSED (via violation).
 - Expected session state: terminated abnormally.
 - Mandatory/optional: Mandatory.
@@ -102,14 +104,14 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory (client role only).
 
-## CONF-RPC-011 resource exhaustion
+## CONF-RPC-011 idempotent retry with fresh request ID
 
-- Related normative requirement: SNTR-RPC-008, SNTR-REL-007/008, SNTR-ASEC-020, SNTR-ERR-002 (`RESOURCE_EXHAUSTED`).
-- Preconditions: ACTIVE with a documented concurrency/rate/queue bound.
-- Input: exceed the bound (e.g., 17th concurrent RPC where max is 16, or flood within policy).
-- Expected output: `RESOURCE_EXHAUSTED` for excess work; conformant traffic unaffected; host recovers without restart; backoff honored by the initiator.
-- Expected connection state: ACTIVE (isolated offender handling).
-- Expected session state: unchanged.
+- Related normative requirement: SNTR-RPC-007, SNTR-RPC-010, SNTR-REL-003/004.
+- Preconditions: ACTIVE, then abrupt transport loss before any `result`; a new connection is established (connection_lost precondition).
+- Input: original `Frame{id=100, request{Echo, op-key "op-ABC"}}` whose outcome was never observed; retried on the new connection as `Frame{id=201, request{Echo, same op-key bytes}}`.
+- Expected output: fresh `request_id` on the new connection (201 ≠ 100 — the ID space dies with the connection, SNTR-RPC-010), operation-key bytes preserved bit-exact inside the opaque payload, server behavior matches its documented dedup policy; the core never deduplicates by `request_id` and `request_id` is never an idempotency key across connections. Outcome-unknown loss is retried only for idempotent/with-key operations (SNTR-REL-003/004).
+- Expected connection state: ACTIVE.
+- Expected session state: active.
 - Mandatory/optional: Mandatory.
 
 ## CONF-RPC-012 connection loss before response
@@ -127,10 +129,11 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Related normative requirement: SNTR-RPC-002, SNTR-RPC-008, SNTR-REL-007.
 - Preconditions: ACTIVE; host supports the ≥16 floor (SNTR-RPC-008; no negotiated mode below 16 — RFC 0005 D2).
 - Input: 16 simultaneously outstanding `Echo` requests with ids 21–36; the initiator sends all of them without waiting. Harness barrier semantics (`reverse_completion_order: {barrier: all_admitted}`): the host releases no result until every request is admitted (all 16 outstanding simultaneously), then completes them in strictly descending id order.
-- Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO.
+- Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO. Excess above the documented maximum is rejected with `RESOURCE_EXHAUSTED` while conformant traffic continues (SNTR-RPC-008).
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
+- Scope: this case executes persistent connection multiplexing (TCP/TLS, WS/WSS, SC1). It MUST NOT be interpreted as requiring any HTTP exchange to carry 16 concurrent RPCs: each HTTP/HTTPS exchange is one logical connection with one RPC (SNTR-HTTP-070; RFC 0004 D3), and the HTTP minimums are transport-owned (SNTR-HTTP-072 listener endpoint groups; SNTR-HTTPS-041 HTTP/2 streams).
 
 ## Traceability
 
@@ -146,6 +149,6 @@ Related normative requirements are cited per case; test IDs are not normative. A
 | CONF-RPC-008 | RPC-004, REL-006 (deadlines) |
 | CONF-RPC-009 | RPC-005/021/031 (cancellation) |
 | CONF-RPC-010 | RPC-002, ERR-004 (malformed result without outcome) |
-| CONF-RPC-011 | RPC-008, REL-007/008 (exhaustion) |
+| CONF-RPC-011 | RPC-007/010, REL-003/004 (idempotent retry, fresh request ID) |
 | CONF-RPC-012 | HS-014, REL-009 (loss) |
 | CONF-RPC-013 | RPC-002/008 (16 floor, out-of-order) |
