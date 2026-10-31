@@ -1,0 +1,39 @@
+conformance/manifest/recovery.yaml
+  s_9e476660298c96::t_29d2c249eed421 31,36
+specifications/core/README.md
+  s_9e476660298c96::t_e51f8cb8733ede 4
+specifications/core/events.md
+  s_9e476660298c96::t_e736772ccc790e 15
+  s_9e476660298c96::t_dc035467f58547 87
+proto/syntra/v1/recovery_profile.proto
+  s_9e476660298c96::t_0b8f77a0ff3363 109
+  s_9e476660298c96::t_53be3001be888a 92-93,95-96
+docs/v1-acceptance-package.md
+  s_9e476660298c96::t_03367e1df9f6ea 71-74
+conformance/plans/mobile-v1.md
+  s_9e476660298c96::t_54793ae0c4c326 5-6,9
+audits/v1-release-readiness.md
+  s_9e476660298c96::t_1ca4b8bf6b0ffa 3-6
+conformance/recovery_profile/recovery.md
+  s_9e476660298c96::t_7ec977edcdc31a 64-66
+specifications/security/opaque-payloads.md
+  s_9e476660298c96::t_7332d61adc714e 46,48-50,53-59
+specifications/security/open-questions.md
+  s_9e476660298c96::t_deae36c8332445 114-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "060313894c534f9307c810b6038fb043357e9c29",
+  "prompts": {},
+  "sessions": {
+    "s_9e476660298c96": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6d81f9caffeIemqT07CbBjJfE",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
