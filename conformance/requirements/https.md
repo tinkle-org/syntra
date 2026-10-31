@@ -21,8 +21,8 @@ Related normative requirements are cited per case; test IDs are not normative. A
 ## CONF-HTTPS-003 concurrent H2 streams, out-of-order completion
 
 - Related normative requirement: SNTR-HTTPS-041/042/043.
-- Input: streams 1 and 3 carry requests `id=7` (slow handler) and `id=8` (fast handler) concurrently.
-- Expected output: stream 3 completes first; initiator correlates by echoed `request_id` only; no FIFO assumption; stream IDs never appear in any Syntra field (negative check on wire traces).
+- Input: SIXTEEN concurrent streams on one transport connection (odd client stream IDs 1..31), each with a distinct `request_id` (21–36) and a distinct opaque payload; the harness admits all sixteen streams before releasing any terminal outcome, then the host completes them in strictly descending `request_id` order.
+- Expected output: initiator correlates by echoed `request_id` only; no FIFO, stream-ID, or priority-order assumption; each `200` envelope echoes its own stream's payload bit-exactly under the same echoed `request_id`; stream IDs never appear in any Syntra field (negative check on wire traces); excess beyond the host's documented maximum rejects pre-dispatch with `429`/`503` or post-acceptance with `200` + `RESOURCE_EXHAUSTED`.
 - Mandatory/optional: Mandatory.
 
 ## CONF-HTTPS-004 invalid chain rejected before any credential

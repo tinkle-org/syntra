@@ -19,26 +19,43 @@ TCP connect; TLS 1.3 handshake with full chain + hostname + expiry
 validation (never send credentials to an unverified endpoint, never fall
 back to plaintext); HTTP target `POST /syntra/v1/rpc`; WS Upgrade to
 `/syntra/v1/ws` offering `syntra.v1` first and validating the `101`
-selects exactly it (abort without Syntra bytes on any mismatch). Start the
-handshake timer at connection establishment (default 5 s); expiry aborts
-with `DEADLINE_EXCEEDED`, never implicit success.
+selects exactly it (abort without Syntra bytes on any mismatch). Timing is
+profile-specific: transport-setup budgets and the core Syntra handshake
+timer are allocated separately per the handshake section below. Any
+expiring budget aborts with `DEADLINE_EXCEEDED`, never implicit success.
 
 ## Syntra handshake
 
-Send exactly one `ClientHello` as the first envelope
+On frame-carrying profiles (TCP, TLS/TCP, WS, WSS), send exactly one
+`ClientHello` as the first envelope
 (`min_version ≤ max_version`, both nonzero, opaque credential bytes —
 empty means anonymous attempt), then await `ServerReady` or a terminal
 error before any `request`, `cancel`, or application payload. Never send a
 second `hello`; never pipeline Syntra RPCs before `ACTIVE` (transport
-negotiation bytes may pipeline only where the profile allows). On
-handshake error: surface the typed code, close the transport, and do not
+negotiation bytes may pipeline only where the profile allows). HTTP/HTTPS
+carries no `hello` frame at all: the logical handshake is synthesized
+through HTTP headers (per-exchange `Authorization: Syntra <base64>` and
+`Syntra-Version`) plus the body of each exchange on
+`POST /syntra/v1/rpc` — a `hello` frame in the HTTP request body is
+nonconformant. Syntra timing
+rule (accepted RFC 0003 D4, SNTR-HS-002): start the core handshake timer only
+at the local `CONNECTED` boundary for frame-carrying profiles — established
+TCP for TCP; successfully completed and verified TLS for TLS/TCP; a validated
+Upgrade for WS; verified TLS plus a validated Upgrade for WSS — never during
+socket/Upgrade establishment, which has its own separate bounded setup budget.
+HTTP/HTTPS carries no frame carriage: every exchange synthesizes the sequence
+under its own request deadline, and there is no connection-level Syntra
+handshake timer at all. On
+handshake error (accepted RFC 0003): the detecting side records a locally
+typed cause; the peer observes only the transport-native close signal;
+there is no typed wire error to surface. Close the transport and do not
 retry with downgraded versions unless the application explicitly
 re-negotiates.
 
-The pre-`ACTIVE` typed-error carrier is still unresolved. In delivered SC1,
-host policy rejection closes the connection and the client can observe
-`UNAVAILABLE`; that does not establish receipt of a typed authentication
-denial. Do not retry automatically with bootstrap or another carrier.
+In delivered SC1, host policy rejection closes the connection and the
+client observes `UNAVAILABLE`; that does not establish receipt of a typed
+authentication denial. Do not retry automatically with bootstrap or
+another carrier.
 
 ## Authentication
 
@@ -106,15 +123,22 @@ release/completion-time gaps remain [open](sc1-implementation.md#remaining-work)
 
 ## Request IDs
 
-Generate nonzero `uint64` IDs, unique among *outstanding* RPCs on the
-connection. IDs may be reused only after the terminal `result` for that
-ID (note the replay-security interaction in `SESSION-OPEN-QUESTIONS.md`
-B3: when in doubt, use fresh IDs). Correlate every `result` by ID; accept
-out-of-order completion; never assume FIFO. Handle interleaved
-`notification`s without completing any RPC. Every new connection (and
-every HTTP exchange) starts a fresh ID space; logical continuity across
-connections uses application operation keys inside payloads, never the old
-`request_id`.
+IDs are nonzero `uint64`, strictly increasing in the actual serialized
+request-frame emission order on one connection
+([RFC 0004](../rfcs/0004-correlation-identity-carriage.md) D1). When requests
+are produced concurrently, serialize the allocation: the ID is claimed when
+the request is actually emitted, never by API-call order. IDs are never
+reused — not even after the terminal `result` for that ID — and moving them
+off the connection's emission sequence is an ordered-admission violation:
+the detecting host records local `FAILED_PRECONDITION`, sends no terminal
+`result` for the violating request, and closes the connection via the
+native signal; the violating client observes only that close and maps
+affected in-flight calls to `UNAVAILABLE` per the connection rule.
+Correlate every `result` by ID; accept out-of-order completion; never assume
+FIFO. Handle interleaved `notification`s without completing any RPC. Every
+new connection (and every HTTP exchange) starts a fresh ID space; logical
+continuity across connections uses application operation keys inside
+payloads, never the old `request_id`.
 
 ## RPC concurrency
 

@@ -2,22 +2,24 @@
 
 - RFC: 0002
 - Title: Auth/session lifecycle precision without new wire types
-- Author(s): TBD — blocker (maintainer assignment)
-- Status: Draft
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-19
 - Target version: v1 clarification (no wire change)
 - Relates to: `specifications/core/handshake.md`, `authentication.md`, `sessions.md`, `capabilities.md`, `errors.md`, `versioning.md`, `reliability.md`; `specifications/security/authentication-security.md`, `replay-protection.md`, `threat-model.md`; `proto/syntra/v1/handshake.proto`, `session.proto`, `capabilities.proto`, `errors.proto`; ADR-005, ADR-009; RFC 0001 (B1–B11); core `open-questions.md` blockers 1–4; security `open-questions.md` items 1, 5
-- Reviewers: TBD — blocker (protocol + security maintainers)
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
 > This RFC resolves NO behavioral conflict by fiat. It records where the task glossary differs from approvals, proposes keeping the approved six-state machine and existing wire types, and lists the capability/binding RFCs still required. No `.proto` change is proposed.
 
-Current decision package: RFCs 0003–0005 select core/HTTP/bounds proposals,
-RFC 0006 §11 selects required update-recovery corrections, RFC 0007 §11
-selects canonical SC1 migration, and [RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md)
-selects mobile lifecycle/parser/resource behavior. All remain Draft. Historical
-references to approvals in this document are not evidence of acceptance of
-those proposals. Logical-session resumption remains deferred and distinct from
-required durable update recovery; no new core session identifier is introduced.
+Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+as a **dependency record** (disclosed self-approval). The decision package
+this document depends on is accepted: RFCs 0003–0005 (core/HTTP/bounds),
+RFC 0006 §11 (update-recovery), RFC 0007 §11 (SC1 migration),
+[RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md) (mobile lifecycle),
+and new RFC 0010 (revocation lifecycle). The §11 supersession map below
+records which of this RFC's carried items each accepted contract resolves.
+Logical-session resumption remains deferred and distinct from required
+durable update recovery; no new core session identifier is introduced.
 
 ## 1. Summary
 
@@ -32,13 +34,13 @@ The task asks for eight states, `ServerHello`, session identifiers, mechanism ad
 Normative force remains with existing IDs; this RFC mints none. Client/server obligations below restate existing requirements in one place.
 
 - **States (keep six; map suggested names):** No new state. `DISCONNECTED` = pre-transport (outside Syntra); `TRANSPORT_ESTABLISHED` = `CONNECTED`; `ERROR` is local reporting + `CLOSING`/`CLOSED`, never a wire state (SNTR-HS-001/006). Client obligations: implement exactly the six transitions; never shortcut or re-handshake on one transport (SNTR-HS-001/040). Server obligations: same; emit exactly one terminal outcome per handshake (SNTR-CORE-020).
-- **Handshake ordering:** Initiator sends one `hello` first; host replies `ready` or handshake error, never `ServerHello` (SNTR-CORE-010/020, SNTR-HS-003/004). Version final at host selection in `Frame.version` (SNTR-HS-010). Capabilities final only where an RFC binding exists; default mandatory-only (SNTR-CAP-002). Auth starts with `hello` credential; follow-ups only via post-`ACTIVE` app RPCs (SNTR-AUTH-003/004). Empty credential is a policy-governed anonymous attempt. No session identifier is ever assigned (SNTR-SESS-002). App RPC/events legal only in `ACTIVE` (SNTR-HS-005). Failures terminate with the §5 code + closure (SNTR-HS-040); the pre-`ACTIVE` carrier gap stays open (B1).
+- **Handshake ordering:** Initiator sends one `hello` first; host replies `ready` or fails the handshake, never `ServerHello` (SNTR-CORE-010/020, SNTR-HS-003/004). Version final at host selection in `Frame.version` (SNTR-HS-010). Capabilities final only where an RFC binding exists; default mandatory-only (SNTR-CAP-002). Auth starts with `hello` credential; follow-ups only via post-`ACTIVE` app RPCs (SNTR-AUTH-003/004). Empty credential is a policy-governed anonymous attempt. No session identifier is ever assigned (SNTR-SESS-002). App RPC/events legal only in `ACTIVE` (SNTR-HS-005). Failures terminate with the detecting side's typed local cause per `specifications/core/handshake.md` §5 plus the transport-native close signal; no error `Frame` crosses the wire pre-`ACTIVE` (resolved by accepted [RFC 0003](0003-handshake-failure-signaling.md) D1/D2, recorded in Decision 0002 — earlier draft wording of the §5 code + closure and the open `B1` carrier gap is historical).
 - **Auth framework:** No mechanism identifier/advertisement/selection/challenge fields in v1; baseline is opaque credential presentation with host policy (SNTR-AUTH-001/003). Multi-round only above `ACTIVE` (SNTR-AUTH-004). Principal fixed per connection (SNTR-AUTH-007); re-auth same-connection forbidden by default (SNTR-AUTH-010).
 - **Principal:** Generic opaque host-owned handle; MAY be human/device/service/process/API consumer/anonymous; never assumed human; no wire principal field; redacted logs (SNTR-AUTH-007, SNTR-ASEC-004).
 - **Session identifier:** None in v1. `connection_id` stays diagnostic-only (SNTR-SESS-002, SNTR-ASEC-010).
 - **Resumption:** Deferred/optional, off by default (SNTR-SESS-006, SNTR-CAP-003). Future RFC must define opaque token, entropy, audience/principal/time/version/capability binding, lifetime, rotation, replay windows, restored vs non-restored state, failure, and revocation (SNTR-ASEC-007/008, SNTR-RPL-011).
 - **Cross-transport:** Not allowed in v1; allowed only where a resumption RFC explicitly binds the profile pair with revalidation and no downgrade (SNTR-TSEC-007/009).
-- **HTTP:** No auth from TCP/HTTP-2 lifetime; per-connection `hello`→`ready`; sessions span HTTP requests only via RFC token; identity only via token, never ambient connection facts (SNTR-ASEC-003).
+- **HTTP:** No auth from TCP/HTTP-2 lifetime; HTTP/HTTPS exchanges are independent, and each exchange synthesizes its logical `hello` from its version and credential headers — no `hello` frame or request-body envelope is sent (`specifications/transports/http.md` §1D; accepted [RFC 0004](0004-correlation-identity-carriage.md) D3, the earlier draft per-connection `hello`→`ready` wording is historical) — with per-exchange authentication and its own terminal outcome. Sessions span HTTP requests only via RFC token; identity only via token, never ambient connection facts (SNTR-ASEC-003).
 - **Termination/timeouts/authorization:** No `CloseSession` message; graceful close is stop-new-RPCs + profile grace + teardown; error mapping per tables (SNTR-HS-006/013, SNTR-ERR-002/004); timeouts per existing defaults (handshake 5 s, per-RPC `timeout_ms`/bounded host default, no separate auth timer, deployment session lifetimes, profile close grace); authorization `UNAUTHENTICATED` vs `PERMISSION_DENIED` per SNTR-AUTH-006/009.
 - **Schema diff:** None. `handshake.proto` (6 fields), `session.proto` (no messages), `capabilities.proto` (no types), `errors.proto` (16 nonzero codes) are unchanged; `reserved 16, 17` and `event`/`resume`/`ack` preserved. Compatibility impact: zero wire/source impact.
 - **State machine deltas:** None. Diagrams added are views of SNTR-HS-001, not new transitions.
@@ -91,7 +93,13 @@ Clarification-only RFCs can be mistaken for approval of the deferred features. M
 
 ## 10. Unresolved questions and blockers
 
-Carried forward; MUST be resolved before stable, never by implementation choice:
+**Historical review context (2026-10).** The items below were the draft
+RFC's snapshot. The accepted dispositions are recorded in §11's supersession
+map and fold into the accepted RFC decisions cited there; the wording must
+not be read as leaving any superseded item awaiting resolution. Items marked
+"Still tracked (deferred)" in §11 are the ones whose status genuinely
+remains open; every superseded item was resolved through its accepted
+authorizing RFC, never by implementation choice:
 
 1. **B1 typed pre-`ACTIVE` error carrier** (which `Frame`, if any, carries handshake errors; zero-`request_id` `result` forbidden).
 2. **B2 pre-`ACTIVE` notification conflict** (ignore vs fail).
@@ -109,8 +117,9 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
     `reliability.md` §1C and the reliable-delivery coverage in §7
     (e.g. SNTR-REL-902) remain proposals without an accepted authorizing
     RFC. SNTR-REL-900/901 remain shipping baseline. This RFC does not
-    authorize them; RFC 0006 is a separate Draft
-    update/recovery proposal. Canonical negotiation/control methods,
+    authorize them. Update/recovery sits outside this open item: RFC 0006 is
+    accepted and its §11 amendment governs it. For reliable delivery, canonical
+    negotiation/control methods,
     versioned binary schemas, delivery-ID carriage, confirmation/fallback,
     and deterministic fixtures are still required. Former `CONF-RS-001..005`
     wire rows have been withdrawn from executable cases; the IDs and
@@ -124,6 +133,26 @@ Carried forward; MUST be resolved before stable, never by implementation choice:
     cannot prove execution stopped. Maintainer protocol/security review
     and acceptance are outstanding. Existing implementation unit tests
     remain useful local checks, not wire-conformance or shipping approval.
+
+## 11. Supersession map (accepted 2026-10-30)
+
+| This RFC's §10 item | Disposition | Resolved by (accepted) |
+|---|---|---|
+| 1 — B1 typed pre-`ACTIVE` error carrier | Superseded | RFC 0003 D1 (no error `Frame`; local typed cause + native signal) |
+| 2 — B2 pre-`ACTIVE` notification conflict | Superseded | RFC 0003 D2 (fail-close) |
+| 3 — B3 stale `request_id` reuse | Superseded | RFC 0004 D1/D2 (permanent non-reuse; high-water ordered admission) |
+| 4/5/7 — capability binding, bounds, mechanism negotiation | Superseded | RFC 0005 D1/D2 (post-ACTIVE profile contracts; no generic probing; concrete bounds); each profile's accepted RFC defines its mechanism (RFC 0006 for update-recovery) |
+| 6 — B10 cancel/deadline/loss races | Superseded | RFC 0004 D4 (+ RFC 0008 D2 clocks) |
+| 10 — HTTP profile bindings | Partially superseded | RFC 0004 D3/D5 (per-exchange independence, credential carriage); transport-profile RFCs still embody §1E principles |
+| 11 — revocation propagation / channel binding / proxy | Partially superseded | RFC 0010 (revocation propagation bound: immediate new connections, 300 s hard max, 60 s target, fail-closed). Channel-binding construction and proxy propagation format remain open |
+| 8 — resumption standard | Still tracked (deferred) | No accepted resumption RFC; fail-closed default stands |
+| 9 — cross-transport binding | Still tracked (deferred) | Not authorized in v1 |
+| 12 — reliable-session/reliable-delivery shipping authority | Still tracked (deferred) | No authorizing RFC; SNTR-CAP-008/902 and related coverage remain proposals |
+
+None of this record's items authorizes new wire types. Where an accepted RFC
+defines a rule, that RFC is the normative authority; where an item remains
+tracked, `SESSION-OPEN-QUESTIONS.md` and the core/security open-questions
+lists own it.
 
 ## Appendix: References
 

@@ -43,18 +43,20 @@ Oversize payloads → `RESOURCE_EXHAUSTED` regardless of format. undecryptable o
 
 Opacity is a safety property (the core cannot be confused by content) but not a confidentiality property — the current secure profiles obtain wire confidentiality from TLS. Application payload encryption alone does not hide method names or subscription metadata; TLS protects envelope contents on its secured leg, while timing, sizes and endpoints remain observable. Applications with sensitive flows SHOULD document padding/quantization above Syntra.
 
-### Proposed channel boundary (informative)
+### Accepted channel boundary (informative)
 
-The carrier-independent [secure-channel draft](secure-channel.md) under
-[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md) would
-authenticate/decrypt channel records before bounded envelope reconstruction
+The carrier-independent [secure channel](secure-channel.md) accepted under
+[RFC 0007](../../rfcs/0007-secure-channel-device-authorization.md)
+authenticates/decrypts channel records before bounded envelope reconstruction
 and core decoding. That operation is distinct from interpreting or decrypting
 `payload` bytes: applications retain ownership of any inner ciphertext and
-its keys. Candidate records may split an envelope without changing its
-opaque bytes or the default serialized-envelope limit. The proposal adds no
-application E2EE algorithm, capability or schema field. SNTR-OPQ-005's current
-secure-profile and certificate requirements remain in force pending RFC
-acceptance; opaque application encryption supplies no policy exception.
+its keys. Accepted record framing may split a serialized envelope without
+changing its opaque bytes or the default serialized-envelope limit. The
+accepted contract adds no application E2EE algorithm, capability or schema
+field. SNTR-OPQ-005's secure-profile and certificate requirements remain in
+force: the accepted channel is additive to transport security, not a
+replacement for it, and opaque application encryption supplies no policy
+exception.
 
 ## 6. Compatibility considerations
 
@@ -62,7 +64,7 @@ Payload formats are application-versioned, never Syntra-versioned. Core evolutio
 
 ## 7. Conformance requirements
 
-- **SNTR-OPQ-900** — Fixtures: arbitrary-byte round-trip (empty, binary, 1 MiB, simulated-ciphertext random bytes) bit-preserved across a secure profile; oversize-ciphertext rejected identically to oversize-plaintext; no E2EE fields present in envelope traces (negative check).
+- **SNTR-OPQ-900** — Fixtures: arbitrary-byte round-trip (empty, binary, a maximum-payload fixture sized so the TOTAL serialized `Frame` stays within `DEFAULT_MAX_FRAME_BYTES` per accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D3 — a MAX-sized total frame is within the bound and `MAX+1` is rejected pre-dispatch, so a 1 MiB payload alone does NOT fit — simulated-ciphertext random bytes) bit-preserved across a secure profile; oversize-ciphertext rejected identically to oversize-plaintext; no E2EE fields present in envelope traces (negative check).
 - **SNTR-OPQ-901** — Scope proof: implementation documentation states E2EE (if any) lives above Syntra and transport security remains enforced.
 
 ```mermaid

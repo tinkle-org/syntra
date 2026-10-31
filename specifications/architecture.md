@@ -202,10 +202,13 @@ encrypts, encryption and decryption occur above Syntra.
 - **Wire versioning.** Every `Frame` carries `version`. Negotiation uses
   `min_version`/`max_version` in `ClientHello`. See ADR-009.
 - **Unknown fields.** Protobuf unknown fields MUST be ignored on receipt
-  and MUST NOT cause failure, unless a future specification explicitly
-  marks a field as critical. Unknown message types (unrecognized `oneof`
+  within the validated envelope limits and MUST NOT cause failure, unless a
+  future specification explicitly marks a field as critical. Unknown message
+  types (unrecognized `oneof`
   bodies) MUST be rejected with `UNIMPLEMENTED` and MUST NOT be silently
-  dropped, so peers detect mismatch deterministically.
+  dropped, so peers detect mismatch deterministically. The bounded raw-wire
+  validation order (reserved tags 16/17, multiple body occurrences and future
+  bodies) is owned by `framing.md`/`serialization.md` per accepted RFC 0008.
 - **Reserved values.** `reserved 16, 17` and `reserved "event",
   "resume", "ack"` in `Frame` MUST be preserved. New fields MUST NOT
   reuse those numbers or names without a major-version RFC.
@@ -222,8 +225,11 @@ encrypts, encryption and decryption occur above Syntra.
 field numbers and names in `proto/syntra/v1/envelope.proto` (`Frame` reservations).
 
 **SYN-ARCH-021** — Implementations MUST ignore unknown Protobuf fields
-and MUST reject unknown `Frame.body` variants with
-`ERROR_CODE_UNIMPLEMENTED`.
+within the validated envelope limits and MUST reject unknown
+`Frame.body` variants with
+`ERROR_CODE_UNIMPLEMENTED`; the bounded raw-wire validation order
+(SNTR-SER-003, SNTR-WIRE-002/004/008) governs reserved-tag and
+future-body classification per accepted RFC 0008.
 
 ## 7. Threat assumptions and security policy
 
@@ -283,6 +289,18 @@ For RFC 0007, the accepted security owners are `security/secure-channel.md`
 and `security/device-authorization.md`; the network-mapping owner is
 `transports/noise-bindings.md`. Acceptance does not create an exception to
 this ownership matrix or to the TLS production policy.
+
+Profiles negotiate after ACTIVE under their own accepted RFCs (accepted
+[RFC 0005](../rfcs/0005-negotiation-bounds-identifiers.md) D1): each accepted
+profile defines its own negotiation method, versioned payloads, bounds and
+confirmation, and there is no generic capability enumeration or
+optional-frame probe. The first stable bundle includes the Update/Recovery
+profile (accepted [RFC 0006](../rfcs/0006-update-recovery-profile.md);
+Option A ratified per accepted
+[RFC 0009](../rfcs/0009-v1-bootstrap-governance-and-release-scope.md)) with
+the wire `syntra.update-recovery/1` remaining optional per connection. The
+strict boundary between transport/session ownership and application APIs is
+unchanged.
 
 **SYN-ARCH-040** — Protobuf schemas are the sole authority for data
 representation. Specification prose MUST NOT redefine field numbers or

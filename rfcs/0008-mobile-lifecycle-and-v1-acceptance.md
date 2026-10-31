@@ -2,19 +2,21 @@
 
 - RFC: 0008
 - Title: Suspension, connection replacement, bounded execution and mobile release evidence
-- Author(s): TBD — blocker (maintainer assignment)
-- Status: Draft
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-28
 - Target version: v1 pre-stable behavioral proposal; compatibility designation requires review
 - Relates to: RFCs 0001–0007; core RPC/reliability/sessions; transport profiles; security threat model; GOVERNANCE.md §5
-- Reviewers: TBD — blocker (protocol, security and mobile-runtime maintainers)
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
-This is a selected proposal for review, not accepted normative behavior.
-Clauses below use ordinary language deliberately; they introduce no active
-requirement IDs, registered profiles or shipping authority. Accepted owner
-edits and permanent requirement/test IDs follow the RFC process. The user
-selected SC1 and standardized update recovery as required release deliverables;
-that product/release scope is not a vote accepting the underlying RFCs.
+Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+(disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3).
+The D1–D5 selections are accepted contracts; permanent requirement/test IDs
+and executable case registration follow the RFC process and are among the
+remaining release gates. The release-gate list below stands: independent
+Rust/Go and mobile evidence, independently derived Noise vectors, executable
+case registration, host lifecycle/storage contracts, and numeric deployment
+budgets declared before measurement are NOT satisfied by acceptance.
 
 ## 1. Summary
 
@@ -278,14 +280,20 @@ and scheduling measurements remain platform-specific and cannot be replaced
 by simulated clocks or WASM compilation. Required recovery and SC1 enlarge
 the release scope; a passing Core subset does not close that scope.
 
-## 10. Unresolved questions and blockers
+## 10. Acceptance disposition and remaining gates
 
-Formal reviewer assignment, security approval and explicit compatibility/freeze
-designation remain blockers. Independent cryptographic vectors, executable
-case registration, downstream alignment, host lifecycle/storage contracts and
-mobile/security evidence are uncompleted gates. Numeric deployment acceptance
-budgets (reconnect, latency, CPU/wakeups, memory, revocation) are declared before
-measurement; changing a threshold after a failure requires a reviewed rationale.
+Review assignment, security approval, and compatibility designation were
+recorded at acceptance via
+[Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+(self-review disclosed). The deadline/suspend contract was reconciled with
+accepted RFC 0004 as recorded there. Remaining release gates (open, not
+satisfied by acceptance): independent cryptographic vectors, executable case
+registration for the owner files, downstream alignment, host
+lifecycle/storage contracts, and mobile/security operational evidence.
+Numeric deployment acceptance budgets (reconnect, latency, CPU/wakeups,
+memory, revocation) are declared before measurement; changing a threshold
+after a failure requires a reviewed rationale. The §8 checklist stays
+unchecked until evidence executes.
 
 No UDP/QUIC, logical-session resumption, reliable-session RPC reconciliation,
 application E2EE or automatic mutation replay is included. Supporting them later

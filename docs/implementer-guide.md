@@ -54,9 +54,17 @@ TLS policy. [ADR-011](../specifications/decisions/ADR-011-noise-device-authoriza
 is accepted; the [SC1 conformance plan](../conformance/plans/secure-channel.md)
 distinguishes registered cases from implementation tests.
 
-Only authenticated out-of-band provisioning is supported. Enrollment RPCs,
-complete issuance/delivery/ack recovery, secure storage and rotation are open
-integration work. Independent review, independent vectors/wire interoperability
+Authenticated out-of-band provisioning is the enrollment function delivered
+in this guide; authorized bootstrap enrollment also stays permitted as a
+designated authority path under the lifecycle contract. Accepted RFC 0007
+owns the SC1 credential levels; accepted RFC 0010 fixes the host operational
+contract for
+enrollment authority, issuance, staged durable provisioning with
+idempotent retries, principal binding, revocation propagation (at most a
+300-second hard profile maximum with a 60-second operational target,
+fail-closed), rotation, and compromise recovery. The contract is
+registered, not yet executed; conformance runs and independent review
+remain open gate work. Independent review, independent vectors/wire interoperability
 and native ABI completion-time/credential-release gaps remain
 [unresolved](sc1-implementation.md#remaining-work).
 
@@ -117,7 +125,7 @@ vectors (logical equality, never byte equality).
 
 Propose your supported range as `[min_version, max_version]` (both nonzero,
 `min ≤ max`) in `ClientHello`; select, as host, the highest overlap or fail
-the handshake with `UNIMPLEMENTED`/`FAILED_PRECONDITION` + close
+the handshake with `UNIMPLEMENTED` + close on version mismatch
 (`SNTR-HS-003/010`, `SNTR-VER-002`). Record the selected version and stamp
 it on every post-handshake `Frame`. Never negotiate below the highest
 mutual version without explicit application consent (`SNTR-VER-007`).
@@ -148,8 +156,10 @@ channel evidence through `ChannelIdentityProvider` and `ChannelPolicy`:
   with least privilege.
 - On success emit exactly one `ServerReady` with a fresh, unguessable
   `connection_id` (≥128-bit entropy) and bind the principal for the
-  connection lifetime. On denial, fail the handshake with
-  `UNAUTHENTICATED`/`PERMISSION_DENIED` and generic text.
+  connection lifetime. On denial, record the detecting-side typed cause
+  (`UNAUTHENTICATED`/`PERMISSION_DENIED`) with generic text. Before `ACTIVE`
+  send no error `Frame`: the peer observes only the transport-native close
+  signal (RFC 0003 D1/D2).
 - Enforce expiry/revocation; re-authentication on the same connection is
   forbidden by default (new handshake instead).
 
@@ -168,8 +178,13 @@ See `docs/server-implementation.md` for the host side and
 
 ## 7. Implement RPC correlation
 
-- Initiator: nonzero `request_id`, unique among outstanding RPCs on the
-  connection (`SNTR-RPC-002`). Correlate each terminal `result` by ID;
+- Initiator: nonzero `request_id`, strictly increasing in the actual
+  serialized request-frame emission order, unique for the whole connection
+  and never reused — not even after a terminal `result` (`SNTR-RPC-002`,
+  accepted RFC 0004; reusing or reissuing an already-seen ID is an
+  ordered-admission violation: the detecting host records local
+  `FAILED_PRECONDITION`, sends no result, and closes the connection).
+  Correlate each terminal `result` by ID;
   tolerate interleaved `notification`s and out-of-order completion.
   Enforce your timer (≤ requested budget); abandonment without `cancel`
   does not cancel the host.

@@ -177,13 +177,13 @@ cases:
   - id: CONF-EVT-014
     requirement: [SNTR-EVENT-005]
     profile: SNTR-EVENTS-V1
-    roles: [client, server]
+    roles: [client]
     capabilities: []
     mandatory: true
     preconditions: [handshake_started]
     input: { faults: { emit_preactive_notification: true } }
-    expected: { connection_state: ACTIVE, session_state: unchanged }
-    notes: "Pre-ACTIVE notification: initiator ignores with a diagnostic (default tolerance); a host sending pre-ACTIVE events commits a protocol violation. Either way no subscription is established."
+    expected: { connection_state: CLOSED, session_state: none, error: { code: FAILED_PRECONDITION }, hygiene: { absent_from: [queue, subscription_state] } }
+    notes: "Client role only: the observable is the initiator's local outcome — the controlled host sends the pre-ACTIVE notification and the initiator (IUT) records local FAILED_PRECONDITION, discards the notification without application delivery, does not establish any subscription, and proceeds CLOSING then CLOSED (SNTR-EVENT-005, RFC 0003 D2). The peer observes only the transport-native close signal; no error Frame crosses the wire. A host-side variant that makes the controlled initiator emit the notification to observe the server's outcome is not registered. Registered; not yet executed."
 
   - id: CONF-EVT-015
     requirement: [SNTR-EVENT-901]

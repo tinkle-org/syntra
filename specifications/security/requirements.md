@@ -31,7 +31,8 @@ additional secure profile and does not replace them.
 | ID family | Defining document | Concern | Status |
 |---|---|---|---|
 | `SNTR-SC-001`–`SNTR-SC-015` | [secure-channel.md](secure-channel.md) | Carrier-independent NK/NKpsk0 channel, authenticated context, fresh keys/confirmation, bounded records/lifecycle and claim limits | Accepted |
-| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Accepted; host lifecycle work remains |
+| `SNTR-DAUTH-001`–`SNTR-DAUTH-010` | [device-authorization.md](device-authorization.md) | Shared AK enrollment/storage, scoped handle, generic principal policy, revocation/rotation and trusted integration | Accepted; host lifecycle work is specified by `SNTR-DAUTH-011`–`SNTR-DAUTH-024` below (accepted RFC 0010); execution pending |
+| `SNTR-DAUTH-011`–`SNTR-DAUTH-024` | [device-authorization.md](device-authorization.md) | Host enrollment/authorization lifecycle: enrollment authority; AK/handle issuance; staged provisioning transaction; idempotent interrupted enrollment; protected pre-`ready` sequence; enrollment-to-principal binding; immediate new-connection enforcement; bounded staleness (≤300 s hard maximum, 60 s operational target); fail-closed on unknown validity; rotation transaction; epoch integrity/rollback prevention; compromise recovery via independent authority; lifecycle storage control and secret disposal; trusted server-key pin rotation | Registered with accepted [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) (this wave); execution pending |
 | `SNTR-SCW-001`–`SNTR-SCW-012` | [noise-bindings.md](../transports/noise-bindings.md) | Canonical v1 WSS mapping, Upgrade admission, first-envelope rule, restricted TCP/WS and deferred UDP | Accepted |
 
 [Carrier mapping](../transports/noise-bindings.md) registers
@@ -40,13 +41,15 @@ The [implementation evidence ledger](../../docs/sc1-implementation.md) retains
 historical draft-1 evidence; current Rust local results are recorded
 downstream. Those results do not imply coverage of every SC/DAUTH/SCW
 obligation, independent interoperability or independent security review.
-Enrollment issuance, protected storage/transactions and rotation flows remain
-host obligations; UDP remains deferred and HTTP/HTTPS request-response is
-excluded from SC1.
+Enrollment issuance, protected storage/transactions and rotation flows are
+specified as `SNTR-DAUTH-011`–`SNTR-DAUTH-024` obligations under accepted
+[RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md); registration
+is not execution, so implementing them remains host work. UDP remains
+deferred and HTTP/HTTPS request-response is excluded from SC1.
 
 ## Uniqueness and ownership rules
 
-- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`; `SC`, `DAUTH` and `SCW` under RFC 0007).
+- IDs are unique suite-wide; new security IDs REQUIRE the prefix of their defining document (`TMOD`, `TSEC`, `ASEC`, `RPL`, `OPQ`, `STEST`; `SC`, `DAUTH` and `SCW` under RFC 0007; `DAUTH-011`–`024` host lifecycle under RFC 0010).
 - No ID is defined twice; companions cite, never duplicate (single-definition rule shared with core).
 - `SNTR-SEC-*` is intentionally unused to keep per-document traceability; the family prefix `SNTR-*SEC*` collectively denotes security scope.
 - Charter `SYN-ARCH-030–035` and core `SNTR-*` remain distinct namespaces; where this suite tightens a core rule (e.g., disclosure), the stricter security rule governs for security claims (SYN-ARCH-043) and MUST be cited in the implementation's conformance report.

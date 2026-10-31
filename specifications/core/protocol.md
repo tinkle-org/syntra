@@ -23,15 +23,15 @@ The following are the only protocol-level abstractions. No application-specific 
 - **Client endpoint (initiator):** The peer that opens a transport connection, proposes versions, presents credentials, invokes RPCs, and receives results and events.
 - **Server endpoint (host):** The peer that accepts transport connections, validates versions and credentials per application policy, dispatches RPCs to application handlers, and optionally emits events.
 - **Transport connection:** A single instance of an underlying transport (TCP, TLS 1.3/TCP, HTTP/1.1, HTTPS/H1/H2, WS/WSS over H1) carrying a Syntra handshake followed by envelopes. Disposable; see `sessions.md` for distinction from sessions.
-- **Logical protocol session:** Application-scoped association of an authenticated principal with connection(s), established per `sessions.md`. A session MAY span sequential connections only if a future session specification explicitly defines resumption; otherwise it is bound to one connection.
+- **Logical protocol session:** Application-scoped association of an authenticated principal with connection(s), established per `sessions.md`. A session MAY span sequential connections only if a future session specification explicitly defines resumption; otherwise it is bound to one connection. In v1 no logical session identifier exists in the protocol: the default session equals exactly one connection's lifetime, and a replacement connection is a fresh establishment — new handshake, fresh principal validation, new local generation — never a resumption (`sessions.md` §1B).
 - **Authenticated principal:** An opaque identity established by successful authentication (see `authentication.md`). Syntra treats it as opaque bytes/handle; it MUST NOT assume user accounts — principals MAY be devices, services, keys, or any application-defined identity.
 - **Request:** An initiator-to-host invocation `RpcRequest{method, payload, timeout_ms}` correlated by `request_id`.
 - **Response:** Exactly one terminal `RpcResult{payload | error}` per request, correlated by the same `request_id`.
 - **Application payload:** Opaque `bytes` whose schema and meaning belong to the application. Syntra MUST NOT parse, validate semantically, or decrypt it.
 - **Server-originated event:** An opaque `Notification{payload}` sent host→initiator after readiness, uncorrelated (`request_id == 0`).
 - **Optional subscription:** A negotiated interest in a class of events, established via generic RPC and delivered as events. Subscription mechanics are generic; topic semantics belong to the application.
-- **Capability:** A named optional behavior (e.g., event streams, resumption, extension) that MUST be explicitly negotiated per `capabilities.md`. Mandatory interop never depends on an unnegotiated capability.
-- **Protocol extension:** A versioned optional addition (new envelope variant, capability, or transport) accepted via RFC. Extensions MUST NOT alter mandatory behavior.
+- **Capability:** An optional behavior (e.g., event streams, resumption, extension payloads) negotiated explicitly and only after ACTIVE, under that behavior's own accepted profile RFC contract per `capabilities.md`. Mandatory interop never depends on an unnegotiated capability.
+- **Protocol extension:** A versioned optional addition (new envelope variant, capability, or transport) accepted via RFC. Extensions MUST NOT alter mandatory behavior. The first stable optional profile binding is the Update/Recovery profile negotiated through `/syntra.v1.UpdateRecovery/Negotiate` (accepted RFC 0006; optional per connection).
 - **Protocol error:** A typed `RpcError{code, message}` with a known nonzero `ErrorCode`, carried as an RPC outcome or handshake/transport failure mapping per `errors.md`.
 
 ```mermaid
@@ -52,7 +52,7 @@ flowchart LR
 
 **SNTR-CORE-003** — Every transport-independent rule MUST be defined once in `specifications/core/*.md` and referenced elsewhere. Transport specifications MUST NOT restate core state machines; core specifications MUST NOT embed socket/TLS details (SYN-ARCH-042).
 
-**SNTR-CORE-004** — Mandatory capabilities for interop are: handshake, authentication interface, generic RPC, cancellation, typed errors, version negotiation. Event streams, subscriptions, session resumption, and extensions are OPTIONAL and MUST be negotiated per `capabilities.md`.
+**SNTR-CORE-004** — Mandatory capabilities for interop are: handshake, authentication interface, generic RPC, cancellation, typed errors, version negotiation. Event streams, subscriptions, session resumption, and extensions are OPTIONAL: each is negotiated only after ACTIVE, via the negotiating profile's own accepted RFC contract per `capabilities.md` (accepted RFC 0005 D1); v1 defines no generic capability enumeration, hello-extension list, or optional-frame probe.
 
 **SNTR-CORE-005** — Transport receipt, framing acknowledgment, or TLS success MUST NOT be exposed as application processing. Only an application-level `RpcResult` proves application outcome (SYN-ARCH-035).
 
@@ -66,13 +66,13 @@ flowchart LR
 
 ## 4. Server behavior
 
-- **SNTR-CORE-020** — The server MUST validate version range and credential per application policy, then emit exactly one of `ServerReady` (→ACTIVE) or a terminal handshake error (→CLOSING), never both.
+- **SNTR-CORE-020** — The server MUST validate version range and credential per application policy, then reach exactly one of `ServerReady` (→ACTIVE) or a terminal handshake failure (→CLOSING), never both: on failure the detecting side records the applicable typed cause (handshake §5) and terminates through the transport-native signal — no pre-ACTIVE error `Frame` is sent, and the peer learns only the native signal (accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) §3 D1).
 - **SNTR-CORE-021** — The server MUST NOT dispatch application handlers or emit `notification` before reaching ACTIVE, and MUST NOT authorize protected operations before successful authentication (SYN-ARCH-033).
 - **SNTR-CORE-022** — The server MUST enforce explicit bounds (max envelope size, max concurrent RPCs, handshake timeout) and map violations to typed errors per `errors.md` / `reliability.md`.
 
 ## 5. Failure handling
 
-- **SNTR-CORE-030** — Any violation of §2–§4 (e.g., pre-ACTIVE RPC, opaque-field inspection as a protocol decision, redefinition of a core term) MUST be treated as a protocol violation: the detecting peer MUST emit `ERROR_CODE_FAILED_PRECONDITION` or `ERROR_CODE_INVALID_ARGUMENT` where an RPC context exists, or close with a handshake error otherwise, per `handshake.md` and `errors.md`.
+- **SNTR-CORE-030** — Any violation of §2–§4 (e.g., pre-ACTIVE RPC, opaque-field inspection as a protocol decision, redefinition of a core term) MUST be treated as a protocol violation: the detecting peer MUST emit `ERROR_CODE_FAILED_PRECONDITION` or `ERROR_CODE_INVALID_ARGUMENT` where an RPC context exists, or otherwise record the local typed cause and terminate through the transport-native signal (handshake failures never travel as wire error `Frame`s — accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) §3 D1), per `handshake.md` and `errors.md`.
 - **SNTR-CORE-031** — Failures MUST be deterministic and bounded: no panics on untrusted input, no unbounded allocation, no silent drops of unknown `Frame.body` variants (see `framing.md` SNTR-WIRE requirements).
 
 ## 6. Security considerations

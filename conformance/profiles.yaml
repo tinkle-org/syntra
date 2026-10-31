@@ -4,7 +4,10 @@
 # over at least one transport profile; each extra transport/capability is claimed independently.
 # RFC 0007 is accepted. SNTR-SC1-WSS-V1 is the registered SC1/WSS profile; its
 # cases are executable specifications, not execution results. Baseline WSS keeps
-# its own profile and frame mapping.
+# its own profile and frame mapping. RFC 0006 is accepted with its §11 decision
+# amendment authoritative; recovery stays capability-gated under
+# syntra.update-recovery/1 and its registered cases remain unexecuted (see the
+# SNTR-EVENTS-V1 profile notes).
 format_version: "1.0"
 syntra_version: "v1"
 profiles:
@@ -50,7 +53,7 @@ profiles:
     manifests: [manifest/events.yaml, manifest/recovery.yaml]
     capabilities: [events-v1, events-replay-v1, syntra.update-recovery/1]
     claimable_alone: false
-    notes: "Capability identifiers are placeholders pending the events RFC and RFC 0006; they MUST NOT be advertised until the respective RFC is accepted. Mandatory-only hosts pass absence rows as UNSUPPORTED. Recovery cases CONF-URP-001…011 are discovered through the manifests selection above; runners load manifest/recovery.yaml subject to the syntra.update-recovery/1 capability gate (placeholder pending RFC 0006 acceptance)."
+    notes: "Capability identifiers MUST NOT be advertised until their defining RFC is accepted; events identifiers follow the events spec and RFC 0006 is accepted for syntra.update-recovery/1. Recovery cases CONF-URP-001…017 are registered executable specifications with RFC 0006 accepted: requirements trace to the accepted SYN-URP-* family (SYN-URP-008/009 reserved, unassigned) and cases are registered, not yet executed. Runners load manifest/recovery.yaml subject to the syntra.update-recovery/1 capability gate; unclaimed recovery reports SKIP/UNSUPPORTED, never PASS."
 
   - id: SNTR-TCP-V1
     kind: TRANSPORT_PROFILE
@@ -140,6 +143,7 @@ profiles:
 claim_rules:
   - "Every claim MUST include SNTR-CORE-V1 (which includes SNTR-SESS-V1 and SNTR-RPC-V1) over at least one transport profile."
   - "No implementation is required to support every transport to claim Core conformance."
+  - "A case declaring applicable_transports runs only over the listed transport families (SC1 multiplexes within ws_wss); a claim whose transports intersect none of them is valid with verdict SKIP for that case citing the key (conformance README §6)."
   - "Interop proof (SNTR-WIRE-901) requires the same logical Frame sequence over at least two transport profiles with only adapter changes."
   - "Production claims MUST name only secure transports (TLS-TCP, HTTPS-H1, HTTPS-H2, WSS-H1, SC1-WSS)."
   - "Capability claims REQUIRE the capability identifier plus its RFC reference; unallocated identifiers MUST NOT be claimed."

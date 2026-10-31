@@ -19,9 +19,112 @@ development, changes land under `Unreleased`.
   with `CONF-SCW-001`–`CONF-SCW-024` case specifications.
 - Added public SC1 context/prologue vectors under
   `conformance/test-vectors/sc1/`.
+- Accepted the 2026-10-30 SDD acceptance wave per
+  `docs/decisions/0002-sdd-acceptance-wave.md` (Option A: standardized
+  recovery stays in Syntra): RFC 0001, 0002 (dependency record), 0003,
+  0004, 0005 (protocol contract; Go `go_package` migration deferred),
+  0006 (with §11 governing), 0008; new RFC 0010 (SC1 host enrollment and
+  authorization lifecycle). Self-approval disclosed; executed conformance
+  evidence remains a release gate.
+- Added `SNTR-DAUTH-011`–`SNTR-DAUTH-024` (host enrollment/lifecycle
+  obligations incl. the decided revocation propagation: new-connection
+  immediate enforcement, 300 s hard maximum, 60 s operational target,
+  fail-closed) and their planned `PLAN-DAUTH-*` case coverage.
+- Registered `SYN-URP-001`–`007`/`010`–`026` requirement rows (reserved
+  `008/009`) with the reconciled `CONF-URP-001`–`CONF-URP-017` recovery
+  cases; the manifest schema and repository validation now admit
+  `SYN-URP-*`.
 
 ### Changed
 
+- Added machine-readable transport applicability: cases MAY declare
+  `applicable_transports` (peer-observation family vocabulary) to encode
+  transport-scoped requirements such as the RFC 0004 D3 persistent-carrier
+  exemptions; `CONF-RPC-004`, `CONF-RPC-013`, and `CONF-RPC-002` declare
+  `[tcp_tls, ws_wss]`, as do the wire-`hello` cases `CONF-CORE-005` /
+  `CONF-CORE-006` and every frame-based `CONF-CORE-*` / `CONF-RPC-*` case
+  whose fixture holds an ACTIVE session (each note names its per-exchange
+  analogue where the transport profiles own one), and so does
+  `CONF-RPC-003` — on HTTP/HTTPS its ordering coverage is transport-owned
+  by `CONF-HTTP-013` / `CONF-HTTPS-003`. An HTTP/HTTPS-only claim reports
+  a valid `SKIP` citing the key (§6 exception to the
+  no-SKIP-for-mandatory rule).
+- Expanded the transport-owned HTTP/HTTPS concurrency floor fixtures so
+  they actually prove the floor: `CONF-HTTP-013` now drives SIXTEEN
+  simultaneously outstanding exchanges (SNTR-HTTP-072) and
+  `CONF-HTTPS-003` SIXTEEN simultaneously outstanding H2 streams on one
+  connection (SNTR-HTTPS-041), both coordinated with the documented
+  `reverse_completion_order: {barrier: all_admitted}` fault, asserting
+  descending completion order, request-ID-only correlation, and the
+  distinct-payload identical-echo assertion (no state merge, no
+  cross-exchange ID memory, per SNTR-HTTP-071/073 and SNTR-HTTPS-042/043).
+- Manifest validation now rejects present-but-null `expected.error` /
+  `expected.transport` maps (case-level and `control_connection`) while
+  absent keys stay allowed; clarified the `expected.frames: []` semantics
+  (response-side Frames only — the stimulus Frame itself is never a
+  member).
+- Cleaned up fixture metadata from `CONF-HTTP-013`'s expected side:
+  expected result rows no longer carry `credentials` (`syntra.v1.Frame`
+  has no such field, and `expected.frames` lists emitted Syntra Frames
+  only); each exchange's credential stays on the input side, and the
+  harness associates each result with its originating exchange by the
+  echoed `request_id`. The manifest format now documents the
+  `expected.frames` entry-key vocabulary (emitted-Frame keys plus the
+  documented `shape`/`note`/`has_connection_id` assertion helpers) and
+  repository validation rejects any other key, present-but-null
+  `expected.frames` and `requirement` values, and non-map
+  `expected.frames` entries; the `CONF-HTTP-013` notes
+  and prose companion no longer overclaim credential isolation — the
+  payload echo asserts response-to-exchange association, not which
+  credential subject the handler bound (that would need a
+  principal-sensitive authorization assertion).
+- Tightened two conformance fixtures (no RFC changes, no new protocol
+  messages): `CONF-URP-015` now drives the recovery reconnect explicitly
+  (fresh authenticated connection, `hello`, then `Negotiate` with
+  `request_id` 1 and asserted confirmation before the `Subscribe` with
+  `request_id` 3), matching RFC 0006 §11.6; `CONF-RPC-013` now gives each
+  of the 16 concurrent `Echo` requests a distinct payload and asserts each
+  result echoes its requester's payload, preserving the
+  `reverse_completion_order` completion schedule.
+- Handshake failures no longer promise a wire-typed code to the peer:
+  detecting-side typed causes plus transport-native close signals
+  (RFC 0003 D1/D3/D4; owner files updated).
+- Request identifiers are strictly increasing, connection-scoped and never
+  reused; duplicate/replayed IDs are ordered-admission violations
+  (RFC 0004 D1/D2). Single serialized terminal gate: cancel/deadline ties
+  select `DEADLINE_EXCEEDED`; clocks start at initiator admission and host
+  bounded-frame receipt (reconciled with RFC 0008 D2).
+- Pre-ACTIVE notifications are protocol violations — deterministic
+  fail-close (RFC 0003 D2), replacing the ignore-with-diagnostic default.
+- Capability/session extension binds post-ACTIVE per accepted profile
+  contracts only; no generic capability enumeration (RFC 0005 D1). Bounds
+  recorded: 8 KiB raw credential, 128-byte connection ID, 4 KiB diagnostic,
+  ≥16 concurrency; 1 MiB applies to the total serialized Frame (RFC 0005
+  D2/D3, fixtures corrected).
+- Raw-wire validation is now the accepted contract: reserved 16/17
+  rejected in frame/body position; future-body variants 18–31 rejected
+  with `UNIMPLEMENTED`; duplicate `Frame.body` alternatives rejected
+  regardless of codec merge behavior (RFC 0008 D1).
+- Update/Recovery semantics compacted to RFC 0006 §11: local overflow
+  ends only the affected subscription with `terminated=true` +
+  `local-queue-exhausted` at the unchanged generation (no
+  initiator-manufactured `next_generation`); generations bind to the
+  authenticated principal scope (P, S, G) and change only on true
+  provider loss or explicit shared rebase; every round uses a fresh
+  handle and freshly captured boundary; snapshot installation is
+  same-generation with no wire carrier for completion; resume anchors to
+  the durable known-safe checkpoint.
+- Recovery refusal mapping reconciled to the accepted `SYN-URP-010`
+  wording by connection state: profile operations on a connection that
+  has not confirmed the profile (like unknown operations) are refused
+  `UNIMPLEMENTED`, and `FAILED_PRECONDITION` is reserved for an
+  unconfirmed option on a connection that has confirmed the profile;
+  owner files, `capabilities.md` §4, `events.md`, and `CONF-URP-001` now
+  agree without an RFC change.
+- Manifest cases can declare a machine-readable `control_connection`
+  paired-control scenario (`schema.yaml`, validators, manifest format);
+  `CONF-URP-001` registers its confirmed-connection control structurally,
+  and validation requires it there instead of a prose-only note.
 - Replaced the experimental `syntra.sc1.draft1` carrier documentation with the
   accepted v1 WSS mapping. Draft-1 and local-revision-1 remain historical and
   are not aliases.
@@ -31,6 +134,32 @@ development, changes land under `Unreleased`.
 - Marked the Go draft-1 implementation ledger historical; current Rust
   implementation evidence is recorded downstream and is not a conformance
   result.
+- Clarified the two-observer handshake-failure representation in
+  `CONF-CORE-005` and `CONF-HTTP-008` (RFC 0003 D1): `error.observer` /
+  `error.carriage` bind the detecting host's local `UNIMPLEMENTED` cause
+  to a no-invented-carrier assertion (`carriage: local_only`, zero
+  Syntra Frames), and `transport.peer_observation` asserts the
+  initiator's transport-native signal (TCP/TLS close → `UNAVAILABLE`
+  absent better evidence; WS/WSS Close 1002 → generic protocol
+  rejection; HTTP 400 → no envelope + adapter `INVALID_ARGUMENT`),
+  documented and validated (`schema.yaml`, manifest README,
+  `scripts/validate-repo.py`).
+- Made `CONF-RPC-004` duplicate-ID detection deterministic with the
+  validated structured barrier fault `duplicate_while_pending:
+  {barrier: first_terminal_result, release_after: violation_and_closure}`
+  (no sleeps; harness-injected duplicate; rejection at admission never
+  dispatches, barrier released only after the violation and closure; no
+  result under ID 7), synchronized its prose companion, and fixed a
+  prose/manifest divergence where prose `CONF-RPC-011` still described
+  the retired exhaustion case instead of the manifest's idempotent-retry
+  case (exhaustion coverage remains under `CONF-RPC-013`).
+- Clarified `SNTR-RPC-008`/§1E scope: the ≥16 floor binds to persistent
+  Syntra connections (TCP/TLS, WS/WSS, SC1); HTTP/HTTPS exchanges are
+  independent logical connections carrying one RPC (SNTR-HTTP-070, RFC
+  0004 D3) with transport-owned minimums preserved (SNTR-HTTP-072
+  listener endpoint groups; SNTR-HTTPS-041 HTTP/2 streams). Synced
+  `CONF-RPC-002`/`CONF-RPC-013` notes and prose, and
+  `specifications/schema/reference.md`.
 
 ## [v1.0.0-rc.1] - 2026-10-22 (release candidate, not stable)
 

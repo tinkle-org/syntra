@@ -2,7 +2,7 @@
 
 - Identifier: `specifications/core/events.md`
 - Title: Server-Originated Events and Event Streams
-- Status: Draft (pending maintainer approval via RFC)
+- Status: Partially accepted (2026-10-30) — pre-`ACTIVE` notification fail-close and handshake-failure fixture semantics accepted per [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) ([Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md)); the event-stream/replay capability itself remains proposal-only (unallocated identifiers; see `capabilities.md` §1)
 - Version: 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/events.proto` (`Notification`); `protocol.md`; `framing.md`; `rpc.md`; `capabilities.md`; `reliability.md`; `errors.md`; ADR-007
 - Scope: Generic host→initiator push: event identity, optional stream identity, subscription lifecycle, ordering scope, delivery guarantees, optional replay and continuation cursors, cancellation, and unsupported-capability behavior. No chat messages, typing indicators, or application event types are defined. Topic/filter semantics belong to the application above generic subscription RPCs.
@@ -12,7 +12,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 ## 1. Protocol requirements
 
-**SNTR-EVENT-001** — Events are OPTIONAL. Hosts MAY support none; initiators MUST NOT assume subscription success. Support MUST be advertised/negotiated per `capabilities.md`; unnegotiated use MUST be rejected with `UNIMPLEMENTED`.
+**SNTR-EVENT-001** — Events are OPTIONAL. Hosts MAY support none; initiators MUST NOT assume subscription success. Support MUST be advertised/negotiated per `capabilities.md`; unnegotiated use MUST be rejected with `UNIMPLEMENTED` (SNTR-EVENT-011). Within the accepted recovery contract this refusal is mapped by connection state (`SYN-URP-010` in accepted [RFC 0006](../../rfcs/0006-update-recovery-profile.md)): a known profile operation on a connection that has not confirmed the profile — like an unknown operation — is refused with `UNIMPLEMENTED` while mandatory service continues, and `FAILED_PRECONDITION` is reserved for use of an unconfirmed option on a connection that has confirmed the profile, or for missing/mismatched confirmed-version payloads (SYN-URP-020).
 
 **SNTR-EVENT-002** — Event identity: the core defines no event ID. If the application needs identity/dedup, it MUST embed it inside the opaque `Notification.payload`. The core MUST NOT synthesize IDs.
 
@@ -20,7 +20,7 @@ The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
 **SNTR-EVENT-004** — Subscription lifecycle: subscriptions are established ONLY via generic RPC after ACTIVE, modified/cancelled via generic RPC (or `cancel` of the subscribing RPC if the subscription is bound to it — application-defined and documented). Host termination of a subscription MUST be signaled by an application-defined terminal event or RPC error, never by silent cessation, except on connection loss.
 
-**SNTR-EVENT-005** — Emission rules: hosts MUST NOT emit `notification` before ACTIVE or after CLOSING; initiators MUST ignore-or-reject (per negotiated stream spec, default: ignore with diagnostic) pre-ACTIVE notifications without failing the handshake. `notification` MUST use `request_id == 0` and MUST NOT complete any RPC.
+**SNTR-EVENT-005** — Emission rules: hosts MUST NOT emit `notification` before ACTIVE or after CLOSING. A `notification` received while the connection is pre-ACTIVE (CONNECTED/NEGOTIATING/AUTHENTICATING) is a protocol violation: the initiator MUST fail the handshake by fail-close (per `handshake.md` SNTR-HS-012 and accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) D2) — it records a local `FAILED_PRECONDITION`, discards the notification without application delivery, proceeds to CLOSING→CLOSED, and MUST NOT queue the event for later delivery nor treat it as establishing a subscription. `notification` MUST use `request_id == 0` and MUST NOT complete any RPC.
 
 **SNTR-EVENT-006** — Ordering scope: the core guarantees NO cross-stream ordering and NO cross-connection ordering. Within one connection, `notification`s from one subscription SHOULD preserve send order where the transport preserves order (TCP/TLS/WS); where it does not (HTTP bindings), order is undefined unless the stream spec adds sequence metadata in the payload. Applications needing order MUST embed sequence data in payloads.
 
@@ -84,7 +84,7 @@ v1 defines NO `SubscribeRequest`, `SubscribeResponse`, or `UnsubscribeRequest` w
 - **Subscription ID:** the opaque handle returned in `RpcResult.payload`. Host-generated, connection-scoped by default, never interpreted by the core, never a credential.
 - **Lifetime:** from confirmation until application-cancelled, host-terminated with a typed signal, or connection/session end. No implicit persistence.
 - **Authentication:** every subscription is an authorization point for the bound principal (SNTR-EVENT-030/031, SNTR-ASEC-022). Hosts MUST authorize before emitting and MUST terminate subscriptions on revocation/expiry.
-- **Capability requirement:** subscriptions for a stream type REQUIRE the negotiated capability for that type; unnegotiated use MUST fail with `UNIMPLEMENTED` (SNTR-EVENT-001/011).
+- **Capability requirement:** subscriptions for a stream type REQUIRE the negotiated capability for that type; unnegotiated use MUST fail with `UNIMPLEMENTED` (SNTR-EVENT-001/011), and use of an unconfirmed option on a connection that has confirmed the profile fails with `FAILED_PRECONDITION` per the owning profile's accepted contract (SYN-URP-010) and `capabilities.md` §4.
 - **Filters:** opaque and application-defined, carried in subscription RPC payloads. Syntra defines no filter grammar and no query language; inventing one is unnecessary and out of scope. Hosts MUST bound filter sizes within the envelope limit and MUST NOT interpret filter semantics at the core layer.
 - **Maximum subscriptions:** deployments MUST document a per-connection/per-principal maximum; excess attempts fail with `RESOURCE_EXHAUSTED` (SNTR-REL-007, SNTR-ASEC-020).
 - **Failure behavior:** unknown stream → `UNIMPLEMENTED`; unauthorized → `PERMISSION_DENIED`/`UNAUTHENTICATED`; overload → `RESOURCE_EXHAUSTED` on subscribe or the documented live-stream drop policy.
@@ -123,7 +123,7 @@ A stream specification MAY define application-level confirmation inside payloads
 
 ## 4. Failure handling
 
-Pre-ACTIVE event → ignore + diagnostic (initiator) / protocol violation (host sending). Unknown stream → `UNIMPLEMENTED`. Expired cursor → `FAILED_PRECONDITION` or `NOT_FOUND` (application-defined, documented). Overload → `RESOURCE_EXHAUSTED` on subscribe or documented drop policy for live streams.
+Pre-ACTIVE event → protocol violation + handshake failure (both directions context: a host sending one is a host-side violation; an initiator receiving one is an initiator-detected violation → local `FAILED_PRECONDITION`, fail-close per `handshake.md`/accepted RFC 0003 D2 — no delivery, no queueing). Unknown stream → `UNIMPLEMENTED`. Expired cursor → `FAILED_PRECONDITION` or `NOT_FOUND` (application-defined, documented). Overload → `RESOURCE_EXHAUSTED` on subscribe or documented drop policy for live streams.
 
 ## 1I. Replay (capability-gated; no core replay store)
 
@@ -191,7 +191,7 @@ New stream types are additive capabilities. Changing default delivery (e.g., to 
 
 ## 7. Conformance requirements
 
-- **SNTR-EVENT-900** — Fixtures: no-stream host rejects subscribe with `UNIMPLEMENTED`; subscribe→events→cancel lifecycle with generic payloads; pre-ACTIVE notification ignored; duplicate tolerance; reconnect requires re-subscribe; cursor expiry mapping.
+- **SNTR-EVENT-900** — Fixtures: no-stream host rejects subscribe with `UNIMPLEMENTED`; subscribe→events→cancel lifecycle with generic payloads; pre-ACTIVE notification MUST be rejected by fail-close — the fixture asserts the handshake failure (local `FAILED_PRECONDITION`, CLOSING/CLOSED, no delivery, no subscription state; accepted RFC 0003 D2); duplicate tolerance; reconnect requires re-subscribe; cursor expiry mapping.
 - **SNTR-EVENT-901** — Generic-proof: fixtures MUST use neutral payloads (e.g., `{"seq":N, "data":"..."}` as opaque bytes) and MUST NOT reference chat/typing/domain types. No fixture uses chat updates, message delivery/read receipts, presence, or typing events.
 
 ## 8. Sequence diagrams (views of §1; no new behavior)

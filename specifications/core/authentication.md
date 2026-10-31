@@ -6,7 +6,7 @@
 - Version: 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/handshake.proto` (`ClientHello.credential`, `ServerReady`); `protocol.md`; `handshake.md`; `errors.md`; `sessions.md`; charter SYN-ARCH-031–033; ADR-004
 - Scope: Transport-independent authentication interfaces: credential carriage, initiation, optional challenge/response, success/rejection, principal binding, expiration/revocation, re-authentication. Credential formats, identity stores, and policy belong to the application and are out of scope. No private identity service is specified or assumed.
-- Terminology: Per `protocol.md`. **Credential** = opaque bytes in `ClientHello` (and optional follow-ups). **Principal** = opaque authenticated identity handle. No assumption of user accounts — principals MAY be services, devices, keys, or anonymous contexts where the application permits.
+- Terminology: Per `protocol.md`. **Credential** = opaque initial credential bytes carried per profile (SNTR-AUTH-002) plus optional explicitly documented follow-ups. **Principal** = opaque authenticated identity handle. No assumption of user accounts — principals MAY be services, devices, keys, or anonymous contexts where the application permits.
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
@@ -47,9 +47,9 @@ conformance or independent interoperability.
 
 **SNTR-AUTH-001** — Mechanisms MUST be pluggable. The core defines carriage and result semantics; it MUST NOT define credential syntax, cryptography, or any private identity service. Applications register mechanisms out of band.
 
-**SNTR-AUTH-002** — Credential transport rules: (a) credentials MUST be carried only in `ClientHello.credential` (initial) and, if the negotiated mechanism requires follow-ups, in subsequent application-defined RPC payloads after ACTIVE — never in `connection_id`, `request_id`, error messages, or logs; (b) in public production, credentials MUST traverse only secure transports (charter SYN-ARCH-030/032); (c) the core MUST treat credentials as opaque sensitive bytes — MUST NOT log, persist, interpret, or echo them.
+**SNTR-AUTH-002** — Credential transport rules: (a) initial credential bytes are profile-specific per accepted RFC 0004 §3 D5: on persistent frame-carrying profiles only in `ClientHello.credential`; on HTTP/HTTPS request-response exchanges only through `Authorization: Syntra <base64>` for that exchange, or deliberate omission for an anonymous attempt; and, if the negotiated mechanism requires follow-ups, in subsequent explicitly documented application-defined RPC payloads after ACTIVE — never in URLs, `connection_id`, `request_id`, method strings, error messages, logs, or event metadata. Base64 is a byte-preserving binding for the header channel, not a second credential format or an added confidentiality mechanism (SNTR-ASEC-003); (b) in public production, credentials MUST traverse only secure transports (charter SYN-ARCH-030/032) — profile-specific carriage never weakens that rule; (c) the core MUST treat credentials as opaque sensitive bytes on every carrier — MUST NOT log, persist, interpret, or echo them.
 
-**SNTR-AUTH-003** — Initiation: the client presents `credential` in `hello`. Empty credential (`len == 0`) means "unauthenticated/anonymous attempt" and is valid on the wire; whether the host accepts it is application policy.
+**SNTR-AUTH-003** — Initiation: the client presents the initial credential per SNTR-AUTH-002's profile-specific carriage. Empty credential (`len == 0`) means "unauthenticated/anonymous attempt" and is valid on the wire; whether the host accepts it is application policy. The initial credential is bounded at 8 KiB (8,192) raw credential bytes per accepted RFC 0005 §3 D2: producers check the raw-byte bound before sending; receivers bound it before allocation/dispatch and before policy lookup, enforce the same units (raw bytes, not encoded text; HTTP counts decoded bytes), and reject an oversized credential instead of silently truncating it.
 
 **SNTR-AUTH-004** — Challenge/response (OPTIONAL): mechanisms requiring more than one round trip MUST be layered above ACTIVE as generic RPCs (e.g., `/syntra.auth/Challenge`), NOT as new `Frame` variants, unless an RFC defines a new capability. The core MUST NOT interpret challenge payloads.
 
@@ -61,9 +61,9 @@ conformance or independent interoperability.
 
 **SNTR-AUTH-008** — Expiration and revocation: credentials/principals MAY expire. The host MUST enforce expiry/revocation by failing affected RPCs with `UNAUTHENTICATED` and, if the binding is withdrawn mid-connection, by closing with `UNAUTHENTICATED`. Clients MUST handle mid-connection revocation as terminal for the binding (reconnect + re-authenticate), not as a retryable RPC error.
 
-**SNTR-AUTH-009** — Authentication failure errors: handshake-phase denials use handshake errors; post-ACTIVE per-RPC authorization denials use `RpcResult{error}` with `UNAUTHENTICATED`/`PERMISSION_DENIED` without tearing down the connection unless policy requires it.
+**SNTR-AUTH-009** — Authentication failure errors: handshake-phase denials never travel as wire error `Frame`s. On denial the detecting side records the applicable local typed cause (SNTR-AUTH-006: `UNAUTHENTICATED` for credential invalid/expired; `PERMISSION_DENIED` for a valid credential with insufficient access) and terminates through the transport-native signal (TCP/TLS close, HTTP `401`/`403`, WS/WSS Close `1008`). The peer observes only that native signal and may conclude at most the generic report its profile maps it to — `UNAVAILABLE` absent better evidence for an indistinguishable TCP/TLS close, the profile's generic status/close-code category otherwise — never the precise rejection code or an authentication sub-reason (accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) §3 D1). Post-ACTIVE per-RPC authorization denials use `RpcResult{error}` with `UNAUTHENTICATED`/`PERMISSION_DENIED` without tearing down the connection unless policy requires it.
 
-**SNTR-AUTH-010** — Reauthentication policy: re-authentication on the same connection without a new handshake is FORBIDDEN unless an RFC-defined capability explicitly permits it. Default flow is: close → new transport → new `hello` with fresh credential.
+**SNTR-AUTH-010** — Reauthentication policy: re-authentication on the same connection without a new handshake is FORBIDDEN unless an RFC-defined capability explicitly permits it. Default flow is: close → new transport → new `hello` with fresh credential. A second `hello` after ACTIVE is a connection state violation: local `FAILED_PRECONDITION` plus native close, without any zero-ID result (per accepted RFC 0004 §3 D5; SNTR-AUTH-007). A valid post-ACTIVE request whose handler would change the credential's bound principal MUST be rejected with `FAILED_PRECONDITION` returned under its valid, nonzero request ID, leaving the existing principal binding intact and the connection usable by default: connection loss MAY still follow as a later consequence of host policy, but it is not the protocol-mandated default for this case. That rejection does not reserve a new authentication mechanism, and explicitly documented follow-up authentication RPC payloads after ACTIVE remain subject to the owning authentication policy — they MUST NOT implicitly change the connection principal or invent mechanism negotiation. Credential expiry/revocation and binding withdrawal keep their separate owning policy (SNTR-AUTH-008).
 
 ## 1A. Authentication framework decision (v1 baseline; see `rfcs/0002-auth-session-lifecycle.md`)
 
@@ -92,7 +92,7 @@ A principal is the opaque authenticated identity bound at `ServerReady` for exac
 | Protected method invoked without authentication (no usable binding) | Reject before handler dispatch (SNTR-AUTH-030, SNTR-ASEC-022) | `UNAUTHENTICATED` |
 | Authenticated principal lacks access for the method/subscription | Reject before handler effects (SNTR-RPC-032) | `PERMISSION_DENIED` |
 | Credential/permission valid at `ready` but revoked or expired mid-connection | Fail affected RPCs; close by default (SNTR-AUTH-008/009, SNTR-ASEC-006) | `UNAUTHENTICATED` (+ close) |
-| Session requires reauthentication (new credential, step-up, rotation) | Close; reconnect with a new handshake (SNTR-AUTH-010). Same-connection principal change is forbidden without a capability RFC | `UNAUTHENTICATED` then new `hello` on a new connection |
+| Session requires reauthentication (new credential, step-up, rotation) | Default: close; reconnect with a new handshake (SNTR-AUTH-010). Same-connection principal change is forbidden without a capability RFC: a valid request that would change the bound principal returns `FAILED_PRECONDITION` under its own nonzero request ID with the binding intact and the connection usable; a second `hello` instead closes the connection (SNTR-AUTH-007/010, accepted RFC 0004 §3 D5) | `FAILED_PRECONDITION` for the forbidden principal-change request; `UNAUTHENTICATED` for the reauth/close path, then new `hello` on a new connection |
 
 Role names, permission sets, and policy languages are application-defined and MUST NOT appear in the core IDL. Error text MUST stay generic per SNTR-AUTH-006 and SNTR-ASEC-011.
 
@@ -107,7 +107,7 @@ Authentication runs inside the handshake deadline (SNTR-HS-002/011): there is no
 
 ## 3. Server behavior
 
-- **SNTR-AUTH-030** — The server MUST validate shape/bounds before policy lookup, MUST evaluate credentials in constant-time comparison where applicable, MUST rate-limit authentication attempts, and MUST NOT grant protected operations before success (SYN-ARCH-033).
+- **SNTR-AUTH-030** — The server MUST validate shape/bounds before policy lookup (including the initial 8 KiB raw-credential ceiling per SNTR-AUTH-003 and accepted RFC 0005 §3 D2), MUST evaluate credentials in constant-time comparison where applicable, MUST rate-limit authentication attempts, and MUST NOT grant protected operations before success (SYN-ARCH-033).
 - **SNTR-AUTH-031** — The server MUST isolate principals: one connection's credential MUST NOT authorize another connection's RPCs, and MUST NOT leak via `connection_id` or errors.
 
 ## 4. Failure handling
@@ -136,6 +136,8 @@ sequenceDiagram
   alt accept
     H-->>C: Frame{ready} (principal bound)
   else reject
-    H-->>C: handshake error UNAUTHENTICATED/PERMISSION_DENIED
+    H->>H: record local typed cause (UNAUTHENTICATED or PERMISSION_DENIED)
+    H-->>C: transport-native signal only (TCP/TLS close, HTTP 401/403, WS/WSS Close 1008); no error Frame
+    C->>C: generic local report per profile (UNAVAILABLE absent better evidence); precise cause not claimed
   end
 ```

@@ -2,12 +2,12 @@
 
 - RFC: 0001
 - Title: Public v1 IDL source layout
-- Author(s): TBD — blocker (maintainer assignment)
-- Status: Draft — unresolved behavior/review; user-directed layout decision implemented (B9)
+- Author(s): oscarlaw
+- Status: Accepted
 - Date: 2026-10-19
 - Target version: v1 pre-stable source-layout migration
 - Relates to: [ADR-002](../specifications/decisions/ADR-002-protobuf-idl.md), [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md), [architecture §8](../specifications/architecture.md#8-requirement-ownership-authoritative-sources), `SNTR-SER-001`, `SNTR-VER-001…005`, `proto/syntra/v1/`, [historical descriptor archive](../compatibility/v1-initial/README.md)
-- Reviewers: TBD — blocker (protocol, schema/tooling, and security maintainers)
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
 > **Recorded user-directed layout decision — implemented:**
 > `proto/syntra/v1` is the sole Protobuf source of truth; the old
@@ -20,11 +20,14 @@
 > current structural execution is recorded in the release-readiness audit;
 > behavioral acceptance and interoperability remain pending.
 
-Selected decision proposals for B1–B8/B10 are now in RFCs 0003–0005,
+Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+(disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3).
+B1–B8/B10 are resolved by accepted RFCs 0003–0005,
 [RFC 0008](0008-mobile-lifecycle-and-v1-acceptance.md) D1 (raw-wire multiplicity,
-body/metadata partition and reserved-tag validation), and RFCs 0006/0007 for
-the required recovery/SC1 target. They remain Draft and do not activate owning
-requirements. The [current audit](../audits/v1-release-readiness.md) records a
+body/metadata partition and reserved-tag validation), and accepted
+RFCs 0006/0007/0010 for the required recovery/SC1/lifecycle target; the
+disposition table in §10 below records the mapping. Owning-file edits land in
+the acceptance PR. The [current audit](../audits/v1-release-readiness.md) records a
 subsequent successful run of the 13-test archive-based schema suite; older
 pending-run statements below describe the earlier record, not this new run.
 
@@ -109,7 +112,7 @@ sequenceDiagram
   Note over C,H: ACTIVE; session lifetime equals connection lifetime
   C->>H: Frame(version=selected, request_id=7, request)
   H-->>C: Frame(version=selected, request_id=7, result{payload})
-  Note over C,H: Rejection/timeout → CLOSING → CLOSED; typed failure binding TBD — blocker B1, no packet defined here
+  Note over C,H: Rejection/timeout → CLOSING → CLOSED (resolved by accepted RFC 0003 D1: local typed cause, native peer signal, no error Frame)
 ```
 
 Draft defaults are a 1,048,576-byte serialized envelope (`SNTR-WIRE-006`), embedded-message nesting depth 32 (`SNTR-SER-006`), a 5-second handshake timer (`SNTR-HS-002/011`), and at least 16 concurrent RPCs unless a lower bound was negotiated (`SNTR-RPC-008`). `timeout_ms=0` chooses a documented bounded host default; its numeric default is not specified (`SNTR-RPC-004`). Negotiated limit overrides have no current binding (B7), and the 1 MiB payload fixtures contradict the envelope bound (B8). No new default is chosen here.
@@ -132,7 +135,7 @@ These 14 user-facing categories are proposed mappings into the existing registry
 |---|---|---|---|
 | 1 | Invalid envelope | `INVALID_ARGUMENT (3)` | Shape errors; size exhaustion maps separately; `SNTR-SER-005/007`, `SNTR-WIRE-003` |
 | 2 | Unsupported protocol version | `UNIMPLEMENTED (12)` or `FAILED_PRECONDITION (9)` | The handshake table permits both; selecting one interoperable policy and its carrier is blocked by B1 |
-| 3 | Unsupported feature | `UNIMPLEMENTED (12)` | Required unsupported capability fails; unknown optional advertisement is ignored; `SNTR-CAP-004/020`, B7 |
+| 3 | Unsupported feature | `UNIMPLEMENTED (12)` | Unsupported required profile and unknown profile input fail under the profile's own accepted negotiation RPC (recovery: `UNIMPLEMENTED`, `SYN-URP-010`); no generic advertisement carrier exists (accepted RFC 0005 D1); `SNTR-CAP-004/020`, B7 |
 | 4 | Handshake rejected | Cause-specific `UNAUTHENTICATED (16)`, `PERMISSION_DENIED (7)`, `FAILED_PRECONDITION (9)` or `UNIMPLEMENTED (12)` | No standalone category or legal typed rejection carrier; handshake §5 and B1 |
 | 5 | Authentication required | `UNAUTHENTICATED (16)` | Missing credential/required authentication; `SNTR-AUTH-009`, `SNTR-ERR-002`; no human-account assumption |
 | 6 | Authentication failed | `UNAUTHENTICATED (16)` | Invalid/expired/revoked credentials; generic disclosure; `SNTR-ASEC-011`, B1 |
@@ -144,6 +147,8 @@ These 14 user-facing categories are proposed mappings into the existing registry
 | 12 | Session expired | `UNAUTHENTICATED (16)`; `UNAVAILABLE (14)` for host shutdown | `SNTR-SESS-005`; no new session error carrier, B1/B7 |
 | 13 | Protocol violation | `INVALID_ARGUMENT (3)` for shape, `FAILED_PRECONDITION (9)` for state, `UNIMPLEMENTED (12)` for unknown variant | Framing §4; no new numeric category; raw-field/state conflicts B2–B6 |
 | 14 | Internal error | `INTERNAL (13)` | Generic sanitized text; `SNTR-ERR-002/003` |
+
+> Correction (2026-10-31): row 3 aligned with accepted [RFC 0005](0005-negotiation-bounds-identifiers.md) D1 per [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md) — there is no generic capability advertisement carrier; optional-profile input fails under the profile's own negotiation contract, not through a handshake advertisement channel. The prior wording ("unknown optional advertisement is ignored") described the pre-D1 model.
 
 The other existing codes, including `CANCELLED (1)`, `UNKNOWN (2)`, `NOT_FOUND (5)`, `ALREADY_EXISTS (6)`, `ABORTED (10)`, `OUT_OF_RANGE (11)`, `UNAVAILABLE (14)`, and `DATA_LOSS (15)` retain their meanings; the category table neither replaces the full registry nor limits its use. Zero remains invalid for failure. No category gets a new number. Unknown received enum values are mapped for application reporting by runtime policy, with the raw number retained diagnostically where possible; codecs do not perform that mapping automatically (`SNTR-ERR-005/010`).
 
@@ -218,7 +223,31 @@ The split breaks source consumers even while binary communication remains compat
 
 ## 10. Unresolved questions and blockers
 
-B9 records the resolved user-directed layout authority decision and known source break. The other items remain **TBD — blocker** for the affected contract/claim. The layout decision does not resolve them. Significant wire/security blockers need explicit review before acceptance, rather than undocumented runtime choices.
+B9 stays resolved (user-directed layout, known FILE break). B1–B10 are
+**resolved by accepted contracts** in the 2026-10-30 acceptance wave
+([Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)); the mapping:
+
+| Blocker | Resolved by | Disposition |
+|---|---|---|
+| B1 typed pre-`ACTIVE` carrier | RFC 0003 D1 | Resolved: no error `Frame`; local typed cause + native peer signal |
+| B2 pre-ACTIVE notifications | RFC 0003 D2 | Resolved: deterministic fail-close |
+| B3 stale `request_id` reuse | RFC 0004 D1/D2 | Resolved: permanent connection-local non-reuse; high-water ordered admission |
+| B4 oneof raw-wire multiplicity | RFC 0008 D1 | Resolved: bounded raw-wire validation; duplicate bodies rejected |
+| B5 unknown body vs metadata | RFC 0008 D1 | Resolved: 10..15 tolerated/bounded; 18..31 future-body rejected `UNIMPLEMENTED` |
+| B6 reserved tags runtime validation | RFC 0008 D1 | Resolved: 16/17 rejected at top-level frame/body position irrespective of metadata |
+| B7 capability/session binding and bounds | RFC 0005 D1 (+ accepted RFC 0006 negotiation) | Resolved: post-ACTIVE profile contracts; no generic enumeration |
+| B8 payload vs envelope size | RFC 0005 D3 | Resolved: 1 MiB total serialized Frame; fixtures corrected |
+| B10 races/tie/late results | RFC 0004 D4 (+ RFC 0008 D2) | Resolved: serialized gate; tie selects `DEADLINE_EXCEEDED`; late results per RFC 0004 |
+| B9 layout | B9 itself | Resolved and implemented (sole `proto/syntra/v1` source) |
+
+B11 remains the deferred-additions record: the deferrals are unchanged, and
+none of them is authorized by this acceptance. The per-block prose below the
+table is retained **as historical review context only**: it records why each
+blocker was raised and its wording predates the table's approved
+dispositions. It no longer states binding requirements; the accepted
+dispositions in the table (Decision 0002 and the corresponding accepted RFC
+decisions) are the operative record, and the prose must not be read as
+leaving any listed disposition awaiting approval.
 
 ### B1. Typed handshake rejection
 

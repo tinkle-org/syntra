@@ -152,8 +152,10 @@ carry Syntra semantics.
 
 **SNTR-HTTPS-041** — Concurrency and independence: streams are
 independent RPCs. Hosts MUST support at least 16 concurrent streams per
-connection unless a lower bound was negotiated (consistent with
-SNTR-RPC-008 and `http.md` §1I), MUST enforce a documented maximum
+connection; no lower bound may be negotiated below the floor
+(consistent with SNTR-RPC-008, `http.md` §1I, and accepted
+[RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2),
+MUST enforce a documented maximum
 (`SETTINGS_MAX_CONCURRENT_STREAMS` plus application caps), and MUST
 reject excess pre-dispatch with `429`/`503` (H2 status delivery per §1F)
 or post-acceptance with `200` + `RESOURCE_EXHAUSTED`, exactly as

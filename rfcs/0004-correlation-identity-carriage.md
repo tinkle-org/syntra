@@ -1,19 +1,25 @@
-# RFC 0004: Correlation identity, races, and authentication carriage (proposal)
+# RFC 0004: Correlation identity, races, and authentication carriage (accepted)
 
 - RFC: 0004
 - Title: Monotonic connection-scoped request IDs, single-terminal races, HTTP independence, and credential carriage
-- Status: Draft (v1 consistency audit findings F-02, F-04, F-10, F-13, F-14, F-15)
+- Status: Accepted (closes audit findings F-02, F-04, F-10, F-13, F-14, F-15 at the specification level)
 - Date: 2026-10-28
 - Target version: pre-stable v1 contract proposal; explicit freeze/version decision required (§6)
 - Relates to: `specifications/core/rpc.md` (§§1B/1F–1I, §4), `framing.md`, `security/replay-protection.md` (SNTR-RPL-012/020/030), `reliability.md` (SNTR-REL-001/003/009), `errors.md` (SNTR-ERR-002/004), `authentication.md` (SNTR-AUTH-010), `sessions.md` (§1B/§1E), `security/authentication-security.md` (SNTR-ASEC-003), HTTP/HTTPS; RFC 0001 B3/B10; RFC 0002 §10 items 3, 6; RFC 0008 queue/suspend proposal
-- Author(s): TBD — blocker (maintainer assignment)
-- Reviewers: TBD — blocker (protocol + security maintainers)
+- Author(s): oscarlaw
+- Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
-> Draft proposal, not acceptance or shipping authority. Choices below are
-> selected for review, not approvals. They allocate no new active requirement
-> IDs and do not amend specifications, schemas, or manifests. Actual owner,
-> reviewer, compatibility, and approval blockers remain in §10 under
-> [governance](../GOVERNANCE.md) and the [RFC process](README.md).
+> Accepted (2026-10-30, [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md);
+> disclosed self-approval per [governance](../GOVERNANCE.md) §3). D1–D5 are
+> normative and the owner edits are applied: strictly increasing request IDs
+> in emission order with permanent connection-local non-reuse (no reuse after
+> completion either), native-close recording of a locally typed cause on
+> violation, per-exchange independence for HTTP/HTTPS, the serialized
+> deadline-checked terminal gate with `DEADLINE_EXCEEDED` on tie, and
+> credentials per profile. Intra-section wording that reads as proposal-only
+> is superseded by §10 and the applied owner files; the obligations above are
+> not merely proposed. Executed conformance evidence remains a separate
+> release gate.
 
 ## 1. Summary
 
@@ -340,20 +346,29 @@ non-execution or automatic retry safety.
 
 | Proposal choice | Selection for review | Approval status |
 |---|---|---|
-| D1/D2 | Increasing request emission IDs; permanent connection-local non-reuse; native close on violation | Unapproved |
-| D3 | HTTP/HTTPS per-exchange exemption | Unapproved |
-| D4 | Serialized, deadline-checked local terminal gate | Unapproved; synchronized with RFC 0008 |
-| D5 | Credentials per profile; no implicit principal replacement | Unapproved |
+| D1/D2 | Increasing request emission IDs; permanent connection-local non-reuse; native close on violation | Accepted 2026-10-30 |
+| D3 | HTTP/HTTPS per-exchange exemption | Accepted 2026-10-30 |
+| D4 | Serialized, deadline-checked local terminal gate | Accepted 2026-10-30; clock wording synchronized with RFC 0008 D2 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md) |
+| D5 | Credentials per profile; no implicit principal replacement | Accepted 2026-10-30 |
 
-1. **TBD — blocker:** assign actual owner/author and protocol/security reviewers.
-2. **TBD — blocker:** two maintainer approvals, security review, and resolution
-   of normative objections under governance §3.
-3. **TBD — blocker:** explicit pre-stable freeze/version and migration decision
-   for correlation, duplicate handling, race semantics, and queue timer changes.
-4. **TBD — blocker:** review synchronized §4/RFC 0008 admission/receipt clocks,
-   suspend accounting, bounded queues and tests.
-5. **TBD — blocker:** accepted owning edits and independent evidence. Existing
-   F-02/F-04/F-10/F-13/F-15 blockers are not closed by selecting a Draft proposal.
+Acceptance was recorded 2026-10-30 via
+[Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+(disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3):
+1. Owner/reviewers: oscarlaw (self-review disclosed).
+2. Approvals: recorded in Decision 0002; security scope acknowledged
+   (RPC/errors/auth carriage); independent security review remains a gate.
+3. Freeze: the specification-freeze decision records the version and
+   migration disposition for correlation/duplicate/race semantics.
+4. Clocks: §4 and RFC 0008 D2 were reconciled into the one controlling
+   wording recorded in Decision 0002 (initiator admission start; host
+   receipt timestamp; validation/queue time consume the budget; RFC 0004
+   owns the terminal gate, RFC 0008 owns queue/suspend; pending calls on a
+   violating or lost connection fail `UNAVAILABLE` while the violation
+   itself is recorded as a local cause).
+5. Owner edits: `rpc.md`, `errors.md`, `sessions.md`, `authentication.md`,
+   `replay-protection.md`, `authentication-security.md`, `framing.md`
+   applied in the acceptance PR. Executed conformance evidence remains a
+   release gate.
 
 ## Appendix: References
 

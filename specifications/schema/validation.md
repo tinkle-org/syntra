@@ -87,8 +87,19 @@ Post-deletion executed results (isolated Rust 1.85.1, Buf 1.59.0, Go 1.26.4):
 - Rust codec tests (`cargo test --locked`): 4 passed
 - `git diff --check`: pass; `git diff -- schema` shows only the two deletions
 
-The layout decision does not establish formal maintainer quorum, behavioral
-RFC acceptance, or resolution of the remaining protocol/security blockers.
+Since these executions, the accepted
+[RFC 0006](../../rfcs/0006-update-recovery-profile.md) §11 update/recovery
+profile added `proto/syntra/v1/recovery_profile.proto` as the eighth `proto/`
+file (profile payload declarations only — no envelope or message change, per
+the [reference](reference.md)); the schema counts above describe the seven
+files that existed at execution time. The raw-wire validation contract
+described in [Remaining acceptance gaps](#remaining-acceptance-gaps) is
+specified by accepted RFC 0008 D1; no runtime raw-wire validator result is
+claimed here.
+
+The layout decision is recorded and schema-approved by the acceptance wave
+([RFC 0001](../../rfcs/0001-public-idl-layout.md)); it does not by itself
+establish behavioral execution or resolution of the runtime work below.
 
 ## Corrections during verification
 
@@ -103,16 +114,28 @@ RFC acceptance, or resolution of the remaining protocol/security blockers.
 
 ## Remaining acceptance gaps
 
-`session.proto` and `capabilities.proto` allocate no messages. Requested
+`session.proto` and `capabilities.proto` allocate no messages. The requested
 new/renamed handshake, session, event, capability, operation-ID and error
-contracts await normative decisions; the [A–G matrix](reference.md#delivered-versus-blocked-ag-coverage)
-and [RFC blockers](../../rfcs/0001-public-idl-layout.md#10-unresolved-questions-and-blockers)
-identify them individually. There was no accepted complete normative v1
-behavioral suite to implement against at task start.
+contracts were classified by the acceptance wave: the classification items
+relevant to this tree are specified by the accepted RFCs, and the remaining
+extension/renames stay deferred per the retained
+[B11 deferral table](../../rfcs/0001-public-idl-layout.md#b11-requested-additions-deliberately-deferred),
+with the [A–G matrix](reference.md#delivered-versus-blocked-ag-coverage)
+mapping each former request to its accepted or deferred disposition. There
+was no accepted complete normative v1 behavioral suite to implement against
+at task start.
 
 No protected-operation authorization, certificate/hostname verification,
 credential expiry/revocation, byte/depth/allocation enforcement on network
 input, queue/rate limits, deadlines/cancel races, session resumption, replay,
-or live transports were implemented/tested. Unknown-body classification,
-raw-oneof rejection and reserved-tag runtime rejection remain unresolved.
-Those require a separate approved specification and implementation.
+or live transports were implemented/tested. The raw-wire classification
+items are no longer unresolved: accepted
+[RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) D1 makes
+the bounded raw-wire validation contract active — reserved tags 16/17 are
+rejected at the top-level `Frame` (`INVALID_ARGUMENT`, SNTR-SER-008) and
+18..31 is the future-body space (rejected `UNIMPLEMENTED` in an
+RPC/connection context, connection closure during handshake) — with raw-oneof
+multiplicity and unknown-body classification following the same validation
+order (SNTR-SER-003, SNTR-WIRE-002/004/008). The executed schema checks above
+remain codec-level, so implementing the raw-wire validator and proving runtime
+rejection still require separate implementation and execution.

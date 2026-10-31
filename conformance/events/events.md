@@ -137,11 +137,12 @@ Conformance rule for optionality: any case exercising a capability the implement
 ## CONF-EVT-014 pre-ACTIVE notification
 
 - Related normative requirement: SNTR-EVENT-005.
+- Roles: client only (the initiator's local outcome is the observable; no host-side variant is registered).
 - Preconditions: handshake started.
 - Input: host emits a notification before ACTIVE.
-- Expected output: initiator ignores it with a diagnostic (default tolerance); the host's pre-ACTIVE event is a protocol violation; no subscription is established.
-- Expected connection state: ACTIVE after handshake completion.
-- Expected session state: unchanged.
+- Expected output: the pre-ACTIVE notification is a protocol violation (SNTR-EVENT-005, RFC 0003 D2). The initiator records local FAILED_PRECONDITION, discards the notification without application delivery, does not queue it and does not establish a subscription; no error Frame crosses the wire and the peer observes only the transport-native close signal.
+- Expected connection state: CLOSING then CLOSED (no ACTIVE).
+- Expected session state: none (no session was established).
 - Mandatory/optional: Mandatory; no capability prerequisite.
 
 ## CONF-EVT-015 generic payload proof

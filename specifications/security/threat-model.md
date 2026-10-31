@@ -122,6 +122,34 @@ forward secrecy depends on uncompromised fresh ephemerals and disposal;
 neither live-endpoint protection, automatic compromise recovery, application
 E2EE, anonymity nor post-quantum security follows from this proposal.
 
+### SC1 host lifecycle scope (companion: RFC 0010; planned coverage)
+
+[RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) — the
+operational companion contract to the accepted RFC 0007 — adds the lifecycle
+review targets below as requirement families `SNTR-DAUTH-011`–`SNTR-DAUTH-024`
+in [device-authorization.md](device-authorization.md). They add no wire change
+and do not modify T1–T10, their TLS/SC1 mitigations or the STEST mappings.
+These rows join the SNTR-TMOD-030 traceability rule when RFC 0010 is accepted;
+until then they impose no new obligation by themselves. Conformance evidence
+for the new families is planned (`PLAN-DAUTH-011`–`PLAN-DAUTH-024` in
+[secure-channel.md](../../conformance/plans/secure-channel.md)), not executed,
+and independent review remains open.
+
+| # | Host lifecycle threat | Requirement owner | Planned test coverage |
+|---|---|---|---|
+| T11 | Host authorization-store compromise: theft of usable AKs, removal or attribution changes on stolen records, or revival of an expired record | Store access control plus storage/hygiene duties (`SNTR-DAUTH-004`, `SNTR-DAUTH-023`), immutable (handle, epoch) scope and duplicate issuance refusal (`SNTR-DAUTH-012`), immediate new-connection denial with bounded active-channel enforcement and fail-closed behavior (`SNTR-DAUTH-017`–`SNTR-DAUTH-019`) | `PLAN-DAUTH-017`–`PLAN-DAUTH-019`, `PLAN-DAUTH-023` |
+| T12 | Enrollment abuse: unauthenticated, anonymous, unauthorized or cross-principal issuance, and self-issued material | Enrollment authority validation per issuance and bounded audit records (`SNTR-DAUTH-011`), host-generated AK and independent collision-checked handle (`SNTR-DAUTH-012`) | `PLAN-DAUTH-011`, `PLAN-DAUTH-012` |
+| T13 | Revocation lag: an enrolled device's authorization outliving its revocation on live or new channels | The decided propagation policy in `SNTR-DAUTH-017`–`SNTR-DAUTH-019` (immediate new-connection denial; 300-second hard profile maximum and 60-second operational target on established channels; post-deadline denial plus delivery cutoff and closure; fail-closed without current validity) | `PLAN-DAUTH-017`–`PLAN-DAUTH-019` |
+| T14 | Lost-device recovery and rotation abuse: a compromised credential restoring itself, overlap windows or epochs being replayed, and epoch wrapping under exhaustion | Independent recovery authority and self-restoration denial (`SNTR-DAUTH-022`), epoch integrity and rollback prevention (`SNTR-DAUTH-021`), the rotation transaction with durable installation before routine retirement, bounded overlap and hard cutoff (`SNTR-DAUTH-020`) | `PLAN-DAUTH-020`–`PLAN-DAUTH-022` |
+| T15 | Secret leakage through lifecycle paths: AKs or handles reaching logs, traces, metrics, errors, backups or configuration, and unauthenticated trust-anchor changes | Lifecycle access control, disposal and backup boundaries (`SNTR-DAUTH-023`), and authenticated bounded server-key pin updates with rollback prevention (`SNTR-DAUTH-024`), extending `SNTR-DAUTH-004` | `PLAN-DAUTH-023`, `PLAN-DAUTH-024` |
+
+T11–T15 remain application-adjacent and credential-store-adjacent boundaries:
+the protocol core and carrier adapters still must not persist or interpret AK
+material (`SNTR-DAUTH-004`), and enrollment remains host-owned. Fail-closed
+behavior under store unavailability trades availability for authorization
+integrity by design; deployments document the residual availability risk with
+their declared bounds.
+
 ## 6. Out-of-scope threats
 
 **SNTR-TMOD-040** — The following are explicitly out of scope for the Syntra core and MUST NOT be claimed as mitigated by Syntra conformance:

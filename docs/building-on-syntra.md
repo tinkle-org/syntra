@@ -75,7 +75,7 @@ implementation.
 Define your credential format, issuance, lifetime, revocation, and
 per-method authorization matrix outside Syntra; Syntra carries the opaque
 bytes and binds the resulting principal per connection. Anonymous access,
-if allowed, gets least privilege. Document expiry/revocation propagation
+if allowed, gets least privilege. Define expiry and revocation propagation as bounded, testable behavior (accepted RFC 0010: immediate enforcement on new connections; at most a 300-second hard profile maximum; fail-closed when validity cannot be established)
 windows — clients treat post-expiry RPCs as `UNAUTHENTICATED` and
 reconnect with fresh credentials.
 

@@ -78,14 +78,18 @@ a full-stack IUT runs both plus loopback self-interop.
 
 ### 1.5 Capability
 
-A named optional behavior (for example `events-v1`) that MUST be explicitly
-negotiated per `specifications/core/capabilities.md` (SNTR-CAP-001/002).
-Capabilities are never assumed. A capability-gated test is evaluated only when
-the IUT advertises the capability; otherwise the runner reports `UNSUPPORTED`
+A named optional behavior (for example `syntra.update-recovery/1`) that MUST
+be explicitly negotiated per `specifications/core/capabilities.md`
+(SNTR-CAP-001/002). Capabilities are never assumed. There is no generic
+capability advertisement carrier (accepted RFC 0005 D1): a capability is
+declared per profile and confirmed per connection through that profile's own
+accepted post-`ACTIVE` negotiation RPC. A capability-gated test is evaluated
+only when the IUT declares support for the capability and follows that
+profile's negotiation contract; otherwise the runner reports `UNSUPPORTED`
 or `SKIP` (see §6), never `FAIL`. No event, resumption, or replay capability
 identifier is allocated in default v1; the names in manifests
 (`events-v1`, `events-replay-v1`, `resume-v1`) are **placeholders for the
-future RFC binding** and MUST NOT be advertised until that RFC is accepted.
+future RFC binding** and MUST NOT be negotiated until that RFC is accepted.
 
 ### 1.6 Mandatory Test
 
@@ -123,7 +127,7 @@ Full definitions: `conformance/profiles.yaml`. Summary:
 | `SNTR-CORE-V1`  | MANDATORY CORE       | Envelope, serialization, handshake machine, RPC, errors, auth interface, bounds, security, capability-free event handling | **every** conformance claim |
 | `SNTR-SESS-V1`  | MANDATORY CORE       | Session = connection, close/loss, expiry, no-implicit-resumption | every claim (runs over any claimed transport) |
 | `SNTR-RPC-V1`   | MANDATORY CORE       | Correlation, concurrency, deadlines, cancel, idempotency discipline | every claim |
-| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery placeholder pending RFC 0006; must not be claimed until accepted) |
+| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery: accepted RFC 0006 §11 — `CONF-URP-001…017` cases and `SYN-URP-*` requirements are registered, not executed; a supported claim still requires executed verdicts) |
 | `SNTR-TCP-V1`   | TRANSPORT PROFILE    | Plaintext TCP framing (restricted development only)         | only TCP claims; never sufficient for production |
 | `SNTR-TLS-TCP-V1` | TRANSPORT PROFILE  | Same framing over TLS 1.3                                   | TLS/TCP claims |
 | `SNTR-HTTP-V1` | TRANSPORT PROFILE    | HTTP/1.1 request/response RPC binding (restricted dev only) | HTTP/1.1 claims |
@@ -151,6 +155,13 @@ Rules:
   selection does not enable any capability-gated event case.
 - Resume-accept cases are Optional and gated on `resume-v1` (no such RFC
   exists; in default v1 only resume-**rejection** cases are Mandatory).
+- The accepted update/recovery profile (`syntra.update-recovery/1`,
+  [RFC 0006](../rfcs/0006-update-recovery-profile.md) §11) is registered in
+  `manifest/recovery.yaml` with `CONF-URP-001…017` cases and `SYN-URP-*`
+  requirement rows; registration is not execution, so no recovery verdict is
+  claimed today. A Core-only conformance result stays valid as a per-profile
+  claim, but Core-only cannot satisfy the stable release bundle, which is
+  recovery-inclusive (RFC 0006 §11.1).
 
 ### 2.1 Manifest and case selection
 
@@ -219,7 +230,8 @@ conformance/
     core.yaml                — CONF-CORE-* portable cases (§E envelope/core)
     session.yaml             — CONF-SESS-* portable cases (§F)
     rpc.yaml                 — CONF-RPC-* portable cases (§G)
-    events.yaml              — CONF-EVT-* portable cases (§H)
+    events.yaml            — CONF-EVT-* portable cases (§H)
+    recovery.yaml            — CONF-URP-* update/recovery cases (registered per accepted RFC 0006 §11; execution pending)
     transport-tcp.yaml       — CONF-TCP-* (§I TCP)
     transport-tls.yaml       — CONF-TLS-* (§I TLS)
     transport-http.yaml      — CONF-HTTP-* (§I HTTP/1.1)
@@ -274,7 +286,7 @@ Every case yields exactly one verdict:
 |---------------|---------|-----------------|
 | `PASS`        | Executed; every `expected` assertion held; logs retained. | **Yes** |
 | `FAIL`        | Executed; at least one `expected` assertion did not hold, or the IUT crashed, hung past its documented bound, or emitted an unlisted error. | No |
-| `SKIP`        | Not executed because a stated precondition is absent (capability unclaimed, transport unclaimed, harness lacks a facility such as raw-certificate injection). The reason MUST cite the missing precondition. `SKIP` MUST NOT be used for a mandatory case of a claimed profile. | **No** — neutral, excluded from pass-rate |
+| `SKIP`        | Not executed because a stated precondition is absent (capability unclaimed, transport unclaimed, harness lacks a facility such as raw-certificate injection). The reason MUST cite the missing precondition. `SKIP` MUST NOT be used for a mandatory case of a claimed profile, except when the case declares `applicable_transports` whose families intersect none of the claimed transports (transport applicability per the manifest README's field reference): then `SKIP` is the correct verdict and the reason MUST cite the `applicable_transports` key. | **No** — neutral, excluded from pass-rate |
 | `UNSUPPORTED` | Executed the optionality probe and the IUT correctly declined it (for example `UNIMPLEMENTED` for an unnegotiated subscription, or rejection of a resume attempt without the capability). The IUT behaved correctly **by refusing**. | **No** — correct refusal, excluded from capability pass-rate |
 | `NOT_EXECUTED`| Listed but never run (planned, blocked, or omitted). The default state before a run. MUST NOT appear in a final claim. | **No** |
 

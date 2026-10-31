@@ -30,9 +30,17 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = []
 
-REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+\b|\bSYN-ARCH-\d+\b")
-REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+)$")
-BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+)\b")
+REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+\b|\bSYN-ARCH-\d+\b|\bSYN-URP-\d+\b")
+# Naming pattern for structured references (manifest rows, defined IDs).
+# Prose mentions keep the freeform REQ_PATTERN below. Reserved SYN-URP-008/009
+# are excluded from structured naming and rejected explicitly by the checks.
+REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+"
+                       r"|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$")
+BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+|SYN-URP-\d+)\b")
+# Reserved recovery IDs (RFC 0006): SYN-URP-008/009 stay unassigned and are
+# intentionally NOT registered in requirements.yaml, but the conversation and
+# schema text may mention them as reserved.
+RESERVED_REQUIREMENTS = {"SYN-URP-008", "SYN-URP-009"}
 # Directories that are tool output, vendored deps, or agent config — never
 # normative content. Markdown/link checks are scoped to repository content.
 # Specification-first policy: no implementation code and no generated language
@@ -172,12 +180,26 @@ def load_manifest_cases():
         if mf.name in ("schema.yaml", "requirements.yaml"):
             continue
         data = yaml.safe_load(mf.read_text())
-        for case in data.get("cases", []):
+        if not isinstance(data, dict):
+            err(mf, "manifest file must be a map")
+            continue
+        entries = data.get("cases", [])
+        if not isinstance(entries, list):
+            err(mf, "cases must be a list of case maps")
+            continue
+        for case in entries:
+            if not isinstance(case, dict):
+                err(mf, f"case entry must be a map, got {type(case).__name__}")
+                continue
             cid = case.get("id")
+            if not isinstance(cid, str):
+                err(mf, f"case entry must have a string id, got {cid!r}")
+                continue
             if cid in cases:
                 err(mf, f"duplicate test ID {cid} (also in {cases[cid][0].name})")
             cases[cid] = (mf, case)
-            for r in case.get("requirement", []) or []:
+            req_field = case.get("requirement")
+            for r in (req_field if isinstance(req_field, list) else []):
                 req_refs.append((r, mf, cid))
     return cases, req_refs
 
@@ -217,6 +239,9 @@ def check_requirements():
         seen_ids.add(rid)
         if not REQ_NAMING.match(rid or ""):
             err("conformance/manifest/requirements.yaml", f"bad requirement_id format: {rid}")
+        if rid in RESERVED_REQUIREMENTS:
+            err("conformance/manifest/requirements.yaml",
+                f"requirement_id {rid} is reserved and MUST NOT be registered")
         if rid not in defined:
             err("conformance/manifest/requirements.yaml",
                 f"requirement_id {rid} has no bold definition in specifications/")
@@ -243,6 +268,131 @@ def check_requirements():
 # Check: manifests
 # --------------------------------------------------------------------------
 
+# Documented two-observer expectation vocabulary (conformance/manifest/
+# README.md "Two-observer handshake-failure vocabulary"): detecting-side
+# error discriminators and transport-native peer-observation entries.
+TRANSPORT_FAMILIES = {"tcp_tls", "ws_wss", "http_1_1", "https_h2"}
+PEER_SIGNALS = {"transport_close", "ws_close", "http_status", "connection_loss"}
+WS_CLOSE_CODES = {1000, 1001, 1002, 1003, 1007, 1008, 1009, 1011}
+GENERIC_LOCAL_REPORTS = {"generic_protocol_rejection", "generic_policy_rejection"}
+ERROR_OBSERVERS = {"detecting_host", "detecting_peer"}
+ERROR_CARRIAGE = {"local_only", "wire"}
+
+
+def _is_allowed_string(value, allowed):
+    """Accept only YAML strings in a known vocabulary; lists/maps are invalid."""
+    return isinstance(value, str) and value in allowed
+
+
+def _is_local_report(value, error_codes):
+    return (_is_allowed_string(value, error_codes)
+            or _is_allowed_string(value, GENERIC_LOCAL_REPORTS))
+
+
+def check_transport_expectation(mf, cid, tmap, error_codes):
+    """Validate the documented two-observer keys inside an ``expected.transport``
+    map; unrelated transport-specific keys stay free-form as before.
+
+    Callers pass this only for a *present* ``transport`` key (absent keys are
+    skipped by the caller); a present key whose value is null is rejected here
+    rather than silently skipped."""
+    if not isinstance(tmap, dict):
+        err(mf, f"case {cid} expected.transport must be a map")
+        return
+    peer = tmap.get("peer_observation")
+    if peer is not None:
+        if not isinstance(peer, dict) or not all(
+                isinstance(v, dict) for v in peer.values()):
+            err(mf, f"case {cid} expected.transport.peer_observation "
+                    "must be a map of transport-family maps")
+        else:
+            for fam in sorted(peer, key=str):
+                obs = peer[fam]
+                if not _is_allowed_string(fam, TRANSPORT_FAMILIES):
+                    err(mf, f"case {cid} peer_observation references "
+                            f"unknown transport family {fam}")
+                unknown = set(obs) - {"signal", "close_code", "status",
+                                      "local_report"}
+                if unknown:
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"keys {sorted(unknown, key=str)}")
+                if "signal" in obs and not _is_allowed_string(obs["signal"], PEER_SIGNALS):
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"signal {obs['signal']}")
+                cc = obs.get("close_code")
+                if cc is not None and (isinstance(cc, bool)
+                                       or not isinstance(cc, int)
+                                       or cc not in WS_CLOSE_CODES):
+                    err(mf, f"case {cid} peer_observation[{fam}] has invalid "
+                            f"close_code {cc}")
+                st = obs.get("status")
+                if st is not None and (isinstance(st, bool)
+                                       or not isinstance(st, int)):
+                    err(mf, f"case {cid} peer_observation[{fam}] has invalid "
+                            f"status {st}")
+                lr = obs.get("local_report")
+                if "local_report" in obs and not _is_local_report(lr, error_codes):
+                    err(mf, f"case {cid} peer_observation[{fam}] has unknown "
+                            f"local_report {lr}")
+    lr = tmap.get("local_report")
+    if "local_report" in tmap and not _is_local_report(lr, error_codes):
+        err(mf, f"case {cid} expected.transport has unknown local_report {lr}")
+    renv = tmap.get("result_envelope")
+    if "result_envelope" in tmap and not _is_allowed_string(renv, {"absent", "present"}):
+        err(mf, f"case {cid} expected.transport has invalid result_envelope "
+                f"{renv}")
+
+
+# Keys allowed inside an `expected.frames` entry (conformance/manifest/
+# README.md "expected.frames entries"): the emitted Syntra Frame's own
+# fields plus the documented assertion helpers. Fixture metadata such as
+# `credentials` is not a Frame field and is rejected here.
+EXPECTED_FRAME_KEYS = {"request_id", "body", "payload_b64", "shape",
+                       "note", "has_connection_id"}
+
+
+def check_expected_frames(mf, cid, label, frames):
+    """Validate ``expected.frames`` (case-level or ``control_connection``):
+    a present-but-null value and every non-map entry (including null entries)
+    are reported as errors, and entries carry only emitted-Frame keys plus
+    the documented assertion helpers — never fixture metadata such as
+    ``credentials``."""
+    if not isinstance(frames, list):
+        err(mf, f"case {cid} {label} frames must be a list of maps")
+        return
+    for i, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            err(mf, f"case {cid} {label} frames[{i}] must be a map")
+            continue
+        unknown = set(frame) - EXPECTED_FRAME_KEYS
+        if unknown:
+            err(mf, f"case {cid} {label} frames[{i}] has unknown keys "
+                    f"{sorted(map(str, unknown))}; expected.frames entries "
+                    "carry only emitted-Frame keys plus documented assertion "
+                    "helpers (conformance/manifest/README.md "
+                    "\"expected.frames entries\")")
+
+
+def check_error_expectation(err_prefix, cid, emap, error_codes, mf):
+    """Validate the documented detecting-side discriminators inside an
+    ``expected.error`` map (observer / carriage).
+
+    Callers pass this only for a *present* ``error`` key (absent keys are
+    skipped by the caller); a present key whose value is null is rejected
+    here rather than silently skipped."""
+    if not isinstance(emap, dict):
+        err(mf, f"case {cid} {err_prefix} must be a map")
+        return
+    obs = emap.get("observer")
+    if "observer" in emap and not _is_allowed_string(obs, ERROR_OBSERVERS):
+        err(mf, f"case {cid} has unknown error observer {obs} "
+                f"({err_prefix}; allowed: {sorted(ERROR_OBSERVERS)})")
+    car = emap.get("carriage")
+    if "carriage" in emap and not _is_allowed_string(car, ERROR_CARRIAGE):
+        err(mf, f"case {cid} has unknown error carriage {car} "
+                f"({err_prefix}; allowed: {sorted(ERROR_CARRIAGE)})")
+
+
 def check_manifests():
     messages, enums = parse_proto_model()
     # Manifests use short code names (UNIMPLEMENTED); the IDL uses
@@ -263,18 +413,47 @@ def check_manifests():
         if not profiles or any(not isinstance(p, str) or p not in KNOWN_PROFILES
                                for p in profiles):
             err(mf, f"case {cid} references unknown profile {case.get('profile')}")
-        for r in case.get("requirement", []) or []:
+        req_field = case.get("requirement")
+        # The required-key loop above already reports a *missing* key; a
+        # present-but-null or otherwise non-list `requirement` is rejected
+        # here so the null value cannot slip through the isinstance-only
+        # skip.
+        if "requirement" in case and not isinstance(req_field, list):
+            err(mf, f"case {cid} requirement must be a list of requirement IDs")
+        for r in req_field if isinstance(req_field, list) else []:
+            if not isinstance(r, str):
+                err(mf, f"case {cid} has malformed requirement ref {r!r}")
+                continue
+            if r in RESERVED_REQUIREMENTS:
+                err(mf, f"case {cid} references reserved requirement {r}")
             if r not in req_ids:
                 err(mf, f"case {cid} references unknown requirement {r}")
             if not REQ_NAMING.match(r):
                 err(mf, f"case {cid} has malformed requirement ref {r}")
         if not isinstance(case.get("mandatory"), bool):
             err(mf, f"case {cid} mandatory must be boolean")
-        if not set(case.get("roles", []) or []) <= KNOWN_ROLES or not case.get("roles"):
-            err(mf, f"case {cid} has invalid roles {case.get('roles')}")
-        for c in case.get("capabilities", []) or []:
-            if c not in KNOWN_CAPABILITIES:
-                err(mf, f"case {cid} has undeclared capability prerequisite {c}")
+        roles = case.get("roles")
+        if not isinstance(roles, list) or not roles or any(
+                not isinstance(v, str) or v not in KNOWN_ROLES for v in roles):
+            err(mf, f"case {cid} has invalid roles {roles!r}")
+        caps = case.get("capabilities")
+        if caps is None:
+            # Absent/null capabilities is handled by the required-key loop;
+            # keep the pre-existing silent treatment instead of double-erroring.
+            pass
+        elif not isinstance(caps, list):
+            err(mf, f"case {cid} capabilities must be a list of capability IDs")
+        else:
+            for c in caps:
+                if not isinstance(c, str) or c not in KNOWN_CAPABILITIES:
+                    err(mf, f"case {cid} has undeclared capability prerequisite {c}")
+        if "applicable_transports" in case:
+            at = case.get("applicable_transports")
+            if not isinstance(at, list) or not at or not all(
+                    _is_allowed_string(t, TRANSPORT_FAMILIES) for t in at):
+                err(mf, f"case {cid} applicable_transports must be a non-empty "
+                        f"list of known transport families "
+                        f"{sorted(TRANSPORT_FAMILIES)}")
         pre = case.get("preconditions")
         if not isinstance(pre, list) or not pre:
             err(mf, f"case {cid} needs a non-empty preconditions list")
@@ -286,15 +465,125 @@ def check_manifests():
             if key not in ("connection_state", "session_state", "frames",
                            "error", "transport", "hygiene", "retry"):
                 err(mf, f"case {cid} has unknown expected key {key}")
-        if "connection_state" in exp and exp["connection_state"] not in KNOWN_CONN_STATES:
+        if "connection_state" in exp and not _is_allowed_string(exp["connection_state"], KNOWN_CONN_STATES):
             err(mf, f"case {cid} has invalid connection_state {exp['connection_state']}")
-        if "session_state" in exp and exp["session_state"] not in KNOWN_SESS_STATES:
+        if "session_state" in exp and not _is_allowed_string(exp["session_state"], KNOWN_SESS_STATES):
             err(mf, f"case {cid} has invalid session_state {exp['session_state']}")
         if "error" in exp and isinstance(exp["error"], dict) and "code" in exp["error"]:
-            if exp["error"]["code"] not in error_codes:
+            if not _is_allowed_string(exp["error"]["code"], error_codes):
                 err(mf, f"case {cid} has unknown error code {exp['error']['code']}")
+        if "error" in exp:
+            check_error_expectation("(expected.error observer/carriage)", cid,
+                                    exp["error"], error_codes, mf)
+        if "transport" in exp:
+            check_transport_expectation(mf, cid, exp["transport"], error_codes)
+        if "frames" in exp:
+            check_expected_frames(mf, cid, "expected", exp["frames"])
+        ctl_specified = "control_connection" in case
+        ctl = case.get("control_connection")
+        if ctl_specified and not isinstance(ctl, dict):
+            # An explicit null or non-map control is not a structured,
+            # runner-executable control; the schema defines a map.
+            err(mf, f"case {cid} control_connection must be a map")
+            ctl = None
+        if isinstance(ctl, dict):
+            if not isinstance(ctl, dict):
+                err(mf, f"case {cid} control_connection must be a map")
+            else:
+                for key in ctl:
+                    if key not in ("preconditions", "frames", "subscriptions",
+                                   "replay", "transport", "faults",
+                                   "credentials", "expected", "notes"):
+                        err(mf, f"case {cid} has unknown control_connection key {key}")
+                for key in ("preconditions", "expected"):
+                    if key not in ctl:
+                        err(mf, f"case {cid} control_connection missing required key '{key}'")
+                cpre = ctl.get("preconditions")
+                if not isinstance(cpre, list) or not cpre:
+                    err(mf, f"case {cid} control_connection needs a non-empty preconditions list")
+                cframes = ctl.get("frames")
+                cframes_ok = isinstance(cframes, list) and all(
+                    isinstance(f, dict) for f in cframes)
+                if cframes is not None and not cframes_ok:
+                    err(mf, f"case {cid} control_connection frames must be a list of maps")
+                if cid == "CONF-URP-001":
+                    # The control is the executable attribution for the gate:
+                    # it must run Negotiate and then the exact same Subscribe
+                    # payload as the case-level probe, so the confirmation
+                    # gate is the sole delta between the two connections.
+                    neg = "/syntra.v1.UpdateRecovery/Negotiate"
+                    sub = "/syntra.v1.UpdateRecovery/Subscribe"
+                    ctl_raw = ctl.get("frames")
+                    ctl_frames = list(ctl_raw) if isinstance(ctl_raw, list) else []
+                    ordered = (len(ctl_frames) >= 2
+                               and isinstance(ctl_frames[0], dict)
+                               and isinstance(ctl_frames[1], dict)
+                               and ctl_frames[0].get("method") == neg
+                               and ctl_frames[1].get("method") == sub)
+                    if not (isinstance(ctl, dict) and ordered):
+                        err(mf, f"case {cid} control_connection must be executable: Negotiate followed by the probe Subscribe request")
+                    inp = case.get("input") or {}
+                    inp_frames = inp.get("frames") if isinstance(inp, dict) else None
+                    inp_frames = inp_frames if isinstance(inp_frames, list) else []
+                    probe = next((f["payload_b64"] for f in inp_frames
+                                  if isinstance(f, dict) and f.get("method") == sub
+                                  and isinstance(f.get("payload_b64"), str)),
+                                 None)
+                    if probe is None:
+                        err(mf, f"case {cid} input must carry a Subscribe probe frame with a payload_b64")
+                    ctl_payloads = [f.get("payload_b64") for f in ctl_frames
+                                    if isinstance(f, dict) and f.get("method") == sub]
+                    if not ctl_payloads or any(not isinstance(p, str) for p in ctl_payloads) \
+                            or ctl_payloads[0] != probe:
+                        err(mf, f"case {cid} control_connection Subscribe payload must equal the case-level probe payload")
+                cexp = ctl.get("expected")
+                if not isinstance(cexp, dict) or not cexp:
+                    err(mf, f"case {cid} control_connection needs a non-empty expected block")
+                    cexp = {}
+                for key in cexp:
+                    if key not in ("connection_state", "session_state", "frames",
+                                   "error", "transport", "hygiene", "retry"):
+                        err(mf, f"case {cid} has unknown control_connection expected key {key}")
+                if "connection_state" in cexp and not _is_allowed_string(cexp["connection_state"], KNOWN_CONN_STATES):
+                    err(mf, f"case {cid} control_connection has invalid connection_state {cexp['connection_state']}")
+                if "session_state" in cexp and not _is_allowed_string(cexp["session_state"], KNOWN_SESS_STATES):
+                    err(mf, f"case {cid} control_connection has invalid session_state {cexp['session_state']}")
+                if "error" in cexp and isinstance(cexp["error"], dict) and "code" in cexp["error"]:
+                    if not _is_allowed_string(cexp["error"]["code"], error_codes):
+                        err(mf, f"case {cid} control_connection has unknown error code {cexp['error']['code']}")
+                if "error" in cexp:
+                    check_error_expectation("(control_connection expected.error observer/carriage)", cid,
+                                            cexp["error"], error_codes, mf)
+                if "transport" in cexp:
+                    check_transport_expectation(mf, cid, cexp["transport"], error_codes)
+                if "frames" in cexp:
+                    check_expected_frames(mf, cid, "control_connection.expected",
+                                          cexp["frames"])
+        elif cid == "CONF-URP-001":
+            # Gate attribution for the negotiation-isolation case depends on
+            # executing its declared paired control connection, so the control
+            # must be a structured, runner-executable scenario rather than
+            # prose-only notes.
+            err(mf, f"case {cid} requires a structured control_connection")
+        if cid == "CONF-RPC-004":
+            # Duplicate-ID detection must be deterministic at race level: the
+            # structured barrier fault is mandatory and must use the documented
+            # semantics. Prose-only coordination or sleeps do not qualify.
+            inp = case.get("input") or {}
+            faults = inp.get("faults") if isinstance(inp, dict) else None
+            dwp = faults.get("duplicate_while_pending") \
+                if isinstance(faults, dict) else None
+            if not isinstance(dwp, dict) \
+                    or set(dwp) != {"barrier", "release_after"} \
+                    or dwp["barrier"] != "first_terminal_result" \
+                    or dwp["release_after"] != "violation_and_closure":
+                err(mf, f"case {cid} must declare the structured harness fault "
+                        "duplicate_while_pending: {barrier: "
+                        "first_terminal_result, release_after: "
+                        "violation_and_closure} for deterministic duplicate "
+                        "injection (no sleeps, no prose-only assumptions)")
     for r, mf, cid in req_refs:
-        if not REQ_NAMING.match(r):
+        if not isinstance(r, str) or not REQ_NAMING.match(r):
             err(mf, f"case {cid} has malformed requirement ref {r}")
     print(f"manifests: {len(cases)} cases, {len(req_refs)} requirement refs")
 
@@ -710,6 +999,8 @@ def check_links():
             continue
         in_scope = str(rel).startswith(REF_EXISTENCE_SCOPE)
         for m in REQ_PATTERN.finditer(text):
+            if m.group(0) in RESERVED_REQUIREMENTS:
+                continue
             if m.group(0) not in defined and in_scope:
                 err(rel, f"references undefined requirement {m.group(0)}")
         for m in PROFILE_PATTERN.finditer(text):

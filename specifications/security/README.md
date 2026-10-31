@@ -35,7 +35,7 @@ provisioned Noise server pin.
 | Accepted owner | Concern | Requirements |
 |---|---|---|
 | [secure-channel.md](secure-channel.md) | Shared channel independent of carrier I/O | `SNTR-SC-001`–`SNTR-SC-015` |
-| [device-authorization.md](device-authorization.md) | Persistent per-enrollment shared authorization | `SNTR-DAUTH-001`–`SNTR-DAUTH-010` |
+| [device-authorization.md](device-authorization.md) | Persistent per-enrollment shared authorization; host enrollment/authorization lifecycle | `SNTR-DAUTH-001`–`SNTR-DAUTH-010` (RFC 0007); `SNTR-DAUTH-011`–`SNTR-DAUTH-024` (accepted [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md); execution pending) |
 | [noise-bindings.md](../transports/noise-bindings.md) | Canonical v1 WSS mapping; restricted TCP/WS; deferred UDP | `SNTR-SCW-001`–`SNTR-SCW-012`; `SNTR-SC1-WSS-V1` |
 
 After the baseline, read RFC 0007 → shared channel → device authorization →
@@ -56,7 +56,11 @@ not execute the registered `CONF-SCW-*` cases or establish independent
 interoperability.
 
 Only out-of-band preprovisioning is delivered; enrollment issuance, protected
-storage/transactions and rotation flows remain absent. Host policy still owns
+storage/transactions and rotation flows are now specified as
+`SNTR-DAUTH-011`–`SNTR-DAUTH-024` under accepted
+[RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) — registration
+is not execution, so their runtime implementation remains host work. Host
+policy still owns
 principal agreement, trusted root identity and synchronous enrollment checking
 before `ready`; empty credentials never authorize automatically and nil method
 authorization denies access. UDP is deferred; HTTP/HTTPS request-response is
