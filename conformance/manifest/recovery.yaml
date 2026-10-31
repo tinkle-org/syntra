@@ -277,15 +277,20 @@ cases:
     roles: [client, server]
     capabilities: [syntra.update-recovery/1]
     mandatory: false
-    preconditions: [restart_from_durable_store, durable_effects_plus_checkpoint, known_safe_checkpoint]
+    preconditions: [transport_connected, restart_from_durable_store, durable_effects_plus_checkpoint, known_safe_checkpoint]
     input:
       frames:
+        - {request_id: 0, body: hello, min_version: 1, max_version: 1}
+        - {request_id: 1, body: request, method: "/syntra.v1.UpdateRecovery/Negotiate", payload_b64: "CAEQARgBIhhzeW50cmEudXBkYXRlLXJlY292ZXJ5LzE="}
         - {request_id: 3, body: request, method: "/syntra.v1.UpdateRecovery/Subscribe", payload_b64: "CAESDnN1YnNjcmlwdGlvbi1hGg1jaGVja3BvaW50LWMx"}
       faults: {crash_after_durable_persist: true}
     expected:
       connection_state: ACTIVE
       session_state: active
-    notes: "Durable-known-safe checkpoint resume after crash without previous confirmation: effects and checkpoint c1 are durable while the Confirm was never sent (or its response/ack bookkeeping was lost), so the initiator reconnects with a fresh authenticated connection, renegotiates, and subscribes — the expected request carries a RecoverySubscribeRequest whose start_checkpoint is the durable known-safe checkpoint c1 (opaque checkpoint bytes; may be newer than the last peer-acknowledged checkpoint); the host validates the issued checkpoint binding (P, S, G), current authority, binding, and retention and MAY accept valid c1 without a previous confirmation record (RFC 0006 §11.6). No rollback by guesswork; no invented generation. SKIP when unclaimed. Registered; not yet executed."
+      frames:
+        - {request_id: 1, body: result, shape: RecoveryNegotiateResponse, note: "selected_version 1 confirmed with the deployment bounds on this fresh connection; the fresh profile confirmation does NOT transfer any prior connection's capability state (SNTR-SESS-008)"}
+        - {request_id: 3, body: result, shape: RecoverySubscribeResponse, note: "fresh connection-scoped handle with a newly captured boundary; the durable known-safe start_checkpoint c1 is validated and accepted without a previous confirmation record (RFC 0006 §11.6)"}
+    notes: "Durable-known-safe checkpoint resume after crash without previous confirmation: effects and checkpoint c1 are durable while the Confirm was never sent (or its response/ack bookkeeping was lost). Test setup establishes the fresh authenticated connection first (hello with a valid credential; the connection reaches ACTIVE before any profile operation), so the case never sends a profile operation on an unconfirmed connection. The reconnect driver then, before any other profile operation (SYN-URP-010 client-side negotiation ordering), runs Negotiate (request_id 1) and asserts its confirmed result — selected_version 1 with the deployment bounds (RFC 0006 §11.6: reconnect always establishes a new authenticated connection, negotiates again, and subscribes with a fresh handle and captured boundary) — and then the recovery Subscribe (request_id 3, increasing though 2 is skipped; RFC 0004) carries a RecoverySubscribeRequest whose start_checkpoint is the durable known-safe checkpoint c1 (opaque checkpoint bytes; may be newer than the last peer-acknowledged checkpoint); the host validates the issued checkpoint binding (P, S, G), current authority, binding, and retention and MAY accept valid c1 without a previous confirmation record (RFC 0006 §11.6). No rollback by guesswork; no invented generation; neither capability state nor pagination or snapshot handles transfer to the fresh connection. SKIP when unclaimed. Registered; not yet executed."
 
   - id: CONF-URP-016
     requirement: [SYN-URP-013, SYN-URP-025, SNTR-EVENT-009]

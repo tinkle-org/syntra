@@ -223,42 +223,42 @@ cases:
     preconditions: [active_session]
     input:
       frames:
-        - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 22, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 23, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 26, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 27, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 28, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 29, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 30, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 31, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 32, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 33, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 34, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 35, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
-        - { request_id: 36, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyMQ==", timeout_ms: 2000 }
+        - { request_id: 22, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyMg==", timeout_ms: 2000 }
+        - { request_id: 23, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyMw==", timeout_ms: 2000 }
+        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyNA==", timeout_ms: 2000 }
+        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyNQ==", timeout_ms: 2000 }
+        - { request_id: 26, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyNg==", timeout_ms: 2000 }
+        - { request_id: 27, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyNw==", timeout_ms: 2000 }
+        - { request_id: 28, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyOA==", timeout_ms: 2000 }
+        - { request_id: 29, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAyOQ==", timeout_ms: 2000 }
+        - { request_id: 30, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzMA==", timeout_ms: 2000 }
+        - { request_id: 31, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzMQ==", timeout_ms: 2000 }
+        - { request_id: 32, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzMg==", timeout_ms: 2000 }
+        - { request_id: 33, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzMw==", timeout_ms: 2000 }
+        - { request_id: 34, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzNA==", timeout_ms: 2000 }
+        - { request_id: 35, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzNQ==", timeout_ms: 2000 }
+        - { request_id: 36, body: request, method: "/example.Echo/Echo", payload_b64: "cnBjLXAzNg==", timeout_ms: 2000 }
       faults:
         reverse_completion_order: { barrier: all_admitted }
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       frames:
-        - { request_id: 36, body: result, payload_b64: "eA==" }
-        - { request_id: 35, body: result, payload_b64: "eA==" }
-        - { request_id: 34, body: result, payload_b64: "eA==" }
-        - { request_id: 33, body: result, payload_b64: "eA==" }
-        - { request_id: 32, body: result, payload_b64: "eA==" }
-        - { request_id: 31, body: result, payload_b64: "eA==" }
-        - { request_id: 30, body: result, payload_b64: "eA==" }
-        - { request_id: 29, body: result, payload_b64: "eA==" }
-        - { request_id: 28, body: result, payload_b64: "eA==" }
-        - { request_id: 27, body: result, payload_b64: "eA==" }
-        - { request_id: 26, body: result, payload_b64: "eA==" }
-        - { request_id: 25, body: result, payload_b64: "eA==" }
-        - { request_id: 24, body: result, payload_b64: "eA==" }
-        - { request_id: 23, body: result, payload_b64: "eA==" }
-        - { request_id: 22, body: result, payload_b64: "eA==" }
-        - { request_id: 21, body: result, payload_b64: "eA==" }
-    notes: "Concurrency floor (SNTR-RPC-008, persistent-carrier scope): 16 simultaneously outstanding RPCs, exactly one correlated terminal result per request with the echoed payload asserted. Harness semantics: the initiator sends all 16 requests without waiting for responses; the host runs the reverse_completion_order fault with barrier=all_admitted, releasing NO result until every request is admitted (all 16 outstanding simultaneously from the initiator's view), then releasing results in strictly descending request_id order (SNTR-RPC-002 non-FIFO correlation); initiators correlate solely by request_id. The floor is supported capacity: no lower bound may be negotiated (RFC 0005 D2); excess above the documented maximum is rejected with RESOURCE_EXHAUSTED (SNTR-RPC-008). Execution scope is persistent multiplexing (TCP/TLS, WS/WSS, SC1): HTTP/HTTPS exchanges are never multiplexed 16-RPC connections — each exchange carries one RPC (SNTR-HTTP-070, RFC 0004 D3), and their concurrency minimums are transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041)."
+        - { request_id: 36, body: result, payload_b64: "cnBjLXAzNg==" }
+        - { request_id: 35, body: result, payload_b64: "cnBjLXAzNQ==" }
+        - { request_id: 34, body: result, payload_b64: "cnBjLXAzNA==" }
+        - { request_id: 33, body: result, payload_b64: "cnBjLXAzMw==" }
+        - { request_id: 32, body: result, payload_b64: "cnBjLXAzMg==" }
+        - { request_id: 31, body: result, payload_b64: "cnBjLXAzMQ==" }
+        - { request_id: 30, body: result, payload_b64: "cnBjLXAzMA==" }
+        - { request_id: 29, body: result, payload_b64: "cnBjLXAyOQ==" }
+        - { request_id: 28, body: result, payload_b64: "cnBjLXAyOA==" }
+        - { request_id: 27, body: result, payload_b64: "cnBjLXAyNw==" }
+        - { request_id: 26, body: result, payload_b64: "cnBjLXAyNg==" }
+        - { request_id: 25, body: result, payload_b64: "cnBjLXAyNQ==" }
+        - { request_id: 24, body: result, payload_b64: "cnBjLXAyNA==" }
+        - { request_id: 23, body: result, payload_b64: "cnBjLXAyMw==" }
+        - { request_id: 22, body: result, payload_b64: "cnBjLXAyMg==" }
+        - { request_id: 21, body: result, payload_b64: "cnBjLXAyMQ==" }
+    notes: "Concurrency floor (SNTR-RPC-008, persistent-carrier scope): 16 simultaneously outstanding RPCs, exactly one correlated terminal result per request with the echoed payload asserted. Each request ID carries a DISTINCT opaque payload (rpc-p21...rpc-p36), and each result payload must equal its requester's payload exactly (identical-echo assertion), so a result delivered under the wrong request_id fails the fixture even in setups that ignore payload contents; correlation itself remains solely by request_id. Harness semantics: the initiator sends all 16 requests without waiting for responses; the host runs the reverse_completion_order fault with barrier=all_admitted, releasing NO result until every request is admitted (all 16 outstanding simultaneously from the initiator's view), then releasing results in strictly descending request_id order (SNTR-RPC-002 non-FIFO correlation); initiators correlate solely by request_id and MUST NOT assume FIFO. The floor is supported capacity: no lower bound may be negotiated (RFC 0005 D2); excess above the documented maximum is rejected with RESOURCE_EXHAUSTED (SNTR-RPC-008). Execution scope is persistent multiplexing (TCP/TLS, WS/WSS, SC1): HTTP/HTTPS exchanges are never multiplexed 16-RPC connections — each exchange carries one RPC (SNTR-HTTP-070, RFC 0004 D3), and their concurrency minimums are transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041)."

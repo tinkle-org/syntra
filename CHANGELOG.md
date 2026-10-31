@@ -37,6 +37,14 @@ development, changes land under `Unreleased`.
 
 ### Changed
 
+- Tightened two conformance fixtures (no RFC changes, no new protocol
+  messages): `CONF-URP-015` now drives the recovery reconnect explicitly
+  (fresh authenticated connection, `hello`, then `Negotiate` with
+  `request_id` 1 and asserted confirmation before the `Subscribe` with
+  `request_id` 3), matching RFC 0006 §11.6; `CONF-RPC-013` now gives each
+  of the 16 concurrent `Echo` requests a distinct payload and asserts each
+  result echoes its requester's payload, preserving the
+  `reverse_completion_order` completion schedule.
 - Handshake failures no longer promise a wire-typed code to the peer:
   detecting-side typed causes plus transport-native close signals
   (RFC 0003 D1/D3/D4; owner files updated).

@@ -201,9 +201,9 @@ precedent in [event manifest](../manifest/events.yaml).
 ## CONF-URP-015 durable-known-safe resume after crash
 
 - Related normative requirement: SYN-URP-005, SYN-URP-006, SYN-URP-013, SNTR-SESS-008.
-- Preconditions: restart against retained durable storage with effects and checkpoint durable; volatile state discarded.
-- Input: crash after durable persistence, then reconnect and subscribe.
-- Expected output: the Subscribe request carries `start_checkpoint` equal to the durable known-safe checkpoint — which may be newer than the last peer-acknowledged checkpoint when the confirmation or its response was lost; the host validates the issued checkpoint binding `(P, S, G)`, current authority, binding, and retention and MAY accept a valid checkpoint without a previous confirmation record; reconnect uses a fresh authenticated connection, renegotiation, fresh handle and boundary; no rollback by guesswork and no invented generation.
+- Preconditions: fresh transport connected against restart-capable retained durable storage with effects and checkpoint durable; volatile state discarded; the reconnection is not yet authenticated.
+- Input: crash after durable persistence; then on the fresh connection the driver authenticates (hello with a valid credential), runs `/syntra.v1.UpdateRecovery/Negotiate` (request_id 1) and asserts the confirmed result, then sends the existing recovery `/syntra.v1.UpdateRecovery/Subscribe` (request_id 3) — negotiation precedes any profile operation (SYN-URP-010 client-side ordering, RFC 0006 §11.6).
+- Expected output: the Negotiate result confirms `selected_version` 1 with the deployment bounds (neither capability state nor pagination or snapshot handles transfer to the fresh connection); the Subscribe request carries `start_checkpoint` equal to the durable known-safe checkpoint — which may be newer than the last peer-acknowledged checkpoint when the confirmation or its response was lost; the host validates the issued checkpoint binding `(P, S, G)`, current authority, binding, and retention and MAY accept a valid checkpoint without a previous confirmation record; reconnect uses a fresh authenticated connection, renegotiation, fresh handle and boundary; no rollback by guesswork and no invented generation.
 - Expected connection state: ACTIVE.
 - Expected session state: active.
 - Mandatory/optional: Optional, gated on `syntra.update-recovery/1` (SKIP when unclaimed). Registered; not yet executed.

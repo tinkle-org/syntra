@@ -128,8 +128,8 @@ Related normative requirements are cited per case; test IDs are not normative. A
 
 - Related normative requirement: SNTR-RPC-002, SNTR-RPC-008, SNTR-REL-007.
 - Preconditions: ACTIVE; host supports the ≥16 floor (SNTR-RPC-008; no negotiated mode below 16 — RFC 0005 D2).
-- Input: 16 simultaneously outstanding `Echo` requests with ids 21–36; the initiator sends all of them without waiting. Harness barrier semantics (`reverse_completion_order: {barrier: all_admitted}`): the host releases no result until every request is admitted (all 16 outstanding simultaneously), then completes them in strictly descending id order.
-- Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO. Excess above the documented maximum is rejected with `RESOURCE_EXHAUSTED` while conformant traffic continues (SNTR-RPC-008).
+- Input: 16 simultaneously outstanding `Echo` requests with ids 21–36, each carrying a distinct opaque payload (rpc-p21 … rpc-p36); the initiator sends all of them without waiting. Harness barrier semantics (`reverse_completion_order: {barrier: all_admitted}`): the host releases no result until every request is admitted (all 16 outstanding simultaneously), then completes them in strictly descending id order.
+- Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each result echoes its requester's exact payload bytes (identical-echo assertion), so a result delivered under the wrong request_id fails the fixture even before payload-content checks; each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO. Excess above the documented maximum is rejected with `RESOURCE_EXHAUSTED` while conformant traffic continues (SNTR-RPC-008).
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
