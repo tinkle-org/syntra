@@ -1,0 +1,38 @@
+tests/test_validate_repo_scalars.py
+  s_356307e6731cb3::t_e28cfa26bfdd0d 168-257
+conformance/manifest/rpc.yaml
+  s_356307e6731cb3::t_7546330828d1bd 62
+  s_356307e6731cb3::t_20d62adff1b161 31,42
+conformance/rpc/rpc.md
+  s_356307e6731cb3::t_b43c869afeb2d9 24,35
+conformance/manifest/README.md
+  s_356307e6731cb3::t_d17f395cc656fe 138-155
+scripts/validate-repo.py
+  s_356307e6731cb3::t_f57e81c4248041 195-197
+  s_356307e6731cb3::t_bf549bfd29052f 547
+  s_356307e6731cb3::t_7888661a062161 401-415
+  s_356307e6731cb3::t_50c5011e316127 183-193,201-202
+  s_356307e6731cb3::t_1d46814a52a28b 386-392
+CHANGELOG.md
+  s_356307e6731cb3::t_dc1a0beb5cb74e 44-50
+conformance/manifest/core.yaml
+  s_356307e6731cb3::t_b2f31c3dbc0c48 85
+  s_356307e6731cb3::t_c70da0075a7101 107,114
+  s_356307e6731cb3::t_5fd8d9087a2889 98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "18d6cdef72809eb6f9298a75a2c8913810f8ed6c",
+  "prompts": {},
+  "sessions": {
+    "s_356307e6731cb3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c641eedffeH2y4KyadyXqDoQ",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
