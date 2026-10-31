@@ -9,7 +9,7 @@ executed them, the exact specification and suite revision pinned at
 execution, and the per-case results. Results use the suite verdict
 vocabulary only (PASS, FAIL, SKIP, UNSUPPORTED, NOT_EXECUTED); missing
 execution is NOT_EXECUTED, never PASS. Registered, planned, not-executed
-rows (such as the RFC 0010 `CONF-SCW-025`–`038` lifecycle rows) must not be
+rows (such as the RFC 0010 `CONF-SCW-025`–`042` lifecycle rows) must not be
 cited as passing or as satisfied.
 
 RFC 0007 and RFC 0010 are accepted and `SNTR-SC1-WSS-V1` is registered with

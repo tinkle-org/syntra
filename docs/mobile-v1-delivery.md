@@ -49,9 +49,9 @@ runs are recorded.
 
 | Stage | Deliverable | Exit evidence |
 |---|---|---|
-| 0. Approval process | RFC 0009 governance/scope proposal and decision-record format; actual owner ratification/roster and authorized process edits next | Verifiable public transition or existing quorum; no retroactive protocol/security approval |
+| 0. Approval process | RFC 0009 governance/scope proposal and decision-record format; owner ratification/roster and authorized process edits — completed via [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md) on 2026-10-29 | Verifiable public transition and disclosed single-owner quorum; no retroactive protocol/security approval |
 | 1. Decisions | RFCs 0001–0005 core/parser/identity/bounds; RFC 0006 recovery amendment; RFC 0007 canonical SC1; RFC 0008 mobile lifecycle; RFC 0009 governance; RFC 0010 host lifecycle | Accepted and recorded ([Decision 0001](../docs/decisions/0001-bootstrap-ratification.md), [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)) with compatibility designations and disclosed self-approval; the roster/signing step remains as documented |
-| 2. Normative activation | Synchronize owning specifications, authorized schema edits, permanent requirement IDs, profile/case definitions and positive/negative fixtures | No contradictory owner text; structural/Buf checks pass; reviewed requirement-to-case mapping |
+| 2. Normative activation (structural, landed in this acceptance wave) | Synchronize owning specifications, authorized schema edits, permanent requirement IDs, profile/case definitions and positive/negative fixtures | No contradictory owner text; structural/Buf checks pass; SC1 lifecycle case registration (`CONF-SCW-025`–`042`) and `SYN-URP-*` requirement rows landed; reviewed requirement-to-case mapping |
 | 3. Downstream alignment | Both independent implementations pin the same accepted revision; generated types refreshed where authorized; TDD fixes and host-policy/lifecycle examples | Package/runtime/adapter/security tests; ABI/mobile builds and bridge lifecycle tests where applicable |
 | 4. Independent execution | Pure Go ↔ Rust in both roles; SC1 bootstrap/returning, required recovery, faults and deployment contracts | Exact commits, commands, bounds, vectors, logs and per-case verdicts; no mandatory omissions |
 | 5. Mobile/operational assurance | Supported iOS/Android lifecycle tests, weak networks, idle/paused cost, soak and independent composition review | Declared performance/resource/revocation budgets met; failures retained as regressions |
@@ -91,8 +91,11 @@ cryptography and service-specific semantics do not become Syntra requirements.
 
 ## Current evidence limits
 
-This change supplies selected proposals, planned acceptance scenarios and public
-context fixture lint. It does not supply accepted normative owner edits,
-registered SC1 cases, a cryptographic vector corpus, downstream wire alignment,
-mobile execution, independent security approval or interoperability PASS.
+This change supplies the accepted normative owner edits and the registered
+SC1/recovery executable case rows (structural activation per Decision 0002,
+including `CONF-SCW-025`–`042`), plus public context fixture lint. It still
+does not supply executed conformance runs, an independently derived Noise
+vector corpus, downstream wire alignment, mobile execution, independent
+security approval or interoperability PASS; those release gates remain
+scheduled until runs are recorded.
 Actual validation commands and results are recorded in the readiness audit.

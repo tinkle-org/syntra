@@ -377,10 +377,15 @@ installation before normal retirement, reconciliation and hard cutoff.
 **SNTR-DAUTH-020** — Rotation transaction. Rotation MUST issue a fresh,
 independent AK and handle with a strictly increasing epoch, delivered through
 the staged provisioning transaction (`SNTR-DAUTH-013`) and its idempotency
-rules (`SNTR-DAUTH-014`). The replacement becomes the sole authorized
-credential set after durable device installation and durable host commit.
-Routine retirement MUST NOT discard the only still-authorized usable
-credential until the replacement is durably installed. Revocation, credential
+rules (`SNTR-DAUTH-014`). The replacement becomes the primary
+authorized credential set at durable host commit. During the deployment's
+declared overlap window the replacement and the old tuple both remain
+admissible: the old tuple MUST stay admissible until its declared expiry (or
+the overlap cutoff, whichever comes first), except when revocation, its own
+credential expiry, or compromise response invalidates it earlier; it MUST NOT
+remain usable at or after that boundary. Routine retirement MUST NOT discard
+the only still-authorized usable credential until the replacement is durably
+installed. Revocation, credential
 expiry, compromise response and the hard overlap cutoff MUST NOT wait for
 installation or acknowledgment: they can invalidate the last usable
 credential, leaving the device fail-closed pending independently authorized
@@ -400,8 +405,12 @@ path plus cutoff without resurrection on the failure paths.
 
 **SNTR-DAUTH-021** — Epoch integrity and rollback prevention. The enrollment
 epoch MUST increase strictly across successful rotations of a logical
-enrollment, and an epoch that is lower than or equal to a previously
-superseded epoch MUST be rejected. A rollback of host authorization state to
+enrollment. During a rotation the directly superseded epoch stays admissible
+only within its declared overlap window under the rotation rules
+(`SNTR-DAUTH-020`) and MUST be rejected once that window lapses, the epoch is
+retired, or it is revoked; every other epoch lower than or equal to a
+previously superseded epoch MUST be rejected. A rollback
+of host authorization state to
 a pre-revocation, pre-retirement or pre-rotation epoch MUST NOT revive that
 epoch: once revoked or retired, an epoch stays invalid. Epoch exhaustion MUST
 retire the enrollment through a fresh rotation or a new enrollment rather
@@ -416,8 +425,8 @@ lapsed or its enrollment fate has applied.
 
 Acceptance evidence (planned, not executed): `PLAN-DAUTH-021` exercises
 concurrent reconnect, rollback, overlap expiry, epoch overflow and device
-loss; every stale, rolled-back or overflowed epoch is refused and no epoch
-wraps or is revived.
+loss; every stale, rolled-back or overflowed epoch is refused outside the
+still-live overlap window, and no epoch wraps or is revived.
 
 ### 3.7 Area 7 — Recovery and secrets (`SNTR-DAUTH-022`–`SNTR-DAUTH-024`)
 

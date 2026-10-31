@@ -156,8 +156,10 @@ channel evidence through `ChannelIdentityProvider` and `ChannelPolicy`:
   with least privilege.
 - On success emit exactly one `ServerReady` with a fresh, unguessable
   `connection_id` (≥128-bit entropy) and bind the principal for the
-  connection lifetime. On denial, fail the handshake with
-  `UNAUTHENTICATED`/`PERMISSION_DENIED` and generic text.
+  connection lifetime. On denial, record the detecting-side typed cause
+  (`UNAUTHENTICATED`/`PERMISSION_DENIED`) with generic text. Before `ACTIVE`
+  send no error `Frame`: the peer observes only the transport-native close
+  signal (RFC 0003 D1/D2).
 - Enforce expiry/revocation; re-authentication on the same connection is
   forbidden by default (new handshake instead).
 

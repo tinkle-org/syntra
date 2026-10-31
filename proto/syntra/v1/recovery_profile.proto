@@ -8,11 +8,14 @@ option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntra
 // snapshot recovery, and committed progress (SYN-URP-001..007,
 // SYN-URP-010..026; SYN-URP-008/009 reserved).
 //
-// Draft RFC 0006 acceptance in progress; comments aligned to the §11 decision
+// RFC 0006 is accepted (2026-10-30 via docs/decisions/0002-sdd-acceptance-
+// wave.md, §11 decision amendment authoritative). Comments aligned to that
 // amendment (release-safe recovery semantics). Do not claim execution: these
 // comments describe accepted-decision semantics awaiting implementations and
-// conformance execution; generated codecs alone do not enforce them. No
-// conformance or release claim may cite this draft file as carried evidence.
+// conformance execution; generated codecs alone do not enforce them, and
+// implementation and conformance evidence remain pending as separation of
+// authority from evidence. No conformance or release claim may cite these
+// comments as executed evidence.
 //
 // Release inclusion versus wire optionality (RFC 0006 §11.1): standardized
 // recovery is required in the target release bundle. On the wire the

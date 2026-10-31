@@ -48,7 +48,7 @@ sufficient evidence for the recovery-inclusive bundle). SC1 includes the
 export of the accepted host lifecycle obligations of
 [RFC 0010](rfcs/0010-sc1-host-authorization-lifecycle.md)
 (`SNTR-DAUTH-011`–`024`) with its registered, planned-not-executed
-`CONF-SCW-025`–`038` rows. Baseline transports remain independently
+`CONF-SCW-025`–`042` rows. Baseline transports remain independently
 claimable but are not all required for the initial bundle. The Rust
 implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
 reviewed proposal; its local evidence does not execute the registered
@@ -181,9 +181,12 @@ from the structural RC boxes above — registration is not execution, and
 registered, not-executed rows never substitute for these:
 
 - [ ] Executed `CONF-SCW` rows, including the RFC 0010 lifecycle rows
-      `CONF-SCW-025`–`038` (enrollment authority, AK/handle issuance, staged
+      `CONF-SCW-025`–`042` (enrollment authority including the equivalent
+      out-of-band path `039` and the valid-but-unauthorized cross-principal
+      and out-of-scope rows `040`/`041`, AK/handle issuance, staged
       provisioning and idempotency, pre-`ready` sequence and principal
-      binding, revocation enforcement/bounded staleness/fail-closed, rotation
+      binding including mid-connection rebinding `042`,
+      revocation enforcement/bounded staleness/fail-closed, rotation
       and epoch integrity, compromise recovery, disposal hygiene, pin
       rotation), in both roles, with per-case verdicts and logs
 - [ ] Executed recovery cases (`CONF-URP-*`): fresh-handle rounds, scoped

@@ -65,7 +65,7 @@ RFC 0001, 0005 and 0008 contract set consolidated), increment 4 (RFC 0006
 owner/IDL-comment map applied, `CONF-URP` cases corrected to the §11
 shapes, `SYN-URP-*` requirement rows registered with 008/009 reserved) and
 increment 5 (SC1 canonical contract with RFC 0010 lifecycle requirements and
-the registered `CONF-SCW-025`–`038` planned rows). Increments 6–9 remain
+the registered `CONF-SCW-025`–`042` planned rows). Increments 6–9 remain
 open: schema source migration (RFC 0005 D5 deferred), evidence tooling,
 specification freeze, stable promotion and release authorization. The Rust
 implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
@@ -135,17 +135,19 @@ Python 3.14.7 and Buf 1.59.0:
 
 2026-10-30 acceptance-wave recount (manifest integration pass, executed
 locally): `python3 scripts/validate-repo.py requirements manifests` passed
-with 593 requirement rows/definitions and 185 registered `CONF-*` cases across
-the suite manifests (593 unique requirement IDs; `CONF-SCW-025`–`038` added
-one-to-one with `SNTR-DAUTH-011`–`024`), and 209 Markdown files in the working
+with 593 requirement rows/definitions and 189 registered `CONF-*` cases across
+the suite manifests (593 unique requirement IDs; `CONF-SCW-025`–`038`
+registered against `SNTR-DAUTH-011`–`024` (one per requirement), and
+`CONF-SCW-039`–`042` added separately as the registration splits of
+`025`/`030` — the out-of-band and valid-but-unauthorized enrollment variants
+after `025` and the mid-connection rebinding variant after `030`), and 209
+Markdown files in the working
 tree by recount. `validate-schema.py` (13 tests against the current revision, including `recovery_profile.proto` per MIGRATION.md §8) and the four unit tests
-passed on this revision. The whole-run `validate-repo.py all` currently
-surfaces 8 pre-existing stale RFC 0006 §11 anchor references in recovery
-owner files plus one trailing-whitespace line in RFC 0006 — open owner
-corrections, not introduced by this pass — so this record asserts the scoped
-checks above rather than re-running the historical whole-run "Passed" claim.
-Registration is not execution: these numbers are structural, not executed
-verdicts.
+passed on this revision. The whole-run `validate-repo.py all` also passes on
+this revision (requirements, manifests, vectors, links, RFCs, markdown,
+boundary), re-verified locally on the reviewed branch on 2026-10-30;
+anchor and whitespace hygiene is clean. Registration is not execution:
+these numbers are structural, not executed verdicts.
 
 No Go/Rust conformance execution, mobile-device run, independent security
 approval, commit, push or release was performed as part of these verification

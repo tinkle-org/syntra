@@ -31,7 +31,7 @@ stateDiagram-v2
   [*] --> CONNECTED: transport connected
   CONNECTED --> NEGOTIATING: send/recv hello
   NEGOTIATING --> AUTHENTICATING: version accepted
-  NEGOTIATING --> CLOSING: version mismatch/unsupported caps
+  NEGOTIATING --> CLOSING: version mismatch
   AUTHENTICATING --> ACTIVE: ServerReady
   AUTHENTICATING --> CLOSING: auth rejected/timeout/unexpected msg
   ACTIVE --> CLOSING: graceful close / fatal error
@@ -76,7 +76,7 @@ Introducing a wire-visible `ERROR` state or splitting `CONNECTED` would alter th
 | CONNECTED | first `hello` (well-formed) | →NEGOTIATING (SNTR-HS-003) | initiator | timer continues | No | Yes | No |
 | CONNECTED | `ready` / `request` / `result` / `cancel` / `notification` / unknown variant | Protocol violation; detecting side records `FAILED_PRECONDITION` (`UNIMPLEMENTED` for unknown variant), discards without delivery, and enters CLOSING/CLOSED; no dispatch, queueing, or subscription state (SNTR-HS-012, SNTR-WIRE-004; RFC 0003 D2) | either peer detects | — | Yes | Closes | No |
 | NEGOTIATING | version overlap found | →AUTHENTICATING; evaluate credential next (SNTR-HS-003/004) | host | timer continues | No | Yes | No |
-| NEGOTIATING | version mismatch / required capability unsupported | Handshake failure with detecting-side `UNIMPLEMENTED` + →CLOSING (SNTR-HS-003; RFC 0003 D3) | host | — | Yes | Closes | No |
+| NEGOTIATING | version mismatch | Handshake failure with detecting-side `UNIMPLEMENTED` + →CLOSING (SNTR-HS-003; RFC 0003 D3). Version mismatch only: required-capability/profile support is not negotiated here — per accepted RFC 0005 D1 it binds post-`ACTIVE` through each profile's own negotiation RPC | host | — | Yes | Closes | No |
 | NEGOTIATING | second `hello` / `ready` / `request` / `result` / `cancel` / `notification` / unknown variant | Protocol violation; detecting side records `FAILED_PRECONDITION` (`UNIMPLEMENTED` for unknown variant) and proceeds to CLOSING/CLOSED without delivery (SNTR-HS-012; RFC 0003 D2) | either peer detects | — | Yes | Closes | No |
 | NEGOTIATING | transport loss / timer expiry | →CLOSING→CLOSED; `UNAVAILABLE`/`DEADLINE_EXCEEDED` (SNTR-HS-011/014) | either / local | handshake deadline | No | Closes | No |
 | AUTHENTICATING | credential accepted | Emit one `ready{connection_id}` (`request_id=0`, `version=selected`) →ACTIVE (SNTR-HS-004) | host | timer stops at ACTIVE | No | Yes | No (session=connection) |
@@ -157,9 +157,7 @@ sequenceDiagram
 sequenceDiagram
   participant C as Initiator
   participant H as Host
-  C->>H: Frame{hello} (requires capability resume/1)
-  H-->>C: native close/status (no error Frame; local UNIMPLEMENTED at detect)
-  Note over C,H: Required-but-unsupported → failure; unknown optional advertisement alone MUST NOT fail (SNTR-CAP-004)
+  Note over C,H: Handshake carries no capability or profile terms (accepted RFC 0005 D1). Capability/session extension binds post-ACTIVE through each profile's own negotiation RPC; an unconfirmed or unsupported required profile fails under that RPC's contract, never as a handshake failure (e.g. FAILED_PRECONDITION for the unconfirmed update/recovery profile, SYN-URP-010). Unknown optional advertisement alone MUST NOT fail (SNTR-CAP-004).
 ```
 
 ```mermaid
@@ -216,7 +214,7 @@ Per accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) D1, fail
 
 | Detecting-side condition | Local mechanism/cause | Transition | Peer-native signal | What the peer may conclude |
 |---|---|---|---|---|
-| TCP/TLS handshake rejection (version mismatch, unsupported capability, state violation, auth rejection, oversize/malformed hello) | Applicable typed cause from this table at the detecting side | →CLOSING | TCP close; TLS shutdown where possible | Attempt ended; `UNAVAILABLE` absent better local evidence; not the precise rejection cause |
+| TCP/TLS handshake rejection (version mismatch, state violation, auth rejection, oversize/malformed hello) | Applicable typed cause from this table at the detecting side | →CLOSING | TCP close; TLS shutdown where possible | Attempt ended; `UNAVAILABLE` absent better local evidence; not the precise rejection cause |
 | HTTP/HTTPS no version overlap | `UNIMPLEMENTED` | →CLOSING | `400`, no Syntra envelope | Local binding failure `INVALID_ARGUMENT` per SNTR-HTTP-041; not proof of a particular host cause |
 | HTTP/HTTPS malformed binding | `INVALID_ARGUMENT` | →CLOSING | `400`, no Syntra envelope | Local binding failure `INVALID_ARGUMENT`; not proof of a particular host cause |
 | HTTP/HTTPS authentication rejection | `UNAUTHENTICATED` / `PERMISSION_DENIED` | →CLOSING | `401` or `403`, no Syntra envelope | Generic adapter report, without an authentication sub-reason |
@@ -236,7 +234,7 @@ Version negotiation is the only wire-version mechanism. Adding handshake fields 
 
 ## 8. Conformance requirements
 
-- **SNTR-HS-900** — Fixtures: success; version mismatch (low/high/disjoint); unsupported required capability; auth reject; timeout; unexpected `request` during NEGOTIATING; second `hello`; pre-ACTIVE `notification`; graceful close; abrupt loss in each state. Each MUST yield the tabled detecting-side cause/transition, and the failure fixtures MUST additionally assert that no error `Frame` (zero-ID `result`, error-bearing `ready`, second `hello`) crosses the wire — the peer's report is the native signal only (accepted RFC 0003).
+- **SNTR-HS-900** — Fixtures: success; version mismatch (low/high/disjoint); auth reject; timeout; unexpected `request` during NEGOTIATING; second `hello`; pre-ACTIVE `notification`; graceful close; abrupt loss in each state. Each MUST yield the tabled detecting-side cause/transition, and the failure fixtures MUST additionally assert that no error `Frame` (zero-ID `result`, error-bearing `ready`, second `hello`) crosses the wire — the peer's report is the native signal only (accepted RFC 0003).
 - **SNTR-HS-902** — Reliable-session attachment fixture (OPTIONAL, gated): pre-`ACTIVE` session control fails per §1B; post-`ACTIVE` attach/resume advances epoch without state-machine change. `CONF-RS-001`.
 - **SNTR-HS-901** — Sequence proof:
 

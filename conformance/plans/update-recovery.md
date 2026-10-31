@@ -16,9 +16,12 @@
 `PLAN-URP-*` labels are document-local planning references, not registered
 `CONF-*` cases or requirement IDs. This file introduces no runner syntax,
 profile, manifest, schema, generated type, or normative owner change. The
-existing recovery manifest is a draft precursor, not an executable definition
-of the amendment. Where it disagrees, record the required follow-up; never
-declare an old fixture passing as evidence for the replacement decision.
+recovery manifest (`conformance/manifest/recovery.yaml`) is the registered
+definition of the reconciled `CONF-URP-001…017` cases, normalized in the
+acceptance PR; registration is not execution, and implementers target those
+registered cases. Where this plan and the manifest disagree, the manifest and
+owning specifications hold; never declare an old fixture passing as
+execution evidence for the replacement decision.
 
 The target release bundle includes standardized recovery and independent
 Rust/Go evidence after acceptance. Wire use remains optional and negotiated

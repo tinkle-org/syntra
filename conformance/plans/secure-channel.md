@@ -28,7 +28,8 @@ fault matrices and revocation time-budget checks.
 [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md) is accepted
 (2026-10-30 via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md));
 its registry rows are registered in the same wave —
-`CONF-SCW-025`–`CONF-SCW-038` in `conformance/manifest/sc1-wss.yaml` and
+`CONF-SCW-025`–`CONF-SCW-042` in `conformance/manifest/sc1-wss.yaml` (with
+`039`–`042` as the registration splits of `025`/`030`) and
 requirement rows `SNTR-DAUTH-011`–`SNTR-DAUTH-024` in
 `conformance/manifest/requirements.yaml` (registration is not execution).
 
@@ -777,7 +778,8 @@ manifest requirement rows for `SNTR-SC-*` and `SNTR-DAUTH-001`–`010` trace
 their `CONF-SCW-*` cases in `requirements.yaml` per the activation pass;
 scoped implementation evidence is recorded in their notes and the ledger.
 The RFC 0010 lifecycle rows `SNTR-DAUTH-011`–`SNTR-DAUTH-024` trace
-`CONF-SCW-025`–`CONF-SCW-038`, the prose cases `PLAN-DAUTH-011`–`024`
+`CONF-SCW-025`–`CONF-SCW-042` (with `039`–`042` the registration splits of
+`025`/`030`), the prose cases `PLAN-DAUTH-011`–`024`
 remain planned and unexecuted, and registration still implies no verdicts.
 
 ## 8. Lifecycle fault matrices and revocation time budgets (planned under RFC 0010; not executed)

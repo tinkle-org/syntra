@@ -991,7 +991,7 @@ this acceptance.
    value 1; `checkpoint` and `confirmed_checkpoint` non-empty at most
    4096 bytes; `RecoveryNegotiateResponse` confirmed bounds are
    `uint32` deployment values.
- 2. **Adopted at acceptance.** Method strings, canonical payloads, and version
+2. **Adopted at acceptance.** Method strings, canonical payloads, and version
    negotiation rule (`SYN-URP-002`/`SYN-URP-020`/`SYN-URP-021`): exact
    standardized generic RPC methods are
    `/syntra.v1.UpdateRecovery/Negotiate`,

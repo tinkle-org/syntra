@@ -24,7 +24,7 @@ and release authorization remain outstanding.
 | Correlation/races/HTTP | RFC 0004 (accepted): increasing emitted request IDs, ordered high-water admission, connection-fatal reuse, one terminal gate, profile credentials | Execution and runtime race evidence |
 | Bounds/negotiation/imports | RFC 0005 (accepted, D1–D4): profile-specific recovery negotiation, concrete limits, current matching IDs; D5 Go path deferred | Execution; tracked FILE/source follow-up for D5 |
 | Recovery | RFC 0006 (accepted) §11: fresh-round handles, local overflow isolation, scoped continuity, crash-safe persistence/confirmation and snapshot install; owner/IDL-comment map applied, recovery manifest normalized | Recovery-plan execution and independent crash evidence |
-| SC1 | RFC 0007 (accepted) + RFC 0010 (accepted): canonical `syntra.sc1.v1` context/prologue/subprotocol and host lifecycle `SNTR-DAUTH-011`–`024` with planned `CONF-SCW-025`–`038` rows (registered, not executed) | Rust/Go alignment to the canonical contract, independent Noise vectors and both socket roles |
+| SC1 | RFC 0007 (accepted) + RFC 0010 (accepted): canonical `syntra.sc1.v1` context/prologue/subprotocol and host lifecycle `SNTR-DAUTH-011`–`024` with planned `CONF-SCW-025`–`042` rows (registered, not executed) | Rust/Go alignment to the canonical contract, independent Noise vectors and both socket roles |
 | Mobile/parser/resources | RFC 0008 (accepted): raw body classification, suspend-aware deadlines, half-open/replacement/reconnect rules, bounded executions/drain | iOS/Android and operational evidence |
 
 The historical local-1/draft-1 byte differences are superseded alignment
@@ -95,7 +95,7 @@ not zero-allocation.
 
 Remaining SC1 work includes independent review/vectors/interoperability,
 executed lifecycle cases for the accepted provisioning/rotation workflow
-(`CONF-SCW-025`–`038`, registered and not executed), secure storage and
+(`CONF-SCW-025`–`042`, registered and not executed), secure storage and
 deployment revocation/rate-limit policy. There is
 no enrollment RPC. Native ABI v1 still lacks completion timestamps and explicit
 post-hello credential release; cleanup does not guarantee erasure of every

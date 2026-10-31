@@ -116,15 +116,17 @@ release/completion-time gaps remain [open](sc1-implementation.md#remaining-work)
 
 ## Request IDs
 
-Generate nonzero `uint64` IDs, unique among *outstanding* RPCs on the
-connection. IDs may be reused only after the terminal `result` for that
-ID (note the replay-security interaction in `SESSION-OPEN-QUESTIONS.md`
-B3: when in doubt, use fresh IDs). Correlate every `result` by ID; accept
-out-of-order completion; never assume FIFO. Handle interleaved
-`notification`s without completing any RPC. Every new connection (and
-every HTTP exchange) starts a fresh ID space; logical continuity across
-connections uses application operation keys inside payloads, never the old
-`request_id`.
+IDs are nonzero `uint64`, strictly increasing within one connection, and
+never reused — not even after the terminal `result` for that ID
+([RFC 0004](../rfcs/0004-correlation-identity-carriage.md)). Reusing,
+replaying or reissuing an already-seen ID is an ordered-admission violation:
+the violating side records local `FAILED_PRECONDITION` and the connection
+terminates; in-flight calls fail `UNAVAILABLE` per the connection rule.
+Correlate every `result` by ID; accept out-of-order completion; never assume
+FIFO. Handle interleaved `notification`s without completing any RPC. Every
+new connection (and every HTTP exchange) starts a fresh ID space; logical
+continuity across connections uses application operation keys inside
+payloads, never the old `request_id`.
 
 ## RPC concurrency
 

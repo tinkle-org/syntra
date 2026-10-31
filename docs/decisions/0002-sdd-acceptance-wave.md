@@ -14,8 +14,8 @@ release, and it does not claim executed conformance evidence.
 | Decision kind | rfc-acceptance (joint record; per-RFC dispositions below) |
 | Decision state | approved |
 | Date | 2026-10-30 |
-| Public decision link | This record plus the acceptance PR discussion (link pending — PR not yet opened; the single-owner approval authority is explicitly disclosed per `GOVERNANCE.md` Sec. 3, and the owner/maintainer approval link will be attached when the PR is public) |
-| Reviewed repository and commit | `tinkle-org/syntra`, review of the working diff on top of baseline `main` at full SHA `0e8b0f8a4a789cb3d6d00b993e281867d2325e06` (git `#18`); post-merge commit SHA pending until the PR is recorded |
+| Public decision link | This record plus the acceptance PR discussion: <https://github.com/tinkle-org/syntra/pull/20> (approval stated here and in that PR; the single-owner approval authority is explicitly disclosed per `GOVERNANCE.md` Sec. 3) |
+| Reviewed repository and commit | `tinkle-org/syntra`, review of the working diff on top of baseline `main` at full SHA `0e8b0f8a4a789cb3d6d00b993e281867d2325e06` (git `#18`); the reviewed content is the acceptance PR head at decision time, full SHA `87b3e6edae6ee68a73bfd6b89b609154858d7212` (branch `docs/sdd-acceptance-wave`, PR #20); review-driven corrections to that content are applied on the same branch. Post-merge commit SHA to be recorded when the PR merges |
 | Scope | RFC 0001, 0002, 0003, 0004, 0005, 0006, 0008 accepted; new RFC 0010 accepted; owner-file, owner-IDDL and conformance-manifest normalization applied in the same PR. RFC 0007 and RFC 0009 remain as previously accepted (2026-10-29). |
 | Author and decision owner | oscarlaw (author of the acceptance edits; sole active maintainer / repository owner) |
 | Authority | `GOVERNANCE.md` Sec. 3 as amended by accepted RFC 0009 and [Decision 0001](0001-bootstrap-ratification.md): exactly one active maintainer, explicit approval, disclosed self-approval |
