@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/core/errors.md`
 - Title: Typed Errors and Failure Mapping
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Accepted (2026-10-30) — error-vocabulary owner file for accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); correlated clauses from RFC 0004 carry inline citations
+- Version: 1.0.0 (2026-10-30) — accepted lineage of 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/errors.proto` (`ErrorCode`, `RpcError` — authoritative); `protocol.md`; `framing.md`; `rpc.md`; `handshake.md`; `reliability.md`
 - Scope: The single shared error vocabulary, when each code is used, what `message` may contain, and how transport/handshake failures map to codes. Application domain errors belong inside opaque payloads or mapped to these codes without leaking internals.
 - Terminology: Per `protocol.md`. **Typed error** = `RpcResult{error{code,message}}`, or a connection-failure local cause recorded by the detecting side (e.g., a pre-`ACTIVE` handshake failure code per `handshake.md` §5); a failed handshake does not carry a wire error `Frame`.

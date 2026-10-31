@@ -2,7 +2,7 @@
 
 - Identifier: `specifications/core/events.md`
 - Title: Server-Originated Events and Event Streams
-- Status: Draft (pending maintainer approval via RFC)
+- Status: Partially accepted (2026-10-30) — pre-`ACTIVE` notification fail-close and handshake-failure fixture semantics accepted per [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) ([Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md)); the event-stream/replay capability itself remains proposal-only (unallocated identifiers; see `capabilities.md` §1)
 - Version: 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/events.proto` (`Notification`); `protocol.md`; `framing.md`; `rpc.md`; `capabilities.md`; `reliability.md`; `errors.md`; ADR-007
 - Scope: Generic host→initiator push: event identity, optional stream identity, subscription lifecycle, ordering scope, delivery guarantees, optional replay and continuation cursors, cancellation, and unsupported-capability behavior. No chat messages, typing indicators, or application event types are defined. Topic/filter semantics belong to the application above generic subscription RPCs.

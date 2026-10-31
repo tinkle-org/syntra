@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/core/serialization.md`
 - Title: Protobuf Serialization and Validation
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Accepted (2026-10-30) — serialization/validation owner file for accepted [RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md) D1 raw-wire partition and order with accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D3 per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md)
+- Version: 1.0.0 (2026-10-30) — accepted lineage of 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/*.proto` (authoritative representation, SYN-ARCH-040); Protobuf proto3 + wire-format encoding docs; `protocol.md`; `framing.md`; `errors.md`
 - Scope: How Syntra messages are encoded with Protobuf binary wire format, how unknown fields and malformed input are handled, and what semantic validation the core performs. Transport framing (length prefixes, HTTP/WS bindings) is out of scope — see `framing.md` and transport specs.
 - Terminology: As in `protocol.md`. **Message** = a Protobuf message (`Frame`, `RpcRequest`, etc.). **Unknown field** = wire field number without a definition in the negotiated schema. **Unknown variant** = unrecognized `Frame.body oneof` member (handled in `framing.md`).

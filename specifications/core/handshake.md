@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/core/handshake.md`
 - Title: Handshake, Version Negotiation, and Connection State Machine
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Accepted (2026-10-30) — protocol-contract owner file for accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); accepted host-timing/cancellation clauses from RFC 0004 and the no-handshake-capability-terms rule from RFC 0005 D1 carry inline citations
+- Version: 1.0.0 (2026-10-30) — accepted lineage of 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; `proto/syntra/v1/envelope.proto` (`Frame`), `proto/syntra/v1/handshake.proto` (`ClientHello`, `ServerReady`); `protocol.md`; `framing.md` (SNTR-WIRE-*); `authentication.md`; `errors.md`; `capabilities.md`; transport specs (connection binding, timeouts)
 - Scope: The transport-independent handshake: version negotiation, authentication initiation, state machine CONNECTED→NEGOTIATING→AUTHENTICATING→ACTIVE→CLOSING→CLOSED, success/failure transitions, timeouts, and close semantics. Credential validation policy belongs to `authentication.md`; byte-on-transport binding belongs to transport specs.
 - Terminology: Per `protocol.md`. **Handshake** = exchange of `hello`→`ready`/error establishing version + authentication before ACTIVE.

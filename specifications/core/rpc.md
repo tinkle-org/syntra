@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/core/rpc.md`
 - Title: Generic Request/Response Correlation and Cancellation
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Partially accepted (2026-10-30) — protocol-contract owner file for accepted [RFC 0004](../../rfcs/0004-correlation-identity-carriage.md) D1–D4 with accepted RFC 0005 D3 and the RFC 0008 D2 timing reconciliation per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); §§1J–1L (`SNTR-RPC-011..013`) remain proposal-only as marked inline
+- Version: 1.0.0-draft.1 (2026-10-19, accepted-clause corrections 2026-10-30)
 - Normative references: BCP 14; `proto/syntra/v1/envelope.proto` (`Frame`), `proto/syntra/v1/rpc.proto` (`RpcRequest`, `RpcResult`, `Cancel`); `protocol.md`; `framing.md`; `errors.md`; `reliability.md`; `capabilities.md`
 - Scope: Transport-independent RPC: method identifiers, correlation IDs, opaque payloads, deadlines, cancellation, error propagation, idempotency metadata. Payload schemas and handler semantics belong to the application.
 - Terminology: Per `protocol.md`. **Request ID** = `Frame.request_id` (transport correlation nonce). **Operation ID** = optional application-level idempotency key carried inside opaque payload (never interpreted by Syntra). The two MUST NOT be conflated.

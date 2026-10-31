@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/transports/http.md`
 - Title: HTTP/1.1 Request/Response Mapping and Plaintext Profile
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Accepted (2026-10-30) — the HTTP/1.1 exchange mapping and binding rules are accepted via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md) ([RFC 0004](../../rfcs/0004-correlation-identity-carriage.md) D3/D5 carriage, [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md) native-signal status mapping, [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D2/D3 bounds); release-activation of additional transport profiles remains governed by [RFC 0009](../../rfcs/0009-v1-bootstrap-governance-and-release-scope.md) and release records
+- Version: 1.0.0 (2026-10-30) — accepted lineage of 1.0.0-draft.1 (2026-10-19)
 - Normative references: BCP 14; RFC 9110, RFC 9112 (HTTP/1.1); RFC 4648 §4 (base64); `proto/syntra/v1/envelope.proto` (`Frame`), `rpc.proto`, `errors.proto`, `handshake.proto`
 - Core dependencies: `specifications/core/protocol.md` (SNTR-CORE-*), `framing.md` (SNTR-WIRE-*), `serialization.md` (SNTR-SER-*), `rpc.md` (SNTR-RPC-*), `errors.md` (SNTR-ERR-*), `handshake.md` (SNTR-HS-*), `authentication.md` (SNTR-AUTH-*), `sessions.md` (SNTR-SESS-*), `events.md` (SNTR-EVENT-*), `reliability.md` (SNTR-REL-*), `versioning.md` (SNTR-VER-*)
 - Security dependencies: `specifications/security/transport-security.md` (SNTR-TSEC-*), `authentication-security.md` (SNTR-ASEC-*), `replay-protection.md` (SNTR-RPL-*), `opaque-payloads.md` (SNTR-OPQ-*), `threat-model.md` (SNTR-TMOD-*)

@@ -55,7 +55,7 @@ pending items.
 | Authorization lifecycle | BLOCKED | RFC 0010 accepted: `SNTR-DAUTH-011`–`024` registered with planned `CONF-SCW-025`–`042` rows (registered, not executed); decided revocation policy (immediate on new connections, 300 s hard maximum/60 s target, fail-closed store) awaits executed lifecycle evidence |
 | Update recovery | BLOCKED | RFC 0006 accepted (Decision 0002); owner/IDL-comment map applied and recovery manifest normalized (corrected/extended `CONF-URP` cases; `SYN-URP-*` rows admitted, 008/009 reserved); Rust/Go crash evidence remains pending |
 | Mobile/runtime bounds | BLOCKED | RFC 0008 accepted: suspension/queue deadlines, connection generations, reconnect, active-execution accounting and bounded drain activated; iOS/Android implementation and operational tests pending |
-| Transport/proxy security | BLOCKED | Initial public target SC1/WSS retains verified TLS; every claimed carrier and at least one accepted proxy topology require applicable independent tests; no new raw public transport exception |
+| Transport/proxy security | BLOCKED | Initial public target SC1/WSS retains verified TLS; every claimed carrier requires applicable independent tests; a proxy topology requires accepted specification and independent tests only when a proxied deployment is claimed (the direct-TLS initial topology does not require one); no new raw public transport exception |
 | Conformance/interop | BLOCKED | CI validates definitions/vectors, not complete IUT runs. Registered suite is now 189 cases (incl. `CONF-SCW-025`–`042` and recovery cases); registration is not execution and no independent results are added |
 | Operational/mobile assurance | BLOCKED | Declared budgets and iOS/Android lifecycle, weak-network, idle-cost and soak evidence required; simulated/compile evidence alone insufficient |
 | License | PRESENT | Apache-2.0 LICENSE present and full-text regression test passes |
@@ -132,7 +132,8 @@ review. Specialist proposal review is advisory, not independent release approval
    independently derived Noise vectors.
 4. Complete the declared operational/mobile budgets (lifecycle, weak-network,
    idle-cost, soak) and proxy/transport-security evidence for every claimed
-   carrier and the accepted topology.
+   carrier and, when a proxied deployment is claimed, the accepted proxy
+   topology.
 5. Complete the independent human security review, then finalize guides,
    declaration/profile claims and maintainer-authorized release notes.
 

@@ -215,6 +215,21 @@ implementation-local evidence MUST NOT be rendered as release claims.
 
 ## 2. Version freeze (RC)
 
+> **Historical RC-1 snapshot — non-normative.** Everything in this section
+> records the retired RC-1 implementation-era freeze at `2a91da7` as process
+> history only. It carries no current normative force. Formerly open
+> behaviors are superseded by the accepted contracts of
+> [Decision 0002](docs/decisions/0002-sdd-acceptance-wave.md): request-ID
+> ordering/non-reuse is governed by
+> [RFC 0004](rfcs/0004-correlation-identity-carriage.md) (strictly increasing
+> IDs in serialized emission order, no reuse for the lifetime of the
+> persistent connection, host high-water rule, fail-close on non-increasing
+> IDs), pre-`ACTIVE` failure carriage by
+> [RFC 0003](rfcs/0003-handshake-failure-signaling.md), and the 1 MiB
+> total-frame bound by [RFC 0005](rfcs/0005-negotiation-bounds-identifiers.md)
+> D3. Do not implement from this section; cite the accepted owner
+> specifications.
+
 At RC tag time the following are frozen. After the tag, any change to a
 frozen item REQUIRES explicit compatibility review: a normative RFC, a
 `buf breaking` re-check against the RC baseline, updated conformance
@@ -269,23 +284,34 @@ exactly one `ClientHello` first; exactly one terminal outcome per
 connection (`ServerReady` or handshake error + close); no re-handshake
 on one transport (`SNTR-HS-001/040`).
 
-Frozen `request_id` semantics: `uint64` connection-scoped correlation;
-nonzero initiator-chosen, unique among outstanding RPCs on the
+Frozen `request_id` semantics (RC-1 historical text; superseded by accepted
+RFC 0004 — see the section header above): `uint64` connection-scoped
+correlation; nonzero initiator-chosen, unique among outstanding RPCs on the
 connection; `0` reserved for `hello`/`ready`/`notification`; reuse only
 after the terminal `result` (stale-reuse conflict tracked as P0 finding
 F-02, resolution via RFC 0004 — the freeze records current text, not a
-resolution).
+resolution). The accepted contract (RFC 0004 D1/D2, Decision 0002) replaces
+this RC-1 text: strictly increasing IDs in serialized emission order, no
+reuse during the lifetime of the persistent connection, a lasting host
+high-water mark, and fail-close on non-increasing request IDs.
 
 Frozen capability identifiers (placeholders pending the events RFC;
 MUST NOT be advertised until the RFC is accepted):
 `events-v1`, `events-replay-v1`; resumption token `resume-v1` (no RFC
 exists; only resume-rejection is mandatory).
 
-Known RC exceptions (frozen text contains these open conflicts; they MUST
-be resolved by Accepted RFCs before stable): F-01 (profile identifier
-spellings), F-02 (stale ID reuse), F-03 (pre-ACTIVE error carrier), F-04
-(HTTP per-exchange ID amnesia vs stale rejection), F-05 (private
-`go_package` path), F-06 (1 MiB payload fixture vs envelope bound).
+Known RC exceptions (historical RC-1 status; disposition per accepted
+[Decision 0002](docs/decisions/0002-sdd-acceptance-wave.md), 2026-10-30):
+F-01 (profile identifier spellings), F-03 (pre-ACTIVE error carrier) and
+F-04 (HTTP per-exchange ID amnesia) were resolved by accepted
+[RFC 0003](rfcs/0003-handshake-failure-signaling.md) and
+[RFC 0004](rfcs/0004-correlation-identity-carriage.md); F-02 (stale ID
+reuse) was resolved by accepted RFC 0004 D1/D2; F-06 (1 MiB payload fixture
+vs envelope bound) was resolved by accepted RFC 0005 D3. F-05 (private
+`go_package` path) is explicitly deferred, not a blocker for this
+documentation-provenance scope: it is a Protobuf FILE/source break
+requiring downstream `syntra-go` confirmation and coordinated release
+ordering, tracked as the RFC 0005 D5 follow-up.
 See `audits/v1-consistency-review.md` and RFCs 0003–0005.
 
 ## 3. Version model

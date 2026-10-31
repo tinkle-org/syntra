@@ -2,8 +2,8 @@
 
 - Identifier: `specifications/core/capabilities.md`
 - Title: Mandatory vs Optional Capabilities and Extension Rules
-- Status: Draft (pending maintainer approval via RFC)
-- Version: 1.0.0-draft.1 (2026-10-19)
+- Status: Partially accepted (2026-10-30) — negotiation-mechanics owner file for accepted [RFC 0005](../../rfcs/0005-negotiation-bounds-identifiers.md) D1/D2/D4 per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); reliable-session shipping authority (`SNTR-CAP-008`/`SNTR-CAP-902`, marked proposal-only inline) remains pending a future RFC
+- Version: 1.0.0-draft.1 (2026-10-19, accepted-paragraph corrections 2026-10-30)
 - Normative references: BCP 14; `protocol.md` (SNTR-CORE-004); `handshake.md`; `versioning.md`; `GOVERNANCE.md`; ADR-009
 - Scope: How peers negotiate and use OPTIONAL behavior (e.g., event streams, resumption, extension payloads) without breaking mandatory interop. Capability identifiers and extension payloads themselves are defined by their respective RFCs; this document defines only the negotiation mechanics and rules.
 - Terminology: Per `protocol.md`. **Mandatory** = required for interop (handshake, RPC, cancel, errors, versioning). **Optional** = negotiated (streams, resumption, extensions). **Extension** = RFC-defined optional addition.

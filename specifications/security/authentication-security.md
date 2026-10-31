@@ -2,7 +2,7 @@
 
 - Identifier: `specifications/security/authentication-security.md`
 - Title: Credential, Session, and Token Security
-- Status: Draft (pending maintainer approval via RFC)
+- Status: Partially accepted (2026-10-30) — carriage rules (`SNTR-ASEC-003`, accepted [RFC 0004](../../rfcs/0004-correlation-identity-carriage.md) D5) and handshake-failure close semantics (accepted [RFC 0003](../../rfcs/0003-handshake-failure-signaling.md)) per [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md); remaining lifetime/disclosure sections remain Draft pending their own acceptance decision
 - Version: 1.0.0-draft.1 (2026-10-26)
 - Normative references:
   - BCP 14; `threat-model.md` (T1, T3, T5, T8, T9); `transport-security.md`; `replay-protection.md`; `opaque-payloads.md`

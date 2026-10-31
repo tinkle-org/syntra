@@ -19,18 +19,25 @@ TCP connect; TLS 1.3 handshake with full chain + hostname + expiry
 validation (never send credentials to an unverified endpoint, never fall
 back to plaintext); HTTP target `POST /syntra/v1/rpc`; WS Upgrade to
 `/syntra/v1/ws` offering `syntra.v1` first and validating the `101`
-selects exactly it (abort without Syntra bytes on any mismatch). Start the
-handshake timer at connection establishment (default 5 s); expiry aborts
-with `DEADLINE_EXCEEDED`, never implicit success.
+selects exactly it (abort without Syntra bytes on any mismatch). Timing is
+profile-specific: transport-setup budgets and the core Syntra handshake
+timer are allocated separately per the handshake section below. Any
+expiring budget aborts with `DEADLINE_EXCEEDED`, never implicit success.
 
 ## Syntra handshake
 
-Send exactly one `ClientHello` as the first envelope
+On frame-carrying profiles (TCP, TLS/TCP, WS, WSS), send exactly one
+`ClientHello` as the first envelope
 (`min_version ≤ max_version`, both nonzero, opaque credential bytes —
 empty means anonymous attempt), then await `ServerReady` or a terminal
 error before any `request`, `cancel`, or application payload. Never send a
 second `hello`; never pipeline Syntra RPCs before `ACTIVE` (transport
-negotiation bytes may pipeline only where the profile allows). Syntra timing
+negotiation bytes may pipeline only where the profile allows). HTTP/HTTPS
+carries no `hello` frame at all: the logical handshake is synthesized
+through HTTP headers (per-exchange `Authorization: Syntra <base64>` and
+`Syntra-Version`) plus the body of each exchange on
+`POST /syntra/v1/rpc` — a `hello` frame in the HTTP request body is
+nonconformant. Syntra timing
 rule (accepted RFC 0003 D4, SNTR-HS-002): start the core handshake timer only
 at the local `CONNECTED` boundary for frame-carrying profiles — established
 TCP for TCP; successfully completed and verified TLS for TLS/TCP; a validated
