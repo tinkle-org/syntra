@@ -1,0 +1,58 @@
+conformance/recovery_profile/recovery.md
+  s_8f22435be87d59::t_5fbda11a5ece15 64-66
+specifications/core/rpc.md
+  s_8f22435be87d59::t_36f03d34f14d96 5-6
+specifications/security/authentication-security.md
+  s_8f22435be87d59::t_d399689f07fdbd 5
+specifications/transports/http.md
+  s_8f22435be87d59::t_2fbdb04b052703 5-6
+conformance/manifest/recovery.yaml
+  s_8f22435be87d59::t_4b2bf82ff610c0 28,31,36
+specifications/core/serialization.md
+  s_8f22435be87d59::t_9e46b0c2683bb6 5-6
+specifications/core/capabilities.md
+  s_8f22435be87d59::t_ee1669a2855270 5
+  s_8f22435be87d59::t_1803f7032d20c6 6
+RELEASE.md
+  s_8f22435be87d59::t_023fb1cd157faa 303-314
+  s_8f22435be87d59::t_4c21fe86e036ec 287-289,293-296
+  s_8f22435be87d59::t_e8610113dfd470 220
+  s_8f22435be87d59::t_2ecef7b03a8c5f 218-219,221-232
+specifications/core/handshake.md
+  s_8f22435be87d59::t_8a5eaf7a670ad4 5-6
+specifications/core/errors.md
+  s_8f22435be87d59::t_d295b0fe46e495 5-6
+specifications/security/opaque-payloads.md
+  s_8f22435be87d59::t_5fe349673b6bca 65
+audits/v1-release-readiness.md
+  s_8f22435be87d59::t_8b76d1120fd33e 135-136
+  s_8f22435be87d59::t_b03e212f7d0391 58
+docs/decisions/0002-sdd-acceptance-wave.md
+  s_8f22435be87d59::t_69e880090c67a1 18
+docs/client-implementation.md
+  s_8f22435be87d59::t_bf31f3e827fbfe 22-25
+  s_8f22435be87d59::t_1e7b1f8e93569c 29-30,35-40
+specifications/security/open-questions.md
+  s_8f22435be87d59::t_ec90609e885f09 22
+specifications/core/events.md
+  s_8f22435be87d59::t_45a2cbb0ce918a 5
+conformance/plans/mobile-v1.md
+  s_8f22435be87d59::t_0431f2007d8b7e 3-15
+  s_8f22435be87d59::t_5c20fa27d9334a 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d5a13c4f72b4bcf27e7fe3145128037e7a852469",
+  "prompts": {},
+  "sessions": {
+    "s_8f22435be87d59": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6db018dfffeRIwdNXhwyqIHyI",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
