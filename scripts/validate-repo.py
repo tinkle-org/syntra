@@ -343,6 +343,36 @@ def check_transport_expectation(mf, cid, tmap, error_codes):
                 f"{renv}")
 
 
+# Keys allowed inside an `expected.frames` entry (conformance/manifest/
+# README.md "expected.frames entries"): the emitted Syntra Frame's own
+# fields plus the documented assertion helpers. Fixture metadata such as
+# `credentials` is not a Frame field and is rejected here.
+EXPECTED_FRAME_KEYS = {"request_id", "body", "payload_b64", "shape",
+                       "note", "has_connection_id"}
+
+
+def check_expected_frames(mf, cid, label, frames):
+    """Validate ``expected.frames`` (case-level or ``control_connection``):
+    a present-but-null value and every non-map entry (including null entries)
+    are reported as errors, and entries carry only emitted-Frame keys plus
+    the documented assertion helpers — never fixture metadata such as
+    ``credentials``."""
+    if not isinstance(frames, list):
+        err(mf, f"case {cid} {label} frames must be a list of maps")
+        return
+    for i, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            err(mf, f"case {cid} {label} frames[{i}] must be a map")
+            continue
+        unknown = set(frame) - EXPECTED_FRAME_KEYS
+        if unknown:
+            err(mf, f"case {cid} {label} frames[{i}] has unknown keys "
+                    f"{sorted(map(str, unknown))}; expected.frames entries "
+                    "carry only emitted-Frame keys plus documented assertion "
+                    "helpers (conformance/manifest/README.md "
+                    "\"expected.frames entries\")")
+
+
 def check_error_expectation(err_prefix, cid, emap, error_codes, mf):
     """Validate the documented detecting-side discriminators inside an
     ``expected.error`` map (observer / carriage).
@@ -384,7 +414,11 @@ def check_manifests():
                                for p in profiles):
             err(mf, f"case {cid} references unknown profile {case.get('profile')}")
         req_field = case.get("requirement")
-        if not isinstance(req_field, list) and req_field is not None:
+        # The required-key loop above already reports a *missing* key; a
+        # present-but-null or otherwise non-list `requirement` is rejected
+        # here so the null value cannot slip through the isinstance-only
+        # skip.
+        if "requirement" in case and not isinstance(req_field, list):
             err(mf, f"case {cid} requirement must be a list of requirement IDs")
         for r in req_field if isinstance(req_field, list) else []:
             if not isinstance(r, str):
@@ -443,6 +477,8 @@ def check_manifests():
                                     exp["error"], error_codes, mf)
         if "transport" in exp:
             check_transport_expectation(mf, cid, exp["transport"], error_codes)
+        if "frames" in exp:
+            check_expected_frames(mf, cid, "expected", exp["frames"])
         ctl_specified = "control_connection" in case
         ctl = case.get("control_connection")
         if ctl_specified and not isinstance(ctl, dict):
@@ -520,6 +556,9 @@ def check_manifests():
                                             cexp["error"], error_codes, mf)
                 if "transport" in cexp:
                     check_transport_expectation(mf, cid, cexp["transport"], error_codes)
+                if "frames" in cexp:
+                    check_expected_frames(mf, cid, "control_connection.expected",
+                                          cexp["frames"])
         elif cid == "CONF-URP-001":
             # Gate attribution for the negotiation-isolation case depends on
             # executing its declared paired control connection, so the control

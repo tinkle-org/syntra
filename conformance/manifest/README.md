@@ -111,6 +111,21 @@ When both must be asserted, use:
   binding's no-invented-Syntra-envelope assertion for non-`200`
   exchanges.
 
+### expected.frames entries (normative for manifest authors)
+
+`expected.frames` lists Frames emitted in response to the stimulus.
+Entries carry only the emitted Frame's own keys (`request_id`, `body`,
+`payload_b64`) plus the documented assertion helpers (`shape`, `note`,
+`has_connection_id`); repository validation rejects any other key. Fixture metadata never rides
+inside an expected frame row: `credentials` is not a `syntra.v1.Frame`
+field and is declared on the input side only — case-level, or per-exchange
+as in `CONF-HTTP-013`'s structured exchange rows. Runners associate each
+expected result row with its originating exchange by the echoed
+`request_id`; the assertion that a distinct payload is echoed identically
+proves response-to-exchange association, not which credential subject
+executed the handler — proving per-exchange principal binding would need a
+principal-sensitive authorization assertion instead.
+
 ### Structured harness coordination faults
 
 Race-sensitive cases MUST coordinate through structured `input.faults`

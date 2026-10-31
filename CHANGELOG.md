@@ -63,6 +63,21 @@ development, changes land under `Unreleased`.
   absent keys stay allowed; clarified the `expected.frames: []` semantics
   (response-side Frames only — the stimulus Frame itself is never a
   member).
+- Cleaned up fixture metadata from `CONF-HTTP-013`'s expected side:
+  expected result rows no longer carry `credentials` (`syntra.v1.Frame`
+  has no such field, and `expected.frames` lists emitted Syntra Frames
+  only); each exchange's credential stays on the input side, and the
+  harness associates each result with its originating exchange by the
+  echoed `request_id`. The manifest format now documents the
+  `expected.frames` entry-key vocabulary (emitted-Frame keys plus the
+  documented `shape`/`note`/`has_connection_id` assertion helpers) and
+  repository validation rejects any other key, present-but-null
+  `expected.frames` and `requirement` values, and non-map
+  `expected.frames` entries; the `CONF-HTTP-013` notes
+  and prose companion no longer overclaim credential isolation — the
+  payload echo asserts response-to-exchange association, not which
+  credential subject the handler bound (that would need a
+  principal-sensitive authorization assertion).
 - Tightened two conformance fixtures (no RFC changes, no new protocol
   messages): `CONF-URP-015` now drives the recovery reconnect explicitly
   (fresh authenticated connection, `hello`, then `Negotiate` with
