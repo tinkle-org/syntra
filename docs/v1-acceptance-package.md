@@ -68,9 +68,10 @@ increment 5 (SC1 canonical contract with RFC 0010 lifecycle requirements and
 the registered `CONF-SCW-025`–`042` planned rows). Increments 6–9 remain
 open: schema source migration (RFC 0005 D5 deferred), evidence tooling,
 specification freeze, stable promotion and release authorization. The Rust
-implementation at `tinkle-org/syntra-rs` main (`50ca849`) implements the
-reviewed SC1 proposal; the canonical-contract activation in Decision 0002
-replaced draft-1 alignment targets, and the implementation's local evidence
+implementation at `tinkle-org/syntra-rs` main
+(`73f9775043ba2625a823f5cca3fbe92cdf345293`) targets the accepted RFC 0007 §11
+canonical contract that Decision 0002 activated against the earlier draft-1
+alignment targets, and the implementation's local implementation evidence
 does not close the registered cases, independent interoperability or release
 gates.
 

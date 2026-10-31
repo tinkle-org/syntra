@@ -1,7 +1,7 @@
 # Syntra v1 Core Specifications — Index
 
 - Version: 1.0.0-draft.1 (2026-10-19)
-- Status: Draft (pending maintainer approval via RFC)
+- Status: Draft (pending maintainer approval via RFC) as an index; per-document status is authoritative and is now mixed — several owner documents are Accepted or Partially accepted via [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md) while the rest remain Draft — so check each document's own Status line rather than this listing.
 - Authority: Each document below owns its `SNTR-*` requirements; `requirements.md` is the index; `architecture.md` (§8) is the project ownership map.
 
 | Document | Identifier | Title | Requirements |

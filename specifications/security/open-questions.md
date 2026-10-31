@@ -111,8 +111,9 @@ become a separate explicitly negotiated profile later).
 3. **Credential lifecycle/privacy.** Rotation (`SNTR-DAUTH-020`/`SNTR-DAUTH-021`),
    compromise recovery (`SNTR-DAUTH-022`), secret hygiene and disposal
    (`SNTR-DAUTH-023`), server-key pin rotation (`SNTR-DAUTH-024`) and the
-   revocation-propagation bound (`SNTR-DAUTH-017`–`SNTR-DAUTH-019`) now
-   require complete contracts from [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md);
+   revocation-propagation bound (`SNTR-DAUTH-017`–`SNTR-DAUTH-019`) are
+   specified by the accepted [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md)
+   lifecycle contract;
    delivering them, executing their planned `PLAN-DAUTH-*` cases and obtaining
    independent verification remain open. Nonzero AK validation does not
    establish entropy. Handle enumeration/correlation

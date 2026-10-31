@@ -1,7 +1,9 @@
 # Syntra v1 release readiness — current assessment
 
-Date: 2026-10-28. Scope: current specification-only repository and selected
-mobile v1 target. Overall verdict: **BLOCKED**. This is not a tag, maintainer
+Date: 2026-10-28. Last updated: 2026-10-30 — the acceptance-wave planning
+update, recount and verification record below are current as of that date,
+not part of this 2026-10-28 snapshot. Scope: current specification-only
+repository and selected mobile v1 target. Overall verdict: **BLOCKED**. This is not a tag, maintainer
 approval, conformance declaration or independent security certification.
 The [October 19 snapshot](history/v1-release-readiness-2026-10-19.md) is retained
 as history; its source counts, distribution, license and profile-ID assertions

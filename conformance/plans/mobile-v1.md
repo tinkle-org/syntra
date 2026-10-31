@@ -2,10 +2,11 @@
 
 Status: planned but not executed. Owner: [RFC 0008](../../rfcs/0008-mobile-lifecycle-and-v1-acceptance.md),
 with [SC1 RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#11-accepted-interoperability-contract-2026-10-29),
-the host authorization lifecycle of [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md)
+the host authorization lifecycle of [RFC 0010](../../rfcs/0010-sc1-host-authorization-lifecycle.md),
+the accepted [recovery decision amendment, RFC 0006 §11](../../rfcs/0006-update-recovery-profile.md#11-decision-amendment--release-inclusion-and-recovery-safety)
 and the accepted [Decision 0002](../../docs/decisions/0002-sdd-acceptance-wave.md)
 wave, plus the [recovery plan](update-recovery.md). Acceptance anchoring:
-RFCs 0007 §11, 0008, 0010 and 0004 are accepted, so the behavioral
+RFCs 0006 §11, 0007 §11, 0008, 0010 and 0004 are accepted, so the behavioral
 outcomes below derive from accepted normative requirements — unlike the
 pre-acceptance draft, they are no longer bare proposals awaiting
 acceptance. Each executed outcome still cites the owning requirement ID
