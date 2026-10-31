@@ -306,6 +306,84 @@ def check_manifests():
         if "error" in exp and isinstance(exp["error"], dict) and "code" in exp["error"]:
             if exp["error"]["code"] not in error_codes:
                 err(mf, f"case {cid} has unknown error code {exp['error']['code']}")
+        ctl_specified = "control_connection" in case
+        ctl = case.get("control_connection")
+        if ctl_specified and not isinstance(ctl, dict):
+            # An explicit null or non-map control is not a structured,
+            # runner-executable control; the schema defines a map.
+            err(mf, f"case {cid} control_connection must be a map")
+            ctl = None
+        if isinstance(ctl, dict):
+            if not isinstance(ctl, dict):
+                err(mf, f"case {cid} control_connection must be a map")
+            else:
+                for key in ctl:
+                    if key not in ("preconditions", "frames", "subscriptions",
+                                   "replay", "transport", "faults",
+                                   "credentials", "expected", "notes"):
+                        err(mf, f"case {cid} has unknown control_connection key {key}")
+                for key in ("preconditions", "expected"):
+                    if key not in ctl:
+                        err(mf, f"case {cid} control_connection missing required key '{key}'")
+                cpre = ctl.get("preconditions")
+                if not isinstance(cpre, list) or not cpre:
+                    err(mf, f"case {cid} control_connection needs a non-empty preconditions list")
+                cframes = ctl.get("frames")
+                cframes_ok = isinstance(cframes, list) and all(
+                    isinstance(f, dict) for f in cframes)
+                if cframes is not None and not cframes_ok:
+                    err(mf, f"case {cid} control_connection frames must be a list of maps")
+                if cid == "CONF-URP-001":
+                    # The control is the executable attribution for the gate:
+                    # it must run Negotiate and then the exact same Subscribe
+                    # payload as the case-level probe, so the confirmation
+                    # gate is the sole delta between the two connections.
+                    neg = "/syntra.v1.UpdateRecovery/Negotiate"
+                    sub = "/syntra.v1.UpdateRecovery/Subscribe"
+                    ctl_raw = ctl.get("frames")
+                    ctl_frames = list(ctl_raw) if isinstance(ctl_raw, list) else []
+                    ordered = (len(ctl_frames) >= 2
+                               and isinstance(ctl_frames[0], dict)
+                               and isinstance(ctl_frames[1], dict)
+                               and ctl_frames[0].get("method") == neg
+                               and ctl_frames[1].get("method") == sub)
+                    if not (isinstance(ctl, dict) and ordered):
+                        err(mf, f"case {cid} control_connection must be executable: Negotiate followed by the probe Subscribe request")
+                    inp = case.get("input") or {}
+                    inp_frames = inp.get("frames") if isinstance(inp, dict) else None
+                    inp_frames = inp_frames if isinstance(inp_frames, list) else []
+                    probe = next((f["payload_b64"] for f in inp_frames
+                                  if isinstance(f, dict) and f.get("method") == sub
+                                  and isinstance(f.get("payload_b64"), str)),
+                                 None)
+                    if probe is None:
+                        err(mf, f"case {cid} input must carry a Subscribe probe frame with a payload_b64")
+                    ctl_payloads = [f.get("payload_b64") for f in ctl_frames
+                                    if isinstance(f, dict) and f.get("method") == sub]
+                    if not ctl_payloads or any(not isinstance(p, str) for p in ctl_payloads) \
+                            or ctl_payloads[0] != probe:
+                        err(mf, f"case {cid} control_connection Subscribe payload must equal the case-level probe payload")
+                cexp = ctl.get("expected")
+                if not isinstance(cexp, dict) or not cexp:
+                    err(mf, f"case {cid} control_connection needs a non-empty expected block")
+                    cexp = {}
+                for key in cexp:
+                    if key not in ("connection_state", "session_state", "frames",
+                                   "error", "transport", "hygiene", "retry"):
+                        err(mf, f"case {cid} has unknown control_connection expected key {key}")
+                if "connection_state" in cexp and cexp["connection_state"] not in KNOWN_CONN_STATES:
+                    err(mf, f"case {cid} control_connection has invalid connection_state {cexp['connection_state']}")
+                if "session_state" in cexp and cexp["session_state"] not in KNOWN_SESS_STATES:
+                    err(mf, f"case {cid} control_connection has invalid session_state {cexp['session_state']}")
+                if "error" in cexp and isinstance(cexp["error"], dict) and "code" in cexp["error"]:
+                    if cexp["error"]["code"] not in error_codes:
+                        err(mf, f"case {cid} control_connection has unknown error code {cexp['error']['code']}")
+        elif cid == "CONF-URP-001":
+            # Gate attribution for the negotiation-isolation case depends on
+            # executing its declared paired control connection, so the control
+            # must be a structured, runner-executable scenario rather than
+            # prose-only notes.
+            err(mf, f"case {cid} requires a structured control_connection")
     for r, mf, cid in req_refs:
         if not REQ_NAMING.match(r):
             err(mf, f"case {cid} has malformed requirement ref {r}")

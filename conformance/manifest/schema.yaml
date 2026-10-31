@@ -37,10 +37,21 @@ schema:
       cases:
         type: list
         item: { $ref: "#/schema/test_case" }
+  expected_map:
+    type: map
+    optional: [connection_state, session_state, frames, error, transport, hygiene, retry]
+    fields:
+      connection_state: { type: string, enum: [CONNECTED, NEGOTIATING, AUTHENTICATING, ACTIVE, CLOSING, CLOSED] }
+      session_state: { type: string, enum: [none, active, unchanged, terminated_normally, terminated_abnormally, withdrawn] }
+      frames: { type: list, item: { type: map } }
+      error: { type: map, optional: [code, message_pattern, message_absent] }
+      transport: { type: map }
+      hygiene: { type: map, optional: [absent_from] }
+      retry: { type: string }
   test_case:
     type: map
     required: [id, requirement, profile, roles, capabilities, mandatory, preconditions, input, expected]
-    optional: [notes, vector_refs]
+    optional: [notes, vector_refs, control_connection]
     fields:
       id: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" }
       # Requirement refs admit the SNTR-* core families and the RFC 0006
@@ -63,17 +74,28 @@ schema:
           credentials: { type: string }
           subscriptions: { type: list, item: { type: map } }
           replay: { type: map }
-      expected:
-        type: map
-        optional: [connection_state, session_state, frames, error, transport, hygiene, retry]
+      expected: { $ref: "#/schema/expected_map" }
+      # Optional paired-control scenario for cases whose outcome depends on
+      # per-connection negotiation isolation (e.g., confirming on one
+      # connection must not enable the profile on another). When present, the
+      # runner executes this stimulus on a fresh connection with the same
+      # host, bound principal, authorization scope, and identifier/selector
+      # basis as the case-level scenario, and asserts these outcomes in
+      # addition to the case-level outcomes. Prose-only controls are not
+      # executable specifications.
+      control_connection:
+        required: [preconditions, expected]
+        optional: [frames, subscriptions, replay, transport, faults, credentials, notes]
         fields:
-          connection_state: { type: string, enum: [CONNECTED, NEGOTIATING, AUTHENTICATING, ACTIVE, CLOSING, CLOSED] }
-          session_state: { type: string, enum: [none, active, unchanged, terminated_normally, terminated_abnormally, withdrawn] }
+          preconditions: { type: list, item: { type: string }, min_items: 1 }
           frames: { type: list, item: { type: map } }
-          error: { type: map, optional: [code, message_pattern, message_absent] }
+          subscriptions: { type: list, item: { type: map } }
+          replay: { type: map }
           transport: { type: map }
-          hygiene: { type: map, optional: [absent_from] }
-          retry: { type: string }
+          faults: { type: map }
+          credentials: { type: string }
+          expected: { $ref: "#/schema/expected_map" }
+          notes: { type: string }
       notes: { type: string }
       vector_refs: { type: list, item: { type: string } }
   requirements_file:

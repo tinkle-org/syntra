@@ -52,6 +52,7 @@ cases for humans. Both share identical test IDs. If they disagree, the cited
 | `preconditions` | string list | yes | Symbolic setup states (see vocabulary below). |
 | `input` | map | yes | Stimulus: `frames` (envelope list), `transport` (raw bytes / HTTP / WS actions), `faults` (loss, delay, tamper), `credentials` (throwaway fixture names). |
 | `expected` | map | yes | Observable outcome: `connection_state`, `session_state`, `frames`, `error` (`{code, message_pattern}`), `transport` (status/close/alert), `hygiene` (negative-grep list). |
+| `control_connection` | map | no | Runner-recognized paired-control scenario for cases whose outcome depends on per-connection negotiation isolation. The runner executes it on a fresh connection with the same host, bound principal, authorization scope, and selector basis as the case-level scenario, then asserts its outcomes in addition to the case-level results. Required `keys`: `preconditions`, `expected`; optional `keys`: `frames`, `subscriptions`, `replay`, `transport`, `faults`, `credentials`, `notes`. Structured fields supersede prose-only controls; a case whose gate attribution relies on a paired control MUST declare it here (e.g., `CONF-URP-001`), and validation rejects prose-only controls for such cases. |
 | `notes` | string | no | Human guidance; never adds normative force. |
 
 Precondition vocabulary (closed list; manifests MUST NOT invent new tokens

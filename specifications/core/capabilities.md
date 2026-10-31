@@ -53,7 +53,7 @@ authority.
 
 ## 4. Failure handling
 
-Required-but-unsupported → `UNIMPLEMENTED` (RPC context) or handshake failure (if handshake-gated). Use of unconfirmed option → `FAILED_PRECONDITION`. Unknown optional advertisement → ignored with diagnostic.
+Required-but-unsupported → `UNIMPLEMENTED` (RPC context) or handshake failure (if handshake-gated). Use of an unconfirmed option → `FAILED_PRECONDITION` for a connection whose capability context is otherwise confirmed; a profile's own pre-confirmation operation handling is owned by that profile's accepted contract per §1 (SNTR-CAP-002) — the accepted recovery profile, for example, refuses profile operations on a connection that has not confirmed the profile with `UNIMPLEMENTED` and reserves `FAILED_PRECONDITION` for an unconfirmed option on a confirmed connection (`SYN-URP-010` in RFC 0006). Unknown optional advertisement → ignored with diagnostic.
 
 ## 5. Security considerations
 

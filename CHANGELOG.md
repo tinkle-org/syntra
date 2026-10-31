@@ -65,6 +65,17 @@ development, changes land under `Unreleased`.
   handle and freshly captured boundary; snapshot installation is
   same-generation with no wire carrier for completion; resume anchors to
   the durable known-safe checkpoint.
+- Recovery refusal mapping reconciled to the accepted `SYN-URP-010`
+  wording by connection state: profile operations on a connection that
+  has not confirmed the profile (like unknown operations) are refused
+  `UNIMPLEMENTED`, and `FAILED_PRECONDITION` is reserved for an
+  unconfirmed option on a connection that has confirmed the profile;
+  owner files, `capabilities.md` §4, `events.md`, and `CONF-URP-001` now
+  agree without an RFC change.
+- Manifest cases can declare a machine-readable `control_connection`
+  paired-control scenario (`schema.yaml`, validators, manifest format);
+  `CONF-URP-001` registers its confirmed-connection control structurally,
+  and validation requires it there instead of a prose-only note.
 - Replaced the experimental `syntra.sc1.draft1` carrier documentation with the
   accepted v1 WSS mapping. Draft-1 and local-revision-1 remain historical and
   are not aliases.

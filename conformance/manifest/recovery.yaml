@@ -22,7 +22,7 @@ cases:
   - id: CONF-URP-001
     requirement: [SYN-URP-001, SYN-URP-010, SYN-URP-020, SNTR-CAP-003, SNTR-EVENT-001, SNTR-EVENT-011]
     profile: SNTR-EVENTS-V1
-    roles: [client, server]
+    roles: [server]
     capabilities: [syntra.update-recovery/1]
     mandatory: false
     preconditions: [active_session]
@@ -32,8 +32,20 @@ cases:
     expected:
       connection_state: ACTIVE
       session_state: unchanged
-      error: {code: FAILED_PRECONDITION}
-    notes: "Mandatory-only fallback and per-connection negotiation isolation: the Negotiate invocation is the only permitted profile operation before confirmation; the Subscribe request itself requires confirmation, so the unconfirmed probe is a complete and otherwise valid RecoverySubscribeRequest — profile_version 1, a non-empty stream_selector within bounds, and the valid empty start_checkpoint initial-subscription sentinel (SYN-URP-021: start_checkpoint MAY be empty; empty means initial subscription) — so request-shape and bounds validation pass, no checkpoint bytes reach validation, and the recorded failure attributes specifically to the confirmation gate (SYN-URP-010), not to method recognition or checkpoint-shape or bounds validation. No handle or checkpoint is created on the unconfirmed connection, including by the checkpoint_issued_for_handle path, because Subscribe itself requires confirmation. The paired control, driven by the runner on a separate connection that confirms the recovery profile first, applies the exact same valid Subscribe payload and expects success — a fresh handle with a newly captured boundary — so the confirmation gate is the sole delta; the empty-start initial-subscription payload needs no pre-established issued-checkpoint fixture state, keeping the control deterministic (the durable known-safe resumption Subscribe is CONF-URP-015's coverage). The probe carries request_id 3 — nonzero and greater than the Negotiate/setup ids on that connection — so ordered admission (RFC 0004) admits it and the recorded failure is the unconfirmed-profile refusal, not a request-ID violation. A truly unknown method still yields UNIMPLEMENTED. On two connections negotiation on one does not enable the profile on the other; partial acceptance falls back to mandatory-only plus previously confirmed options. RFC 0006 §11.1 release-bundle inclusion does not relax the per-connection gate. SKIP when unclaimed. Registered; not yet executed."
+      error: {code: UNIMPLEMENTED}
+    control_connection:
+      preconditions: [active_session]
+      frames:
+        - {request_id: 1, body: request, method: "/syntra.v1.UpdateRecovery/Negotiate", payload_b64: "CAEQARgBIhhzeW50cmEudXBkYXRlLXJlY292ZXJ5LzE="}
+        - {request_id: 3, body: request, method: "/syntra.v1.UpdateRecovery/Subscribe", payload_b64: "CAESDnN1YnNjcmlwdGlvbi1h"}
+      expected:
+        connection_state: ACTIVE
+        session_state: unchanged
+        frames:
+          - {request_id: 1, body: result, shape: RecoveryNegotiateResponse, note: "selected_version 1 confirmed with the deployment bounds; the profile is confirmed on this connection only"}
+          - {request_id: 3, body: result, shape: RecoverySubscribeResponse, note: "fresh connection-scoped handle with a newly captured boundary"}
+      notes: "Runner-driven paired control on a fresh connection to the same recovery-capable host, bound principal, authorization scope, and stream selector as the case-level probe connection."
+    notes: "Mandatory-only fallback and per-connection negotiation isolation on one recovery-capable Host: both connections target the same host, bound principal, authorization scope, and stream selector, and the Host's mandatory service continues on the unconfirmed connection. UNCONFIRMED PROBE CONNECTION: no Negotiate is run and the profile is not confirmed; the runner deliberately injects the otherwise valid initial-subscription RecoverySubscribeRequest — profile_version 1, a non-empty stream_selector within bounds, and the valid empty start_checkpoint initial-subscription sentinel (SYN-URP-021: start_checkpoint MAY be empty; empty means initial subscription) — as a negative test, because a conforming initiator MUST NOT send profile operations before confirmation (SYN-URP-001); this injection is therefore runner-driven only. The host replies UNIMPLEMENTED (SYN-URP-010: the operation belongs to a profile not confirmed on this connection, and an unknown operation is likewise UNIMPLEMENTED), so the refusal is attributed to the confirmation gate by the paired control rather than by the error code alone. No handle and no checkpoint are created on the unconfirmed connection, including by the checkpoint_issued_for_handle path, because Subscribe itself requires confirmation. request_id 3 is nonzero and admitted as increasing on its connection (RFC 0004), so the refusal is not a request-ID violation. CONTROL CONNECTION (runner-driven, fresh connection to the same host): Negotiate (request_id 1) returns selected_version 1 with the confirmed deployment bounds, confirming the profile on that connection only, and the exact same valid Subscribe payload (request_id 3) then succeeds with a fresh connection-scoped handle and a newly captured boundary, so the confirmation gate is the sole delta; request IDs are independently valid within each connection. Negotiation and confirmation on the control connection never enable the profile on the unconfirmed one; partial acceptance falls back to mandatory-only plus previously confirmed options (SYN-URP-001). The durable known-safe resumption shape is CONF-URP-015's coverage. RFC 0006 §11.1 release-bundle inclusion does not relax the per-connection gate. SKIP when unclaimed. Registered; not yet executed."
 
   - id: CONF-URP-002
     requirement: [SYN-URP-003, SYN-URP-004, SNTR-EVENT-007, SNTR-REL-005]

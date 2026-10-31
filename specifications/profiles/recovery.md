@@ -68,7 +68,7 @@ IDs in this section use prefix `SYN-URP`. They are accepted requirements of RFC 
 
 ### 2.2 Host obligations
 
-**SYN-URP-010** — The host MUST confirm the profile only where it implements it for the bound principal, MUST confirm per connection so that confirmation on one connection does not enable the profile on another, MUST document the confirmed profile version and bounds per deployment, MUST accept the standardized profile negotiation invocation after ACTIVE before confirmation where the host implements the profile, and MUST reject other unnegotiated profile use with `UNIMPLEMENTED` for an unknown operation or `FAILED_PRECONDITION` for use of an unconfirmed operation or for use of an unconfirmed option on a confirmed connection. The negotiation invocation itself is the only permitted profile operation before confirmation. Release-bundle inclusion under RFC 0006 §11.1 does not change per-connection confirmation or refusal behavior.
+**SYN-URP-010** — The host MUST confirm the profile only where it implements it for the bound principal, MUST confirm per connection so that confirmation on one connection does not enable the profile on another, MUST document the confirmed profile version and bounds per deployment, MUST accept the standardized profile negotiation invocation after ACTIVE before confirmation where the host implements the profile, and MUST reject other unnegotiated profile use with `UNIMPLEMENTED` (an operation that is unknown, or that belongs to a profile not confirmed on this connection) or `FAILED_PRECONDITION` (use of an unconfirmed option on a connection that has confirmed the profile). The negotiation invocation itself is the only permitted profile operation before confirmation. Release-bundle inclusion under RFC 0006 §11.1 does not change per-connection confirmation or refusal behavior.
 
 **SYN-URP-011** — The host MUST implement negotiation, subscribe, replay, catch-up, snapshot, continuation, confirm, and terminate operations as standardized generic invocations with versioned payloads inside existing envelopes. The host MUST NOT add envelope fields, MUST NOT reuse reserved numbers 16, 17 or reserved names `event`, `resume`, `ack`, MUST NOT introduce a wire carrier for `RecoverySnapshotComplete` (SYN-URP-016), and MUST keep unknown profile fields ignored on receipt where explicitly marked ignorable, rejecting unknown profile operations with `UNIMPLEMENTED`.
 
@@ -306,9 +306,9 @@ Profile errors use the existing typed codes. No code semantics change. Mappings:
 | Condition | Code | Scope |
 |---|---|---|
 | Unknown profile operation | `UNIMPLEMENTED` | Affected invocation only |
-| Use of an unconfirmed profile operation | `FAILED_PRECONDITION` | Affected invocation only |
+| Use of an unconfirmed profile operation (profile not confirmed on this connection) | `UNIMPLEMENTED` | Affected invocation only |
 | Unknown stream handle | `UNIMPLEMENTED` | Affected invocation on the handle, unless retained stale context is tracked (SYN-URP-024) |
-| Use of an unconfirmed option on a confirmed connection | `FAILED_PRECONDITION` | Affected invocation only |
+| Use of an unconfirmed option on a connection that has confirmed the profile | `FAILED_PRECONDITION` | Affected invocation only |
 | Unauthorized or unknown principal at any hook | `PERMISSION_DENIED` or `UNAUTHENTICATED` | Affected invocation and targeted termination where possible |
 | Stale, forged, malformed, cross-stream, cross-generation, or cross-principal checkpoint | `FAILED_PRECONDITION`, or `UNAUTHENTICATED` where token-like | Affected invocation only, without leaking other principals' state |
 | Requested checkpoint outside retention or unrecoverable by replay | `FAILED_PRECONDITION` in the failed replay/catch-up `RpcResult` plus explicit snapshot-required signal as `RecoveryBatchTrailer{snapshot_required=true}` in a `Notification` payload; no generation change | Affected stream, recovery by snapshot path with binding otherwise unchanged |
