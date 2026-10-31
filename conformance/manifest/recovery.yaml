@@ -25,15 +25,15 @@ cases:
     roles: [client, server]
     capabilities: [syntra.update-recovery/1]
     mandatory: false
-    preconditions: [active_session]
+    preconditions: [active_session, checkpoint_issued_for_handle]
     input:
       frames:
-        - {request_id: 3, body: request, method: "/syntra.v1.UpdateRecovery/Replay", payload_b64: "CAESCGhhbmRsZS1BGg1jaGVja3BvaW50LWM3IAE="}
+        - {request_id: 3, body: request, method: "/syntra.v1.UpdateRecovery/Replay", payload_b64: "CAESCGhhbmRsZS1BGg1jaGVja3BvaW50LWM3IAEoAQ=="}
     expected:
       connection_state: ACTIVE
       session_state: unchanged
       error: {code: FAILED_PRECONDITION}
-    notes: "Mandatory-only fallback and per-connection negotiation isolation: the Negotiate invocation is the only permitted profile operation before confirmation; use of the unconfirmed /syntra.v1.UpdateRecovery/Replay operation on an ACTIVE connection yields FAILED_PRECONDITION (SYN-URP-010) with no batches and intact mandatory interop; a truly unknown method still yields UNIMPLEMENTED. The probe carries request_id 3 — nonzero and greater than the Negotiate/setup ids on that connection — so ordered admission (RFC 0004) admits it and the recorded failure is the unconfirmed-profile refusal, not a request-ID violation. On two connections negotiation on one does not enable the profile on the other; partial acceptance falls back to mandatory-only plus previously confirmed options. RFC 0006 §11.1 release-bundle inclusion does not relax the per-connection gate. SKIP when unclaimed. Registered; not yet executed."
+    notes: "Mandatory-only fallback and per-connection negotiation isolation: the Negotiate invocation is the only permitted profile operation before confirmation; use of the unconfirmed /syntra.v1.UpdateRecovery/Replay operation on an ACTIVE connection yields FAILED_PRECONDITION (SYN-URP-010) with no batches and intact mandatory interop; a truly unknown method still yields UNIMPLEMENTED. The probe payload is complete and otherwise valid: profile_version 1, handle-A at the fixture-issued committable checkpoint checkpoint-c7 (issued by the checkpoint_issued_for_handle precondition), max_batches 1 and max_bytes 1, so request-shape and checkpoint validation pass and the recorded failure attributes specifically to the confirmation gate (SYN-URP-010), not to checkpoint-shape or bounds validation. The paired control, driven by the runner on a separate connection that confirms the recovery profile first, applies the same payload and expects success — the confirmation gate is the sole delta. The probe carries request_id 3 — nonzero and greater than the Negotiate/setup ids on that connection — so ordered admission (RFC 0004) admits it and the recorded failure is the unconfirmed-profile refusal, not a request-ID violation. On two connections negotiation on one does not enable the profile on the other; partial acceptance falls back to mandatory-only plus previously confirmed options. RFC 0006 §11.1 release-bundle inclusion does not relax the per-connection gate. SKIP when unclaimed. Registered; not yet executed."
 
   - id: CONF-URP-002
     requirement: [SYN-URP-003, SYN-URP-004, SNTR-EVENT-007, SNTR-REL-005]
@@ -158,7 +158,7 @@ cases:
     input:
       faults: {provider_history_loss: true}
       frames:
-        - {request_id: 1, body: request, method: "/syntra.v1.UpdateRecovery/Replay", payload_b64: "CAESCGhhbmRsZS1BGg1jaGVja3BvaW50LWM3IAE=", generation: 7}
+        - {request_id: 1, body: request, method: "/syntra.v1.UpdateRecovery/Replay", payload_b64: "CAESCGhhbmRsZS1BGg1jaGVja3BvaW50LWM3IAEoAQ==", generation: 7}
         - {request_id: 2, body: request, method: "/syntra.v1.UpdateRecovery/Confirm", payload_b64: "CAESCGhhbmRsZS1BGAciDWNoZWNrcG9pbnQtYzc=", generation: 7}
     expected:
       connection_state: ACTIVE

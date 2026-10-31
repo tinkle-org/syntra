@@ -178,8 +178,13 @@ See `docs/server-implementation.md` for the host side and
 
 ## 7. Implement RPC correlation
 
-- Initiator: nonzero `request_id`, unique among outstanding RPCs on the
-  connection (`SNTR-RPC-002`). Correlate each terminal `result` by ID;
+- Initiator: nonzero `request_id`, strictly increasing in the actual
+  serialized request-frame emission order, unique for the whole connection
+  and never reused — not even after a terminal `result` (`SNTR-RPC-002`,
+  accepted RFC 0004; reusing or reissuing an already-seen ID is an
+  ordered-admission violation: the detecting host records local
+  `FAILED_PRECONDITION`, sends no result, and closes the connection).
+  Correlate each terminal `result` by ID;
   tolerate interleaved `notification`s and out-of-order completion.
   Enforce your timer (≤ requested budget); abandonment without `cancel`
   does not cancel the host.

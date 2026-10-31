@@ -116,12 +116,17 @@ release/completion-time gaps remain [open](sc1-implementation.md#remaining-work)
 
 ## Request IDs
 
-IDs are nonzero `uint64`, strictly increasing within one connection, and
-never reused — not even after the terminal `result` for that ID
-([RFC 0004](../rfcs/0004-correlation-identity-carriage.md)). Reusing,
-replaying or reissuing an already-seen ID is an ordered-admission violation:
-the violating side records local `FAILED_PRECONDITION` and the connection
-terminates; in-flight calls fail `UNAVAILABLE` per the connection rule.
+IDs are nonzero `uint64`, strictly increasing in the actual serialized
+request-frame emission order on one connection
+([RFC 0004](../rfcs/0004-correlation-identity-carriage.md) D1). When requests
+are produced concurrently, serialize the allocation: the ID is claimed when
+the request is actually emitted, never by API-call order. IDs are never
+reused — not even after the terminal `result` for that ID — and moving them
+off the connection's emission sequence is an ordered-admission violation:
+the detecting host records local `FAILED_PRECONDITION`, sends no terminal
+`result` for the violating request, and closes the connection via the
+native signal; the violating client observes only that close and maps
+affected in-flight calls to `UNAVAILABLE` per the connection rule.
 Correlate every `result` by ID; accept out-of-order completion; never assume
 FIFO. Handle interleaved `notification`s without completing any RPC. Every
 new connection (and every HTTP exchange) starts a fresh ID space; logical
