@@ -41,8 +41,13 @@ development, changes land under `Unreleased`.
   `applicable_transports` (peer-observation family vocabulary) to encode
   transport-scoped requirements such as the RFC 0004 D3 persistent-carrier
   exemptions; `CONF-RPC-004` and `CONF-RPC-013` now declare
-  `[tcp_tls, ws_wss]`, and an HTTP/HTTPS-only claim reports a valid `SKIP`
-  citing the key (§6 exception to the no-SKIP-for-mandatory rule).
+  `[tcp_tls, ws_wss]`, so do the wire-`hello` cases `CONF-CORE-005` /
+  `CONF-CORE-006` and the per-connection concurrency floor `CONF-RPC-002`
+  (HTTP floor coverage lives in `CONF-HTTP-013` and `CONF-HTTPS-003`),
+  while `CONF-RPC-003` stays unrestricted — on HTTP/HTTPS its two requests
+  map to two independent concurrent exchanges (RFC 0004 D3). An
+  HTTP/HTTPS-only claim reports a valid `SKIP` citing the key (§6
+  exception to the no-SKIP-for-mandatory rule).
 - Manifest validation now rejects present-but-null `expected.error` /
   `expected.transport` maps (case-level and `control_connection`) while
   absent keys stay allowed; clarified the `expected.frames: []` semantics

@@ -82,6 +82,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [transport_connected]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 0, body: hello, min_version: 2, max_version: 3 }
@@ -94,7 +95,7 @@ cases:
         peer_observation:
           tcp_tls: { signal: transport_close, local_report: UNAVAILABLE }
           ws_wss: { signal: ws_close, close_code: 1002, local_report: generic_protocol_rejection }
-    notes: "Unsupported protocol version (disjoint range against v1-only host). Two observers, one rejection: the detecting host records a local UNIMPLEMENTED cause and closes (SNTR-HS-003, accepted RFC 0003 D3); `observer: detecting_host` binds that error assertion to the host's local record, `carriage: local_only` asserts that zero Syntra Frames leave the host (no RpcResult, no error-bearing ready, no zero-ID error Frame — the RFC 0003 D1 no-invented-carrier rule, executable here as `frames: []`), and `transport.peer_observation` asserts the initiator's transport-specific native signal (handshake.md §5: TCP/TLS = native close, initiator reports UNAVAILABLE absent better local evidence; WS/WSS = Close 1002, initiator reports a generic protocol rejection and MUST NOT infer the host's exact ErrorCode). The HTTP/HTTPS legs are bound separately: header synthesis replaces the wire hello Frame, and their version-mismatch case is CONF-HTTP-008 (400, no Syntra envelope, adapter local report INVALID_ARGUMENT) — never an ordinary hello-frame exchange. No credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
+    notes: "Unsupported protocol version (disjoint range against v1-only host). Two observers, one rejection: the detecting host records a local UNIMPLEMENTED cause and closes (SNTR-HS-003, accepted RFC 0003 D3); `observer: detecting_host` binds that error assertion to the host's local record, `carriage: local_only` asserts that zero Syntra Frames leave the host (no RpcResult, no error-bearing ready, no zero-ID error Frame — the RFC 0003 D1 no-invented-carrier rule, executable here as `frames: []`), and `transport.peer_observation` asserts the initiator's transport-specific native signal (handshake.md §5: TCP/TLS = native close, initiator reports UNAVAILABLE absent better local evidence; WS/WSS = Close 1002, initiator reports a generic protocol rejection and MUST NOT infer the host's exact ErrorCode). The HTTP/HTTPS legs are bound separately: header synthesis replaces the wire hello Frame, and their version-mismatch case is CONF-HTTP-008 (400, no Syntra envelope, adapter local report INVALID_ARGUMENT) — never an ordinary hello-frame exchange. Persistent-carrier scope is machine-readable via this case's applicable_transports [tcp_tls, ws_wss]; an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6). No credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
 
   - id: CONF-CORE-006
     requirement: [SNTR-CAP-002, SNTR-CAP-004, SNTR-CAP-011]
@@ -103,13 +104,14 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [transport_connected]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 0, body: hello, min_version: 1, max_version: 1 }
     expected:
       connection_state: ACTIVE
       session_state: active
-    notes: "Handshake carries no capability or profile terms (accepted RFC 0005 D1): a mandatory-only hello against a full host reaches ACTIVE; no capability field exists on the wire, so a host MUST NOT fail a handshake over optional-capability state (SNTR-CAP-004). Harness host configuration: the authentication policy permits the supplied hello credentials. Accepted-profile negotiation positive/negative coverage is owned by that profile's own registered cases (recovery: CONF-URP-001). Contrast CONF-CORE-007."
+    notes: "Handshake carries no capability or profile terms (accepted RFC 0005 D1): a mandatory-only hello against a full host reaches ACTIVE; no capability field exists on the wire, so a host MUST NOT fail a handshake over optional-capability state (SNTR-CAP-004). Harness host configuration: the authentication policy permits the supplied hello credentials. Persistent-carrier scope is machine-readable via this case's applicable_transports [tcp_tls, ws_wss]: the wire hello never applies to HTTP/HTTPS directly — header synthesis replaces it (RFC 0003 D1), so an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6), with positive per-exchange coverage in CONF-HTTP-001 and CONF-HTTPS-001. Accepted-profile negotiation positive/negative coverage is owned by that profile's own registered cases (recovery: CONF-URP-001). Contrast CONF-CORE-007."
 
   - id: CONF-CORE-007
     requirement: [SNTR-CAP-002, SNTR-CAP-011]

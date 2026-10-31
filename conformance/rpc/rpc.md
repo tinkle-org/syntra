@@ -21,7 +21,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
-- Scope: persistent-carrier concurrency (SNTR-RPC-008) — this case runs on persistent Syntra connections (TCP/TLS, WS/WSS, SC1). HTTP/HTTPS exchanges are independent logical connections each carrying one RPC (SNTR-HTTP-070); their minimum concurrency is transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041).
+- Scope: persistent-carrier concurrency (SNTR-RPC-008) — this case runs on persistent Syntra connections (TCP/TLS, WS/WSS, SC1), machine-readable via its manifest `applicable_transports: [tcp_tls, ws_wss]` (SC1 multiplexes within the `ws_wss` family; an HTTP/HTTPS-only claim reports `SKIP` citing the key). HTTP/HTTPS exchanges are independent logical connections each carrying one RPC (SNTR-HTTP-070); their minimum concurrency is transport-owned (SNTR-HTTP-072 per CONF-HTTP-013, SNTR-HTTPS-041 per CONF-HTTPS-003).
 
 ## CONF-RPC-003 reversed response order
 
@@ -32,6 +32,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
+- Scope: correlation discipline applies on every carrier — this case declares no transport restriction. On persistent connections the two requests are outstanding RPCs on one Syntra connection; on HTTP/HTTPS (RFC 0004 D3) the harness maps them to two INDEPENDENT concurrent exchanges (ordering: none, SNTR-HTTP-072; H2 streams: SNTR-HTTPS-041) and asserts exchange 8 completes before exchange 7. No cross-exchange request-ID memory or shared state is implied on HTTP (SNTR-HTTP-073).
 
 ## CONF-RPC-004 duplicate request ID
 

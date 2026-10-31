@@ -180,12 +180,26 @@ def load_manifest_cases():
         if mf.name in ("schema.yaml", "requirements.yaml"):
             continue
         data = yaml.safe_load(mf.read_text())
-        for case in data.get("cases", []):
+        if not isinstance(data, dict):
+            err(mf, "manifest file must be a map")
+            continue
+        entries = data.get("cases", [])
+        if not isinstance(entries, list):
+            err(mf, "cases must be a list of case maps")
+            continue
+        for case in entries:
+            if not isinstance(case, dict):
+                err(mf, f"case entry must be a map, got {type(case).__name__}")
+                continue
             cid = case.get("id")
+            if not isinstance(cid, str):
+                err(mf, f"case entry must have a string id, got {cid!r}")
+                continue
             if cid in cases:
                 err(mf, f"duplicate test ID {cid} (also in {cases[cid][0].name})")
             cases[cid] = (mf, case)
-            for r in case.get("requirement", []) or []:
+            req_field = case.get("requirement")
+            for r in (req_field if isinstance(req_field, list) else []):
                 req_refs.append((r, mf, cid))
     return cases, req_refs
 
@@ -369,7 +383,13 @@ def check_manifests():
         if not profiles or any(not isinstance(p, str) or p not in KNOWN_PROFILES
                                for p in profiles):
             err(mf, f"case {cid} references unknown profile {case.get('profile')}")
-        for r in case.get("requirement", []) or []:
+        req_field = case.get("requirement")
+        if not isinstance(req_field, list) and req_field is not None:
+            err(mf, f"case {cid} requirement must be a list of requirement IDs")
+        for r in req_field if isinstance(req_field, list) else []:
+            if not isinstance(r, str):
+                err(mf, f"case {cid} has malformed requirement ref {r!r}")
+                continue
             if r in RESERVED_REQUIREMENTS:
                 err(mf, f"case {cid} references reserved requirement {r}")
             if r not in req_ids:
@@ -378,11 +398,21 @@ def check_manifests():
                 err(mf, f"case {cid} has malformed requirement ref {r}")
         if not isinstance(case.get("mandatory"), bool):
             err(mf, f"case {cid} mandatory must be boolean")
-        if not set(case.get("roles", []) or []) <= KNOWN_ROLES or not case.get("roles"):
-            err(mf, f"case {cid} has invalid roles {case.get('roles')}")
-        for c in case.get("capabilities", []) or []:
-            if c not in KNOWN_CAPABILITIES:
-                err(mf, f"case {cid} has undeclared capability prerequisite {c}")
+        roles = case.get("roles")
+        if not isinstance(roles, list) or not roles or any(
+                not isinstance(v, str) or v not in KNOWN_ROLES for v in roles):
+            err(mf, f"case {cid} has invalid roles {roles!r}")
+        caps = case.get("capabilities")
+        if caps is None:
+            # Absent/null capabilities is handled by the required-key loop;
+            # keep the pre-existing silent treatment instead of double-erroring.
+            pass
+        elif not isinstance(caps, list):
+            err(mf, f"case {cid} capabilities must be a list of capability IDs")
+        else:
+            for c in caps:
+                if not isinstance(c, str) or c not in KNOWN_CAPABILITIES:
+                    err(mf, f"case {cid} has undeclared capability prerequisite {c}")
         if "applicable_transports" in case:
             at = case.get("applicable_transports")
             if not isinstance(at, list) or not at or not all(
@@ -514,7 +544,7 @@ def check_manifests():
                         "violation_and_closure} for deterministic duplicate "
                         "injection (no sleeps, no prose-only assumptions)")
     for r, mf, cid in req_refs:
-        if not REQ_NAMING.match(r):
+        if not isinstance(r, str) or not REQ_NAMING.match(r):
             err(mf, f"case {cid} has malformed requirement ref {r}")
     print(f"manifests: {len(cases)} cases, {len(req_refs)} requirement refs")
 

@@ -135,11 +135,24 @@ documented coordination faults follow the established
   separate client-side obligation), and the host-side rule (reject the
   duplicate at admission, never dispatch it) is what the case verifies.
 
-Cases whose stimulus is a wire `hello` `Frame` (e.g. `CONF-CORE-005`)
-never apply to HTTP/HTTPS directly: those profiles synthesize the
-handshake from headers, and their version-mismatch coverage is the
-per-exchange transport case (`CONF-HTTP-008`), not an exchange of the
-same fixture.
+Cases whose stimulus is a wire `hello` `Frame` (`CONF-CORE-005`,
+`CONF-CORE-006`) never apply to HTTP/HTTPS directly: those profiles
+synthesize the handshake from headers, and their per-exchange coverage
+lives in the transport manifests (`CONF-HTTP-001`, `CONF-HTTPS-001` for
+the positive path; `CONF-HTTP-008` for version mismatch), not an
+exchange of the same fixture. Both cases therefore declare
+`applicable_transports: [tcp_tls, ws_wss]`.
+
+`CONF-RPC-002` (per-connection concurrency floor) scopes to persistent
+carriers for the same reason (one RPC per HTTP exchange; SNTR-HTTP-070)
+and declares `applicable_transports: [tcp_tls, ws_wss]`; an
+HTTP/HTTPS-only claim reports `SKIP` for it and cites the key. Its
+HTTP/HTTPS floor coverage is transport-owned instead: `CONF-HTTP-013`
+(SNTR-HTTP-072) and `CONF-HTTPS-003` (SNTR-HTTPS-041). `CONF-RPC-003`
+(out-of-order correlation) is deliberately unrestricted: its semantics
+apply on every carrier — on HTTP/HTTPS the two requests map to two
+independent concurrent exchanges (SNTR-HTTP-072; SNTR-HTTPS-041), each
+correlated by request ID (RFC 0004 D3, SNTR-HTTP-073).
 
 ## Base64 and hex conventions
 

@@ -165,6 +165,96 @@ class ValidateManifestScalarsTests(unittest.TestCase):
                 case["applicable_transports"] = bad
                 self.assertIn("applicable_transports", self.check_case(case))
 
+    def test_bad_roles_are_recorded(self):
+        # Nested sequences, non-list scalars and non-string members must be
+        # reported, not crash the validator (no set()/membership TypeErrors).
+        for bad in ([["server"]], 5, "server", [5], None):
+            with self.subTest(bad=bad):
+                VALIDATOR.ERRORS.clear()
+                case = make_case()
+                case["roles"] = bad
+                self.assertIn("invalid roles", self.check_case(case))
+
+    def test_bad_capability_values_are_recorded(self):
+        # Unhashable members (nested maps/sequences) and non-list values must
+        # produce recorded errors instead of TypeError at membership/iteration.
+        for bad in ([{"id": 1}], 7, "resumable", [["x"]]):
+            with self.subTest(bad=bad):
+                VALIDATOR.ERRORS.clear()
+                case = make_case()
+                case["capabilities"] = bad
+                self.assertIn("capabilit", self.check_case(case))
+
+    def test_bad_requirement_values_are_recorded(self):
+        # Non-list `requirement` (scalar) and nested sequences inside it.
+        for bad in (5, "SNTR-RPC-002", [["SNTR-RPC-002"]]):
+            with self.subTest(bad=bad):
+                VALIDATOR.ERRORS.clear()
+                case = make_case()
+                case["requirement"] = bad
+                result = self.check_case(case)
+                self.assertTrue(
+                    "must be a list" in result or "malformed requirement ref" in result,
+                    result)
+
+    def test_malformed_collected_requirement_ref_is_recorded(self):
+        # The req_refs consumer (parsed once by load_manifest_cases, consumed
+        # at the end of check_manifests) must tolerate non-string entries.
+        with (mock.patch.object(VALIDATOR, "parse_proto_model", return_value=({}, {})),
+              mock.patch.object(VALIDATOR, "load_manifest_cases", return_value=(
+                  {}, [(["SNTR-RPC-002"], "fixture.yaml", "CONF-TEST-999")])),
+              mock.patch.object(VALIDATOR, "load_requirements", return_value=[])):
+            VALIDATOR.ERRORS.clear()
+            VALIDATOR.check_manifests()
+        self.assertIn("malformed requirement ref", "\n".join(VALIDATOR.ERRORS))
+
+    def test_load_manifest_cases_survives_malformed_yaml(self):
+        # The loader must report structurally invalid manifest files (non-map
+        # documents, non-list `cases`, non-map entries, non-string ids, and
+        # malformed nested `requirement` values) instead of crashing; valid
+        # siblings keep loading side effects free of the malformed ones.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with mock.patch.object(VALIDATOR, "ROOT", root):
+                mdir = root / "conformance" / "manifest"
+                mdir.mkdir(parents=True)
+                (mdir / "bad-nonmap.yaml").write_text("hello\n")
+                (mdir / "bad-cases.yaml").write_text("cases: 5\n")
+                (mdir / "bad-entry.yaml").write_text("cases: [5]\n")
+                (mdir / "bad-id.yaml").write_text(
+                    "cases:\n"
+                    "  - requirement: [SNTR-RPC-002]\n"
+                    "    profile: SNTR-RPC-V1\n"
+                    "    roles: [client]\n"
+                    "    capabilities: []\n"
+                    "    mandatory: true\n"
+                    "    preconditions: [active_session]\n"
+                    "    input: {frames: []}\n"
+                    "    expected: {connection_state: CLOSED, session_state: none}\n")
+                (mdir / "bad-req.yaml").write_text(
+                    "cases:\n"
+                    "  - id: CONF-REQT-001\n"
+                    "    requirement: [[SNTR-RPC-002]]\n"
+                    "    profile: SNTR-RPC-V1\n"
+                    "    roles: [client]\n"
+                    "    capabilities: []\n"
+                    "    mandatory: true\n"
+                    "    preconditions: [active_session]\n"
+                    "    input: {frames: []}\n"
+                    "    expected: {connection_state: CLOSED, session_state: none}\n")
+                VALIDATOR.ERRORS.clear()
+                cases, req_refs = VALIDATOR.load_manifest_cases()
+        result = "\n".join(VALIDATOR.ERRORS)
+        self.assertIn("manifest file must be a map", result)
+        self.assertIn("cases must be a list of case maps", result)
+        self.assertIn("case entry must be a map", result)
+        self.assertIn("case entry must have a string id", result)
+        # The malformed-but-parseable case keeps its collected refs; nested
+        # sequences land in req_refs and are rejected by the consumer later.
+        self.assertEqual(len(req_refs), 1)
+        self.assertIn("CONF-REQT-001", cases)
+
     def test_bad_connection_state_is_recorded(self):
         case = make_case()
         case["expected"]["connection_state"] = ["ACTIVE"]

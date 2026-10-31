@@ -28,6 +28,7 @@ cases:
     capabilities: []
     mandatory: true
     preconditions: [active_session]
+    applicable_transports: [tcp_tls, ws_wss]
     input:
       frames:
         - { request_id: 7, body: request, method: "/example.Echo/Echo", payload_b64: "YQ==", timeout_ms: 2000 }
@@ -38,7 +39,7 @@ cases:
       frames:
         - { request_id: 7, body: result }
         - { request_id: 8, body: result }
-    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs; no lower bound may be negotiated (RFC 0005 D2). Persistent-carrier scope (SNTR-RPC-008): this floor is per persistent Syntra connection (TCP/TLS, WS/WSS, SC1); HTTP/HTTPS exchanges are independently scoped (one RPC per exchange; SNTR-HTTP-070) and their minimum concurrency is transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041). Floor-capacity coverage with deliberate out-of-order completion: CONF-RPC-013."
+    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs; no lower bound may be negotiated (RFC 0005 D2). Persistent-carrier scope (SNTR-RPC-008): this floor is per persistent Syntra connection (TCP/TLS, WS/WSS, SC1); HTTP/HTTPS exchanges are independently scoped (one RPC per exchange; SNTR-HTTP-070) and their minimum concurrency is transport-owned (SNTR-HTTP-072, SNTR-HTTPS-041). Machine-readable via this case's applicable_transports [tcp_tls, ws_wss] (SC1 multiplexes within the ws_wss family): an HTTP/HTTPS-only claim reports SKIP for this case citing the key (conformance README §6), with its floor covered by CONF-HTTP-013 (SNTR-HTTP-072) and CONF-HTTPS-003 (SNTR-HTTPS-041). Floor-capacity coverage with deliberate out-of-order completion: CONF-RPC-013."
 
   - id: CONF-RPC-003
     requirement: [SNTR-RPC-002]
@@ -58,7 +59,7 @@ cases:
       frames:
         - { request_id: 8, body: result }
         - { request_id: 7, body: result }
-    notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO."
+    notes: "Out-of-order responses: completion order is insignificant; correlation is by request_id only; initiator MUST NOT assume FIFO. Transport execution mapping: persistent carriers run the two requests as outstanding RPCs on one Syntra connection; HTTP/HTTPS (RFC 0004 D3) map them to two INDEPENDENT concurrent exchanges (ordering: none, SNTR-HTTP-072; H2 streams: SNTR-HTTPS-041), with complete_second_first asserting exchange 8 completes before exchange 7 — correlation discipline (SNTR-RPC-002 by request_id only, no FIFO assumption, no cross-exchange shared state per SNTR-HTTP-073) is carrier-independent, so this case declares no applicable_transports restriction and applies on every claimed transport."
 
   - id: CONF-RPC-004
     requirement: [SNTR-RPC-002, SNTR-RPL-012]
