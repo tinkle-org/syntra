@@ -1,0 +1,45 @@
+conformance/manifest/README.md
+  s_2b6297f6bb093d::t_dbce1167461db5 52
+  s_2b6297f6bb093d::t_9f5506ea5e14ce 87-98
+conformance/rpc/rpc.md
+  s_2b6297f6bb093d::t_4d41cc64914c06 136
+conformance/profiles.yaml
+  s_2b6297f6bb093d::t_f8ea2240d3c318 146
+CHANGELOG.md
+  s_2b6297f6bb093d::t_dbb5b3ba90332f 40-50
+conformance/README.md
+  s_2b6297f6bb093d::t_5aa88f7878db33 289
+conformance/manifest/rpc.yaml
+  s_2b6297f6bb093d::t_383c6bd739f20c 70
+  s_2b6297f6bb093d::t_9f4b58f5059ea7 82
+  s_2b6297f6bb093d::t_03d5bedeb196ed 225
+  s_2b6297f6bb093d::t_ffc4f603e45aad 266
+scripts/validate-repo.py
+  s_2b6297f6bb093d::t_f4c7f563d4659c 334-338,340
+  s_2b6297f6bb093d::t_6b7f5fc89df08e 411-415
+  s_2b6297f6bb093d::t_25b4802396955c 280-284,286
+  s_2b6297f6bb093d::t_01ec4511072152 488-492
+  s_2b6297f6bb093d::t_da2a5eb6b12752 386-392
+tests/test_validate_repo_scalars.py
+  s_2b6297f6bb093d::t_dc720a2e6e0190 126-167
+conformance/manifest/schema.yaml
+  s_2b6297f6bb093d::t_f1ce418ade4e2f 47-50
+  s_2b6297f6bb093d::t_05ba0388c796a8 75
+  s_2b6297f6bb093d::t_8d496d91bd7b78 88-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fd1957bf961ed9b22b7c3c732f70150311deacd6",
+  "prompts": {},
+  "sessions": {
+    "s_2b6297f6bb093d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6c75d2b2ffeXg28VEAnktaH3b",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
