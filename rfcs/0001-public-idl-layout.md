@@ -135,7 +135,7 @@ These 14 user-facing categories are proposed mappings into the existing registry
 |---|---|---|---|
 | 1 | Invalid envelope | `INVALID_ARGUMENT (3)` | Shape errors; size exhaustion maps separately; `SNTR-SER-005/007`, `SNTR-WIRE-003` |
 | 2 | Unsupported protocol version | `UNIMPLEMENTED (12)` or `FAILED_PRECONDITION (9)` | The handshake table permits both; selecting one interoperable policy and its carrier is blocked by B1 |
-| 3 | Unsupported feature | `UNIMPLEMENTED (12)` | Required unsupported capability fails; unknown optional advertisement is ignored; `SNTR-CAP-004/020`, B7 |
+| 3 | Unsupported feature | `UNIMPLEMENTED (12)` | Unsupported required profile and unknown profile input fail under the profile's own accepted negotiation RPC (recovery: `UNIMPLEMENTED`, `SYN-URP-010`); no generic advertisement carrier exists (accepted RFC 0005 D1); `SNTR-CAP-004/020`, B7 |
 | 4 | Handshake rejected | Cause-specific `UNAUTHENTICATED (16)`, `PERMISSION_DENIED (7)`, `FAILED_PRECONDITION (9)` or `UNIMPLEMENTED (12)` | No standalone category or legal typed rejection carrier; handshake §5 and B1 |
 | 5 | Authentication required | `UNAUTHENTICATED (16)` | Missing credential/required authentication; `SNTR-AUTH-009`, `SNTR-ERR-002`; no human-account assumption |
 | 6 | Authentication failed | `UNAUTHENTICATED (16)` | Invalid/expired/revoked credentials; generic disclosure; `SNTR-ASEC-011`, B1 |
@@ -147,6 +147,8 @@ These 14 user-facing categories are proposed mappings into the existing registry
 | 12 | Session expired | `UNAUTHENTICATED (16)`; `UNAVAILABLE (14)` for host shutdown | `SNTR-SESS-005`; no new session error carrier, B1/B7 |
 | 13 | Protocol violation | `INVALID_ARGUMENT (3)` for shape, `FAILED_PRECONDITION (9)` for state, `UNIMPLEMENTED (12)` for unknown variant | Framing §4; no new numeric category; raw-field/state conflicts B2–B6 |
 | 14 | Internal error | `INTERNAL (13)` | Generic sanitized text; `SNTR-ERR-002/003` |
+
+> Correction (2026-10-31): row 3 aligned with accepted [RFC 0005](0005-negotiation-bounds-identifiers.md) D1 per [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md) — there is no generic capability advertisement carrier; optional-profile input fails under the profile's own negotiation contract, not through a handshake advertisement channel. The prior wording ("unknown optional advertisement is ignored") described the pre-D1 model.
 
 The other existing codes, including `CANCELLED (1)`, `UNKNOWN (2)`, `NOT_FOUND (5)`, `ALREADY_EXISTS (6)`, `ABORTED (10)`, `OUT_OF_RANGE (11)`, `UNAVAILABLE (14)`, and `DATA_LOSS (15)` retain their meanings; the category table neither replaces the full registry nor limits its use. Zero remains invalid for failure. No category gets a new number. Unknown received enum values are mapped for application reporting by runtime policy, with the raw number retained diagnostically where possible; codecs do not perform that mapping automatically (`SNTR-ERR-005/010`).
 

@@ -19,7 +19,7 @@ A minimal implementation MUST pass:
 5. **Errors:** all 16 codes at least once; `UNSPECIFIED`-as-failure rejected; unknown-code→`UNKNOWN`; message hygiene; code-not-text branching (SNTR-ERR-900).
 6. **Auth/sessions:** empty/invalid/expired credential handling; re-auth-same-connection rejected; `connection_id`-as-credential rejected; reconnect loses state (SNTR-AUTH-900, SNTR-SESS-900).
 7. **Reliability:** loss→`UNAVAILABLE` + safe-retry discipline; no transport-ack-as-success (SNTR-REL-900/901).
-8. **Versioning/caps:** range overlap selection; unknown-optional ignored; required-unsupported→`UNIMPLEMENTED`; unconfirmed-use→`FAILED_PRECONDITION` (SNTR-VER-900, SNTR-CAP-900).
+8. **Versioning/caps:** range overlap selection; capability negotiation only through accepted profiles' own post-`ACTIVE` negotiation RPCs (no generic advertisement carrier): required-but-unsupported profile and profile operation before confirmation → `UNIMPLEMENTED` under that profile's contract (recovery: `SYN-URP-010`); unconfirmed-option use on an otherwise-confirmed connection → `FAILED_PRECONDITION` (SNTR-VER-900, SNTR-CAP-900).
 
 Optional (only if claimed): event subscribe→events→cancel, replay/cursor, resumption (each with its capability ID cited).
 
