@@ -60,7 +60,7 @@ precedent in [event manifest](../manifest/events.yaml).
 
 ## CONF-URP-001 mandatory-only fallback and negotiation isolation
 
-- Related normative requirement: SYN-URP-001, SYN-URP-010, SYN-URP-020, SNTR-CAP-003, SNTR-EVENT-001, SNTR-EVENT-011.
+- Related normative requirement: SYN-URP-001, SYN-URP-010, SYN-URP-020, SNTR-CAP-003, SNTR-CAP-010, SNTR-CAP-020, SNTR-EVENT-001, SNTR-EVENT-011.
 - Preconditions: ACTIVE on both connections of the same recovery-capable Host (never a Core-only host: the control on the other connection negotiates and confirms the profile). On the probe connection no Negotiate is run and the profile is not confirmed; no handle or checkpoint is created there, including by the `checkpoint_issued_for_handle` path, because Subscribe itself requires confirmation.
 - Input: the runner deliberately injects a complete and otherwise valid initial-subscription `RecoverySubscribeRequest` (profile_version 1, non-empty bounded `stream_selector`, the valid empty `start_checkpoint` initial-subscription sentinel per SYN-URP-021) as the unconfirmed `/syntra.v1.UpdateRecovery/Subscribe` operation on the `ACTIVE` probe connection — a conforming initiator MUST NOT send profile operations before confirmation (SYN-URP-001), so this injection is runner-driven only; and, on the machine-readable paired control scenario (`control_connection` in the manifest, beside `input`), Negotiate (`RecoveryNegotiateRequest`, selected_version 1 with confirmed deployment bounds) followed by the exact same valid Subscribe payload; repeated across two connections with negotiation on one only. The case's verdict applies to the server role (the runner drives both initiator connections); initiator-side conformance for SYN-URP-001 is exercised by the plan's initiator-validation runs against a controlled host.
 - Expected output: `UNIMPLEMENTED` on the probe (SYN-URP-010: the operation belongs to a profile not confirmed on this connection; an unknown operation is likewise `UNIMPLEMENTED`, so the attribution to the confirmation gate comes from the paired control's success with the same valid payload, not from the error code alone; request-shape and bounds validation are not the refusal cause) and success on the control (confirmed negotiation with the deployment bounds, then a fresh connection-scoped handle with a newly captured boundary) — the confirmation gate is the sole delta; request IDs are independently valid within each connection (the probe's `request_id` 3 is nonzero and admitted as increasing, RFC 0004); no batches emitted; negotiation on one connection does not enable the profile on the other; partial acceptance falls back to mandatory-only plus previously confirmed options. RFC 0006 §11.1 makes recovery required in the release bundle without relaxing the per-connection gate: Core-only conformance cannot satisfy the bundle; the durable known-safe resumption shape is CONF-URP-015's coverage.
@@ -265,7 +265,7 @@ Initiator                              Host
 
 | Test | Requirement family |
 |---|---|
-| CONF-URP-001 | URP-001/010/020 (negotiation gate and isolation) |
+| CONF-URP-001 | URP-001/010/020 (negotiation gate and isolation), CAP-010/020 |
 | CONF-URP-002 | URP-003/004 (scoped duplicate tolerance) |
 | CONF-URP-003 | URP-003/004/012 (gap detection, no generation change) |
 | CONF-URP-004 | URP-004/014/022/023 (paged results, continuation gate) |

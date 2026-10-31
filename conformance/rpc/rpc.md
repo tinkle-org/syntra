@@ -122,6 +122,16 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected session state: terminated abnormally; reconnect assumes no continuity.
 - Mandatory/optional: Mandatory.
 
+## CONF-RPC-013 concurrency floor with out-of-order completion
+
+- Related normative requirement: SNTR-RPC-002, SNTR-RPC-008, SNTR-REL-007.
+- Preconditions: ACTIVE; host supports the ≥16 floor (SNTR-RPC-008; no negotiated mode below 16 — RFC 0005 D2).
+- Input: 16 simultaneously outstanding `Echo` requests with ids 21–36; harness completes results in strictly descending id order (`reverse_completion_order`).
+- Expected output: exactly 16 terminal results observed out of request order (ids 36–21); each correlated exactly once with the echoed payload; initiator correlates solely by request_id and MUST NOT assume FIFO.
+- Expected connection state: ACTIVE.
+- Expected session state: unchanged.
+- Mandatory/optional: Mandatory.
+
 ## Traceability
 
 | Test | Requirement family |
@@ -138,3 +148,4 @@ Related normative requirements are cited per case; test IDs are not normative. A
 | CONF-RPC-010 | RPC-002, ERR-004 (malformed result without outcome) |
 | CONF-RPC-011 | RPC-008, REL-007/008 (exhaustion) |
 | CONF-RPC-012 | HS-014, REL-009 (loss) |
+| CONF-RPC-013 | RPC-002/008 (16 floor, out-of-order) |

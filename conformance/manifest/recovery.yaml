@@ -20,7 +20,7 @@ format_version: "1.0"
 profile: SNTR-EVENTS-V1
 cases:
   - id: CONF-URP-001
-    requirement: [SYN-URP-001, SYN-URP-010, SYN-URP-020, SNTR-CAP-003, SNTR-EVENT-001, SNTR-EVENT-011]
+    requirement: [SYN-URP-001, SYN-URP-010, SYN-URP-020, SNTR-CAP-003, SNTR-CAP-010, SNTR-CAP-020, SNTR-EVENT-001, SNTR-EVENT-011]
     profile: SNTR-EVENTS-V1
     roles: [server]
     capabilities: [syntra.update-recovery/1]

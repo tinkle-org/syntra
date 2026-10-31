@@ -89,7 +89,7 @@ cases:
       connection_state: CLOSED
       session_state: none
       error: { code: UNIMPLEMENTED }
-    notes: "Unsupported protocol version (disjoint range against v1-only host): handshake failure carrying UNIMPLEMENTED or FAILED_PRECONDITION + close; no credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
+    notes: "Unsupported protocol version (disjoint range against v1-only host): detecting-side negotiation failure records a local UNIMPLEMENTED cause and closes (SNTR-HS-003, accepted RFC 0003 D3; no wire error Frame is sent); no credential evaluation; no downgrade retry by the IUT. Repeat with low-only and high-only ranges."
 
   - id: CONF-CORE-006
     requirement: [SNTR-CAP-002, SNTR-CAP-004, SNTR-CAP-011]

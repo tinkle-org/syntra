@@ -9,10 +9,11 @@
 - Author(s): oscarlaw
 - Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
-> Draft proposal, not acceptance or shipping authority. The selections below
-> replace open decision menus for review only. They allocate no new active
-> requirement IDs and change no specification, schema, manifest, generated
-> output, or publication ownership. Acceptance remains subject to
+> Accepted via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
+> (2026-10-30) for the protocol contract recorded below, per the Status line;
+> D5 (Go migration) remains deferred. This notice replaces the historical
+> Draft-proposal caveat, which described only the pre-acceptance review state
+> and no longer limits authority. Later changes remain subject to
 > [governance](../GOVERNANCE.md) and the [RFC process](README.md).
 
 ## 1. Summary

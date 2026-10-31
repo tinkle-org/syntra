@@ -165,14 +165,14 @@ requirements:
 
   # ---- RPC: specifications/core/rpc.md ----
   - { requirement_id: SNTR-RPC-001, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-005], automation_status: automated }
-  - { requirement_id: SNTR-RPC-002, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-001, CONF-RPC-002, CONF-RPC-003], automation_status: automated }
+  - { requirement_id: SNTR-RPC-002, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-001, CONF-RPC-002, CONF-RPC-003, CONF-RPC-013], automation_status: automated }
   - { requirement_id: SNTR-RPC-003, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-CORE-001], automation_status: automated }
   - { requirement_id: SNTR-RPC-004, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-007], automation_status: partially_automated,
       notes: "Deadline expiry uses injected-slow handlers or generous margins with explicit DEADLINE_EXCEEDED assertion; never flaky wall-clock races." }
   - { requirement_id: SNTR-RPC-005, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-008], automation_status: automated }
   - { requirement_id: SNTR-RPC-006, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-009], automation_status: automated }
   - { requirement_id: SNTR-RPC-007, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
-  - { requirement_id: SNTR-RPC-008, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-002, CONF-RPC-011], automation_status: automated }
+  - { requirement_id: SNTR-RPC-008, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-002, CONF-RPC-011, CONF-RPC-013], automation_status: automated }
   - { requirement_id: SNTR-RPC-010, specification: specifications/core/rpc.md, section: "§1", test_ids: [CONF-RPC-011], automation_status: automated }
   - { requirement_id: SNTR-RPC-020, specification: specifications/core/rpc.md, section: "§2", test_ids: [CONF-RPC-010, CONF-RPC-001], automation_status: automated }
   - { requirement_id: SNTR-RPC-021, specification: specifications/core/rpc.md, section: "§2", test_ids: [CONF-RPC-008], automation_status: automated }
@@ -267,17 +267,22 @@ requirements:
     test_ids: [CONF-EVT-002]
     automation_status: manual
     notes: "No optional capability has been withdrawn in v1; verified by human review of the capability registry and RFC history."
-  - { requirement_id: SNTR-CAP-010, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-EVT-001, CONF-URP-001], automation_status: automated }
+  - requirement_id: SNTR-CAP-010
+    specification: specifications/core/capabilities.md
+    section: "§2"
+    test_ids: [CONF-EVT-001, CONF-URP-001, CONF-URP-007]
+    automation_status: partially_automated
+    notes: "Client negotiation discipline: CONF-URP-001 exercises the confirmation gate and per-connection isolation from the server role with runner-driven initiator halves; CONF-URP-007 exercises the initiator's negotiate-before-re-subscribe flow in a client,server case; initiator-verdict discipline runs are covered by the update-recovery plan's initiator-validation runs against a controlled host (conformance/plans/update-recovery.md). A dedicated client-verdict registered case would extend the RFC 0006 §11-registered case identity set (CONF-URP-001…017) and is deliberately deferred. CONF-EVT-001 traces the unallocated events-v1 placeholder."
   - { requirement_id: SNTR-CAP-011, specification: specifications/core/capabilities.md, section: "§2", test_ids: [CONF-CORE-007], automation_status: automated }
   - { requirement_id: SNTR-CAP-020, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001, CONF-URP-001], automation_status: automated }
   - { requirement_id: SNTR-CAP-021, specification: specifications/core/capabilities.md, section: "§3", test_ids: [CONF-EVT-001], automation_status: automated }
-  - { requirement_id: SNTR-CAP-900, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-CORE-006, CONF-EVT-002], automation_status: automated }
+  - { requirement_id: SNTR-CAP-900, specification: specifications/core/capabilities.md, section: "§7", test_ids: [CONF-CORE-006, CONF-EVT-002, CONF-URP-001], automation_status: automated }
   - requirement_id: SNTR-CAP-901
     specification: specifications/core/capabilities.md
     section: "§7"
     test_ids: [CONF-EVT-001]
     automation_status: partially_automated
-    notes: "Negotiation trace: the runner automates confirmation of advertised identifiers; a human confirms each cited identifier has an RFC reference."
+    notes: "Negotiation trace: the runner automates confirmation of negotiated capability identifiers; a human confirms each cited identifier has an RFC reference."
   - { requirement_id: SNTR-CAP-008, specification: specifications/core/capabilities.md, section: "§1", test_ids: [], automation_status: not_testable,
       notes: "Planned CONF-RS-001 awaits accepted negotiation identifier/binding/payloads; Draft proposal is not shipping authority." }
   - { requirement_id: SNTR-CAP-902, specification: specifications/core/capabilities.md, section: "§7", test_ids: [], automation_status: not_testable,

@@ -157,7 +157,7 @@ sequenceDiagram
 sequenceDiagram
   participant C as Initiator
   participant H as Host
-  Note over C,H: Handshake carries no capability or profile terms (accepted RFC 0005 D1). Capability/session extension binds post-ACTIVE through each profile's own negotiation RPC; an unconfirmed or unsupported required profile fails under that RPC's contract, never as a handshake failure (e.g. FAILED_PRECONDITION for the unconfirmed update/recovery profile, SYN-URP-010). Optional-capability state alone MUST NOT fail a handshake (SNTR-CAP-004).
+  Note over C,H: Handshake carries no capability or profile terms (accepted RFC 0005 D1). Capability/session extension binds post-ACTIVE through each profile's own negotiation RPC; an unconfirmed or unsupported required profile fails under that RPC's contract, never as a handshake failure (e.g. UNIMPLEMENTED for a profile operation on a connection that has not confirmed the profile, SYN-URP-010). Optional-capability state alone MUST NOT fail a handshake (SNTR-CAP-004).
 ```
 
 ```mermaid

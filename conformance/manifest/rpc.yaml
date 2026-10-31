@@ -38,7 +38,7 @@ cases:
       frames:
         - { request_id: 7, body: result }
         - { request_id: 8, body: result }
-    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs; no lower bound may be negotiated (RFC 0005 D2)."
+    notes: "Concurrent requests: two terminal results, each correlated exactly once, no cross-delivery. Host MUST support >=16 concurrent RPCs; no lower bound may be negotiated (RFC 0005 D2). Floor-capacity coverage with deliberate out-of-order completion: CONF-RPC-013."
 
   - id: CONF-RPC-003
     requirement: [SNTR-RPC-002]
@@ -212,3 +212,51 @@ cases:
       session_state: terminated_abnormally
       error: { code: UNAVAILABLE, message_pattern: "NEGATIVE:success" }
     notes: "Ambiguous transport failure: loss before any result maps to UNAVAILABLE with unknown outcome; MUST NOT be reported as success or as proof of non-execution."
+
+  - id: CONF-RPC-013
+    requirement: [SNTR-RPC-002, SNTR-RPC-008]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session]
+    input:
+      frames:
+        - { request_id: 21, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 22, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 23, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 24, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 25, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 26, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 27, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 28, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 29, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 30, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 31, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 32, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 33, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 34, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 35, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+        - { request_id: 36, body: request, method: "/example.Echo/Echo", payload_b64: "eA==", timeout_ms: 2000 }
+      faults: { reverse_completion_order: true }
+    expected:
+      connection_state: ACTIVE
+      session_state: unchanged
+      frames:
+        - { request_id: 36, body: result, payload_b64: "eA==" }
+        - { request_id: 35, body: result, payload_b64: "eA==" }
+        - { request_id: 34, body: result, payload_b64: "eA==" }
+        - { request_id: 33, body: result, payload_b64: "eA==" }
+        - { request_id: 32, body: result, payload_b64: "eA==" }
+        - { request_id: 31, body: result, payload_b64: "eA==" }
+        - { request_id: 30, body: result, payload_b64: "eA==" }
+        - { request_id: 29, body: result, payload_b64: "eA==" }
+        - { request_id: 28, body: result, payload_b64: "eA==" }
+        - { request_id: 27, body: result, payload_b64: "eA==" }
+        - { request_id: 26, body: result, payload_b64: "eA==" }
+        - { request_id: 25, body: result, payload_b64: "eA==" }
+        - { request_id: 24, body: result, payload_b64: "eA==" }
+        - { request_id: 23, body: result, payload_b64: "eA==" }
+        - { request_id: 22, body: result, payload_b64: "eA==" }
+        - { request_id: 21, body: result, payload_b64: "eA==" }
+    notes: "Concurrency floor (SNTR-RPC-008): 16 simultaneously outstanding RPCs, exactly one correlated terminal result per request with the echoed payload asserted. The harness completes results deliberately out of request order (strictly descending request_id: reverse_completion_order) to prove non-FIFO delivery at floor capacity (SNTR-RPC-002); initiators correlate solely by request_id. The floor is supported capacity: no lower bound may be negotiated (RFC 0005 D2); excess above the documented maximum is rejected with RESOURCE_EXHAUSTED (SNTR-RPC-008)."
