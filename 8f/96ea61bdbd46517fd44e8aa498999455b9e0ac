@@ -1,0 +1,33 @@
+rfcs/0002-auth-session-lifecycle.md
+  s_b52c85fd6e474e::t_9922ca14ef59fe 43
+docs/implementer-guide.md
+  s_b52c85fd6e474e::t_f2b93e72f5c05f 181-182
+  s_b52c85fd6e474e::t_ee2706ae3c12c4 183-187
+conformance/manifest/events.yaml
+  s_b52c85fd6e474e::t_d732cda87f06d7 186
+  s_b52c85fd6e474e::t_1bb673229b2a99 180
+conformance/events/events.md
+  s_b52c85fd6e474e::t_0f503996dbcb3f 140
+conformance/manifest/recovery.yaml
+  s_b52c85fd6e474e::t_4d3901c9003fce 28,31,36
+  s_b52c85fd6e474e::t_1900ba4b6501fd 161
+docs/client-implementation.md
+  s_b52c85fd6e474e::t_b7e4d095b632b7 120-121,128
+  s_b52c85fd6e474e::t_2f40896cafd97b 119,122-127,129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8f96ea61bdbd46517fd44e8aa498999455b9e0ac",
+  "prompts": {},
+  "sessions": {
+    "s_b52c85fd6e474e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e72e2f5c7ffeEh9X2Me78imjgO",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
