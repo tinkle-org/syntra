@@ -49,6 +49,7 @@ cases for humans. Both share identical test IDs. If they disagree, the cited
 | `roles` | subset of `client, server` | yes | Which IUT side(s) the verdict applies to. `client-server` in prose = `[client, server]` here. |
 | `capabilities` | string list | yes (may be empty) | Capability identifiers required to *execute* (not merely handle absence). Empty = always executed. Placeholder names (`events-v1`, `events-replay-v1`, `resume-v1`) gate Optional cases until their RFCs exist. |
 | `mandatory` | boolean | yes | `true` = MUST pass to claim the profile; `false` = Optional (SKIP when capability unclaimed). |
+| `applicable_transports` | string list, subset of `tcp_tls, ws_wss, http_1_1, https_h2` | no | Machine-readable transport applicability for transport-scoped requirements (e.g. RFC 0004 D3 persistent-carrier exemptions: SNTR-HTTP-070 — SC1 multiplexes within `ws_wss`). Absent (the default for every pre-existing case) = applies on any claimed transport. Present = the case executes exactly over the listed families; a claim whose transport profiles resolve to none of them reports `SKIP` for the case with a reason citing this key (conformance README §6), which is a valid verdict for a mandatory case. Not a capability gate: it never changes capability negotiation or mandatory-service handling. |
 | `preconditions` | string list | yes | Symbolic setup states (see vocabulary below). |
 | `input` | map | yes | Stimulus: `frames` (envelope list), `transport` (raw bytes / HTTP / WS actions), `faults` (loss, delay, tamper, structured coordination), `credentials` (throwaway fixture names). |
 | `expected` | map | yes | Observable outcome: `connection_state`, `session_state`, `frames`, `error` (`{code, message_pattern, observer, carriage}`), `transport` (status/close/alert plus the two-observer extensions below), `hygiene` (negative-grep list). |
@@ -83,14 +84,18 @@ When both must be asserted, use:
   Absent `observer` (the default in all pre-existing cases) means the
   error is the initiator's terminal result within the exchange context.
 - `expected.error.carriage`: `wire` (default) or `local_only`.
-  `local_only` is executable: the cause never crosses the wire, so the
-  runner asserts that zero Syntra `Frame` envelopes are decoded from the
-  joint stimulus onward. Pair it with `expected.frames: []` — an empty
-  frames list means "no Syntra Frames cross the wire for this stimulus"
-  (RFC 6455 Close frames, HTTP statuses, and TLS alerts are
-  transport-native signals, not Syntra Frames, and are asserted under
-  `transport`). No `RpcResult`, zero-ID result, error-bearing `ready`,
-  or second `hello` may be invented as an error carrier.
+  `local_only` is executable: the cause never crosses the wire from the
+  responding side, so the runner asserts that no Syntra `Frame` envelope
+  is emitted in response to the stimulus. Pair it with
+  `expected.frames: []` — `expected.frames` lists only Frames emitted in
+  response to the stimulus (the stimulus Frame itself — including the
+  harness-injected one, e.g. `CONF-CORE-005`'s `hello` — is never a
+  member), so an empty frames list means "the responding side emits no
+  Syntra Frames for this input" (RFC 6455 Close frames, HTTP statuses,
+  and TLS alerts are transport-native signals, not Syntra Frames, and
+  are asserted under `transport`). No `RpcResult`, zero-ID result,
+  error-bearing `ready`, or second `hello` may be invented as an error
+  carrier.
 - `expected.transport.peer_observation`: map keyed by transport family
   (`tcp_tls`, `ws_wss`, `http_1_1`, `https_h2`); each entry asserts the
   peer's observable outcome with optional `signal`

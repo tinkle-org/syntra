@@ -123,6 +123,48 @@ class ValidateManifestScalarsTests(unittest.TestCase):
                 }
                 self.assertIn("control_connection", self.check_case(case))
 
+    def test_null_expectation_maps_are_recorded(self):
+        # A present `error`/`transport` key with a null value must be
+        # rejected, at both call sites (case-level and control_connection).
+        for owner in ("case", "control_connection"):
+            for key in ("error", "transport"):
+                with self.subTest(owner=owner, key=key):
+                    VALIDATOR.ERRORS.clear()
+                    case = make_case()
+                    if owner == "case":
+                        case["expected"][key] = None
+                    else:
+                        case["control_connection"] = {
+                            "preconditions": ["active_session"],
+                            "expected": {"connection_state": "ACTIVE", key: None},
+                        }
+                    self.assertIn("must be a map", self.check_case(case))
+
+    def test_absent_expectation_keys_still_pass(self):
+        # Absent `error`/`transport` keys must stay silently allowed.
+        case = make_case()
+        self.assertEqual(self.check_case(case), "")
+
+    def test_non_map_expectation_values_are_recorded(self):
+        for key in ("error", "transport"):
+            with self.subTest(key=key):
+                VALIDATOR.ERRORS.clear()
+                case = make_case()
+                case["expected"][key] = "not-a-map"
+                self.assertIn("must be a map", self.check_case(case))
+
+    def test_applicable_transports_are_validated(self):
+        # Valid known families; absent key on make_case stays accepted.
+        case = make_case()
+        case["applicable_transports"] = ["tcp_tls", "ws_wss"]
+        self.assertEqual(self.check_case(case), "")
+        for bad in (None, [], "tcp_tls", [""], "http_1_1"):
+            with self.subTest(bad=bad):
+                VALIDATOR.ERRORS.clear()
+                case = make_case()
+                case["applicable_transports"] = bad
+                self.assertIn("applicable_transports", self.check_case(case))
+
     def test_bad_connection_state_is_recorded(self):
         case = make_case()
         case["expected"]["connection_state"] = ["ACTIVE"]

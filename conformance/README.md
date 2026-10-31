@@ -286,7 +286,7 @@ Every case yields exactly one verdict:
 |---------------|---------|-----------------|
 | `PASS`        | Executed; every `expected` assertion held; logs retained. | **Yes** |
 | `FAIL`        | Executed; at least one `expected` assertion did not hold, or the IUT crashed, hung past its documented bound, or emitted an unlisted error. | No |
-| `SKIP`        | Not executed because a stated precondition is absent (capability unclaimed, transport unclaimed, harness lacks a facility such as raw-certificate injection). The reason MUST cite the missing precondition. `SKIP` MUST NOT be used for a mandatory case of a claimed profile. | **No** — neutral, excluded from pass-rate |
+| `SKIP`        | Not executed because a stated precondition is absent (capability unclaimed, transport unclaimed, harness lacks a facility such as raw-certificate injection). The reason MUST cite the missing precondition. `SKIP` MUST NOT be used for a mandatory case of a claimed profile, except when the case declares `applicable_transports` whose families intersect none of the claimed transports (transport applicability per the manifest README's field reference): then `SKIP` is the correct verdict and the reason MUST cite the `applicable_transports` key. | **No** — neutral, excluded from pass-rate |
 | `UNSUPPORTED` | Executed the optionality probe and the IUT correctly declined it (for example `UNIMPLEMENTED` for an unnegotiated subscription, or rejection of a resume attempt without the capability). The IUT behaved correctly **by refusing**. | **No** — correct refusal, excluded from capability pass-rate |
 | `NOT_EXECUTED`| Listed but never run (planned, blocked, or omitted). The default state before a run. MUST NOT appear in a final claim. | **No** |
 

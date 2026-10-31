@@ -37,6 +37,17 @@ development, changes land under `Unreleased`.
 
 ### Changed
 
+- Added machine-readable transport applicability: cases MAY declare
+  `applicable_transports` (peer-observation family vocabulary) to encode
+  transport-scoped requirements such as the RFC 0004 D3 persistent-carrier
+  exemptions; `CONF-RPC-004` and `CONF-RPC-013` now declare
+  `[tcp_tls, ws_wss]`, and an HTTP/HTTPS-only claim reports a valid `SKIP`
+  citing the key (§6 exception to the no-SKIP-for-mandatory rule).
+- Manifest validation now rejects present-but-null `expected.error` /
+  `expected.transport` maps (case-level and `control_connection`) while
+  absent keys stay allowed; clarified the `expected.frames: []` semantics
+  (response-side Frames only — the stimulus Frame itself is never a
+  member).
 - Tightened two conformance fixtures (no RFC changes, no new protocol
   messages): `CONF-URP-015` now drives the recovery reconnect explicitly
   (fresh authenticated connection, `hello`, then `Negotiate` with

@@ -133,7 +133,7 @@ Related normative requirements are cited per case; test IDs are not normative. A
 - Expected connection state: ACTIVE.
 - Expected session state: unchanged.
 - Mandatory/optional: Mandatory.
-- Scope: this case executes persistent connection multiplexing (TCP/TLS, WS/WSS, SC1). It MUST NOT be interpreted as requiring any HTTP exchange to carry 16 concurrent RPCs: each HTTP/HTTPS exchange is one logical connection with one RPC (SNTR-HTTP-070; RFC 0004 D3), and the HTTP minimums are transport-owned (SNTR-HTTP-072 listener endpoint groups; SNTR-HTTPS-041 HTTP/2 streams).
+- Scope: this case executes persistent connection multiplexing (TCP/TLS, WS/WSS, SC1), machine-readable via its manifest `applicable_transports: [tcp_tls, ws_wss]` (SC1 multiplexes within the `ws_wss` family). It MUST NOT be interpreted as requiring any HTTP exchange to carry 16 concurrent RPCs: each HTTP/HTTPS exchange is one logical connection with one RPC (SNTR-HTTP-070; RFC 0004 D3), the HTTP minimums are transport-owned (SNTR-HTTP-072 listener endpoint groups; SNTR-HTTPS-041 HTTP/2 streams), and an HTTP/HTTPS-only claim reports `SKIP` for this case citing the `applicable_transports` key (conformance README §6).
 
 ## Traceability
 

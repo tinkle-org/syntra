@@ -44,8 +44,10 @@ schema:
     # received terminal result in the exchange context), `error.carriage`
     # declares whether the cause crosses the wire (wire | local_only;
     # absent = wire). `carriage: local_only` is executable: together with
-    # `frames: []` (an empty frames list asserts zero Syntra Frame
-    # envelopes) it forbids every invented error carrier.
+    # `frames: []` (an empty frames list asserts that no Syntra Frame
+    # envelopes are emitted in response to the stimulus; the stimulus
+    # Frame itself is never a member) it forbids every invented error
+    # carrier.
     # `transport.peer_observation` asserts the peer's transport-native
     # signal per transport family (tcp_tls | ws_wss | http_1_1 |
     # https_h2), each entry optionally asserting `signal`
@@ -70,7 +72,7 @@ schema:
   test_case:
     type: map
     required: [id, requirement, profile, roles, capabilities, mandatory, preconditions, input, expected]
-    optional: [notes, vector_refs, control_connection]
+    optional: [notes, vector_refs, control_connection, applicable_transports]
     fields:
       id: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" }
       # Requirement refs admit the SNTR-* core families and the RFC 0006
@@ -83,6 +85,13 @@ schema:
       capabilities: { type: list, item: { type: string } }
       mandatory: { type: boolean }
       preconditions: { type: list, item: { type: string }, min_items: 1 }
+      # Transport applicability (machine-readable, e.g. RFC 0004 D3
+      # persistent-carrier exemptions): when present, the case executes
+      # exactly over the listed transport families and a claim whose
+      # transports intersect none of them reports SKIP for the case citing
+      # this key (absent = applies to any claimed transport — the default
+      # for every pre-existing case).
+      applicable_transports: { type: list, item: { type: string, enum: [tcp_tls, ws_wss, http_1_1, https_h2] }, min_items: 1 }
       input:
         # `faults` maps are free-form per case (loss/delay/tamper), but
         # race-sensitive coordination MUST use the documented structured

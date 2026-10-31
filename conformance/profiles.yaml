@@ -143,6 +143,7 @@ profiles:
 claim_rules:
   - "Every claim MUST include SNTR-CORE-V1 (which includes SNTR-SESS-V1 and SNTR-RPC-V1) over at least one transport profile."
   - "No implementation is required to support every transport to claim Core conformance."
+  - "A case declaring applicable_transports runs only over the listed transport families (SC1 multiplexes within ws_wss); a claim whose transports intersect none of them is valid with verdict SKIP for that case citing the key (conformance README §6)."
   - "Interop proof (SNTR-WIRE-901) requires the same logical Frame sequence over at least two transport profiles with only adapter changes."
   - "Production claims MUST name only secure transports (TLS-TCP, HTTPS-H1, HTTPS-H2, WSS-H1, SC1-WSS)."
   - "Capability claims REQUIRE the capability identifier plus its RFC reference; unallocated identifiers MUST NOT be claimed."

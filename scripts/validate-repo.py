@@ -277,10 +277,13 @@ def _is_local_report(value, error_codes):
 
 def check_transport_expectation(mf, cid, tmap, error_codes):
     """Validate the documented two-observer keys inside an ``expected.transport``
-    map; unrelated transport-specific keys stay free-form as before."""
+    map; unrelated transport-specific keys stay free-form as before.
+
+    Callers pass this only for a *present* ``transport`` key (absent keys are
+    skipped by the caller); a present key whose value is null is rejected here
+    rather than silently skipped."""
     if not isinstance(tmap, dict):
-        if tmap is not None:
-            err(mf, f"case {cid} expected.transport must be a map")
+        err(mf, f"case {cid} expected.transport must be a map")
         return
     peer = tmap.get("peer_observation")
     if peer is not None:
@@ -328,10 +331,13 @@ def check_transport_expectation(mf, cid, tmap, error_codes):
 
 def check_error_expectation(err_prefix, cid, emap, error_codes, mf):
     """Validate the documented detecting-side discriminators inside an
-    ``expected.error`` map (observer / carriage)."""
+    ``expected.error`` map (observer / carriage).
+
+    Callers pass this only for a *present* ``error`` key (absent keys are
+    skipped by the caller); a present key whose value is null is rejected
+    here rather than silently skipped."""
     if not isinstance(emap, dict):
-        if emap is not None:
-            err(mf, f"case {cid} {err_prefix} must be a map")
+        err(mf, f"case {cid} {err_prefix} must be a map")
         return
     obs = emap.get("observer")
     if "observer" in emap and not _is_allowed_string(obs, ERROR_OBSERVERS):
@@ -377,6 +383,13 @@ def check_manifests():
         for c in case.get("capabilities", []) or []:
             if c not in KNOWN_CAPABILITIES:
                 err(mf, f"case {cid} has undeclared capability prerequisite {c}")
+        if "applicable_transports" in case:
+            at = case.get("applicable_transports")
+            if not isinstance(at, list) or not at or not all(
+                    _is_allowed_string(t, TRANSPORT_FAMILIES) for t in at):
+                err(mf, f"case {cid} applicable_transports must be a non-empty "
+                        f"list of known transport families "
+                        f"{sorted(TRANSPORT_FAMILIES)}")
         pre = case.get("preconditions")
         if not isinstance(pre, list) or not pre:
             err(mf, f"case {cid} needs a non-empty preconditions list")
@@ -395,9 +408,11 @@ def check_manifests():
         if "error" in exp and isinstance(exp["error"], dict) and "code" in exp["error"]:
             if not _is_allowed_string(exp["error"]["code"], error_codes):
                 err(mf, f"case {cid} has unknown error code {exp['error']['code']}")
-        check_error_expectation("(expected.error observer/carriage)", cid,
-                                exp.get("error"), error_codes, mf)
-        check_transport_expectation(mf, cid, exp.get("transport"), error_codes)
+        if "error" in exp:
+            check_error_expectation("(expected.error observer/carriage)", cid,
+                                    exp["error"], error_codes, mf)
+        if "transport" in exp:
+            check_transport_expectation(mf, cid, exp["transport"], error_codes)
         ctl_specified = "control_connection" in case
         ctl = case.get("control_connection")
         if ctl_specified and not isinstance(ctl, dict):
@@ -470,9 +485,11 @@ def check_manifests():
                 if "error" in cexp and isinstance(cexp["error"], dict) and "code" in cexp["error"]:
                     if not _is_allowed_string(cexp["error"]["code"], error_codes):
                         err(mf, f"case {cid} control_connection has unknown error code {cexp['error']['code']}")
-                check_error_expectation("(control_connection expected.error observer/carriage)", cid,
-                                        cexp.get("error"), error_codes, mf)
-                check_transport_expectation(mf, cid, cexp.get("transport"), error_codes)
+                if "error" in cexp:
+                    check_error_expectation("(control_connection expected.error observer/carriage)", cid,
+                                            cexp["error"], error_codes, mf)
+                if "transport" in cexp:
+                    check_transport_expectation(mf, cid, cexp["transport"], error_codes)
         elif cid == "CONF-URP-001":
             # Gate attribution for the negotiation-isolation case depends on
             # executing its declared paired control connection, so the control
