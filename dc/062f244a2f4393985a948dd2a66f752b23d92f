@@ -1,0 +1,41 @@
+rfcs/0005-negotiation-bounds-identifiers.md
+  s_d39bce3fe63d40::t_e40ee42996553d 12-16
+specifications/core/handshake.md
+  s_d39bce3fe63d40::t_a3d1c5ef643dd0 160
+conformance/manifest/rpc.yaml
+  s_d39bce3fe63d40::t_c5af0d7264cd60 41
+  s_d39bce3fe63d40::t_a72ceba33d52a4 215-262
+conformance/manifest/core.yaml
+  s_d39bce3fe63d40::t_1dfbe38aace2da 92
+conformance/rpc/rpc.md
+  s_d39bce3fe63d40::t_c83c5569ef6ae1 125-134
+  s_d39bce3fe63d40::t_5e9727c6011fef 151
+conformance/manifest/requirements.yaml
+  s_d39bce3fe63d40::t_a5536b8257367a 275
+  s_d39bce3fe63d40::t_0e2bf4e290e5dc 175
+  s_d39bce3fe63d40::t_fd4ae6fa17b8f8 279
+  s_d39bce3fe63d40::t_d19934b0bf8116 285
+  s_d39bce3fe63d40::t_a4c712d7fd7920 270-274
+  s_d39bce3fe63d40::t_87281d794b985b 168
+conformance/recovery_profile/recovery.md
+  s_d39bce3fe63d40::t_e90679278cce3c 63
+  s_d39bce3fe63d40::t_2600141bf35efa 268
+conformance/manifest/recovery.yaml
+  s_d39bce3fe63d40::t_7e0f04bea2892a 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dc062f244a2f4393985a948dd2a66f752b23d92f",
+  "prompts": {},
+  "sessions": {
+    "s_d39bce3fe63d40": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6cd54002ffe00R2jz4G55ui0y",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
