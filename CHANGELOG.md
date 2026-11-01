@@ -12,7 +12,9 @@ During development, changes land under `Unreleased`.
 ### Added
 
 - Proposed Draft RFC 0011 and a maintainer-authorized two-component
-  specification release workflow. This branch prepares removal of Release
+  specification release workflow: the Git tag and commit are the normative
+  release identity, and the same authorized action records a corresponding
+  GitHub Release with no assets. This branch prepares removal of Release
   Please; the policy takes effect only after public RFC approval. Wire and
   profile negotiation are unchanged.
 - Accepted the 2026-10-29 bootstrap governance transition: roster-based

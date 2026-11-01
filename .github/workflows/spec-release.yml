@@ -1,6 +1,7 @@
-# Tags-only specification publication. Validation runs without
+# Authorization-gated specification publication. Validation runs without
 # release credentials; only trusted main code enters the protected job.
-# SDD releases are Git tags; no packages, assets, or GitHub Releases.
+# The Git tag and its commit are the normative release; the same authorized
+# action records a corresponding GitHub Release with no packages or assets.
 name: spec-release
 
 on:

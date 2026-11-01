@@ -145,7 +145,8 @@ by an SC1/WSS pass.
 - [ ] Conformance requirements complete
 - [ ] Test vectors validated
 - [ ] Consistency audit has no P0 blockers
-- [ ] Release workflow ready to tag the authorized commit (tag-only: no packages, archives, or GitHub Releases)
+- [ ] Release workflow ready to tag and record the authorized commit (tag
+      plus no-asset GitHub Release record: no packages, archives, or assets)
 - [ ] License present (Apache-2.0 `LICENSE`)
 - [ ] Security process documented
 - [ ] CHANGELOG updated
@@ -345,10 +346,12 @@ per-transport version numbers.
 
 This procedure is proposed by RFC 0011 (Discussion) and is not yet active.
 Until acceptance, `.github/workflows/release-please.yml` and its configuration
-remain the active publisher. On acceptance the workflow tags only
-when RFC 0011 is marked Accepted on trusted `main`; that status must
-follow an actual public maintainer decision, not a bot or this document. There
-are no packages, archives, or GitHub Releases: the Git tag is the release.
+remain the active publisher. On acceptance the workflow publishes only when
+RFC 0011 is marked Accepted on trusted `main`; that status must follow an
+actual public maintainer decision, not a bot or this document. The Git tag
+and its exact commit are the normative release identity; the same authorized
+action records a corresponding GitHub Release with no packages, archives, or
+assets, as a discovery and evidence record only.
 
 ### Administrative setup
 
@@ -360,14 +363,20 @@ are no packages, archives, or GitHub Releases: the Git tag is the release.
    GitHub's automatic creation of an unprotected environment is insufficient.
 2. Store `SPEC_RELEASE_TOKEN` as an **environment secret**, not a repository
    or organization secret. Use a dedicated narrowly scoped repository token
-   with contents write permission and permission to create `v*` tags. Validation
-   jobs have only read access and do not receive
-   this secret. Rotate it on suspected exposure.
+   with contents write permission and permission to create `v*` tags and the
+   linked release records. Validation jobs have only read access and do not
+   receive this secret. Rotate it on suspected exposure.
 3. Protect `main` and the `v*` tag namespace with appropriate rulesets:
    restrict creation to maintainers and the publishing identity, prohibit
-   movement/deletion, and require the repository checks on PRs. Verify the
-   publishing identity works with the rulesets. Enable immutable releases or
-   tag protections for future tags where available.
+   movement/deletion, and require the repository checks on PRs. Wherever the
+   immutable-releases feature is available, enable the setting: it locks
+   published tags against movement or deletion, blocks tag-name reuse, and
+   generates a release attestation binding each release tag, commit SHA, and
+   assets. Configure tag protections only where immutable releases are
+   unavailable. Verify the publishing identity works with the rulesets, and
+   before releasing, verify that the applicable protection is in place —
+   the immutable-releases setting where available, otherwise tag
+   protections/rulesets covering the `v*` namespace.
 
 ### Prepare and authorize
 
@@ -419,14 +428,22 @@ tag, full target SHA, decision issue number, and `recovery=false`. After the
 read-only validation succeeds, approve the protected environment. The
 publisher rechecks the RFC status, current main revision, maintainer roster,
 environment protections, public approvals, tag identity and changelog section
-before creating the tag. The workflow does not execute target scripts with
-release credentials. RC status lives in the tag suffix and changelog; there is
-no separate prerelease flag or latest-release marker.
+before creating the tag and its corresponding GitHub Release record. The
+workflow does not execute target scripts with release credentials. RC status
+lives in the tag suffix and changelog; the release record's prerelease flag
+mirrors the `-rcN` suffix, latest-release metadata is informative only, and a
+record alone never asserts the stability criteria in `GOVERNANCE.md` §5.
 
 If publication stops after tag creation, investigate and rerun the same
 authorized version and commit with `recovery=true`. Recovery only accepts an
-existing tag pointing directly to the same approved commit. It never moves a
-tag. Tag
+existing tag pointing directly to the same approved commit; it never moves a
+tag, and it completes the GitHub Release record when the tag exists at the
+approved commit but the record does not. An existing record is verified
+against the approved contract — the release tag, a prerelease flag mirroring
+the `-rcN` suffix, empty assets, and notes carrying the reviewed changelog
+section, the full commit SHA, and the public decision link — and any
+deviation fails with a correction procedure instead of counting as
+verified. Tag
 protection and independent maintainer review of evidence are administrative
 and human controls, not guarantees provided by the script.
 
@@ -454,7 +471,7 @@ Language artifact assets from that release (crate archives, Go-bindings
 archive, native-ABI header distribution) are out of scope for this
 repository going forward.
 
-## 6. Tag association (no BSR, no GitHub Releases)
+## 6. Tag association (no BSR)
 
 Snapshot-scoped section (RC-1, `2a91da7`): the crate-anchored tag pairing
 below applied to that release. Forward releases of this specification-first

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Tag an explicitly approved specification release; see RELEASE.md.
+"""Record an approved specification release; see RELEASE.md.
 
 Publication requires a protected environment, a public SHA-bound decision,
 successful validation of the target and an environment-scoped write token.
-This tool cannot judge conformance evidence or resolve unstructured objections.
+The authorized write creates the Git tag and the corresponding GitHub
+Release record with no assets; the tag and commit remain the normative
+release identity. This tool cannot judge conformance evidence or resolve
+unstructured objections.
 """
 
 import argparse
@@ -154,6 +157,47 @@ def extract_notes(changelog, tag):
     return notes
 
 
+def release_record(tag, sha, issue_number, notes):
+    """Build the non-normative GitHub Release record; assets stay empty."""
+    footer = "\n\n".join((
+        "---",
+        f"Repository: {REPO}",
+        f"Normative release: Git tag `{tag}` at commit `{sha}`.",
+        "Profiles and evidence: see the public release decision.",
+        f"Decision: https://github.com/{REPO}/issues/{issue_number}",
+        "No release assets; consumers pin the tag or full commit SHA.",
+    ))
+    return {
+        "tag_name": tag,
+        "name": f"Syntra Specification {tag[1:]}",
+        "body": notes + "\n\n" + footer,
+        "prerelease": bool(PREFLIGHT.validate_tag(tag)),
+    }
+
+
+def verify_record(tag, sha, issue_number, notes, record):
+    """Fail closed when an existing record deviates from the release contract."""
+    decision_url = f"https://github.com/{REPO}/issues/{issue_number}"
+    expected_prerelease = bool(PREFLIGHT.validate_tag(tag))
+    assets = record.get("assets")
+    body = record.get("body")
+    if (record.get("tag_name") != tag
+            or not isinstance(record.get("prerelease"), bool)
+            or record.get("prerelease") != expected_prerelease
+            or not isinstance(assets, list) or assets
+            or not isinstance(body, str)
+            or notes not in body
+            or sha not in body
+            or decision_url not in body):
+        raise ReleaseError(
+            "existing release record does not match the approved contract: "
+            f"tag_name must be {tag}, prerelease must be {expected_prerelease}, "
+            "assets must be empty, and the notes must carry the reviewed "
+            f"changelog section, the full commit SHA {sha}, and the public "
+            f"decision ({decision_url}); correct the record, or delete it "
+            "and rerun recovery")
+
+
 class NoRedirect(request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise ReleaseError("GitHub API redirect refused")
@@ -224,7 +268,7 @@ def publish(read_api, write_api, tag, sha, trusted_head, issue_number, recovery=
     verify_environment(environment, policies, roster)
     issue = decision(read_api, issue_number, tag, sha, roster)
     digest = hashlib.sha256(issue["body"].encode("utf-8")).hexdigest()
-    extract_notes(PREFLIGHT.git(ROOT, "show", f"{sha}:CHANGELOG.md").stdout, tag)
+    notes = extract_notes(PREFLIGHT.git(ROOT, "show", f"{sha}:CHANGELOG.md").stdout, tag)
     candidate = PREFLIGHT.validate_tag(tag)
     _ = candidate
     ref = read_api.call("GET", f"{PREFIX}/git/ref/tags/{tag}", missing=True)
@@ -236,15 +280,35 @@ def publish(read_api, write_api, tag, sha, trusted_head, issue_number, recovery=
     verify_main(read_api, trusted_head)
     if hashlib.sha256(decision(read_api, issue_number, tag, sha, roster)["body"].encode()).hexdigest() != digest:
         raise ReleaseError("release decision changed during validation")
+    tag_created = False
     if not ref:
         write_api.call("POST", f"{PREFIX}/git/refs", {"ref": f"refs/tags/{tag}", "sha": sha})
+        tag_created = True
     current = read_api.call("GET", f"{PREFIX}/git/ref/tags/{tag}")
     if current.get("object", {}).get("sha") != sha or current["object"].get("type") != "commit":
         raise ReleaseError("tag changed after creation")
     verify_main(read_api, trusted_head)
+    record = read_api.call("GET", f"{PREFIX}/releases/tags/{tag}", missing=True)
+    record_created = False
+    if record is None:
+        if hashlib.sha256(decision(read_api, issue_number, tag, sha, roster)["body"].encode()).hexdigest() != digest:
+            raise ReleaseError("release decision changed before record creation")
+        record = write_api.call("POST", f"{PREFIX}/releases",
+                                release_record(tag, sha, issue_number, notes))
+        record_created = True
+        if record.get("tag_name") != tag:
+            raise ReleaseError("release record does not reference the release tag")
+    else:
+        verify_record(tag, sha, issue_number, notes, record)
+    verify_main(read_api, trusted_head)
     if hashlib.sha256(decision(read_api, issue_number, tag, sha, roster)["body"].encode()).hexdigest() != digest:
-        raise ReleaseError("release decision changed after tag creation")
-    print(f"Tagged {tag}: {sha}")
+        raise ReleaseError("release decision changed after publication")
+    if tag_created and record_created:
+        print(f"Published {tag} at {sha}: tag created, release record created")
+    elif record_created:
+        print(f"Published {tag} at {sha}: release record completed for existing tag")
+    else:
+        print(f"Published {tag} at {sha}: tag and release record verified")
 
 
 def main():

@@ -18,9 +18,9 @@ data model, or internal architecture.
 - Protocol version: Syntra v1 (in development — core/security drafts and
   public IDL tooling present; behavioral acceptance pending, see
   [Status](#current-protocol-status) and `SESSION-OPEN-QUESTIONS.md`)
-- IDL: Protocol Buffers (proto3), governed by Buf v2; specification releases use
-  maintainer-authorized Git tags and GitHub
-  Releases (see [Schema distribution](#schema-distribution))
+- IDL: Protocol Buffers (proto3), governed by Buf v2; specification releases
+  use maintainer-authorized Git tags paired with no-asset GitHub Release
+  records (see [Schema distribution](#schema-distribution))
 - Implementation evidence: delivered experimental Go SC1 draft-1 over
   TCP/WS/WSS, recorded in the [implementation ledger](docs/sc1-implementation.md#implementation-status);
   implementation behavior does not confer normative authority
@@ -269,7 +269,8 @@ Syntra Git repository (spec-first)
         │
         │ contains source schemas + validation tooling
         ▼
-maintainer-authorized specification releases (vX.Y Git tags only)
+maintainer-authorized specification releases (vX.Y tags plus per-release
+GitHub Release records, no assets)
         │
         └── protocol consumers and implementations pin schemas by
             exact Git revision or release tag
@@ -296,8 +297,9 @@ Distribution:
 
 - Maintainers prepare a release PR and explicitly authorize a frozen commit;
   the protected manual release workflow creates the `vX.Y` Git tag — the tag
-  itself is the release, with no packages, assets, or GitHub Releases
-  (documents and schema provenance, no language artifacts). The proposed
+  and its commit are the release — and records the corresponding GitHub
+  Release with no packages, archives, or assets (notes and links only;
+  documents and schema provenance, no language artifacts). The proposed
   process is subject to Draft RFC 0011.
 - Language artifact distribution is out of scope for this repository;
   implementations pin schema revisions from here.
@@ -321,8 +323,9 @@ streams, TCP framing, HTTP transport, or WebSocket transport (see
 
 ## Schema distribution
 
-Schema provenance is released from this repository via Git tags
-(`vX.Y` Git tags only); there is no Buf Schema Registry module and no
+Schema provenance is released from this repository via specification Git
+tags (`vX.Y`), each paired with a corresponding no-asset GitHub Release
+record; there is no Buf Schema Registry module and no
 `buf push` (see `buf.yaml`: no registry `name:` by design):
 
 - Release tag: `vX.Y` (specification release; proposal in RFC 0011)

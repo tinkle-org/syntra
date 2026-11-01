@@ -252,7 +252,7 @@ Authoritative relationships at a glance (see §7 for rules):
 | You want… | Use… | Example (illustrative) |
 |---|---|---|
 | Exact schema bytes | Release tag or Git SHA | `v1.0` / `92e5f28…` |
-| A specification release | Authorized Git tag (no GitHub Release) | `v1.0` |
+| A specification release | Authorized Git tag plus its no-asset GitHub Release record | `v1.0` |
 | Current development | `main` head | moves with each accepted merge |
 | Release candidate | Tag suffix `-rcN` | `v1.1-rc1` |
 | Production dependency | Reviewed exact version meeting the needed stability criteria | `v1.1`; see `GOVERNANCE.md` §5 |

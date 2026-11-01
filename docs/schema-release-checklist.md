@@ -26,17 +26,18 @@ releases (no BSR or GHCR).
 - [ ] Version recorded: `vX.Y` or `vX.Y-rcN` specification tag, Core wire version, schema package (`syntra.v1`), and profiles covered.
 - [ ] No BSR identity/publication configured (`buf.yaml` has no `name:`, no `BUF_TOKEN` or BSR environment). No language-artifact publishing from this repository.
 - [ ] Maintainer-reviewed release PR, frozen commit and public version/SHA-bound release authorization are recorded. Self-review is disclosed when applicable.
-- [ ] Tag protection covers `v*` (historical crate-era `syntra-*-v*` tags keep their protection), with the release automation identity allowed.
+- [ ] Tag protection covers `v*` (historical crate-era `syntra-*-v*` tags keep their protection), with the release automation identity allowed; the immutable-releases setting is enabled for the repository where available.
 - [ ] Full Apache-2.0 license present.
 - [ ] Release notes describe wire contracts, migration notes, and the schema provenance. No browser-WASM assets are promised.
 
-## C. Release (manual tag-only workflow)
+## C. Release (manual, authorization-gated workflow)
 
-- [ ] Protected `spec-release` environment, active maintainer reviewers, main-only policy, scoped publishing token and tag rulesets are configured.
-- [ ] The manually dispatched workflow validates the exact frozen commit, public approval, tag identity and changelog section before tagging.
+- [ ] Protected `spec-release` environment, active maintainer reviewers, main-only policy, scoped publishing token, tag rulesets and immutable releases are configured.
+- [ ] The manually dispatched workflow validates the exact frozen commit, public approval, tag identity and changelog section before creating the tag and its corresponding GitHub Release record.
+- [ ] The GitHub Release references the released tag, carries the release notes with the full commit SHA and decision link, contains no assets, and its prerelease flag mirrors the `-rcN` suffix.
 - [ ] Repository and schema gates, release tooling Python tests and actionlint passed against the target; merged tag ancestry is validated.
 - [ ] No language artifact expected: no crate archives, no bindings archive, no tag pairing beyond the document release tag.
-- [ ] Correct maturity recorded (`-rcN` suffix and changelog section); finals/tags alone do not assert protocol stability. Published tags never move.
+- [ ] Correct maturity recorded (`-rcN` suffix, changelog section, and mirroring prerelease flag); finals/tags alone do not assert protocol stability. Published tags never move.
 
 ## D. Post-release
 

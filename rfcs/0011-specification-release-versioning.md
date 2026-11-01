@@ -23,11 +23,14 @@ claims that a release, interoperability result, or security review exists.
 ## 1. Summary
 
 Propose maintainer-selected two-component specification releases, such as
-Syntra 1.0 and 1.1, identified by Git tags `v1.0` and `v1.1`. Tags are the
-release; no packages, archives, or GitHub Releases are produced. Release
-candidates use a maturity suffix, such as `v1.0-rc1`; the suffix is not a
-third protocol-version component. Propose replacing Release Please with a
-manual, authorization-gated publishing workflow after this RFC is accepted.
+Syntra 1.0 and 1.1, identified by Git tags `v1.0` and `v1.1`. The tag and its
+exact commit SHA are the normative release identity; the same authorized
+publication action also records a corresponding GitHub Release with no
+release assets as a non-normative discovery and evidence record. Release
+candidates use a maturity suffix, such as `v1.0-rc1`, mirrored by the GitHub
+prerelease flag; the suffix is not a third protocol-version component.
+Propose replacing Release Please with a manual, authorization-gated
+publishing workflow after this RFC is accepted.
 The existing integer wire version, schema package, profiles, and downstream
 implementation versions remain distinct. This proposal changes no peer or
 wire behavior.
@@ -59,13 +62,19 @@ section are proposed policy; they do not activate themselves.
   `v1.0`. Versions are compared numerically, so 1.10 follows 1.9.
 - The first stable specification release is intended to be `v1.0`, subject
   to the existing freeze, evidence, and release-authorization gates. A
-  candidate is identified by the `-rcN` suffix and changelog section; there is
-  no GitHub prerelease flag, and it is not a stability claim.
+  candidate is identified by the `-rcN` suffix and changelog section; the
+  GitHub prerelease flag mirrors the suffix, and remaining release metadata,
+  such as latest-release status, is informative only. A candidate is not a
+  stability claim.
 - These release identifiers are not Semantic Versioning 2.0. Downstream
   implementation projects choose their own versioning policies.
-- Published tags name exact commits and are never moved or reused. A
-  release and its notes identify the repository, tag, full commit SHA,
-  release scope, maturity, profiles, and relevant decision/evidence links.
+- Published tags name exact commits and are never moved or reused. Each
+  published tag MUST have a corresponding GitHub Release published by the
+  same authorized action; its notes identify the repository, tag, full
+  commit SHA, release scope, maturity, profiles, and relevant
+  decision/evidence links. The record is non-normative: it MUST NOT
+  redefine or supersede the tagged specification, and release notes may be
+  corrected later without changing the release identity.
 
 ### D2. Compatibility and negotiation
 
@@ -152,13 +161,26 @@ release.
 Initially reject an existing tag. If tagging fails after partial progress,
 permit a reviewed retry only when the existing tag resolves to the same
 approved commit; never move a tag. Serialize concurrent publication attempts
-and recheck tag identity at write time. Candidate maturity is carried by the
-`-rcN` suffix and changelog section, not by GitHub prerelease or
-latest-release metadata.
+and recheck tag identity at write time. After the tag passes post-write
+verification, the same authorized action records the corresponding GitHub
+Release: it references the same tag, carries the changelog section as notes
+plus the repository, tag, commit SHA, and decision link, sets the prerelease
+flag to mirror the `-rcN` suffix, and uploads no assets. Maturity is
+normatively carried by the suffix and changelog section; prerelease and
+latest-release metadata are informative. Recovery completes a missing
+record for an existing, verified tag without re-tagging and never rewrites
+an existing record. A failure between the two writes leaves a tag without a
+record; only explicit recovery completes it.
 
-GitHub immutable releases (or tag protections/rulesets) may protect future
-published tags if enabled by an administrator. The tagged changelog and
-commit remain the canonical release snapshot; no release assets exist.
+Administrators MUST enable the immutable-releases setting for the
+repository where it is available; otherwise tag protections/rulesets MUST
+prohibit tag movement and deletion. Immutable releases lock a published tag
+against movement or deletion while its release exists, block tag-name reuse
+even after the release or repository is deleted, and generate a release
+attestation that binds the release tag, commit SHA, and assets at
+publication. The tagged changelog and commit remain the canonical release
+snapshot; no release assets exist in this policy, and a future asset bundle
+(such as frozen conformance vectors) would require its own accepted design.
 
 ## 4. Detailed design and activation map
 
@@ -177,9 +199,10 @@ The changes prepared in this branch are proposed for activation on acceptance:
 2. Preserve the repository and schema validation workflows. Add a
    publication workflow with the controls in D5, and remove Release Please's
    workflow and configuration atomically with activation.
-3. Configure and verify the environment, tag protections, required CI
-   checks, publishing identity and permissions outside the repository.
-   These settings are prerequisites, not consequences of adding YAML.
+3. Configure and verify the environment, tag protections, immutable
+   releases, required CI checks, publishing identity and permissions outside
+   the repository. These settings are prerequisites, not consequences of
+   adding YAML.
 4. Consolidate changelog history and record the actual migration in
    `MIGRATION.md`. Retire the open Release Please PR after the new policy is
    active. Do not rename or delete historical implementation tags.
@@ -196,13 +219,20 @@ verify release authority or produce a conformance result.
 1. Keep Release Please and override generated versions. This retains useful
    automation but still needs explicit protocol-scope review and does not
    natively make the proposed two-component policy authoritative.
-2. Use Semantic Versioning for specification tags. This supplies a patch
+2. Publish tags with no GitHub Release object — the initially proposed
+   tag-only policy. This would lose the releases-page discovery surface,
+   watcher notifications, and, more importantly, the cryptographically
+   verifiable release attestation that immutable releases generate; tag
+   protection alone never binds tag and commit into one verifiable record.
+   It would remain viable only if a standalone versioned specification site
+   later became the public release index.
+3. Use Semantic Versioning for specification tags. This supplies a patch
    component and broad package-tool support but does not match the proposed
    two-component public protocol naming.
-3. Negotiate major and minor on the wire. This requires a separate protocol
+4. Negotiate major and minor on the wire. This requires a separate protocol
    design, compatibility analysis and migration; a release-label decision
    alone is not enough.
-4. Do nothing. Existing release automation and three-component labels remain
+5. Do nothing. Existing release automation and three-component labels remain
    in force, including the current need for manual scrutiny of release scope.
 
 ## 6. Compatibility
@@ -242,8 +272,10 @@ weaken production transport policy, or waive independent security review.
 - [ ] Automated approval checks reject missing, stale, duplicated, revoked,
       non-maintainer and wrong-version/wrong-revision approvals, and fail
       closed on an unresolved objection or absent environment protection.
-- [ ] Candidate/stable flags, exact-target validation, concurrent attempts,
-      partial publication and recovery are tested without a real release.
+- [ ] Candidate/stable flags, prerelease mirroring, exact-target validation,
+      concurrent attempts, tag creation, release-record creation, and partial
+      publication recovery (tag without record; tag and record both present)
+      are tested without a real release.
 - [ ] Repository checks, schema checks, Python tests, and actionlint run;
       record actual commands and results separately from release evidence.
 - [ ] No new protocol conformance requirement or wire test is claimed; this
@@ -258,6 +290,14 @@ published tag. Manual authorization and a sole maintainer concentrate
 responsibility; a protected environment does not prove independent review or
 all evidence. Automated approval parsing adds a security-sensitive component
 that needs its own review and regression tests before it can publish.
+Immutable releases make a mistaken publication hard to retract: deleting
+the record frees deletion of its tag but the tag name can never be reused,
+and the attested binding persists. The record write adds a second
+partial-publication state — a tag without a record — which only explicit
+recovery completes. Prerelease and latest-release metadata are convenient
+but non-normative, and the release body itself stays editable after
+publication, so only the attested tag-and-commit binding is integrity
+information.
 
 ## 10. Unresolved questions and blockers
 
@@ -267,7 +307,8 @@ that needs its own review and regression tests before it can publish.
    active-roster source require maintainer and security review. GitHub
    environment approval alone is not the complete quorum record.
 3. The administrator must choose and verify a publishing identity compatible
-   with tag rulesets and configure the environment and repository protections.
+   with tag rulesets and configure the environment, repository protections,
+   and the immutable-release setting.
 4. The first stable bundle still lacks its required freeze, independent
    interoperability and security review, recovery/mobile evidence, and final
    authorization. This proposal cannot satisfy those gates.

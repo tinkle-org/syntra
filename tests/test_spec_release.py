@@ -128,6 +128,7 @@ class EnvironmentAndNotesTests(unittest.TestCase):
 class FakeGitHub:
     def __init__(self):
         self.ref: dict | None = None
+        self.release: dict | None = None
         self.comments = [approval()]
         self.issue = ISSUE
         self.environment = EnvironmentAndNotesTests().environment()
@@ -140,6 +141,10 @@ class FakeGitHub:
             if path.endswith("/git/refs"):
                 self.ref = {"object": {"sha": data["sha"], "type": "commit"}}
                 return self.ref
+            if path.endswith("/releases"):
+                self.release = {"tag_name": data["tag_name"], "name": data.get("name"),
+                                "body": data.get("body"), "prerelease": data["prerelease"]}
+                return self.release
             raise AssertionError(path)
         if path.endswith("/commits/main"):
             return {"sha": "b" * 40}
@@ -151,6 +156,10 @@ class FakeGitHub:
             if self.ref is None and not missing:
                 raise RELEASE.ReleaseError("missing tag")
             return self.ref
+        if "/releases/tags/" in path:
+            if self.release is None and not missing:
+                raise RELEASE.ReleaseError("missing release")
+            return self.release
         raise AssertionError(path)
 
     def pages(self, path, key=None):
@@ -181,11 +190,32 @@ class PublicationTests(unittest.TestCase):
     def publish(self, recovery=False):
         RELEASE.publish(self.api, self.api, "v1.0", SHA, "b" * 40, 42, recovery)
 
-    def test_valid_decision_creates_tag(self):
+    def test_valid_decision_creates_tag_and_release_record(self):
         self.publish()
-        self.assertEqual([x[0] for x in self.api.writes], ["POST"])
+        self.assertEqual([x[0] for x in self.api.writes], ["POST", "POST"])
+        self.assertTrue(self.api.writes[0][1].endswith("/git/refs"))
+        self.assertTrue(self.api.writes[1][1].endswith("/releases"))
         assert self.api.ref is not None
         self.assertEqual(self.api.ref["object"]["sha"], SHA)
+        record = self.api.release
+        assert record is not None
+        self.assertEqual(record["tag_name"], "v1.0")
+        self.assertIn("Reviewed changes.", record["body"])
+        self.assertIn(SHA, record["body"])
+        self.assertIn("No release assets", record["body"])
+        self.assertFalse(record["prerelease"])
+
+    def test_release_record_mirrors_the_rc_suffix_and_names_no_assets(self):
+        record = RELEASE.release_record("v2.0-rc1", SHA, 7, "Notes.")
+        self.assertTrue(record["prerelease"])
+        stable = RELEASE.release_record("v1.10", SHA, 7, "Notes.")
+        self.assertFalse(stable["prerelease"])
+        self.assertEqual(stable["name"], "Syntra Specification 1.10")
+        self.assertIn(f"Normative release: Git tag `v1.10` at commit `{SHA}`",
+                      stable["body"])
+        self.assertIn("Decision: https://github.com/tinkle-org/syntra/issues/7",
+                      stable["body"])
+        self.assertIn("No release assets", stable["body"])
 
     def test_missing_approval_or_environment_never_writes(self):
         for kind in ("approval", "environment"):
@@ -207,11 +237,47 @@ class PublicationTests(unittest.TestCase):
 
     def test_existing_tag_requires_explicit_recovery_at_the_same_sha(self):
         self.api.ref = {"object": {"sha": SHA, "type": "commit"}}
+        self.api.release = dict(RELEASE.release_record("v1.0", SHA, 42, "Reviewed changes."),
+                                assets=[])
         with self.assertRaises(RELEASE.ReleaseError):
             self.publish()
         self.assertEqual(self.api.writes, [])
         self.publish(recovery=True)
         self.assertEqual(self.api.writes, [])
+
+    def test_existing_record_mismatch_fails_with_correction_procedure(self):
+        base = dict(RELEASE.release_record("v1.0", SHA, 42, "Reviewed changes."),
+                    assets=[])
+        decision_line = "Decision: https://github.com/tinkle-org/syntra/issues/42"
+        for wrong in ({"tag_name": "v0.9"}, {"prerelease": True},
+                      {"assets": [{"name": "syntra-v1.0.tar.gz"}]},
+                      {"body": base["body"].replace(SHA, "b" * 40)},
+                      {"body": base["body"].replace("Reviewed changes.",
+                                                    "Unrelated prose.")},
+                      {"body": base["body"].replace(decision_line,
+                                                    "Decision: https://example.invalid/x")},
+                      {"body": ""}, {"body": None}):
+            with self.subTest(wrong=wrong):
+                self.api = FakeGitHub()
+                self.api.ref = {"object": {"sha": SHA, "type": "commit"}}
+                self.api.release = dict(base, **wrong)
+                with self.assertRaises(RELEASE.ReleaseError) as caught:
+                    self.publish(recovery=True)
+                self.assertIn("correct the record", str(caught.exception))
+                self.assertEqual(self.api.writes, [])
+
+    def test_recovery_completes_a_missing_record_never_retaging(self):
+        self.api.ref = {"object": {"sha": SHA, "type": "commit"}}
+        with self.assertRaises(RELEASE.ReleaseError):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+        self.publish(recovery=True)
+        self.assertEqual([x[0] for x in self.api.writes], ["POST"])
+        self.assertTrue(self.api.writes[0][1].endswith("/releases"))
+        record = self.api.release
+        assert record is not None
+        self.assertEqual(record["tag_name"], "v1.0")
+        self.assertFalse(record["prerelease"])
 
     def test_recovery_never_repoints_a_different_tag(self):
         self.api.ref = {"object": {"sha": "c" * 40, "type": "commit"}}
