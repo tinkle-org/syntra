@@ -145,7 +145,7 @@ by an SC1/WSS pass.
 - [ ] Conformance requirements complete
 - [ ] Test vectors validated
 - [ ] Consistency audit has no P0 blockers
-- [ ] Release workflow ready to build and attach assets after tagging
+- [ ] Release workflow ready to tag the authorized commit (tag-only: no packages, archives, or GitHub Releases)
 - [ ] License present (Apache-2.0 `LICENSE`)
 - [ ] Security process documented
 - [ ] CHANGELOG updated
