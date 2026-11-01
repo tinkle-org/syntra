@@ -2,15 +2,19 @@
 
 All notable changes to Syntra will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-for protocol versions once stable (see `GOVERNANCE.md` Sec. 5). During
-development, changes land under `Unreleased`.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+The proposed specification release format is `MAJOR.MINOR`, not Semantic
+Versioning; it remains subject to Draft RFC 0011 and `GOVERNANCE.md` Sec. 5.
+During development, changes land under `Unreleased`.
 
 ## [Unreleased]
 
 ### Added
 
+- Proposed Draft RFC 0011 and a maintainer-authorized two-component
+  specification release workflow. This branch prepares removal of Release
+  Please; the policy takes effect only after public RFC approval. Wire and
+  profile negotiation are unchanged.
 - Accepted the 2026-10-29 bootstrap governance transition: roster-based
   approval rule, `MAINTAINERS.md`, and
   `docs/decisions/0001-bootstrap-ratification.md`.
@@ -225,7 +229,11 @@ the crates.io model governs.
   restricted to trusted environments; credentials opaque and never logged;
   negative security cases enforced via STEST fixtures.
 
-## [Unreleased]
+## Historical development notes
+
+The following entries retain development and proposal history. Their dates
+and statuses describe the recorded events, not the current acceptance or
+release status; see the current entries above and the referenced decisions.
 
 ### v1 acceptance preparation — 2026-10-29
 

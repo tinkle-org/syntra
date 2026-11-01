@@ -1,5 +1,8 @@
 # Syntra
 
+> The specification-release process described in this branch is proposed by
+> Draft RFC 0011; the policy on `main` remains authoritative until approval.
+
 A general-purpose, transport-independent, binary client-server
 communication protocol.
 
@@ -15,8 +18,8 @@ data model, or internal architecture.
 - Protocol version: Syntra v1 (in development — core/security drafts and
   public IDL tooling present; behavioral acceptance pending, see
   [Status](#current-protocol-status) and `SESSION-OPEN-QUESTIONS.md`)
-- IDL: Protocol Buffers (proto3), governed by Buf v2; document releases are
-  managed by release-please through this repository's Git tags and GitHub
+- IDL: Protocol Buffers (proto3), governed by Buf v2; specification releases use
+  maintainer-authorized Git tags and GitHub
   Releases (see [Schema distribution](#schema-distribution))
 - Implementation evidence: delivered experimental Go SC1 draft-1 over
   TCP/WS/WSS, recorded in the [implementation ledger](docs/sc1-implementation.md#implementation-status);
@@ -266,7 +269,7 @@ Syntra Git repository (spec-first)
         │
         │ contains source schemas + validation tooling
         ▼
-release-please document releases (vX.Y.Z tags + GitHub Releases)
+maintainer-authorized specification releases (vX.Y Git tags only)
         │
         └── protocol consumers and implementations pin schemas by
             exact Git revision or release tag
@@ -291,10 +294,10 @@ Supporting (validation, process, explanation):
 
 Distribution:
 
-- release-please maintains a release PR bundling document changes into
-  `CHANGELOG.md`; merging it tags `vX.Y.Z` and creates the GitHub Release
-  for this repository (documents and schema provenance, no language
-  artifacts).
+- Maintainers prepare a release PR and explicitly authorize a frozen commit;
+  the protected manual release workflow publishes `vX.Y` and its GitHub
+  Release (documents and schema provenance, no language artifacts). The
+  proposed process is subject to Draft RFC 0011.
 - Language artifact distribution is out of scope for this repository;
   implementations pin schema revisions from here.
 
@@ -317,11 +320,11 @@ streams, TCP framing, HTTP transport, or WebSocket transport (see
 
 ## Schema distribution
 
-Schema assets are released from this repository via release-please Git tags
-(`vX.Y.Z`) and GitHub Releases; there is no Buf Schema Registry module and no
+Schema provenance is released from this repository via Git tags
+(`vX.Y` Git tags only); there is no Buf Schema Registry module and no
 `buf push` (see `buf.yaml`: no registry `name:` by design):
 
-- Release tag: `vX.Y.Z` (release-please, document releases)
+- Release tag: `vX.Y` (specification release; proposal in RFC 0011)
 - Package defined: `syntra.v1` (`proto/syntra/v1/*.proto`)
 - Consumer contract, pinning, version mapping, and release policy:
   [`docs/schema-registry.md`](docs/schema-registry.md)

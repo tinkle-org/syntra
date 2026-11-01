@@ -10,6 +10,15 @@
 
 The key words "MUST", "MUST NOT", etc. are per BCP 14.
 
+## Specification release labels (proposal)
+
+Draft [RFC 0011](../../rfcs/0011-specification-release-versioning.md)
+proposes two-component specification releases such as Syntra 1.0 and 1.1.
+These labels identify reviewed document snapshots; they do not introduce a
+minor-version field or alter the integer wire negotiation in SNTR-VER-001/002.
+They are distinct from Semantic Versioning and from implementation versions.
+The proposal is not in force until its public acceptance.
+
 ## 1. Protocol requirements
 
 **SNTR-VER-001** — Dimensions are independent and MUST NOT be conflated:

@@ -1,5 +1,9 @@
 # Governance
 
+> **Proposed change:** the release-process edits in this branch are subject to
+> public approval of [RFC 0011](rfcs/0011-specification-release-versioning.md).
+> Until acceptance, the governance on `main` remains authoritative.
+
 This document defines who decides what in Syntra, how normative changes
 are approved, how breaking changes are handled, and how a protocol
 release becomes stable.
@@ -49,18 +53,16 @@ for:
 - Enforcing the review bar (`rfcs/README.md`): requirement IDs, client/
   server obligations, bounded resources, unknown-field handling, security
   and compatibility considerations, testable acceptance criteria.
-- Authorizing releases and notes per Sec. 5 through reviewed release PRs.
-  Language artifact publishing is out of scope for this repository; its
-  document and schema-provenance releases are maintained by release-please
-  release PRs (see `RELEASE.md` §4). Maintainers alone may create recovery
-  releases. `v*` tag namespaces require ruleset restriction to
-  maintainers plus the release automation identity; `main` requires pull
-  requests for all updates.
-- Custody of release and reporting credentials (automatic `github.token`
-  for release-please and validation workflows, private vulnerability
-  reports): least privilege, no exposure in logs or PR jobs, rotation on
-  suspected exposure. There is no external registry publishing path from
-  this repository.
+- Authorizing release scope and notes per Sec. 5 through reviewed release
+  PRs and an explicit public decision bound to the final commit. A single
+  active maintainer may approve with self-review disclosed; two or more
+  require two distinct approvals. See `RELEASE.md` §4. Language artifact
+  publishing remains out of scope. Restrict `v*` tag creation to maintainers
+  and the release identity; protect tags against movement and deletion.
+- Custody of release and reporting credentials, including the environment-only
+  publication token and private vulnerability reports: least privilege, no
+  exposure in logs or PR jobs, rotation on suspected exposure. There is no
+  external registry publishing path from this repository.
 - Keeping `CHANGELOG.md`, `MIGRATION.md`, and the conformance suite
   consistent with every normative merge.
 
@@ -91,8 +93,9 @@ for:
    - Schema changes (field addition/deprecation/option change, `buf.yaml`
      rule changes) follow this same bar, plus a clean `buf lint`,
       `buf build`, and `buf breaking` gate. Wire-incompatible schema
-      changes are breaking (Sec. 4). GitHub Releases attach release notes
-      only, on reviewed release-please tags via the gated release workflow.
+       changes are breaking (Sec. 4). Git tags carry the release; release notes
+       live in `CHANGELOG.md` at the tagged commit, published only on explicitly
+authorized tags via the gated release workflow.
    - MUST update `CHANGELOG.md` (`Unreleased`) and link requirement IDs
      to conformance tests (or tracked placeholders).
 - **Governance / process changes** (this file, `CONTRIBUTING.md`,
@@ -156,8 +159,8 @@ does not assert protocol stability):
    independent packet-fixture verification, during bootstrap).
 3. `CHANGELOG.md` lists every wire-affecting change with migration notes.
 4. Maintainers authorize the release and notes. This repository's
-   document releases are tagged `vX.Y.Z` by release-please after a
-   reviewed release PR merge; schema provenance rides those tags.
+   specification releases use `vX.Y` tags after a reviewed release PR,
+   freeze and explicit public authorization; schema provenance rides those tags.
    Language artifact releases are owned by the implementation
    repositories and pin a revision of this repository. Branches do not
    define stability; see `RELEASE.md` §4 for recovery and ownership.

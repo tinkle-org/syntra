@@ -1,9 +1,8 @@
 # Syntra Schema Registry — distribution and consumer contract
 
-> **Scope note (2026-10-27).** This repository returned to specification-first
-> ownership and is pre-release: it publishes documents and schema provenance
-> via release-please (`vX.Y.Z` tags, GitHub Releases) and commits or
-> generates no language bindings (see `MIGRATION.md` §10). Sections
+> **Proposed release-process update:** the `vX.Y` publication procedure in
+> this branch is subject to public approval of Draft RFC 0011. The repository
+> is specification-first and publishes no language bindings. Sections
 > describing crates.io publication, nested Go module tags, or the
 > committed-generation contract apply to the RC-1 snapshot (`2a91da7`) and
 > are retained as process history for that release. Schema provenance,
@@ -11,21 +10,20 @@
 
 - Status: Active schema-provenance and pinning contract (see scope note)
 - Scope: How Syntra's Protobuf schemas are released and pinned, what consumers are guaranteed, and what generated packages do **not** provide. Protocol behavior is owned by `specifications/`; this document owns only schema provenance and consumer pinning.
-- Normative references: `buf.yaml`, `proto/syntra/v1/*.proto`, `specifications/core/versioning.md` (SNTR-VER-*), `specifications/schema/compatibility.md`, `GOVERNANCE.md`, `CHANGELOG.md`, `conformance/profiles.yaml`, `RELEASE.md` §§4–6, `.github/workflows/release-please.yml`.
+- Normative references: `buf.yaml`, `proto/syntra/v1/*.proto`, `specifications/core/versioning.md` (SNTR-VER-*), `specifications/schema/compatibility.md`, `GOVERNANCE.md`, `CHANGELOG.md`, `conformance/profiles.yaml`, `RELEASE.md` §§4–6, `.github/workflows/spec-release.yml`.
 - Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
 
 ## 1. Distribution identity (A)
 
-There is **no BSR module**. Document releases are tagged by release-please:
+There is **no BSR module** and no release packaging. Proposed specification release tags:
 
 ```text
-vX.Y.Z      — release-please document release (GitHub Release)
-vX.Y.Z-rc.N — release candidate (marked prerelease)
+vX.Y      — specification release (Git tag only)
+vX.Y-rcN  — release candidate (tag suffix only)
 ```
 
-- Maintainers authorize releases by reviewing and merging release PRs.
-  release-please maintains the release PR bundling `CHANGELOG.md`; merging
-  it tags `vX.Y.Z` (see `RELEASE.md` §4). Branches never define releases.
+- Maintainers review the release PR and explicitly authorize the frozen
+  version and commit in public (see `RELEASE.md` §4). Branches never define releases.
 - `buf.yaml` carries **no registry `name:`** by design. A BSR identity is
   only needed for `buf push` / `--against-registry` breaking checks; this
   repository never pushes schemas to the BSR. Breaking baselines are
@@ -38,18 +36,18 @@ vX.Y.Z-rc.N — release candidate (marked prerelease)
 | Item | Policy |
 |---|---|
 | Module ownership | Held by the Syntra maintainers (interim: repository owners per `GOVERNANCE.md` §2). |
-| Visibility | **Public** Git repository; GitHub Releases carry the release notes. |
+| Visibility | **Public** Git repository; the tag and `CHANGELOG.md` at that commit carry the release. |
 | Public status | A configured publishing path is not evidence of a completed release. Verify the tag and notes before pinning a dependency. |
 | Source repository relationship | Git is the authoring authority AND the release point for tagged revisions (§2). |
-| Release/tag relationship | Document releases are tagged `vX.Y.Z`; language implementations pin those revisions from here (see `RELEASE.md` §5). |
+| Release/tag relationship | Specification releases are tagged `vX.Y`; language implementations pin those revisions from here (see `RELEASE.md` §4). |
 
 ## 2. Source of truth (B)
 
 ```text
 Git repository (proto/syntra/v1/*.proto)   ← sole authoring authority
-        │  reviewed release PR (release-please)
+        │  reviewed release PR + explicit authorization
         ▼
-Release tag vX.Y.Z + GitHub Release notes
+Release tag vX.Y (+ `CHANGELOG.md` section at that commit)
         │  git / tag pinning
         ▼
 Consumers (implementations pin exact revisions; downstream generators
@@ -126,8 +124,8 @@ Five independent dimensions (SNTR-VER-001). The table below is the precise mappi
 | Dimension | Identifier | Examples | Governed by |
 |---|---|---|---|
 | Git commit | SHA | `92e5f28…` | Git history; every change lands here first |
-| Git tag (document release) | `vX.Y.Z` or `-rc.N` | `v1.0.0-rc.1` | release-please after a reviewed release PR; protocol stability separately governed by `GOVERNANCE.md` §5 |
-| GitHub Release | release notes at the tag | `v1.0.0` notes | Attached by `.github/workflows/release-please.yml` |
+| Git tag (specification release) | `vX.Y` or `-rcN` | `v1.0-rc1` | Maintainer authorization; protocol stability separately governed by `GOVERNANCE.md` §5 |
+| Git tag | release identity | `v1.0` tag | Published by `.github/workflows/spec-release.yml` |
 | Syntra Core version | protocol behavior | Syntra Core v1 | `specifications/core/versioning.md` |
 | Protobuf package version | representation namespace | `syntra.v1` | `proto/` + Buf FILE checks |
 
@@ -140,13 +138,13 @@ Rules:
 
 ## 8. Release labels (H)
 
-Channel semantics live in exact package versions, Git tags, and GitHub Release metadata:
+Channel semantics live in exact package versions and Git tags:
 
 | Channel | GitHub mechanism | Git counterpart |
 |---|---|---|
 | `development` | `main` head (no release) | Commit on `main`, pre-tag |
-| `candidate` | GitHub Release marked **prerelease** from a `-rc` tag | `syntra-core-vX.Y.Z-rc.N` + `bindings/go/vX.Y.Z-rc.N` at the same commit |
-| `stable` | Final release meeting the protocol stability criteria | `syntra-core-vX.Y.Z` + `bindings/go/vX.Y.Z` at the same commit, after `GOVERNANCE.md` §5 criteria hold; package final/latest metadata alone is insufficient |
+| `candidate` | Tag suffix `-rcN` | `vX.Y-rcN` at the authorized commit |
+| `stable` | Final release meeting the protocol stability criteria | `vX.Y` at the authorized commit, after `GOVERNANCE.md` §5 and applicable bundle gates hold |
 
 Releases move forward only: re-pointing a release at an older commit is forbidden and is treated as an incident (audit, announce, re-release). No other channel vocabulary is introduced; anything fancier stays in Git metadata (notes, release notes), not in a registry.
 
@@ -167,10 +165,10 @@ Downstream language projects run their own generation-drift, codec, and
 (WASM where applicable) gates in their own repositories before relying on
 a revision.
 
-- Post-release baseline: build `image.json` from the stable release tag locally, verify its checksum, and commit it at a baseline path through a reviewed PR. release-please attaches no descriptor assets, so operators reproduce them from the tagged revision:
+- Post-release baseline: build `image.json` from the stable release tag locally, verify its checksum, and commit it at a baseline path through a reviewed PR. Operators reproduce descriptors from the tagged revision:
   ```sh
-  git fetch origin tag vX.Y.Z
-  git worktree add --detach /tmp/syntra-stable vX.Y.Z
+  git fetch origin tag vX.Y
+  git worktree add --detach /tmp/syntra-stable vX.Y
   (cd /tmp/syntra-stable && buf build -o /tmp/stable-image.json)
   shasum -a 256 /tmp/stable-image.json
   ```
@@ -183,8 +181,9 @@ a revision.
 | Event | Action |
 |---|---|
 | Pull request | Validate only (format, lint, build, breaking vs Git baseline). No credentials present; nothing attached. |
-| Ordinary merge to `main` | Re-validate; release-please maintains the release PR (document releases only). |
-| Release PR merge | release-please tags `vX.Y.Z` and creates the GitHub Release for this repository. No descriptor assets are attached; operators build `image.json` from the tag per §9. |
+| Ordinary merge to `main` | Re-validate; no release is created. |
+| Release PR merge | Freeze the merged revision and gather the required evidence; merging alone does not publish. |
+| Authorized manual dispatch | Validate the exact commit and publish `vX.Y` or `vX.Y-rcN`; operators build `image.json` from the tag per §9. |
 | Maintainer recovery release | Re-validate the existing merged tag and re-attach notes. Does not publish language artifacts. |
 | Local developer machine | Can validate and prepare source, but does not bypass maintainer release authorization. Manual recovery is defined in `RELEASE.md` §4. |
 
@@ -204,7 +203,7 @@ transport, or WebSocket transport.
 
 Per-ecosystem guidance:
 
-- Pin the schema source: a release-please tag (`vX.Y.Z`) or exact commit
+- Pin the schema source: a specification tag (`vX.Y`) or exact commit
   SHA of this repository.
 - Pin the generator: remote plugin version **and** revision (as recorded
   in `specifications/schema/generation.md`), plus the language runtime
@@ -220,7 +219,7 @@ Protobuf runtime. Rebuild bindings deliberately; never float.
 
 Production consumers pin **exact** revisions:
 
-1. Pin the source: a release-please tag (`vX.Y.Z`) or commit SHA of this repository.
+1. Pin the source: a specification tag (`vX.Y`) or commit SHA of this repository.
 2. Pin the generator: remote plugin version **and** revision (see `specifications/schema/generation.md`), plus the Protobuf runtime version in the consumer's own lockfile. Verify `SHA256SUMS` on release assets when release assets are used.
 3. Record all pins where the consumer records dependencies, so a rebuild years later reproduces identical types.
 4. Upgrades are deliberate PRs in the consumer: bump one pin at a time, regenerate, rerun the consumer's Syntra conformance subset, and review `CHANGELOG.md` entries since the previously pinned tag.
@@ -237,10 +236,9 @@ Per SNTR-VER-006 and `GOVERNANCE.md` §4, deprecating any schema element follows
 
 ## 14. Release security (N)
 
-- **Release credentials:** release-please and validation workflows use the
-  automatic `github.token` with least privilege (contents read for
-  validation; contents/pull-request write for the release PR job). No
-  `BUF_TOKEN`, BSR publishing environment, or GHCR login.
+- **Release credentials:** validation uses a read-only `github.token`;
+  publication uses the scoped `SPEC_RELEASE_TOKEN` environment secret after
+  authorization. No `BUF_TOKEN`, BSR publishing environment, or GHCR login.
 - **CI secrets:** PR jobs receive **no** release credentials (validation is credential-less apart from the read-only checkout). `pull_request_target` is not used.
 - **Least privilege:** tag creation/attachment is confined to the release automation. Validation uses read-only permissions. Exposure handling is per `SECURITY.md`.
 - **Pull-request security:** PR validation attaches nothing. Protect `main` (pull requests required) and the `syntra-*-v*` tag namespaces, permitting the release automation identity as needed. Release workflows run only in the upstream repository; privileged workflow changes require maintainer review.
@@ -253,20 +251,20 @@ Authoritative relationships at a glance (see §7 for rules):
 
 | You want… | Use… | Example (illustrative) |
 |---|---|---|
-| Exact schema bytes | Release tag or Git SHA | `v1.0.0` / `92e5f28…` |
-| A document release | release-please tag + GitHub Release | `v1.0.0` |
+| Exact schema bytes | Release tag or Git SHA | `v1.0` / `92e5f28…` |
+| A specification release | Authorized Git tag (no GitHub Release) | `v1.0` |
 | Current development | `main` head | moves with each accepted merge |
-| Release candidate | GitHub prerelease from a `-rc` tag | `v1.1.0-rc.1` |
-| Production dependency | Reviewed exact version meeting the needed stability criteria | `v1.1.0`; see `GOVERNANCE.md` §5 |
+| Release candidate | Tag suffix `-rcN` | `v1.1-rc1` |
+| Production dependency | Reviewed exact version meeting the needed stability criteria | `v1.1`; see `GOVERNANCE.md` §5 |
 | Protocol behavior version | Syntra Core version (handshake-negotiated) | Core v1 (`Frame.version == 1`) |
 | Representation namespace | Protobuf package | `syntra.v1` |
 | Transport conformance | Transport profile ID | `SNTR-WSS-H1-V1` (see `conformance/profiles.yaml`) |
 
-Document release tags such as `v1.0.0` are explicit. Language artifact
+Specification release tags such as `v1.0` are explicit. Language artifact
 distribution does not drive this workflow. Implementation versions do not
 version the protocol (ADR-010).
 
-## 16. What GitHub Releases provide — and do not
+## 16. What tags provide — and do not
 
 Provides: release notes at the tagged revision. Tags must never be moved;
 tag identity is the release identity — there is no mutable asset to

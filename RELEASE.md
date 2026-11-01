@@ -1,5 +1,9 @@
 # Syntra v1 Release Candidate — Release Process
 
+> **Proposed change:** the release procedure in this branch is pending public
+> approval of [RFC 0011](rfcs/0011-specification-release-versioning.md).
+> The current process on `main` remains authoritative until acceptance.
+
 This document defines how the repository is tagged as a Syntra v1 release
 candidate, what is frozen at RC, how versions relate, and how release
 artifacts are produced. It creates no new normative behavior; all rules
@@ -7,7 +11,7 @@ cite their owning specification or governance section.
 
 > **Scope note (2026-10-27).** This repository returned to
 > specification-first ownership: it publishes documents and schema
-> provenance only, via release-please release PRs and `vX.Y.Z` tags (see
+> provenance only, via maintainer-authorized `vX.Y` tags (see
 > `MIGRATION.md` §10). Language implementation gates and artifact
 > publishing are out of scope for this repository. Sections below that
 > describe retired implementation-era mechanics apply to the RC-1
@@ -112,8 +116,8 @@ rule that a single-transport claim does not require a two-transport proof. The
 two-transport proof is required only for a claim of transport independence
 across two named transports. The [acceptance package](docs/v1-acceptance-package.md)
 separates specification freeze from independent execution and stable
-authorization. Acceptance does not waive any applicable bundle gate. Prerelease
-configuration remains unchanged; structural validation alone does not authorize
+authorization. Acceptance does not waive any applicable bundle gate. Candidate
+releases remain distinct from stable promotion; structural validation does not authorize
 stable promotion.
 
 Check each box with evidence (command output, PR link, or reviewer sign-off).
@@ -161,7 +165,7 @@ Evidence mapping (where each box is verified):
 | Implementation gates | Out of scope for this repository; owned by the separate language implementation projects (RC-1-era evidence rows below are process history) |
 | License present | Apache-2.0 `LICENSE` file present per `GOVERNANCE.md` Sec. 7 |
 | Security process documented | `SECURITY.md` private reporting channel live; embargo handling per `GOVERNANCE.md` Sec. 3 |
-| CHANGELOG updated | `## [v1.0.0-rc.1]` section with Added/Changed/Deprecated/Removed/Security; every wire-affecting change has migration notes |
+| CHANGELOG updated | A section for the exact proposed tag; every wire-affecting change has migration notes |
 
 ### Specification freeze at pinned revision
 
@@ -337,38 +341,94 @@ version lines are NOT defined. Claim conformance per profile ID
 (`conformance/claims.md`, `declaration.example.yaml`); do not invent
 per-transport version numbers.
 
-## 4. Tagging procedure (release-please release PR, then publish on merge)
+## 4. Tagging procedure (manual, authorized publication)
 
-`.github/workflows/release-please.yml` maintains a release PR that bundles
-document changes into `CHANGELOG.md`. Review the complete release scope and
-CI evidence before merging. Merging the release PR is what authorizes the
-release; ordinary merges to `main` do not publish. The repository must
-allow Actions to create PRs; approve the checks on bot-created PRs if
-GitHub requires it before merging.
+This procedure is proposed by RFC 0011 (Discussion) and is not yet active.
+Until acceptance, `.github/workflows/release-please.yml` and its configuration
+remain the active publisher. On acceptance the workflow tags only
+when RFC 0011 is marked Accepted on trusted `main`; that status must
+follow an actual public maintainer decision, not a bot or this document. There
+are no packages, archives, or GitHub Releases: the Git tag is the release.
 
-On merge, release-please tags `vX.Y.Z` (or increments the current
-prerelease, e.g. `1.0.0-rc.1` → the next version per conventional commits)
-and creates the GitHub Release with the CHANGELOG section as notes. Before
-merging, reviewers must confirm every existing `[Unreleased]` entry has
-been moved under the generated release entry (release-please proposes
-this move in the release PR; do not merge while entries remain stranded
-under `[Unreleased]`). This repository publishes no language artifacts;
-language implementations pin schema revisions from here.
+### Administrative setup
 
-Recovery: rerun failed jobs. A maintainer may recreate a missing release
-path using a new signed tag at an approved, merged commit:
+1. Create the GitHub environment `spec-release`. Require a reviewer from the
+   active maintainer roster (individual users, not teams) and select **only**
+   the branch `main` under its
+   custom deployment branch policies. With exactly one active maintainer,
+   leave prevent-self-review disabled. The workflow checks these settings;
+   GitHub's automatic creation of an unprotected environment is insufficient.
+2. Store `SPEC_RELEASE_TOKEN` as an **environment secret**, not a repository
+   or organization secret. Use a dedicated narrowly scoped repository token
+   with contents write permission and permission to create `v*` tags. Validation
+   jobs have only read access and do not receive
+   this secret. Rotate it on suspected exposure.
+3. Protect `main` and the `v*` tag namespace with appropriate rulesets:
+   restrict creation to maintainers and the publishing identity, prohibit
+   movement/deletion, and require the repository checks on PRs. Verify the
+   publishing identity works with the rulesets. Enable immutable releases or
+   tag protections for future tags where available.
 
-```sh
-git tag -s v1.0.0 -m "Syntra schema v1.0.0"
-git push origin v1.0.0
+### Prepare and authorize
+
+Prepare a release PR containing the reviewed scope and a nonempty
+`## [v1.0]` or `## [v1.0-rc1]` section in `CHANGELOG.md`. Merge it, freeze
+the exact resulting full commit SHA, and collect the evidence required for
+its scope. The initial stable bundle retains RFC 0009's independent Go/Rust,
+SC1, recovery, mobile and independent security-review gates. An RC does not
+assert those stable gates passed.
+
+Open a public issue or PR containing these unique, single-line fields. Use
+the exact tag and full commit; describe any pending candidate evidence
+honestly. Stable `Freeze`, `Evidence`, and `Security` fields must be HTTPS
+links to the actual records. The maintainer reviews the linked contents,
+including applicable profiles, case results and unresolved objections.
+
+```text
+Release-Tag: v1.0-rc1
+Release-Commit: <full-commit-sha>
+Release-Scope: <declared scope and profiles>
+Release-Freeze: <freeze record or candidate status>
+Release-Evidence: <evidence links or candidate limitations>
+Release-Security: <security review link or candidate limitations>
+Release-Objections: <none or resolution links>
+Release-Self-Review: yes
 ```
 
-Restrict `v*` tag creation to maintainers and the release
-automation identity (historical `syntra-*-v*` crate-era tags keep their
-existing protection). Deleting or moving a published tag is forbidden; fix
-forward. The RC-1-era mechanics that follow in §§5–6 describe the retired
-crate/Go release model and are retained as process history for that
-release only.
+After saving the final body, run the following with an authenticated `gh`
+session and post its output as a **separate comment** on that issue or PR:
+
+```sh
+GITHUB_TOKEN="$(gh auth token)" python3 scripts/spec-release.py approval --issue 42 --tag v1.0-rc1 --target <full-commit-sha>
+```
+
+The comment binds the approving account, tag, commit and SHA-256 of the exact
+decision body. Editing that body invalidates earlier approvals. With one
+active maintainer one approval suffices; with two or more, two distinct
+active maintainers must comment. To object, an active maintainer posts exactly
+`SYNTRA-OBJECT <tag> <full-commit-sha>`; their later valid approval resolves
+that structured objection. Reviewers must also check ordinary discussion:
+automation cannot identify every unstructured objection or assess evidence.
+
+### Tag and recover
+
+Manually dispatch `.github/workflows/spec-release.yml` on `main` with the
+tag, full target SHA, decision issue number, and `recovery=false`. After the
+read-only validation succeeds, approve the protected environment. The
+publisher rechecks the RFC status, current main revision, maintainer roster,
+environment protections, public approvals, tag identity and changelog section
+before creating the tag. The workflow does not execute target scripts with
+release credentials. RC status lives in the tag suffix and changelog; there is
+no separate prerelease flag or latest-release marker.
+
+If publication stops after tag creation, investigate and rerun the same
+authorized version and commit with `recovery=true`. Recovery only accepts an
+existing tag pointing directly to the same approved commit. It never moves a
+tag. Tag
+protection and independent maintainer review of evidence are administrative
+and human controls, not guarantees provided by the script.
+
+The RC-1-era mechanics in §§5–6 are historical only.
 
 ## 5. Release artifacts
 
@@ -392,12 +452,11 @@ Language artifact assets from that release (crate archives, Go-bindings
 archive, native-ABI header distribution) are out of scope for this
 repository going forward.
 
-## 6. GitHub Release association (no BSR)
+## 6. Tag association (no BSR, no GitHub Releases)
 
 Snapshot-scoped section (RC-1, `2a91da7`): the crate-anchored tag pairing
 below applied to that release. Forward releases of this specification-first
-repository are tagged `vX.Y.Z` by release-please after a reviewed release
-PR merge; they carry documents and schema provenance, not language
+repository use maintainer-authorized `vX.Y` tags; they carry documents and schema provenance, not language
 artifacts. There is no BSR module, `buf push`, or GHCR publication from
-this repository. RC tags are marked prerelease; a tag alone never asserts
+this repository. RC status lives in the `-rcN` tag suffix; a tag alone never asserts
 the protocol stability criteria in `GOVERNANCE.md` §5.
