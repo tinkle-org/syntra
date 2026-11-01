@@ -172,12 +172,13 @@ record for an existing, verified tag without re-tagging and never rewrites
 an existing record. A failure between the two writes leaves a tag without a
 record; only explicit recovery completes it.
 
-Administrators MUST enable the immutable-releases setting for the
-repository where it is available; otherwise tag protections/rulesets MUST
-prohibit tag movement and deletion. Immutable releases lock a published tag
-against movement or deletion while its release exists, block tag-name reuse
-even after the release or repository is deleted, and generate a release
-attestation that binds the release tag, commit SHA, and assets at
+Administrators MUST protect `main` and the `v*` tag namespace with rulesets
+restricting creation and prohibiting movement/deletion, whether or not
+immutable releases are enabled, and MUST enable the immutable-releases
+setting for the repository where it is available. Immutable releases lock a
+published tag against movement or deletion while its release exists, block
+tag-name reuse even after the release or repository is deleted, and generate
+a release attestation that binds the release tag, commit SHA, and assets at
 publication. The tagged changelog and commit remain the canonical release
 snapshot; no release assets exist in this policy, and a future asset bundle
 (such as frozen conformance vectors) would require its own accepted design.

@@ -369,14 +369,12 @@ assets, as a discovery and evidence record only.
 3. Protect `main` and the `v*` tag namespace with appropriate rulesets:
    restrict creation to maintainers and the publishing identity, prohibit
    movement/deletion, and require the repository checks on PRs. Wherever the
-   immutable-releases feature is available, enable the setting: it locks
-   published tags against movement or deletion, blocks tag-name reuse, and
-   generates a release attestation binding each release tag, commit SHA, and
-   assets. Configure tag protections only where immutable releases are
-   unavailable. Verify the publishing identity works with the rulesets, and
-   before releasing, verify that the applicable protection is in place —
-   the immutable-releases setting where available, otherwise tag
-   protections/rulesets covering the `v*` namespace.
+   immutable-releases feature is available, also enable the setting: it
+   locks published tags against movement or deletion, blocks tag-name reuse,
+   and generates a release attestation binding each release tag, commit SHA,
+   and assets. Verify the publishing identity works with the rulesets, and
+   before releasing, verify that the protections are in place: the `v*`
+   rulesets always, and the immutable-releases setting where available.
 
 ### Prepare and authorize
 
