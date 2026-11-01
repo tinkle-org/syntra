@@ -61,7 +61,7 @@ pending items.
 | Conformance/interop | BLOCKED | CI validates definitions/vectors, not complete IUT runs. Registered suite is now 189 cases (incl. `CONF-SCW-025`–`042` and recovery cases); registration is not execution and no independent results are added |
 | Operational/mobile assurance | BLOCKED | Declared budgets and iOS/Android lifecycle, weak-network, idle-cost and soak evidence required; simulated/compile evidence alone insufficient |
 | License | PRESENT | Apache-2.0 LICENSE present and full-text regression test passes |
-| Distribution | CURRENT MODEL DOCUMENTED | Document/schema-provenance releases via release-please Git tags; language artifacts downstream. BSR schema publication/GHCR gates retired, not open blockers |
+| Distribution | PROPOSED UPDATE | Draft RFC 0011 proposes maintainer-authorized two-component tags; language artifacts remain downstream. BSR/GHCR gates remain retired. |
 
 ## Historical consistency findings disposition
 

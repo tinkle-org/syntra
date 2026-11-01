@@ -1059,8 +1059,9 @@ def check_markdown():
 #   FORBIDDEN: implementation trees (crates/, bindings/, including any
 #            generated language sources) and legacy gen//generated/ trees.
 #   Language implementations are separate projects, out of scope here.
-#            Schema asset distribution is via GitHub Release assets (no
-#            BSR, no GHCR, no external registries).
+#            Schema provenance is released via specification Git tags with
+#            a no-asset GitHub Release record (no BSR, no GHCR, no external
+#            registries).
 LEGACY_GEN_DIRS = ("gen", "generated")
 
 IMPL_ROOTS = ("crates", "bindings")

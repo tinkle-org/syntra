@@ -342,7 +342,7 @@ vectors (minus the implementation harness), the repository validators
 the Buf checks and `tests/schema/test_schema.py`),
 `tests/schema/test_schema.py` with its fixture, and `tests/test_license.py`.
 
-Forward policy: release-please maintains document releases (`vX.Y.Z`
+Policy at extraction: release-please maintains document releases (`vX.Y.Z`
 tags, GitHub Releases) bundling `CHANGELOG.md`; schema provenance rides
 those tags. Language implementations pin schema revisions from here; no
 language artifacts are published from this repository. The frozen
@@ -513,3 +513,18 @@ Deferred and tracked (not merged in this wave):
   — a Protobuf FILE/source break awaiting downstream `syntra-go` owner
   confirmation and coordinated release ordering. The accepted spec text
   stays implementation-neutral.
+
+## 14. Proposed specification release-process migration
+
+Draft [RFC 0011](rfcs/0011-specification-release-versioning.md) proposes
+replacing Release Please's three-component document releases with explicit
+maintainer authorization, `vX.Y` specification tags, and a protected manual
+publication workflow. The branch prepares removal of the Release Please
+workflow and configuration, updates release documentation, and adds tests.
+This record is a proposal until the RFC's public decision; it is not a
+release authorization or a claim that repository settings were configured.
+
+The old crate/Go RC tags retain their historical identities. Wire version,
+schema package, profile identifiers, compatibility baselines, and downstream
+implementation versions are unchanged. A stable `v1.0` remains blocked on
+the existing applicable freeze, interoperability and security evidence.
