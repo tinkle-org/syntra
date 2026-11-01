@@ -143,7 +143,8 @@ class FakeGitHub:
                 return self.ref
             if path.endswith("/releases"):
                 self.release = {"tag_name": data["tag_name"], "name": data.get("name"),
-                                "body": data.get("body"), "prerelease": data["prerelease"]}
+                                "body": data.get("body"), "prerelease": data["prerelease"],
+                                "assets": []}
                 return self.release
             raise AssertionError(path)
         if path.endswith("/commits/main"):
@@ -168,6 +169,18 @@ class FakeGitHub:
         if path.endswith("/issues/42/comments"):
             return list(self.comments)
         raise AssertionError(path)
+
+
+class MangledReleaseGitHub(FakeGitHub):
+    def call(self, method, path, data=None, missing=False):
+        record = super().call(method, path, data, missing)
+        if method != "GET" and path.endswith("/releases"):
+            assert data is not None
+            # Simulate an API response that deviates from the submitted contract.
+            return {"tag_name": data["tag_name"], "name": data.get("name"),
+                    "body": "Notes without the decision link.",
+                    "prerelease": data["prerelease"], "assets": []}
+        return record
 
 
 class PublicationTests(unittest.TestCase):
@@ -204,6 +217,13 @@ class PublicationTests(unittest.TestCase):
         self.assertIn(SHA, record["body"])
         self.assertIn("No release assets", record["body"])
         self.assertFalse(record["prerelease"])
+
+    def test_created_record_mismatch_fails_instead_of_reporting_success(self):
+        self.api = MangledReleaseGitHub()
+        with self.assertRaises(RELEASE.ReleaseError) as caught:
+            self.publish()
+        self.assertIn("correct the record", str(caught.exception))
+        self.assertEqual([x[0] for x in self.api.writes], ["POST", "POST"])
 
     def test_release_record_mirrors_the_rc_suffix_and_names_no_assets(self):
         record = RELEASE.release_record("v2.0-rc1", SHA, 7, "Notes.")

@@ -296,8 +296,7 @@ def publish(read_api, write_api, tag, sha, trusted_head, issue_number, recovery=
         record = write_api.call("POST", f"{PREFIX}/releases",
                                 release_record(tag, sha, issue_number, notes))
         record_created = True
-        if record.get("tag_name") != tag:
-            raise ReleaseError("release record does not reference the release tag")
+        verify_record(tag, sha, issue_number, notes, record)
     else:
         verify_record(tag, sha, issue_number, notes, record)
     verify_main(read_api, trusted_head)
