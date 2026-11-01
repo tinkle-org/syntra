@@ -32,7 +32,8 @@ ROSTER = "| [alice](https://github.com/alice) | Active maintainer; owner | all |
 
 def approval(user="alice", body=BODY, tag="v1.0", sha=SHA, ident=1):
     digest = hashlib.sha256(body.encode()).hexdigest()
-    return {"id": ident, "updated_at": f"2026-10-31T12:00:{ident:02d}Z",
+    timestamp = f"2026-10-31T12:00:{ident:02d}Z"
+    return {"id": ident, "created_at": timestamp, "updated_at": timestamp,
             "user": {"login": user, "type": "User"},
             "body": f"SYNTRA-APPROVE {tag} {sha} {digest}"}
 
@@ -84,6 +85,19 @@ class AuthorizationTests(unittest.TestCase):
                 with self.assertRaises(RELEASE.ReleaseError):
                     RELEASE.verify_authorization(dict(ISSUE, body=text), [approval(body=text)],
                                                  {"alice"}, "v1.0", SHA)
+
+    def test_edited_comment_cannot_forge_approval(self):
+        forged = approval(user="bob", ident=2)
+        forged["updated_at"] = "2026-10-31T12:05:02Z"
+        with self.assertRaises(RELEASE.ReleaseError):
+            RELEASE.verify_authorization(ISSUE, [approval(), forged],
+                                         {"alice", "bob"}, "v1.0", SHA)
+
+    def test_missing_created_at_fails_closed(self):
+        comment = approval()
+        del comment["created_at"]
+        with self.assertRaises(RELEASE.ReleaseError):
+            RELEASE.verify_authorization(ISSUE, [comment], {"alice"}, "v1.0", SHA)
 
     def test_roster_refuses_unparseable_active_rows(self):
         for text in ("", ROSTER + "| bob | Active maintainer | all |\n", ROSTER + ROSTER):

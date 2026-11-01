@@ -113,13 +113,23 @@ def verify_authorization(issue, comments, roster, tag, sha):
         if not text.startswith("SYNTRA-"):
             continue
         try:
-            timestamp = datetime.fromisoformat(comment["updated_at"].replace("Z", "+00:00"))
+            created = datetime.fromisoformat(comment["created_at"].replace("Z", "+00:00"))
+            updated = datetime.fromisoformat(comment["updated_at"].replace("Z", "+00:00"))
             ident = int(comment["id"])
-            if timestamp.utcoffset() is None:
+            if created.utcoffset() is None or updated.utcoffset() is None:
                 raise ValueError("timezone required")
+            if updated != created:
+                # REST exposes only second-precision created/updated
+                # timestamps with no editor field, so equality is a
+                # fail-closed heuristic, not proof the comment is unedited.
+                # Any detected edit is refused because the current body
+                # cannot be attributed to the original author.
+                raise ReleaseError("maintainer decision was edited; post a new comment")
         except (KeyError, TypeError, ValueError) as exc:
+            if isinstance(exc, ReleaseError):
+                raise
             raise ReleaseError("malformed maintainer decision timestamp") from exc
-        ordered.append((timestamp, ident, login, text))
+        ordered.append((created, ident, login, text))
     for _, _, login, text in sorted(ordered):
         parts = text.split()
         if len(parts) >= 3 and parts[:3] == ["SYNTRA-OBJECT", tag, sha]:
