@@ -1,0 +1,24 @@
+scripts/spec-release.py
+  s_b0b37ca0a15871::t_6a1a5b3ae1152e 299
+tests/test_spec_release.py
+  s_b0b37ca0a15871::t_ee7fde1bbf8007 221-227
+  s_b0b37ca0a15871::t_cfeeed461c00a2 178
+  s_b0b37ca0a15871::t_398355bc0f84d8 146-147
+  s_b0b37ca0a15871::t_ffe6ac68db2b82 174-177,179-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c6905b7418b78a3a14ff84d2584616eee67c0900",
+  "prompts": {},
+  "sessions": {
+    "s_b0b37ca0a15871": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6aef1422ffeTMC4U4xAK4Sq68",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
