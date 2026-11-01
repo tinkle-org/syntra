@@ -1,0 +1,21 @@
+RELEASE.md
+  s_b0b37ca0a15871::t_9dadb099c99f4b 372-377
+rfcs/0011-specification-release-versioning.md
+  s_b0b37ca0a15871::t_4e6b544c279470 175-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d963197fef1c70938064123ecc821bf01e990ce",
+  "prompts": {},
+  "sessions": {
+    "s_b0b37ca0a15871": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6aef1422ffeTMC4U4xAK4Sq68",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
