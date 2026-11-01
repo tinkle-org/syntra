@@ -1,0 +1,29 @@
+README.md
+  s_1b4d8a7820fe93::t_e31804008a902c 298-301
+tests/test_spec_release.py
+  s_1b4d8a7820fe93::t_db05a37a0a82d3 222-232,234-237
+  s_1b4d8a7820fe93::t_9b294d2f7e24ec 233
+tests/test_spec_release_preflight.py
+  s_1b4d8a7820fe93::t_db05a37a0a82d3 91-95
+  s_1b4d8a7820fe93::t_eb0ad926e2b82b 90
+RELEASE.md
+  s_1b4d8a7820fe93::t_e31804008a902c 375-377
+docs/schema-registry.md
+  s_1b4d8a7820fe93::t_e31804008a902c 244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "55af0b5b9aa285d24412c6b2d94fa2b3be6d3f71",
+  "prompts": {},
+  "sessions": {
+    "s_1b4d8a7820fe93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6b71a88affezHo4KvlykdY316",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
