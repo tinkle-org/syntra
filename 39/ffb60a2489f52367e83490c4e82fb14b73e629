@@ -1,0 +1,19 @@
+RELEASE.md
+  s_1b4d8a7820fe93::t_c246e540b31e99 148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "39ffb60a2489f52367e83490c4e82fb14b73e629",
+  "prompts": {},
+  "sessions": {
+    "s_1b4d8a7820fe93": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6b71a88affezHo4KvlykdY316",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
