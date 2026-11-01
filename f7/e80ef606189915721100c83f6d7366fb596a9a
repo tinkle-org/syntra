@@ -1,0 +1,38 @@
+docs/schema-registry.md
+  s_b0b37ca0a15871::t_a36c318f254618 255
+rfcs/0011-specification-release-versioning.md
+  s_b0b37ca0a15871::t_a36c318f254618 26-33,65-68,71-77,164-183,202-205,222-229,232,235,275-278,293-300,310-311
+scripts/validate-repo.py
+  s_b0b37ca0a15871::t_a36c318f254618 1062-1064
+CHANGELOG.md
+  s_b0b37ca0a15871::t_a36c318f254618 15-17
+.github/workflows/spec-release.yml
+  s_b0b37ca0a15871::t_a36c318f254618 1,3-4
+RELEASE.md
+  s_b0b37ca0a15871::t_a36c318f254618 148-149,349-354,366-368,371-379,431-435,439-446,474
+README.md
+  s_b0b37ca0a15871::t_a36c318f254618 21-23,272-273,300-302,326-328
+scripts/spec-release.py
+  s_b0b37ca0a15871::t_a36c318f254618 2,6-9,160-200,271,283,286,291-303,305-311
+tests/test_spec_release.py
+  s_b0b37ca0a15871::t_a36c318f254618 131,144-147,159-162,193,195-197,200-218,240-241,248-280
+  s_b0b37ca0a15871::t_9b0a7b328bfdac 281
+docs/schema-release-checklist.md
+  s_b0b37ca0a15871::t_a36c318f254618 29,33,35-37,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f7e80ef606189915721100c83f6d7366fb596a9a",
+  "prompts": {},
+  "sessions": {
+    "s_b0b37ca0a15871": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6aef1422ffeTMC4U4xAK4Sq68",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
