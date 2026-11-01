@@ -295,9 +295,10 @@ Supporting (validation, process, explanation):
 Distribution:
 
 - Maintainers prepare a release PR and explicitly authorize a frozen commit;
-  the protected manual release workflow publishes `vX.Y` and its GitHub
-  Release (documents and schema provenance, no language artifacts). The
-  proposed process is subject to Draft RFC 0011.
+  the protected manual release workflow creates the `vX.Y` Git tag — the tag
+  itself is the release, with no packages, assets, or GitHub Releases
+  (documents and schema provenance, no language artifacts). The proposed
+  process is subject to Draft RFC 0011.
 - Language artifact distribution is out of scope for this repository;
   implementations pin schema revisions from here.
 

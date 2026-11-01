@@ -241,7 +241,7 @@ Per SNTR-VER-006 and `GOVERNANCE.md` §4, deprecating any schema element follows
   authorization. No `BUF_TOKEN`, BSR publishing environment, or GHCR login.
 - **CI secrets:** PR jobs receive **no** release credentials (validation is credential-less apart from the read-only checkout). `pull_request_target` is not used.
 - **Least privilege:** tag creation/attachment is confined to the release automation. Validation uses read-only permissions. Exposure handling is per `SECURITY.md`.
-- **Pull-request security:** PR validation attaches nothing. Protect `main` (pull requests required) and the `syntra-*-v*` tag namespaces, permitting the release automation identity as needed. Release workflows run only in the upstream repository; privileged workflow changes require maintainer review.
+- **Pull-request security:** PR validation attaches nothing. Protect `main` (pull requests required) and protect creation/changes of the `v*` release-tag namespace for the maintainer-authorized workflow; historical implementation-era `syntra-*-v*` tags keep their existing protection. Release workflows run only in the upstream repository; privileged workflow changes require maintainer review.
 - **Supply-chain implications:** remote generation submits schema text (including comments) to public generators — publishable content only, never production payloads or credentials (already policy in `specifications/schema/generation.md`). Consumers pin plugin revisions to blunt generator-side substitution.
 - **Untrusted forks:** fork PRs run validation with no secrets (`pull_request`, not `push` semantics for forks); maintainer approval is required before any privileged context touches fork code.
 

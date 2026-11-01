@@ -372,7 +372,9 @@ are no packages, archives, or GitHub Releases: the Git tag is the release.
 ### Prepare and authorize
 
 Prepare a release PR containing the reviewed scope and a nonempty
-`## [v1.0]` or `## [v1.0-rc1]` section in `CHANGELOG.md`. Merge it, freeze
+`CHANGELOG.md` section whose heading is `## [<tag>]` exactly matching the tag
+you will dispatch — for example `## [v1.0]` or `## [v1.0-rc1]` (the publisher
+enforces exactly one matching section). Merge it, freeze
 the exact resulting full commit SHA, and collect the evidence required for
 its scope. The initial stable bundle retains RFC 0009's independent Go/Rust,
 SC1, recovery, mobile and independent security-review gates. An RC does not

@@ -88,6 +88,12 @@ class GitPreflightTests(unittest.TestCase):
             PREFLIGHT.verify_candidate(self.repo, "v1.0", self.second, self.second,
                                        allow_existing=True)
 
+    def test_annotated_existing_tag_is_rejected_even_in_recovery(self):
+        self.git("tag", "-a", "v1.0", "-m", "release", self.first)
+        with self.assertRaisesRegex(PREFLIGHT.PreflightError, "does not directly name"):
+            PREFLIGHT.verify_candidate(self.repo, "v1.0", self.first, self.second,
+                                       allow_existing=True)
+
     def test_unrelated_commit_is_rejected(self):
         self.git("checkout", "-q", "--detach", self.first)
         divergent = self.commit("divergent")

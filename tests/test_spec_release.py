@@ -219,6 +219,22 @@ class PublicationTests(unittest.TestCase):
             self.publish(recovery=True)
         self.assertEqual(self.api.writes, [])
 
+    def test_recovery_rejects_non_commit_tag_object_without_recheck(self):
+        self.api.ref = {"object": {"sha": SHA, "type": "tag"}}
+        calls = []
+        original_call = self.api.call
+
+        def call(method, path, data=None, missing=False):
+            if "/git/ref/tags/" in path:
+                calls.append(path)
+            return original_call(method, path, data, missing)
+
+        self.api.call = call
+        with self.assertRaises(RELEASE.ReleaseError):
+            self.publish(recovery=True)
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(len(calls), 1)
+
     def test_objection_with_trailing_text_blocks_publication(self):
         objection = approval(ident=2)
         objection["body"] = f"SYNTRA-OBJECT v1.0 {SHA} withdrawing: evidence gap"
