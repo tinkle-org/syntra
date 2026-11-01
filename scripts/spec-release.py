@@ -119,9 +119,11 @@ def verify_authorization(issue, comments, roster, tag, sha):
             if created.utcoffset() is None or updated.utcoffset() is None:
                 raise ValueError("timezone required")
             if updated != created:
-                # GitHub attributes the body to the original author even
-                # after another writer edits it, and the API does not reveal
-                # the editor, so an edited decision can never be credited.
+                # REST exposes only second-precision created/updated
+                # timestamps with no editor field, so equality is a
+                # fail-closed heuristic, not proof the comment is unedited.
+                # Any detected edit is refused because the current body
+                # cannot be attributed to the original author.
                 raise ReleaseError("maintainer decision was edited; post a new comment")
         except (KeyError, TypeError, ValueError) as exc:
             if isinstance(exc, ReleaseError):
