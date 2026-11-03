@@ -1,0 +1,574 @@
+rfcs/0008-mobile-lifecycle-and-v1-acceptance.md
+  s_f9f9cc691a09a7::t_a1ea1559d7adbd 261,304
+tests/schema/test_schema.py
+  s_9307563e119d34::t_dc792dfb89b024 3
+  s_9307563e119d34::t_ebc05e2aeb77d6 11,19,187-223
+  s_9307563e119d34::t_1fb7ae3a0fb8e0 182,184
+  s_9307563e119d34::t_b273f3688632b7 20
+  s_9307563e119d34::t_093da7054605b8 224
+RELEASE.md
+  s_28ef373d7c969c::t_d1d393c32ae33c 1,3-5,7,9-14,16-19,21,23-27,29-36,38,40-43,45,47-51,53-55,59-62,66-76,80-86,88,93,98,101-106,112-120,124-143
+conformance/manifest/recovery.yaml
+  s_9307563e119d34::t_dc792dfb89b024 207,224
+  s_f7eb0b13f50cab::t_0fceabd439a85f 1-3
+  s_f7eb0b13f50cab::t_61a1e2007c1463 35
+conformance/interoperability/scenarios.yaml
+  s_f7eb0b13f50cab::t_238befa7d5eca1 14
+  s_9307563e119d34::t_4f5a41bb6a41f5 4-5,10,23-24
+  s_f7eb0b13f50cab::t_793e5cf5cfa158 3
+tests/test_connection_vectors.py
+  s_2fb146388426ac::t_ea2855e852d396 49,104
+  s_24d1910a61d1f9::t_a106639150e6b8 45-46,111
+  s_0584ffaf8dbbd5::t_4a6b9b94421327 48,103
+  s_9307563e119d34::t_33f1ba3f3d0af5 1,9-10,13,20,42-43,52-60,77,84,87-98,107,131
+  s_f7eb0b13f50cab::t_73e913b2427d35 4,14-17,35,105,116-130
+  s_9307563e119d34::t_72c6f6d0cc47f7 24-34,36-40
+proto/syntra/v1/recovery_profile.proto
+  s_8dececeb468476::t_8eaef53d5bbc1e 7,11,16-17,63,76,79,82,85,95,111,130,153,163,177,201,241,265,275,291,310,334,356,371,387,406,437,448,471,491,518,568,572,575
+  s_30e06ab4007939::t_2cedfd2db74d9d 12,14-15,20,36-41,137,247,249,282,289,299,321,417,446,480,497,524,537,554
+  s_30e06ab4007939::t_6e0defb895b728 21-22,30-31,119-120,138-139,174-175,184-185,228-229,235,258-259,300-301,351-352,379-380,418-419,434-435,454-455,457-458,538-539
+specifications/connection.md
+  s_da230fa673b3b2::t_e5ed3ecee6fc05 279
+  s_da230fa673b3b2::t_0af6de3646ad99 1-2,15-17,39,104,113,116,123-124,127,131,134-136,141-143,148,158-160,165-166,223-224,228-229,232,237,241,243,246,260-262,280-281,283-286,288,306-308
+  s_5ba49bcaff529b::t_667790a17aa041 3-14,18-19,22-24,29-38,40-47,49-103,105-112,114-115,117-122,125-126,128-130,132-133,137-140,144-147,149-157,161-164,167-222,225-227,230-231,233-236,238-240,242,244-245,247-259,263-278,282,289-294,299-305,309-310,312-314,316-321
+  s_24d1910a61d1f9::t_553f536b9deafe 48,315
+  s_da230fa673b3b2::t_1406a6afe1b1a5 287
+  s_5ba49bcaff529b::t_d039d5f5425c3c 27-28,295-298,311
+docs/schema-tooling.md
+  s_22283484f3b619::t_3c7a70d4ced94a 16,20
+  s_cac6c7e2d924dd::t_238ddcd2802239 1-15,17-19,21-24,30-31,34-52,55-78,81-102
+conformance/interoperability/matrix.yaml
+  s_9307563e119d34::t_4f5a41bb6a41f5 1,4,7,9,11,13,16-20,22-24,27,30-31
+  s_f7eb0b13f50cab::t_238befa7d5eca1 3
+  s_24d1910a61d1f9::t_08b9662ea07150 12
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 8
+conformance/README.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 19-22
+  s_f7eb0b13f50cab::t_8e18f4439d3938 1-18,23-183,199-218,222-274,277-280
+  s_24d1910a61d1f9::t_d569e826d73f72 184-198,219-221
+compatibility/syntra-1.0.json
+  s_9307563e119d34::t_7fb1b6af6fa19a 16-24
+  s_9307563e119d34::t_045056218b9c5e 34
+  s_9307563e119d34::t_c92e06419daa32 1-7,14-15,25-33,35-36,46-49,51-52
+  s_f7eb0b13f50cab::t_ee371592f73120 37-45,50
+  s_9307563e119d34::t_33f1ba3f3d0af5 8-13
+tests/test_conformance_owner_sync.py
+  s_f7eb0b13f50cab::t_e8b37c48df8081 83
+  s_9307563e119d34::t_d479c4cd0c60be 5,7,44,57,65
+  s_f7eb0b13f50cab::t_41ad60158ad714 26,45-56,58-64,66-82,84-95,97-100
+  s_24d1910a61d1f9::t_8072a5168c2456 101
+  s_f7eb0b13f50cab::t_e0223c916d0862 13
+  s_9307563e119d34::t_7fb1b6af6fa19a 1-4,6,8-12,14-25,27-43,96,102-104
+rfcs/0001-public-idl-layout.md
+  s_24d1910a61d1f9::t_8d6b28247ea472 20-21,30-32,193-196,312
+  s_cebb714e2757e3::t_f0622154fbc8ae 42,64,101,124,128,132,157,159,185,187,189,252,256,260,264,268,272,276,278,282,292,299-304
+  s_f9f9cc691a09a7::t_a1ea1559d7adbd 9,204,213,308-310
+scripts/sync-conformance-owners.py
+  s_9307563e119d34::t_9f4e4b3a7237bd 39
+  s_f7eb0b13f50cab::t_3ac577b17ce0fd 2,5-7,20-23,25-26,28-33,35-36,38,41,45-48,50-51,53-57,62-77,80,83,85-92,96-98,101-103,113-115,121
+  s_9307563e119d34::t_fdb513bbc0a3c1 105-106
+  s_9307563e119d34::t_1a01a4b0581a6e 19
+  s_9307563e119d34::t_c92e06419daa32 1,3-4,8-18,40,42-44,58-61,78-79,81-82,84,93-95,99-100,104,107-112,116-120,122-125
+  s_f7eb0b13f50cab::t_e8b37c48df8081 24
+  s_f7eb0b13f50cab::t_3eab60bec4b24e 27,34,37,49,52
+conformance/manifest/carrier-ws.yaml
+  s_9307563e119d34::t_c37105a44a50ae 1,3,5,7,13,15-17,20-25,27,29,33,35-41,43,45-46,49,51,55-61
+  s_9307563e119d34::t_33f1ba3f3d0af5 19,54
+  s_a5c140c2b2562e::t_9ba3f003b1493f 44
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 6,28
+  s_0584ffaf8dbbd5::t_64a20fb42bfbc6 14,18,52-53
+  s_9307563e119d34::t_045056218b9c5e 11
+specifications/transports.md
+  s_81d29ebdf231e3::t_d0c9ea8f62b87e 341-342,386,414-415,422,431-432,471-473,476-492,499-500
+  s_81d29ebdf231e3::t_695e6b21ced812 61,95-98,196-198,363-364,410,418-419,427-428
+  s_24d1910a61d1f9::t_553f536b9deafe 440
+  s_24d1910a61d1f9::t_6aa501f38397f3 21
+  s_da230fa673b3b2::t_279a9ee3fb3572 1-2,14,16-20,22,24,38-40,44,48-60,62-69,71-82,84,99-143,146-164,167-175,178-193,201,205-212,214-215,217,219-224,226-253,258-265,267-268,272-295,301-340,343-362,365-367,379-385,387-404,406-409,411-413,416-417,420-421,423-426,429-430,433-439,441-442,449,462-470,501-510,512,516-525,528-543
+  s_22283484f3b619::t_3c7a70d4ced94a 368-374
+  s_da230fa673b3b2::t_b3ac1a31a1a37c 41-43
+  s_81d29ebdf231e3::t_1498d0824de9f5 194-195,199-200,269-271,296-300
+  s_81d29ebdf231e3::t_877c660ea331bb 3-13,23,34,36-37,45-47,83,85-94,144-145,165-166,176-177,202-204,213,216,218,225,254-257,266
+  s_22283484f3b619::t_1eb1ab9269109a 376-378
+  s_22283484f3b619::t_3d7eb2cc66a347 375
+  s_24d1910a61d1f9::t_4e2c9e50b7bd6b 443,450-461,474-475,493-498
+  s_da230fa673b3b2::t_1406a6afe1b1a5 15,25-33,35,70,405,444-448,511,513-515,526-527
+conformance/test-vectors/tcp/README.md
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 1,3-9,11-22
+specifications/wire-format.md
+  s_8dececeb468476::t_8eaef53d5bbc1e 28,153,189,291-293
+  s_cebb714e2757e3::t_3a37b0586cd9fd 1-2,7-9,11,94-95,118-136,138-141,147,149-152,154-188,190-197,211-214,219-220,228-235,238-240,244-290,295-302,304-312,317-319,323-325
+  s_cac6c7e2d924dd::t_238ddcd2802239 3-6,10,57-62,64-66,294,303,313
+  s_24d1910a61d1f9::t_553f536b9deafe 96-117,148
+  s_cebb714e2757e3::t_469d49943e20ef 198-202,207-210,215-218,221-227,236-237,241-243
+  s_1f4448b82984ec::t_acf049ecb45293 203-206
+  s_cac6c7e2d924dd::t_3ec8e2379a14aa 314-316,320-322
+  s_cebb714e2757e3::t_e07839776be9da 12-27,29-56,63
+  s_cebb714e2757e3::t_73bd35973396c8 67-93,137,142-146
+MIGRATION.md
+  s_28ef373d7c969c::t_d1d393c32ae33c 1-32
+specifications/rpc.md
+  s_5ba49bcaff529b::t_667790a17aa041 3-9,14-45,49-53,58-74,76-79,81-86,89-147,151-184,186-188,191-228,230-233,237-239,243-246,249-251,254-256,258-290,294-298,302-303,305-308,314-315,317,319-320
+  s_24d1910a61d1f9::t_553f536b9deafe 1
+  s_cebb714e2757e3::t_bc2fa5c9ebfb44 234
+  s_cebb714e2757e3::t_3a37b0586cd9fd 2,10-13,54-57,75,80,87-88,148-150,185,189-190,235-236,240-242,247-248,252-253,257,291
+  s_8dececeb468476::t_8eaef53d5bbc1e 292,299-301,304,309-313,316,318
+  s_cebb714e2757e3::t_e07839776be9da 293
+  s_5ba49bcaff529b::t_d039d5f5425c3c 46-48,229
+SUPPORT.md
+  s_cebb714e2757e3::t_bab99afaf2b8c3 23
+  s_22283484f3b619::t_3c7a70d4ced94a 9
+  s_28ef373d7c969c::t_e827533210bc13 5-7,11,25-29,31-34,38-41
+conformance/manifest/session.yaml
+  s_f7eb0b13f50cab::t_ee371592f73120 1-2
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 139
+conformance/test-vectors/tcp/byte-vectors.yaml
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 1-3
+conformance/test-vectors/protobuf/README.md
+  s_f7eb0b13f50cab::t_e0223c916d0862 1,8-9,14
+conformance/profiles.yaml
+  s_9307563e119d34::t_5bf5e6b853fc00 55-56,76-77,94-95
+  s_9307563e119d34::t_4729ffdbaa5019 4-6,11-12,20,22,26-27,33-34,41,47,49-54,58,62,64,66-74,78,82,84,86-93,97,105-109
+  s_f7eb0b13f50cab::t_ee371592f73120 1-2,7,40,43,45
+  s_9307563e119d34::t_33f1ba3f3d0af5 57,59,75,79,96,98
+  s_9307563e119d34::t_045056218b9c5e 101-102
+proto/syntra/v1/rpc.proto
+  s_30e06ab4007939::t_2cedfd2db74d9d 18,22-23
+conformance/declaration.example.yaml
+  s_f7eb0b13f50cab::t_238befa7d5eca1 19-20
+  s_f7eb0b13f50cab::t_e0223c916d0862 33,35,44
+  s_9307563e119d34::t_e7a8cf166b7a92 15-18,28,31-32,34,37,39-41
+  s_9307563e119d34::t_9696fafbfd28d8 13
+rfcs/0009-v1-bootstrap-governance-and-release-scope.md
+  s_cebb714e2757e3::t_14abdc91b241af 360-361
+  s_f9f9cc691a09a7::t_a1ea1559d7adbd 44,47,208,358-359
+  s_24d1910a61d1f9::t_8d6b28247ea472 355-356
+.github/workflows/release-please.yml
+  s_22283484f3b619::t_3c7a70d4ced94a 35
+conformance/manifest/carrier-tcp.yaml
+  s_9307563e119d34::t_c37105a44a50ae 1,3,5,7,11,13,15,18-24,26,28,32,34-40,43-45,47,49,55-56,58-64,66-69,74,78-84,86,88,94-98,100-102,106,109,111,117-121,125-126
+  s_9307563e119d34::t_045056218b9c5e 6,87,110
+  s_24d1910a61d1f9::t_8ff35b3b252d02 99,107
+  s_9307563e119d34::t_33f1ba3f3d0af5 17,77
+  s_0584ffaf8dbbd5::t_64a20fb42bfbc6 14,16,75-76
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 27,48
+  s_f7eb0b13f50cab::t_793e5cf5cfa158 57
+.github/workflows/spec-release.yml
+  s_22283484f3b619::t_3c7a70d4ced94a 72
+.github/workflows/schema-validation.yml
+  s_22283484f3b619::t_3c7a70d4ced94a 47
+  s_24d1910a61d1f9::t_553f536b9deafe 39,58,62
+  s_9307563e119d34::t_dc792dfb89b024 46,48
+tests/test_validate_repo_scalars.py
+  s_9307563e119d34::t_7fb1b6af6fa19a 84-85,87-98
+  s_f7eb0b13f50cab::t_e0223c916d0862 13,209,216
+  s_f7eb0b13f50cab::t_73e913b2427d35 83,86,178,198-200
+README.md
+  s_cebb714e2757e3::t_5553d583f77b6f 62,82,84
+  s_24d1910a61d1f9::t_9c167f15ef3e7d 3-6,8-10,12,19-23,26-32,35,37-41,44-50,53-55,57,59,61,63-68,70-73,75-76,78-80
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 14-17,56
+docs/implementer-guide.md
+  s_28ef373d7c969c::t_e827533210bc13 1,3-5,7-9,11-36
+  s_cebb714e2757e3::t_5553d583f77b6f 2,6,10
+rfcs/0007-secure-channel-device-authorization.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-8
+  s_1f4448b82984ec::t_85168706f52f7a 73,503
+  s_24d1910a61d1f9::t_8d6b28247ea472 202-203,289-292
+  s_cebb714e2757e3::t_14abdc91b241af 21-23,69-71,172,285,556,575-577
+  s_f9f9cc691a09a7::t_a1ea1559d7adbd 380,504
+tests/test_documentation_scope.py
+  s_24d1910a61d1f9::t_8d6b28247ea472 45,47-54
+  s_24d1910a61d1f9::t_a106639150e6b8 17,63-91
+  s_24d1910a61d1f9::t_bb04a5fd385b03 46
+  s_24d1910a61d1f9::t_d569e826d73f72 1-16,18-44,55-62,92-95
+tests/test_spec_release.py
+  s_0584ffaf8dbbd5::t_4a6b9b94421327 22
+specifications/decisions/ADR-011-noise-device-authorization.md
+  s_cebb714e2757e3::t_11b744e2eae20b 33,86
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-7
+specifications/recovery.md
+  s_cebb714e2757e3::t_95a3e385616cde 243-245
+  s_cebb714e2757e3::t_bab7d6c0c90f6a 440
+  s_42b7aa4bc7e156::t_2e25bcbf9d294c 236-237,257-258,296-297,307,316-317,437-438
+  s_42b7aa4bc7e156::t_10220ce4f98b78 3,5-6,20-42,97-98,113-116,133-136,142,146-147,161,167,176-192,253-255,268,276-278,343-344,381-383,390-391,417-425,441,447,459,476
+  s_cebb714e2757e3::t_e07839776be9da 10
+  s_42b7aa4bc7e156::t_5338c53acecfec 12,14-15,64,162-163,193,234-235,250,256,279-280,295,313-315,345-346,372-374,429-430
+  s_cebb714e2757e3::t_469d49943e20ef 246-249,442-445
+  s_8dececeb468476::t_8eaef53d5bbc1e 4,11,13,17-19,48,53,58,99,132,139-140,144,154-155,158,160,165,194,304,354,463,466
+  s_cebb714e2757e3::t_bab99afaf2b8c3 464-465
+  s_cebb714e2757e3::t_73bd35973396c8 68-71
+  s_cebb714e2757e3::t_96eacedbd4ae82 1-2,7-9,16,43-47,49-52,54-57,59-63,65-67,72-96,100-112,117-131,137-138,141,143,145,148-153,156-157,159,164,166,168-175,195-233,238-242,251-252,259-267,269-275,281-294,298-303,305-306,308-312,318-342,347-353,355-371,375-380,384-389,392-416,426-428,431-436,439,446,448-458,460-462,467-475
+scripts/migrate-conformance-1.0.py
+  s_9307563e119d34::t_9d9ca027732c19 1,7-18,43,46-47,49,54-55,59-62,64-67,69-76,81,84-93
+  s_f7eb0b13f50cab::t_3ac577b17ce0fd 2-6,19-42,44,48,50-53,56-58,63,77-80,82-83
+  s_9307563e119d34::t_33f1ba3f3d0af5 45,68
+rfcs/0005-negotiation-bounds-identifiers.md
+  s_cebb714e2757e3::t_14abdc91b241af 369-374
+  s_f9f9cc691a09a7::t_a1ea1559d7adbd 376-378
+CHANGELOG.md
+  s_28ef373d7c969c::t_d1d393c32ae33c 3-5,16-26
+  s_24d1910a61d1f9::t_8d6b28247ea472 11-12
+  s_24d1910a61d1f9::t_a106639150e6b8 13-15
+rfcs/0004-correlation-identity-carriage.md
+  s_cebb714e2757e3::t_14abdc91b241af 375-383
+conformance/manifest/rpc.yaml
+  s_f7eb0b13f50cab::t_793e5cf5cfa158 22,43,64,102,118,136,154,172,189,211,227,277
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 85
+  s_9307563e119d34::t_bfa858912b52b4 2
+conformance/manifest/requirements.yaml
+  s_9307563e119d34::t_3c83a1f01026c3 8,21,30,34,45-46,51,59,68-69,85,90-91,95,97-98,100,107-108,112,123,125,127,129,131-134,154-155,157,160,163-164,178,190,197,201-202,208,214,216-217,222-223,228-229,234-235,240-241,246-247,252-253,258-259,264-265,270-271,276,285,298,303,310,313,322,325,327,335,341,362,376-377,382-383,388,513,653-654,657-659,661,663,669-670,678-679,681-682,684-685,693,698,700-701,705,708-709,714,719,722,726,729-730,736-737,742-743,745-747,749-751,753-754,758,760-764,769-772,775-776,780-782,784,786
+  s_f7eb0b13f50cab::t_0fceabd439a85f 1-2,417,523,582,650,667,675,690,724-725,766-768,783,787
+  s_24d1910a61d1f9::t_a106639150e6b8 172
+  s_f7eb0b13f50cab::t_b16d0a5908042a 354-357
+  s_a2e99b5b67df3d::t_460105660af155 652,660,677,774
+  s_a5c140c2b2562e::t_23030c7388544d 370-371,405-407,409-415,418-425,427-436,438-449,451-476,478-490,492-511,515-521,524-529,531-534,536-537,539-550,552-575,578-580
+  s_24d1910a61d1f9::t_553f536b9deafe 477,551,664,688
+  s_f7eb0b13f50cab::t_2b09fb1b83378a 609,612-613,615,618-619,621,624-625,627,630-631,633,636-637,639,642-643,645,648,651,680,686,691,694,715,727,731,733-734,740-741,744,748,757,759
+  s_f7eb0b13f50cab::t_60d1af473b5f4c 336-340,342-343,345-348,350,352-353,358-361,363-369,372-374,378-380,384,386,389-403,450,538,585,591,597,600,603,606
+  s_a5c140c2b2562e::t_3f186e8cdf7912 437,535,576-577
+  s_9307563e119d34::t_7c243fb94496f3 151
+  s_22283484f3b619::t_3c7a70d4ced94a 491
+  s_f7eb0b13f50cab::t_5cf38571f4054f 206-207,209-212,218,220,224,226,230,232,236,238,242,244,248,250,254,256,260,262,266,268,272,274,277-284,286,288-296,299-302,305-309,311-312,314-320,323-324,326,328-333
+  s_f7eb0b13f50cab::t_b7f7bf226aa942 105,109-111,114-122,126,128,130,135-149,152-153,156,159,161,167-171,180,182,186-189,191-195,198,203,205
+  s_9307563e119d34::t_d64e4a12ca5e84 39
+  s_24d1910a61d1f9::t_024533adab9ba9 408,416,426,514,522,530,665,676
+  s_24d1910a61d1f9::t_8ec1a28ce0c7a9 687
+  s_24d1910a61d1f9::t_0438c59d64f47f 173-176,179,183-185
+  s_f7eb0b13f50cab::t_01d6c81d069a3c 9-20,22,24-26,28,31-32,35-38,40-43,48-50,52-57,60-61,63-65,70-83,86-88,92-94,96,101-104
+  s_9307563e119d34::t_b88ba18806b6e1 33,47,62,66,199,584,590,596,602,608,614,620,626,632,638,644,656,666,683,721,773,778
+  s_9307563e119d34::t_540b675b9768c0 655
+  s_a2e99b5b67df3d::t_809715a182555f 601,607
+docs/decisions/0002-sdd-acceptance-wave.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-7
+  s_24d1910a61d1f9::t_8d6b28247ea472 37
+.github/workflows/repo-validation.yml
+  s_22283484f3b619::t_3c7a70d4ced94a 29,99
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 112,117
+  s_9307563e119d34::t_e7a8cf166b7a92 110,113-115
+  s_f7eb0b13f50cab::t_b16d0a5908042a 69,85
+  s_22283484f3b619::t_e4820565c52af7 116
+specifications/decisions/ADR-008-transport-security.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-7
+rfcs/0011-specification-release-versioning.md
+  s_24d1910a61d1f9::t_8d6b28247ea472 321
+  s_cebb714e2757e3::t_14abdc91b241af 13
+  s_22283484f3b619::t_3c7a70d4ced94a 14
+proto/syntra/v1/handshake.proto
+  s_24d1910a61d1f9::t_a106639150e6b8 23
+  s_30e06ab4007939::t_2cedfd2db74d9d 24-25
+rfcs/0012-protocol-reference-scope.md
+  s_24d1910a61d1f9::t_d569e826d73f72 1-90
+conformance/manifest/binding-policy.yaml
+  s_24d1910a61d1f9::t_553f536b9deafe 81-82
+  s_9307563e119d34::t_5bf5e6b853fc00 1,3,5-8,11,13-14,16-17,19-21,23-25,29,31-41,43-46,49,51-59,61-63,67,69-80,84-86,90,92-98,102-104
+  s_9307563e119d34::t_100150a7c9e4d6 15
+proto/syntra/v1/session.proto
+  s_24d1910a61d1f9::t_9c167f15ef3e7d 4-5
+rfcs/README.md
+  s_24d1910a61d1f9::t_36d953c11b54d4 22
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-8
+proto/syntra/v1/events.proto
+  s_30e06ab4007939::t_2cedfd2db74d9d 7,9,11
+  s_8dececeb468476::t_8eaef53d5bbc1e 10
+tests/test_conformance_contract.py
+  s_f7eb0b13f50cab::t_e0223c916d0862 8,16,20,160-162,164-178
+  s_f7eb0b13f50cab::t_0fceabd439a85f 26-31
+  s_f7eb0b13f50cab::t_e8b37c48df8081 73
+  s_9307563e119d34::t_ebc05e2aeb77d6 1-7,9,11-15,17-19,21-25,43-61,63,77-78,83-84,87-91,93-109,192-194
+  s_9307563e119d34::t_100150a7c9e4d6 92
+  s_f7eb0b13f50cab::t_239a136f802a4a 163,179-190
+  s_f7eb0b13f50cab::t_a981072673c0e4 85-86
+  s_24d1910a61d1f9::t_8072a5168c2456 110-122,191
+  s_24d1910a61d1f9::t_8ff35b3b252d02 124-131
+  s_f7eb0b13f50cab::t_41ad60158ad714 10,32-42,62,64-72,74-76,79-82,123,132-159
+scripts/validate-repo.py
+  s_f7eb0b13f50cab::t_39bf753afe3891 74-81,83,653-685,687-692,694-697,700-701,703-704,724-731,733,735-737,741,743-752,758-759,767,769
+  s_9307563e119d34::t_9696fafbfd28d8 285-287,325-326,401
+  s_f7eb0b13f50cab::t_248b2d3ae7b8bf 198-202,753-756
+  s_9307563e119d34::t_67ed14403b0734 20,73,461-462,693,702,710-723,732,734,738,740,742,757,761-766,768,770-780,782-783,1004,1007,1010,1016,1018,1020,1022,1024,1026,1028,1031,1360
+  s_0584ffaf8dbbd5::t_4a6b9b94421327 986-988,990,993,1000,1003,1005,1009,1011,1013,1015,1017,1019,1021,1023,1025,1027,1029,1033,1036-1037,1039,1041
+  s_9307563e119d34::t_d64e4a12ca5e84 40,44
+  s_f7eb0b13f50cab::t_1d38fbcc2cbf4c 36,1051,1100-1109,1152,1154,1156,1158,1167,1170,1175-1176
+  s_f7eb0b13f50cab::t_239a136f802a4a 226-239,279-282,288-289,292,300,310,935,1155
+  s_9307563e119d34::t_1fb7ae3a0fb8e0 248,290-291
+  s_f7eb0b13f50cab::t_d0ae29f2b2eb4b 760
+  s_9307563e119d34::t_49d82b3d0519c5 1042-1050,1054-1072
+  s_9307563e119d34::t_72c6f6d0cc47f7 985
+  s_9307563e119d34::t_e7a8cf166b7a92 512-518
+  s_f7eb0b13f50cab::t_3eab60bec4b24e 19,34-35,37-38,84-85,203-204,249-251,264-266,277,295-299,301-307,311-312,328,400,426,477-478,698-699,739,781
+  s_9307563e119d34::t_1a01a4b0581a6e 46
+  s_9307563e119d34::t_fdb513bbc0a3c1 686,705-709
+  s_f7eb0b13f50cab::t_3d98047a821d5f 1177-1178
+  s_0584ffaf8dbbd5::t_0c506de5601049 1052-1053
+tests/test_conformance_profiles.py
+  s_f7eb0b13f50cab::t_538b504d8503e3 251-256
+  s_9307563e119d34::t_4f5a41bb6a41f5 1-7,9,11-15,17-47,49-56,58,65,262-263,265-266,268-276,278-283,285-288,335-338,343-344,349-355
+  s_f7eb0b13f50cab::t_73e913b2427d35 8,57,59-64,242-250,257-261,264,267
+  s_f7eb0b13f50cab::t_23e2e7cb23e6fe 209,215-220
+  s_9307563e119d34::t_33f1ba3f3d0af5 277
+  s_f7eb0b13f50cab::t_248b2d3ae7b8bf 66-79,221
+  s_24d1910a61d1f9::t_08b9662ea07150 235-240
+  s_f7eb0b13f50cab::t_d0ae29f2b2eb4b 82-83,89-91,96,110-120,125,136-146,193-207,213
+  s_24d1910a61d1f9::t_8072a5168c2456 222-234,241
+  s_f7eb0b13f50cab::t_21325803762838 10,48,80-81,84-88,92-95,97-109,121-124,126-135,147-192,208,210-212,214
+  s_a2e99b5b67df3d::t_d853a985a034ea 289-334
+  s_f7eb0b13f50cab::t_a981072673c0e4 339-342
+  s_9307563e119d34::t_fdb513bbc0a3c1 345-348
+  s_f7eb0b13f50cab::t_e0223c916d0862 16
+  s_0584ffaf8dbbd5::t_4a6b9b94421327 284
+proto/syntra/v1/envelope.proto
+  s_30e06ab4007939::t_2cedfd2db74d9d 12-13,22-23,28-29
+specifications/security.md
+  s_81d29ebdf231e3::t_1519f979b85391 335
+  s_da230fa673b3b2::t_1406a6afe1b1a5 201-203,222,298-302,304-307
+  s_81d29ebdf231e3::t_1498d0824de9f5 191-198,320-329,333-334,338-339,407-411,421-422
+  s_24d1910a61d1f9::t_553f536b9deafe 164
+  s_81d29ebdf231e3::t_f0d9e7174e6ac6 11,336-337,394-395
+  s_da230fa673b3b2::t_64b37f8b3fe50c 1-2,18-20,25-38,40-41,76-136,138-155,158-160,165,171-175,177-183,188-190,199,204-221,223-224,229-240,243-251,253-254,256-282,284-297,310-315,317-319,330-332,340-392,396-406,412-420,423-445,448-476,479-516,521,523-546,555-564,568-596,598-628,638
+  s_81d29ebdf231e3::t_6812ec6e48dad1 3-10,12-17,39,42-75,137,161,166-170,176,184-187,200,225,241,255,283,316,446-447,517-520,547-554,565-567,597,629-637,639-640
+  s_81d29ebdf231e3::t_695e6b21ced812 21-24,156-157,162,226-228,252,303,308-309,393,477-478
+  s_24d1910a61d1f9::t_4e2c9e50b7bd6b 163
+  s_da230fa673b3b2::t_b3ac1a31a1a37c 242
+  s_da230fa673b3b2::t_e5ed3ecee6fc05 522
+SESSION-OPEN-QUESTIONS.md
+  s_28ef373d7c969c::t_d1d393c32ae33c 1-31
+docs/decision-record-template.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 68,82
+conformance/manifest/core.yaml
+  s_24d1910a61d1f9::t_6aa501f38397f3 102
+  s_9307563e119d34::t_5bf5e6b853fc00 174-190
+  s_f7eb0b13f50cab::t_793e5cf5cfa158 2-3,27,46,64,81,103,119,137,154,172,205
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 49
+CONTRIBUTING.md
+  s_28ef373d7c969c::t_e827533210bc13 3-5,7-8,12-27,31-39,45-56,60-78,82-106,123-128,132-140
+  s_22283484f3b619::t_3c7a70d4ced94a 43-44
+specifications/decisions/README.md
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-6,24-27
+rfcs/0003-handshake-failure-signaling.md
+  s_cebb714e2757e3::t_14abdc91b241af 269-278
+proto/syntra/v1/capabilities.proto
+  s_8dececeb468476::t_8eaef53d5bbc1e 3
+  s_24d1910a61d1f9::t_9c167f15ef3e7d 1-2
+conformance/test-vectors/connection/context-vectors.json
+  s_9307563e119d34::t_33f1ba3f3d0af5 1-6,8-19,21-32,34-45,47-58,60-71,73-82,122-125,130-132,137-139,142-146,149-153,156-160,163-167,170-174,177-181,184-188,191-195,198-202,296-297,375-377,379
+  s_f7eb0b13f50cab::t_a981072673c0e4 378
+  s_0584ffaf8dbbd5::t_64a20fb42bfbc6 7,20,33,46,59,72,126-127,133-134,140-141,147-148,154-155,161-162,168-169,175-176,182-183,189-190,196-197,203-204
+  s_2fb146388426ac::t_ea2855e852d396 83-121,205-295,298-374
+  s_f7eb0b13f50cab::t_238befa7d5eca1 128-129,135-136
+conformance/test-vectors/README.md
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 1,3-5,7,9-11,13-17,19-21
+SECURITY.md
+  s_28ef373d7c969c::t_d1d393c32ae33c 8-13,24-27,53-65
+  s_22283484f3b619::t_3c7a70d4ced94a 18
+conformance/test-vectors/protobuf/vectors.yaml
+  s_f7eb0b13f50cab::t_e0223c916d0862 1,4-6,11-12
+conformance/test-vectors/connection/context-vectors.yaml
+  s_0584ffaf8dbbd5::t_64a20fb42bfbc6 10,21,32,43,54,65,110-111,114-115,118-119,122-123,126-127,130-131,134-135,138-139,142-143,146-147,150-151,154-155
+  s_9307563e119d34::t_33f1ba3f3d0af5 1-7,9,11-20,22-31,33-42,44-53,55-64,66-75,109,113,117,120-121,124-125,128-129,132-133,136-137,140-141,144-145,148-149,152-153,156,253
+  s_f7eb0b13f50cab::t_238befa7d5eca1 112,116
+  s_2fb146388426ac::t_ea2855e852d396 76-108,157-252
+  s_f7eb0b13f50cab::t_a981072673c0e4 8
+proto/syntra/v1/errors.proto
+  s_30e06ab4007939::t_2cedfd2db74d9d 7,48
+GOVERNANCE.md
+  s_24d1910a61d1f9::t_36d953c11b54d4 21-22
+conformance/manifest/events.yaml
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 86
+  s_f7eb0b13f50cab::t_238befa7d5eca1 1-4,20,31,45,58,72,83,97
+rfcs/0006-update-recovery-profile.md
+  s_cebb714e2757e3::t_14abdc91b241af 27
+conformance/manifest/connection.yaml
+  s_24d1910a61d1f9::t_6aa501f38397f3 9,19,25-26,28-37,42
+  s_a5c140c2b2562e::t_9ba3f003b1493f 162,182,235,255,277,355,399,438
+  s_0584ffaf8dbbd5::t_64a20fb42bfbc6 54-55,61,72,114,118-119,133,224,243,263,285,344,363,383,385,406,408,427-428,435,445,447,469,486,506,526,550,571,591,609,628,646-647,686,704,724,741,761,779,799,818,846,860,882,904,912
+  s_9307563e119d34::t_33f1ba3f3d0af5 5,17-18,20-23,47,56,65,69,73,85,104,123,143,151,163,171-172,183,202,208,213,217,236,256,260,278,338-343,346-351,356,377,400,404,420,429,439,459,479,499,519,543,564,584,602,621,625,639,643,679,687,697,717,734,754,772,792,833,853,875,897
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 8,27,84,103,122,142,458
+  s_f7eb0b13f50cab::t_0fceabd439a85f 1-3,537-539,560,580,598,617,635,693,713,730,768,788,807,848
+  s_f7eb0b13f50cab::t_238befa7d5eca1 24,43
+  s_24d1910a61d1f9::t_8ff35b3b252d02 127,244,252,811,815,819-820,829
+  s_a2e99b5b67df3d::t_460105660af155 299-318,325-327,333-337,345,352,649-669,675
+  s_a2e99b5b67df3d::t_2331c2799f5c53 750
+scripts/validate-schema.py
+  s_24d1910a61d1f9::t_553f536b9deafe 4
+  s_9307563e119d34::t_e7a8cf166b7a92 11
+conformance/manifest/security.yaml
+  s_9307563e119d34::t_15696f796a4845 11
+  s_a5c140c2b2562e::t_9ba3f003b1493f 154
+  s_f7eb0b13f50cab::t_b3dd1fc2805d98 12,128,141
+  s_9307563e119d34::t_e7a8cf166b7a92 35,127,140,151
+  s_f7eb0b13f50cab::t_93efa6bd596ec1 2,5,90
+  s_24d1910a61d1f9::t_d569e826d73f72 100,107
+rfcs/0010-sc1-host-authorization-lifecycle.md
+  s_cebb714e2757e3::t_14abdc91b241af 44,74,77,96,98-99,101,647,666,690,766,812-813,815,817-819,822
+  s_24d1910a61d1f9::t_8fbdc9e0a00a08 3-8
+  s_24d1910a61d1f9::t_6aa501f38397f3 824
+conformance/manifest/schema.yaml
+  s_9307563e119d34::t_e7a8cf166b7a92 77,97
+  s_9307563e119d34::t_d64e4a12ca5e84 84,159
+  s_9307563e119d34::t_9696fafbfd28d8 168,173
+  s_9307563e119d34::t_baa31db6d64de2 20,29,33,79,162,183,186,188
+  s_f7eb0b13f50cab::t_ee371592f73120 55,61-62,90,95-96,101,187,189
+  s_f7eb0b13f50cab::t_538b504d8503e3 7,32,87,175
+  s_9307563e119d34::t_90a2cb0c00e855 8,12-13,174
+compatibility/v1-initial/README.md
+  s_24d1910a61d1f9::t_8d6b28247ea472 36-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cb2392b2aca582cf914660703b7f75377b4d6761",
+  "prompts": {},
+  "sessions": {
+    "s_0584ffaf8dbbd5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e0b0da1ffe7TTH2poXhXUbPu",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_1f4448b82984ec": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e6ba57e68ffefdIOk5guXT9vZO",
+        "model": "gpt-6.1-terra"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_22283484f3b619": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e19e37fffechKtpGbjfimo3e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_24d1910a61d1f9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e61023eddffeX4APILCa38zuz9",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_28ef373d7c969c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e4f4842ffe2gIo47vAQEhDqe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_2fb146388426ac": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5deaf70effeP1pWGp9XQjFGRS",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_30e06ab4007939": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e3f9d92ffedhgfZClNHvaqhm",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_42b7aa4bc7e156": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60b71036ffewV8IIdFRunFtBx",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_5ba49bcaff529b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60c4ee25ffeyrMMUKoe4trxh8",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_81d29ebdf231e3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60c4ee0effe6t7Fug3K78444m",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_8dececeb468476": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e078dd7ffei2GoVsi4HhxK06",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_9307563e119d34": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e619e8bd7fferlqOQh8AjgPLEp",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_a2e99b5b67df3d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5df24362ffe2z61kOXGwagdFo",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_a5c140c2b2562e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60ed3df4ffeZyBgVHlaygQS79",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_cac6c7e2d924dd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60c4ee03ffeuuw4aL0btMTLWZ",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_cebb714e2757e3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e619e8bdeffeAJY7vUWkbI8akv",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_da230fa673b3b2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e619e8bebffeqokw6Nw6wg86oF",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_f7eb0b13f50cab": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e60c4edf9ffe67DKEKpcjPlbIk",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_f9f9cc691a09a7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e5e4f47c5ffebO8eoplc5qGsul",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
