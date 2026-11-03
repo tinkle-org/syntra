@@ -1,378 +1,280 @@
-# Syntra v1 Conformance Suite — Implementation-Independent Definition
+# Conformance test guide
 
-- Version: 1.0.0-draft.1 (2026-10-26)
-- Status: Draft (pending conformance-suite RFC; informative until accepted, then normative for claims)
-- Scope: How any independent implementation proves Syntra v1 conformance without
-  Rust, Go, private servers, private credentials, or private infrastructure.
-- Normative references: `specifications/core/requirements.md`,
-  `specifications/security/requirements.md`, `specifications/core/conformance.md`,
-  `proto/syntra/v1/*.proto`, transport specifications in `specifications/transports/`.
-- Terminology: BCP 14 keywords per `specifications/core/protocol.md`.
+This directory contains test definitions, selectors, fixtures, and evidence
+formats for the current Syntra 1.0 pre-release. It does not implement a peer or
+grant a runtime verdict. Protocol behavior is owned by
+[connection](../specifications/connection.md), [wire format](../specifications/wire-format.md),
+[RPC](../specifications/rpc.md), [security](../specifications/security.md),
+[transports](../specifications/transports.md), and [recovery](../specifications/recovery.md).
+The [IDL](../proto/syntra/v1/) owns representation. A test disagreement never
+overrides its cited protocol requirement.
 
-This directory is the **sole executable definition of conformance**.
-Language implementations are separate projects, out of scope for this
-repository; complete manifest-driven conformance runs remain a pending
-verification goal (CI currently validates manifests and vectors only).
-Implementation tests are evidence, never the source of truth
-(ADR-010, SYN-ARCH-041). This
-repository is pre-release.
+## Suite inputs and selectors
 
-RFC 0007 is accepted. `SNTR-SC1-WSS-V1` is registered in
-[`profiles.yaml`](profiles.yaml) with executable case specifications in
-[`manifest/sc1-wss.yaml`](manifest/sc1-wss.yaml); the companion
-[`plans/secure-channel.md`](plans/secure-channel.md) retains historical
-manual-observation mapping. Registration is not execution: no `CONF-SCW-*`
-verdict is claimed. Rust implementation tests and measured in-memory benchmarks
-are recorded separately in the [implementation evidence ledger](../docs/sc1-implementation.md);
-they are not full conformance or independent interoperability. The profile is
-additive and does not remove the TLS policy.
+Consume [`profiles.yaml`](profiles.yaml), [`manifest/schema.yaml`](manifest/schema.yaml),
+[`manifest/*.yaml`](manifest/), [`manifest/requirements.yaml`](manifest/requirements.yaml),
+[`test-vectors/`](test-vectors/), and [`declaration.example.yaml`](declaration.example.yaml).
+`CONF-*` IDs identify test definitions; requirement IDs identify their owners.
 
-> A completely separate repository or a third-party implementation in any
-> language MUST be able to read these files and build its own conformance
-> runner. No language-specific runtime is required to understand the tests.
+Syntra has one protocol contract. The `profiles` entries in the test registry
+are suite selectors for protocol concerns, carriers, and capabilities. They
+do not register distinct Syntra protocols or security profiles, negotiate wire
+behavior, or prescribe code organization:
 
----
+| Selector | Test scope |
+|---|---|
+| `SNTR-CORE-V1` | Envelopes, serialization, readiness, auth interface, bounds, mandatory refusal behavior |
+| `SNTR-SESS-V1` | Connection-bound session, loss/close/expiry, no implicit resumption |
+| `SNTR-RPC-V1` | Correlation, deadlines, cancellation, errors, retry discipline |
+| `SNTR-EVENTS-V1` | Generic notification/refusal checks and separately negotiated update recovery |
+| `SYNTRA-1.0-TCP` | Encrypted TCP, carrier 1 |
+| `SYNTRA-1.0-WS` | Protected WS/H1, carrier 2; explicitly enabled loopback development only |
+| `SYNTRA-1.0-WSS` | Protected WSS/H1, carrier 3; independently verified TLS ≥1.3 |
 
-## 1. Conformance model (Section A)
+A claim names Core, session and RPC coverage over at least one current carrier.
+Evaluate each additional carrier independently. Encrypted TCP and verified WSS
+are production-permitted; WS evidence carries its restricted-development label.
+There is no HTTP request/response or UDP suite binding. The transport owner
+defines the carrier policy; selectors allocate no additional protocol behavior.
 
-### 1.1 Normative Requirement
+Capability support requires an exact allocated identifier and the defined
+connection negotiation. `syntra.update-recovery/1` is the recovery gate.
+Generic application subscription fixtures allocate no event or resume capability.
+Mandatory-only peers remain conformant when they correctly refuse unconfirmed
+options. Recovery is optional per connection, but its own evidence is required
+for a recovery-inclusive claim; Core-only evidence cannot satisfy that claim.
 
-A `MUST`, `MUST NOT`, `REQUIRED`, `SHALL`, `SHALL NOT`, `SHOULD`, `SHOULD NOT`,
-`RECOMMENDED`, `MAY`, or `OPTIONAL` statement in a `specifications/` document,
-carrying a stable `SNTR-*-*` identifier (for example `SNTR-RPC-002`).
-Only the defining document owns the requirement; this suite never restates
-normative force. Requirement IDs are permanent; prose may be clarified only by
-RFC.
+Claims state the exact specification and suite revisions, roles, carriers,
+capabilities, security labels, and exclusions, and link their evidence declaration.
+A capability not evaluated is never implied to pass. Unqualified “compliant”,
+“certified”, or “compatible” wording cannot substitute for that scope.
 
-### 1.2 Conformance Test
+## Selection and execution
 
-A portable, language-neutral test case with a stable `CONF-*-*` identifier
-(for example `CONF-RPC-001`). A test cites one or more normative requirements,
-states preconditions, a neutral input, and an exact expected observable outcome
-(connection state, session state, wire bytes or logical envelope, error code).
-Test IDs are **not** normative: if a test and its cited requirement disagree,
-the requirement prevails and the test is a bug (file an RFC).
+Each profile manifest reference loads all cases or applies its `select` map.
+All filter fields must match. `select: {mandatory: true, capabilities: []}`
+matches the exact empty capability list, not a wildcard. A profile filter matches
+string equality or membership in a list-valued case profile. Shared cases execute
+independently for each carrier and role; deduplicate overlapping selections by
+case ID only within a carrier/role run. Then apply role and capability gates.
+Loading a manifest does not negotiate an option. Core selects capability-free
+notification/refusal cases without enabling recovery delivery.
 
-Human-readable test prose lives in `conformance/rpc/*.md`,
-`conformance/auth-session/*.md`, `conformance/errors/*.md`,
-`conformance/events/*.md`, and `conformance/requirements/*.md`.
-Machine-readable equivalents live in `conformance/manifest/*.yaml` and are
-authoritative for runners (same IDs, same expectations; prose is commentary).
+Client-only implementations run applicable initiator halves; host-only run host
+halves; full-stack implementations run both. Execute every mandatory applicable
+case, including negatives and refusal probes. Optional capability cases run only
+when claimed and their connection negotiation is established. Application-defined
+stream checks require explicit harness setup; they cannot infer an allocated
+protocol capability or a recovery guarantee.
 
-### 1.3 Conformance Profile
+`applicable_profiles` excludes other exact bindings during selection, without
+creating a SKIP result. `applicable_transports` is a carrier-family applicability
+filter (`tcp_tls` for encrypted TCP, `ws_wss` for WS/WSS); an empty intersection
+permits an explicitly reasoned SKIP citing that key. The family label does not
+require TLS on encrypted TCP. WSS-only certificate tests are not TCP tests.
 
-A named, versioned claim boundary (for example `SNTR-CORE-V1`). A profile
-lists the requirement families it covers, the transport or capability binding
-it exercises, and whether it is mandatory for a given claim level.
-Profiles are defined in `conformance/profiles.yaml` and summarized in §2 below.
-An implementation claims conformance **per profile**, never by a single vague
-word (see §8).
+Fixtures use neutral echo/key-value/subscription payloads, throwaway credentials
+and documentation hostnames. Protobuf vectors compare decoded logical fields,
+not encoder byte equality. Chosen framing/context fixtures may be byte-exact.
+Public context vectors do not establish Noise ciphertext interoperability.
+Certificate fixtures reference harness PKI identities, never production keys;
+no frozen raw TLS exchange is required. Deadline tests use injected clocks or
+explicit margins with expiry assertions.
 
-### 1.4 Implementation Under Test (IUT)
+## Manifest authoring and harness conventions
 
-The Syntra peer being evaluated: a client endpoint (initiator), a server
-endpoint (host), or both. Every manifest case declares `roles` (`client`,
-`server`, or `client-server`) stating which side(s) the verdict applies to.
-A client-only IUT runs initiator halves; a server-only IUT runs host halves;
-a full-stack IUT runs both plus loopback self-interop.
+Manifests are portable YAML 1.2 maps. Preserve existing current case identities;
+do not reuse a removed ID for a different test. The machine schema owns types
+and vocabularies. A case cannot invent behavior beyond its cited requirements.
 
-### 1.5 Capability
+| Field | Contract |
+|---|---|
+| `id`, `requirement`, `profile` | Case ID, non-empty requirement list, one selector or non-empty independently applicable selector list |
+| `roles`, `capabilities`, `mandatory` | Applicable client/server roles, prerequisite capabilities, mandatory execution flag |
+| `applicable_transports` | Optional non-empty carrier-family filter; absence applies to all selected carriers |
+| `applicable_profiles` | Optional exact current-binding filter; excluded bindings do not generate a verdict |
+| `preconditions` | Non-empty explicit setup list |
+| `input` | Frames, transport actions, structured faults/coordination, throwaway credentials |
+| `expected` | Connection/session state, emitted frames, typed error, native observations, hygiene assertions |
+| `control_connection` | Fresh paired control with structured setup and expectations |
+| `notes` | Explanation, never extra protocol behavior |
 
-A named optional behavior (for example `syntra.update-recovery/1`) that MUST
-be explicitly negotiated per `specifications/core/capabilities.md`
-(SNTR-CAP-001/002). Capabilities are never assumed. There is no generic
-capability advertisement carrier (accepted RFC 0005 D1): a capability is
-declared per profile and confirmed per connection through that profile's own
-accepted post-`ACTIVE` negotiation RPC. A capability-gated test is evaluated
-only when the IUT declares support for the capability and follows that
-profile's negotiation contract; otherwise the runner reports `UNSUPPORTED`
-or `SKIP` (see §6), never `FAIL`. No event, resumption, or replay capability
-identifier is allocated in default v1; the names in manifests
-(`events-v1`, `events-replay-v1`, `resume-v1`) are **placeholders for the
-future RFC binding** and MUST NOT be negotiated until that RFC is accepted.
+### expected.frames entries
 
-### 1.6 Mandatory Test
+`expected.frames` lists only emitted response Frames, never injected stimuli or
+native Close/status/alert signals. Entries contain Frame fields `request_id`,
+`body`, `payload_b64` and assertion helpers `shape`, `note`, `has_connection_id`.
+Credentials are input metadata, never expected Frame fields. Associate results
+by echoed request ID and bit-identical payload. That alone cannot establish
+principal-sensitive authorization without a corresponding assertion.
 
-A test whose `mandatory: true` flag means: every IUT claiming a profile that
-selects the case MUST execute it for its applicable role and MUST report `PASS`
-(or the specified `UNSUPPORTED` verdict for a correct optionality refusal).
-Mandatory tests cover all mandatory interop (handshake, envelope, RPC, errors,
-auth interface, bounds)
-and all documented rejections. A mandatory test MUST NOT be skipped because a
-transport makes it inconvenient.
+For failures, `expected.error.observer` distinguishes `detecting_host` from
+`detecting_peer`; omission uses the initiator's exchange-context outcome.
+`carriage: local_only` plus `frames: []` asserts no invented Syntra error envelope.
+Native peer evidence is separate under `expected.transport.peer_observation`.
+A generic close never proves the detector's exact private cause.
+`message_pattern` is a case-insensitive substring or `NEGATIVE:` hygiene list,
+never an application decision based on diagnostic wording.
 
-### 1.7 Optional Test
+Race-sensitive cases use structured barriers/injected clocks, never sleeps or
+prose-only coordination. `duplicate_while_pending` holds the original handler's
+completion candidate behind `first_terminal_result` until violation and closure.
+Only an uncommitted candidate or undeliverable output is discarded; a selected
+terminal outcome stays immutable even when closure prevents delivery. Invalid
+stimuli are harness injections, not conformant client emissions.
+`reverse_completion_order: {barrier: all_admitted}` tests correlation independently
+of scheduling. Paired controls assert their own outcomes on fresh connections
+with the same principal/scope/selector basis where required.
 
-A test whose `mandatory: false` flag and non-empty `capabilities` list mean:
-evaluate it only when the IUT claims the capability. Passing is required to
-claim the capability; skipping is correct when the capability is unclaimed.
-Example: `CONF-EVT-008` (replay) is Optional, gated on `events-replay-v1`.
+`*_b64` uses RFC 4648 standard-alphabet base64 of exact bytes. `*_hex` is lowercase
+hex without prefixes/separators; strip whitespace in grouped displays.
+`payload_b64: ""` is selected empty success, distinct from an absent outcome.
+Resolve references against the schema, current requirement/profile registries
+and retained vector paths.
 
-### 1.8 Unsupported Test (per-case verdict, not a test kind)
+Negative coverage is required for every `MUST NOT` and failure-mapping row.
+Each requirement has an automated, partially automated, manual, or reasoned
+not-testable disposition. A `test_ids` edge must name an existing case that
+actually cites that requirement. Do not invent coverage to fill a registry:
+use `test_ids: []`, a manual/not-testable disposition, and explanatory notes when
+no adequate executable case exists. Neither registration nor an `automated`
+authoring disposition asserts a run or PASS. Owner synchronization changes
+locations only, not membership, coverage, automation status, or evidence.
 
-`UNSUPPORTED` is a **result**, not a test category. It means the IUT correctly
-rejected or declined an unnegotiated option (for example a mandatory-only host
-answering a subscription with `UNIMPLEMENTED`). `UNSUPPORTED` is a passing
-signal for optionality handling; it MUST NOT be counted as `PASS` for the
-capability itself, and MUST NOT be confused with `SKIP` (see §6).
+## Verdicts and evidence
 
----
+| Verdict | Meaning | Counts as PASS? |
+|---|---|---|
+| `PASS` | Executed; every assertion held; logs retained | Yes |
+| `FAIL` | Assertion failed, crash, hang beyond bound, or unlisted error | No |
+| `SKIP` | Not executed because cited precondition/applicability is absent | No |
+| `UNSUPPORTED` | Executed refusal probe correctly declined an unconfirmed option | No; proves refusal only |
+| `NOT_EXECUTED` | Planned, blocked or omitted; never run | No |
 
-## 2. Conformance profiles (Section B)
+Never infer, copy or report PASS without execution and retained logs. Harness
+inconvenience cannot justify skipping a mandatory case. An incomplete mandatory
+run remains incomplete. Report SKIP/UNSUPPORTED separately; mandatory executed
+pass-rate is `PASS / (PASS + FAIL)`, excluding them.
 
-Full definitions: `conformance/profiles.yaml`. Summary:
+Implementation declarations name implementation/version/repository, roles,
+exact selectors, allocated capabilities and their contracts, security labels,
+documented bounds/defaults, executed IDs, runner/tool, exact specification and
+suite revision pinned at execution, per-case verdicts, and rerunnable log
+references. They live with the implementation and do not imply that its code
+resides in this repository. Retain source IDL, schema, fixtures, compatibility
+records and generator/tool provenance for reproduction.
 
-| Profile ID      | Kind                 | What it proves                                              | Required for … |
-|-----------------|----------------------|-------------------------------------------------------------|----------------|
-| `SNTR-CORE-V1`  | MANDATORY CORE       | Envelope, serialization, handshake machine, RPC, errors, auth interface, bounds, security, capability-free event handling | **every** conformance claim |
-| `SNTR-SESS-V1`  | MANDATORY CORE       | Session = connection, close/loss, expiry, no-implicit-resumption | every claim (runs over any claimed transport) |
-| `SNTR-RPC-V1`   | MANDATORY CORE       | Correlation, concurrency, deadlines, cancel, idempotency discipline | every claim |
-| `SNTR-EVENTS-V1`| OPTIONAL CAPABILITY  | Gated subscribe/delivery/unsubscribe, ordering, replay/cursor, recovery; mandatory capability-free cases also selected by Core | only `events-v1` / `events-replay-v1` / `syntra.update-recovery/1` claims (recovery: accepted RFC 0006 §11 — `CONF-URP-001…017` cases and `SYN-URP-*` requirements are registered, not executed; a supported claim still requires executed verdicts) |
-| `SNTR-TCP-V1`   | TRANSPORT PROFILE    | Plaintext TCP framing (restricted development only)         | only TCP claims; never sufficient for production |
-| `SNTR-TLS-TCP-V1` | TRANSPORT PROFILE  | Same framing over TLS 1.3                                   | TLS/TCP claims |
-| `SNTR-HTTP-V1` | TRANSPORT PROFILE    | HTTP/1.1 request/response RPC binding (restricted dev only) | HTTP/1.1 claims |
-| `SNTR-HTTPS-H1-V1` | TRANSPORT PROFILE | HTTPS with HTTP/1.1                                         | HTTPS/H1 claims |
-| `SNTR-HTTPS-H2-V1` | TRANSPORT PROFILE | HTTPS with HTTP/2 (streams, refusal semantics)              | HTTPS/H2 claims |
-| `SNTR-WS-V1` | TRANSPORT PROFILE    | WebSocket over HTTP/1.1 (restricted dev only)               | WS claims |
-| `SNTR-WSS-H1-V1` | TRANSPORT PROFILE   | Secure WebSocket over HTTP/1.1 (TLS 1.3)                    | WSS claims |
+**SNTR-CORE-901** — Evidence MUST cite requirement IDs and their ownership;
+implementation behavior alone is not normative. A registered case,
+generated-type round trip, benchmark, local unit test, or successful
+build is not an executed manifest verdict, independent interoperability,
+human review, freeze, or release authorization.
 
-Rules:
+## Independent interoperability and acceptance evidence
 
-- Claiming `SNTR-CORE-V1` REQUIRES passing its selected core, session, RPC,
-  security, and mandatory capability-free event cases, including `SNTR-SESS-V1` and `SNTR-RPC-V1`,
-  over **at least one** transport profile (secure transport required for any
-  production claim; SYN-ARCH-030).
-- No implementation is required to support every transport to claim Core
-  conformance. Each additional transport profile is claimed independently by
-  passing its applicable manifest cases plus Core's selected cases over that transport
-  (SNTR-WIRE-901 interop proof needs at least two profiles).
-- An `SNTR-EVENTS-V1` capability claim is never required for Core. Core selects
-  every event case with `mandatory: true` and `capabilities: []`:
-  `CONF-EVT-002`, `CONF-EVT-005`, `CONF-EVT-010`, `CONF-EVT-011`,
-  `CONF-EVT-012`, `CONF-EVT-014`, and `CONF-EVT-015`. A mandatory-only host
-  correctly refuses subscription probes with `UNIMPLEMENTED` (reported as
-  `UNSUPPORTED`); the other cases retain their manifest expectations. This
-  selection does not enable any capability-gated event case.
-- Resume-accept cases are Optional and gated on `resume-v1` (no such RFC
-  exists; in default v1 only resume-**rejection** cases are Mandatory).
-- The accepted update/recovery profile (`syntra.update-recovery/1`,
-  [RFC 0006](../rfcs/0006-update-recovery-profile.md) §11) is registered in
-  `manifest/recovery.yaml` with `CONF-URP-001…017` cases and `SYN-URP-*`
-  requirement rows; registration is not execution, so no recovery verdict is
-  claimed today. A Core-only conformance result stays valid as a per-profile
-  claim, but Core-only cannot satisfy the stable release bundle, which is
-  recovery-inclusive (RFC 0006 §11.1).
+Use the [matrix](interoperability/matrix.yaml) and
+[scenarios](interoperability/scenarios.yaml) to record planned pairings.
+Independent evidence requires genuinely different codebases, A initiator/B host
+and then B initiator/A host, both versions/bounds, and per-leg logs. Two checkouts
+or native linkage to the same implementation are not independent. Compare logical
+requests/results and opaque bytes alongside each carrier's establishment/framing
+assertions. A single-carrier claim needs one secure carrier; a transport/dimension
+independence claim needs two named carrier legs. One carrier never certifies another.
 
-### 2.1 Manifest and case selection
+Acceptance and release decisions follow [governance](../GOVERNANCE.md) and the
+[release process](../RELEASE.md), not this guide or its static checks.
 
-In `profiles.yaml`, each `manifests` entry is either a path (load all cases,
-subject to capability gating) or `{path, select}`. A `select` map matches every
-listed field by exact equality. Thus `select: {mandatory: true, capabilities: []}`
-selects only mandatory capability-free cases; an empty capability list is an
-exact empty-list match, not a wildcard. These entries follow
-`schema.profile_manifests` in `manifest/schema.yaml`.
+Fault runs record the governing requirements and cases, exact tested versions,
+role, mode, carrier, bounds, random seed, faults, commands, outcomes, and cleanup.
+Use an outer harness deadline. Exercise malformed and split inputs, request-ID
+ordering, confirmation and principal checks, deadline/cancel/loss races, partial
+output, slow consumers, and fresh establishment after loss. Recovery tests cover
+checkpoint and snapshot persistence across crashes. Security tests cover
+enrollment, revocation, rotation, store failures, and permitted endpoint topology.
 
-A manifest's or case's `profile` is one profile ID or a non-empty list of
-independently applicable profile IDs. Within a multi-profile transport manifest,
-run only cases whose profile includes the selected transport; a shared case
-runs separately for each claimed transport in its list. The manifest-level list
-describes the file's coverage; the case-level value determines applicability.
-Explicitly included single-profile manifests may belong to another profile
-(for example Core's session/RPC/event cases or WSS's shared WS cases).
-Deduplicate overlapping selections by case ID within each transport/role run.
-Apply `roles` and capability gates
-after selection; loading a manifest never negotiates a capability.
+When testing suspension and restart, record the environment and elapsed-time
+behavior. A simulated clock is useful for protocol assertions but does not prove
+behavior on a particular operating system. Neither a test harness nor a passing
+build establishes application persistence correctness or independent security review.
 
-For HTTPS, `CONF-HTTPS-001` is H1-only; `002`, `003`, `009`, `010`, `012`, and
-`013` are H2-only; `004`…`008`, `011`, and `014` apply independently to both.
-Shared probes use the selected binding's exchange/header representation.
+## Security test groups
 
----
+**SNTR-STEST-001** — Invalid/untrusted/malformed WSS certificates fail
+before hello/credential release, with no fallback and generic failure to waiters.
 
-## 3. How external projects consume this suite
+**SNTR-STEST-002** — A valid chain for the wrong DNS/IP identity fails
+before credentials; chain validity alone is insufficient. Tests cover
+wrong SAN and inappropriate CN-only identity handling.
 
-1. **Read the profiles** (`profiles.yaml`) and decide which profiles to claim.
-2. **Read the manifest schema** (`manifest/README.md`, `manifest/schema.yaml`).
-   Every case is plain YAML/JSON: `id`, `requirement`, `profile`, `roles`,
-   `capabilities`, `mandatory`, `preconditions`, `input`, `expected`.
-   No protobuf toolchain, no Rust, no Go, and no test framework is required
-   to parse them — any YAML 1.2 parser suffices.
-3. **Load the fixtures** in `test-vectors/`:
-   `protobuf/` (golden logical encodings), `tcp/` (exact wire bytes),
-   `http/` (request/response text), `websocket/` (Upgrade + framing).
-   All names, hosts (`example.com`, `syntra.example`), and credentials
-   (`opaque-test-credential-A`) are throwaway documentation values.
-4. **Implement a runner** in any language that drives the IUT through the
-   selected cases for the claimed profiles (§2.1), compares observables to `expected`, and
-   emits one of the §6 verdicts per case. A minimal runner is ~300 lines:
-   YAML load → transport connect → send `input` → assert `expected`.
-5. **Publish a declaration** (`declaration.example.yaml`) listing name,
-   version, claimed profiles, capabilities, bounds, and per-case verdicts with
-   logs. Reviewers re-run any case from the declaration using only this repo.
+**SNTR-STEST-003** — Expired credentials fail `UNAUTHENTICATED` in the
+appropriate phase without establishing an unauthorized binding.
 
-Language-specific helpers (if any) MUST remain non-normative conveniences;
-the YAML manifests are the normative executable form.
+**SNTR-STEST-004** — Revoked credentials fail at admission and active
+bindings terminate within the documented, bounded propagation contract.
 
----
+**SNTR-STEST-005** — Valid but insufficient principals receive
+`PERMISSION_DENIED` for protected methods/subscriptions without handler
+effects or undocumented existence oracles.
 
-## 4. Directory map (deliverables)
+**SNTR-STEST-006** — A diagnostic connection ID presented as a credential
+MUST NOT restore a session or authority. A new connection requires fresh
+authentication under current host policy.
 
-```text
-conformance/
-  README.md                  — this file (model, profiles, results, claims)
-  profiles.yaml              — machine-readable profile definitions (§2)
-  claims.md                  — badge / claim wording rules (§8)
-  declaration.example.yaml   — implementation declaration template (§7)
-  plans/secure-channel.md    — RFC 0007 companion plan and historical observation mapping
-  manifest/
-    README.md                — manifest format + field reference (§C)
-    schema.yaml              — machine-readable schema for manifests
-    core.yaml                — CONF-CORE-* portable cases (§E envelope/core)
-    session.yaml             — CONF-SESS-* portable cases (§F)
-    rpc.yaml                 — CONF-RPC-* portable cases (§G)
-    events.yaml            — CONF-EVT-* portable cases (§H)
-    recovery.yaml            — CONF-URP-* update/recovery cases (registered per accepted RFC 0006 §11; execution pending)
-    transport-tcp.yaml       — CONF-TCP-* (§I TCP)
-    transport-tls.yaml       — CONF-TLS-* (§I TLS)
-    transport-http.yaml      — CONF-HTTP-* (§I HTTP/1.1)
-    transport-https.yaml     — CONF-HTTPS-* (§I HTTPS/H1 + H2)
-    transport-ws.yaml        — CONF-WS-* (§I WS)
-    transport-wss.yaml       — CONF-WSS-* (§I WSS)
-    security.yaml            — CONF-SEC-* negative cases (§Q)
-    requirements.yaml        — requirement → test traceability matrix (§D)
-  requirements/              — human-readable transport cases (prose companions)
-  rpc/, auth-session/, errors/, events/
-                             — human-readable core cases (prose companions)
-  test-vectors/
-    README.md                — vector conventions + index
-    protobuf/                — golden logical encodings (§J)
-    tcp/                     — exact [length][protobuf] bytes (§K)
-    http/                    — request/response fixtures (§L)
-    websocket/               — Upgrade + framing fixtures (§M)
-  interoperability/
-    README.md                — two-implementation proof procedure
-    matrix.yaml              — required interop pairs
-    scenarios.yaml           — cross-implementation scenarios
+**SNTR-STEST-007** — Test otherwise-valid serialized Frames of MAX,
+MAX+1, and 2×MAX, counting all envelope overhead. MAX is accepted only if
+all other validation/state/auth/field bounds pass; oversize follows its
+lawful resource-error/close path without panic/allocation failure.
+Separately test method, credential, payload, and notification field caps;
+never enlarge independent limits to construct a total-frame fixture.
+Simulated application ciphertext uses the same bounds.
+
+**SNTR-STEST-008** — Truncated varints/prefixes, incomplete handshakes,
+and slow-drip inputs fail deterministically under decode/assembly/deadline
+rules; slow clients are closed, not retained indefinitely.
+
+**SNTR-STEST-009** — Flood handshakes, calls, subscriptions, and queues
+from one principal while a conformant principal operates; verify bounded
+rejection, offender isolation, documented priority, and recovery without restart.
+
+**SNTR-STEST-010** — Reject weak WSS TLS, fallback after endpoint/channel
+failure, downgraded wire/profile behavior, and endpoint-validation
+confusion; verify highest secure overlap and no credential disclosure.
+
+**SNTR-STEST-011** — Re-evaluate credential/handle/connection-ID misuse
+across connections, principals, and carriers; deny cross-principal use
+and fixation, never accept diagnostic IDs as authentication.
+
+**SNTR-STEST-900** — Every group MUST include traces proving credential/
+token absence from URLs/logs/errors/metrics labels, message-hygiene
+checks, timing-robust criteria, and accurate secure/restricted-carrier
+labels. Execute applicable certificate cases on WSS; encrypted TCP has
+its independent pin/channel tests, never a fictitious TLS layer.
+
+Channel/lifecycle tests also cover independently derived NK/NKpsk0 vectors,
+wrong pins/AKs, unauthorized/interrupted enrollment, lookup collision/scope/epoch,
+expiry/revocation/rotation races, replayed first flights with no effects before
+fresh client confirmation, no 0-RTT, cross-carrier fresh keys, invalid tags/nonces,
+lifetime/record/frame bounds, partial I/O and aggregate resources. No UDP result
+is implied. Deterministic test RNG is never a production API.
+
+Security-adjacent reviews cite affected threat/requirement IDs and applicable
+negatives; analyze construction, trust provisioning, freshness, lifecycle/storage,
+opacity, hygiene, downgrade, resources and compatibility; and record unresolved
+objections/risks in the public approval process. Checks are not approval evidence;
+the decision record identifies the actual approver and independence.
+
+## Repository checks
+
+From the root, run:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+python3 scripts/sync-conformance-owners.py
+python3 scripts/migrate-conformance-1.0.py
+python3 scripts/validate-repo.py all
 ```
 
-`conformance/requirements/*.md` and the `rpc/`, `auth-session/`, `errors/`,
-`events/` prose files are companions, not duplicates: IDs match the manifests
-one-to-one.
-
----
-
-## 5. Test-vector conventions
-
-- Neutral applications only: `echo` (`/example.Echo/Echo`), generic key/value
-  (`/example.KV/Get`), generic subscriptions (`/example.Events/Subscribe`).
-  No chat, contact, receipt, payment, or social concept appears anywhere.
-- Hosts `syntra.example`, `example.com`; never production names.
-- Credentials are throwaway opaque bytes (`opaque-test-credential-A`,
-  32-byte `0x41`/`0x42` patterns); never real secrets.
-- Protobuf golden vectors assert **logical equality** (decoded fields), never
-  byte equality across encoders (SNTR-SER-002/901). Only the TCP framing
-  prefix + chosen fixture bytes are byte-exact — and only for that fixture.
-- No raw TLS byte vectors are defined (TLS is negotiated, not frozen).
-  WSS vectors cover Upgrade/framing; TLS behavior is referenced by harness
-  name to `specifications/security/*`.
-
----
-
-## 6. Result model (Section N)
-
-Every case yields exactly one verdict:
-
-| Verdict       | Meaning | Counts as pass? |
-|---------------|---------|-----------------|
-| `PASS`        | Executed; every `expected` assertion held; logs retained. | **Yes** |
-| `FAIL`        | Executed; at least one `expected` assertion did not hold, or the IUT crashed, hung past its documented bound, or emitted an unlisted error. | No |
-| `SKIP`        | Not executed because a stated precondition is absent (capability unclaimed, transport unclaimed, harness lacks a facility such as raw-certificate injection). The reason MUST cite the missing precondition. `SKIP` MUST NOT be used for a mandatory case of a claimed profile, except when the case declares `applicable_transports` whose families intersect none of the claimed transports (transport applicability per the manifest README's field reference): then `SKIP` is the correct verdict and the reason MUST cite the `applicable_transports` key. | **No** — neutral, excluded from pass-rate |
-| `UNSUPPORTED` | Executed the optionality probe and the IUT correctly declined it (for example `UNIMPLEMENTED` for an unnegotiated subscription, or rejection of a resume attempt without the capability). The IUT behaved correctly **by refusing**. | **No** — correct refusal, excluded from capability pass-rate |
-| `NOT_EXECUTED`| Listed but never run (planned, blocked, or omitted). The default state before a run. MUST NOT appear in a final claim. | **No** |
-
-Critical rules (normative for reporting):
-
-- `UNSUPPORTED != PASS`. A refusal proves optionality handling, not capability support.
-- `SKIP != PASS`. An unrun case proves nothing.
-- `NOT_EXECUTED != PASS`. A claim containing any `NOT_EXECUTED` case is incomplete.
-- `PASS` MUST NOT be reported unless executed with logs (SNTR-CORE-901,
-  SNTR-STEST-900). Replayed, copied, or inferred passes are non-conformant.
-- Pass-rate is computed over executed mandatory cases:
-  `PASS / (PASS + FAIL)` for the claimed profiles. `SKIP`/`UNSUPPORTED` cases
-  are listed separately and MUST NOT enter the denominator.
-
----
-
-## 7. Implementation declaration (Section O)
-
-Implementations publish a declaration (template:
-`conformance/declaration.example.yaml`) with:
-
-```yaml
-implementation: { name, version, repository, languages }
-syntra_core: v1
-profiles: [SNTR-WSS-H1-V1, SNTR-HTTPS-H2-V1]   # claimed transport profiles
-capabilities: [events-v1]                       # empty when mandatory-only
-bounds: { max_frame_bytes, max_concurrent_rpcs, handshake_timeout_ms, … }
-results: [{ test_id, verdict, log_ref }]        # one row per manifest case
-```
-
-The declaration MUST live with the implementation (not in this repository),
-MUST NOT claim source residence here, and MUST link logs sufficient for an
-independent party to re-run any `PASS`. Bounds and defaults MUST be documented
-(SNTR-REL-031); undocumented unbounded behavior is non-conformant.
-
----
-
-## 8. Conformance badge and claims (Section P)
-
-Full wording rules: `conformance/claims.md`. Summary:
-
-- Say exactly which profiles passed, for example:
-
-  > "Conforms to Syntra Core v1 and WSS/H1 v1"
-
-  or with two transports plus events:
-
-  > "Conforms to Syntra Core v1 with transports WSS/H1 v1, HTTPS/H2 v1 and
-  > capability events-v1 (replay excluded)"
-
-- NEVER use a bare "Syntra compliant" / "Syntra certified" / "Syntra compatible"
-  without the profile list. A bare claim is non-conformant wording even when
-  the technical results pass.
-- Production claims MUST name only secure transports. A claim naming
-  `SNTR-TCP-V1`, `SNTR-HTTP-V1`, or `SNTR-WS-V1` MUST carry the suffix
-  "(restricted development only; not for public production traffic)".
-- Capability claims MUST cite the capability identifier and its RFC. Until the
-  events/resume RFCs are accepted, no implementation may claim `events-v1`,
-  `events-replay-v1`, or `resume-v1` support — only correct **absence**
-  handling (`UNSUPPORTED` on probes).
-
----
-
-## 9. Security posture of this suite
-
-- Every `CONF-SEC-*` case in `manifest/security.yaml` is Mandatory for the
-  profile it guards (STEST-001…011 map in `specifications/security/test-plan.md`).
-- Negative cases (oversize, truncation, replay, fixation, downgrade, invalid
-  state) MUST be executed; absence of attack fixtures is not evidence of safety.
-- No private key, production credential, or production hostname appears in any
-  fixture. Certificate fixtures are harness-named references
-  (`test-pki:valid-leaf`, `test-pki:wrong-san`, …), never embedded PEM bytes.
-- Error-message hygiene is asserted by negative grep in every security case:
-  no credential, token, path, SQL text, stack trace, or raw untrusted bytes in
-  any `RpcError.message`, log, or diagnostic visible to the peer.
-
----
-
-## 10. Acceptance criteria for this suite itself
-
-- A separate repository can build a runner from these files alone (no
-  language runtime implied).
-- Every `SNTR-*` normative ID appears in `manifest/requirements.yaml` with a
-  non-empty disposition (`automated`, `partially_automated`, `manual`, or
-  `not_testable` with a stated reason). No mandatory ID is silently uncovered.
-- Profiles, manifests, vectors, and the declaration template validate as YAML
-  1.2 and cross-reference consistently (IDs cited exist; vectors decode).
-- No domain-specific concept (chat, receipt, contact, profile, group) and no
-  private dependency appears in any fixture or test.
+Owner discovery reads the six protocol pages, this guide, and the optional
+schema-tooling guide. `--write` on the sync scripts updates only their described
+metadata/fixture outputs; review registry membership and test edges separately.
+Schema validation and repository-boundary gates remain independent checks in CI.

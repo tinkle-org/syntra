@@ -1,6 +1,6 @@
-# Exact TCP byte vectors (Section K): [length][protobuf] (machine-readable)
-# Companion to test-vectors/tcp/vectors.json (identical wire_hex). Each unit on
-# the wire is the 4-byte big-endian length followed by exactly those bytes.
+# Authenticated inner-stream fixtures: u32BE length followed by Frame bytes.
+# Companion to test-vectors/tcp/vectors.json (identical shared wire_hex).
+# These are plaintext units inside protected records, never outer TCP bytes.
 # These bytes ARE byte-exact for the chosen contained fixture (framing prefix
 # plus that fixture). They do NOT freeze Protobuf encoding in general.
 format_version: "1.0"

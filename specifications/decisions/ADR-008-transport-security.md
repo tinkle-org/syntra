@@ -1,5 +1,10 @@
 # ADR-008: Transport Security Policy
 
+> Historical decision record. Carrier policies and profile identifiers below
+> describe the revision reviewed at the recorded date. Use the
+> [current protocol reference](../../README.md#detailed-description) for Syntra's
+> single protocol contract. Recorded acceptance status is unchanged.
+
 - Status: Accepted
 - Date: 2026-10-19
 - Owner: Syntra maintainers (see `GOVERNANCE.md`)

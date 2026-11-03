@@ -4,18 +4,20 @@
 # references against profiles.yaml, requirements.yaml, and test-vectors/.
 format_version: "1.0"
 schema:
+  capability_id: { type: string, enum: [syntra.update-recovery/1] }
+  profile_id: { type: string, pattern: "^(SNTR-[A-Z0-9-]+-V1|SYNTRA-1\\.0-(TCP|WS|WSS))$" }
   profile_selection:
     description: "One applicable profile, or a non-empty list of independently applicable profiles; every ID must resolve in profiles.yaml."
     one_of:
-      - { type: string, pattern: "^SNTR-[A-Z0-9-]+-V1$" }
-      - { type: list, item: { type: string, pattern: "^SNTR-[A-Z0-9-]+-V1$" }, min_items: 1 }
+      - { $ref: "#/schema/profile_id" }
+      - { type: list, item: { $ref: "#/schema/profile_id" }, min_items: 1 }
   profile_manifests:
     description: "The profiles.yaml profiles[].manifests field."
     type: list
     min_items: 1
     item: { $ref: "#/schema/manifest_reference" }
   manifest_reference:
-    description: "Each profiles.yaml profiles[].manifests entry is a path or a filtered path. Filters match all listed fields by exact equality; capabilities: [] selects only capability-free cases. A string path loads every case subject to normal capability gating."
+    description: "Each profiles.yaml profiles[].manifests entry is a path or a filtered path. Filters match all listed fields; profile matches string equality or membership in a case's profile list. capabilities: [] selects capability-free cases. A string path loads every case subject to normal capability gating."
     one_of:
       - { type: string }
       - type: map
@@ -24,10 +26,11 @@ schema:
           path: { type: string }
           select:
             type: map
-            required: [mandatory, capabilities]
+            optional: [mandatory, capabilities, profile]
             fields:
               mandatory: { type: boolean }
-              capabilities: { type: list, item: { type: string } }
+              capabilities: { type: list, item: { $ref: "#/schema/capability_id" } }
+              profile: { type: string }
   manifest_file:
     type: map
     required: [format_version, profile, cases]
@@ -49,15 +52,14 @@ schema:
     # Frame itself is never a member) it forbids every invented error
     # carrier.
     # `transport.peer_observation` asserts the peer's transport-native
-    # signal per transport family (tcp_tls | ws_wss | http_1_1 |
-    # https_h2), each entry optionally asserting `signal`
+    # signal per carrier family (tcp_tls | ws_wss), each entry optionally asserting `signal`
     # (transport_close | ws_close | http_status | connection_loss),
     # `close_code` (RFC 6455 application code), `status` (integer HTTP
     # status) and `local_report` (a known ErrorCode or the documented
     # generic marks generic_protocol_rejection | generic_policy_rejection
     # when the signal cannot distinguish causes). `transport.result_envelope`
-    # (absent | present) is the HTTP binding's no-invented-envelope
-    # assertion. Unknown transport-family keys or unknown local_report
+    # (absent | present) asserts whether a result envelope was emitted.
+    # Unknown transport-family keys or unknown local_report
     # values fail validation.
     type: map
     optional: [connection_state, session_state, frames, error, transport, hygiene, retry]
@@ -72,30 +74,31 @@ schema:
   test_case:
     type: map
     required: [id, requirement, profile, roles, capabilities, mandatory, preconditions, input, expected]
-    optional: [notes, vector_refs, control_connection, applicable_transports]
+    optional: [notes, vector_refs, control_connection, applicable_transports, applicable_profiles]
     fields:
-      id: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" }
+      id: { $ref: "#/schema/case_id" }
       # Requirement refs admit the SNTR-* core families and the RFC 0006
       # recovery family SYN-URP-nnn except the reserved unassigned IDs
       # SYN-URP-008 and SYN-URP-009, which the pattern rejects outright
       # (they MUST NOT appear as case refs or registrations).
-      requirement: { type: list, item: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }, min_items: 1 }
+      requirement: { type: list, item: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+[A-Z]*|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }, min_items: 1 }
       profile: { $ref: "#/schema/profile_selection" }
       roles: { type: list, item: { enum: [client, server] }, min_items: 1 }
-      capabilities: { type: list, item: { type: string } }
+      capabilities: { type: list, item: { $ref: "#/schema/capability_id" } }
       mandatory: { type: boolean }
       preconditions: { type: list, item: { type: string }, min_items: 1 }
-      # Transport applicability (machine-readable, e.g. RFC 0004 D3
-      # persistent-carrier exemptions): when present, the case executes
+      # Carrier applicability: when present, the case executes
       # exactly over the listed transport families and a claim whose
       # transports intersect none of them reports SKIP for the case citing
       # this key (absent = applies to any claimed transport — the default
       # for every pre-existing case).
-      applicable_transports: { type: list, item: { type: string, enum: [tcp_tls, ws_wss, http_1_1, https_h2] }, min_items: 1 }
+      applicable_transports: { type: list, item: { type: string, enum: [tcp_tls, ws_wss] }, min_items: 1 }
+      # Exact canonical bindings take precedence over coarse carrier families.
+      applicable_profiles: { type: list, item: { type: string, enum: [SYNTRA-1.0-TCP, SYNTRA-1.0-WS, SYNTRA-1.0-WSS] }, min_items: 1 }
       input:
         # `faults` maps are free-form per case (loss/delay/tamper), but
         # race-sensitive coordination MUST use the documented structured
-        # barrier faults (see conformance/manifest/README.md): e.g.
+        # barrier faults (see conformance/README.md): e.g.
         # `duplicate_while_pending: {barrier: first_terminal_result,
         # release_after: violation_and_closure}` — required, validated, on
         # CONF-RPC-004 — and `reverse_completion_order: {barrier:
@@ -153,21 +156,23 @@ schema:
       # the reserved unassigned IDs SYN-URP-008 and SYN-URP-009, which the
       # pattern rejects outright (they MUST NOT be registered as requirement
       # rows).
-      requirement_id: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }
+      requirement_id: { type: string, pattern: "^(SNTR-[A-Z]+-[0-9]+[A-Z]*|SYN-ARCH-[0-9]+|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$" }
       specification: { type: string }
       section: { type: string }
-      test_ids: { type: list, item: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" } }
+      test_ids: { type: list, item: { $ref: "#/schema/case_id" } }
       automation_status: { type: string, enum: [automated, partially_automated, manual, not_testable] }
       notes: { type: string }
   declaration_file:
     type: map
     required: [format_version, implementation, syntra_core, profiles, capabilities, bounds, results]
+    optional: [syntra_protocol]
     fields:
       format_version: { type: string, pattern: "^1\\.0$" }
       implementation: { type: map, required: [name, version] }
       syntra_core: { type: string, pattern: "^v1$" }
-      profiles: { type: list, item: { type: string, pattern: "^SNTR-[A-Z0-9-]+-V1$" }, min_items: 1 }
-      capabilities: { type: list, item: { type: string } }
+      syntra_protocol: { type: string, pattern: "^1\\.0$" }
+      profiles: { type: list, item: { $ref: "#/schema/profile_id" }, min_items: 1 }
+      capabilities: { type: list, item: { $ref: "#/schema/capability_id" } }
       bounds: { type: map }
       results:
         type: list
@@ -175,9 +180,13 @@ schema:
           type: map
           required: [test_id, verdict]
           fields:
-            test_id: { type: string, pattern: "^CONF-[A-Z]+-[0-9]+$" }
+            test_id: { $ref: "#/schema/case_id" }
             verdict: { type: string, enum: [PASS, FAIL, SKIP, UNSUPPORTED, NOT_EXECUTED] }
   verdicts: [PASS, FAIL, SKIP, UNSUPPORTED, NOT_EXECUTED]
+  case_id:
+    description: "Case IDs use a suite family and numeric suffix."
+    type: string
+    pattern: "^CONF-[A-Z]+-[0-9]+$"
   verdict_rules:
     - "UNSUPPORTED != PASS"
     - "SKIP != PASS"

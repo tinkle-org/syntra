@@ -6,7 +6,7 @@
 - Status: Accepted
 - Date: 2026-10-19
 - Target version: v1 pre-stable source-layout migration
-- Relates to: [ADR-002](../specifications/decisions/ADR-002-protobuf-idl.md), [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md), [architecture §8](../specifications/architecture.md#8-requirement-ownership-authoritative-sources), `SNTR-SER-001`, `SNTR-VER-001…005`, `proto/syntra/v1/`, [historical descriptor archive](../compatibility/v1-initial/README.md)
+- Relates to: [ADR-002](../specifications/decisions/ADR-002-protobuf-idl.md), [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md), [architecture §8](../specifications/wire-format.md#general-model), `SNTR-SER-001`, `SNTR-VER-001…005`, `proto/syntra/v1/`, [historical descriptor archive](../compatibility/v1-initial/README.md)
 - Reviewers: oscarlaw (self-review disclosed; sole active maintainer)
 
 > **Recorded user-directed layout decision — implemented:**
@@ -17,8 +17,8 @@
 > are retained in the immutable compatibility archive. This records explicit
 > user direction, not formal maintainer quorum or RFC acceptance. This RFC
 > remains Draft for the remaining protocol/security blockers and review;
-> current structural execution is recorded in the release-readiness audit;
-> behavioral acceptance and interoperability remain pending.
+> structural checks alone do not establish behavioral acceptance or
+> interoperability.
 
 Accepted 2026-10-30 via [Decision 0002](../docs/decisions/0002-sdd-acceptance-wave.md)
 (disclosed self-approval; sole active maintainer per `GOVERNANCE.md` Sec. 3).
@@ -27,9 +27,9 @@ B1–B8/B10 are resolved by accepted RFCs 0003–0005,
 body/metadata partition and reserved-tag validation), and accepted
 RFCs 0006/0007/0010 for the required recovery/SC1/lifecycle target; the
 disposition table in §10 below records the mapping. Owning-file edits land in
-the acceptance PR. The [current audit](../audits/v1-release-readiness.md) records a
-subsequent successful run of the 13-test archive-based schema suite; older
-pending-run statements below describe the earlier record, not this new run.
+the acceptance PR. The [schema tooling guide](../docs/schema-tooling.md)
+describes current validation; this design record does not establish a current
+test result or readiness verdict.
 
 ## 1. Summary
 
@@ -39,7 +39,7 @@ This RFC records the user-directed physical split of the existing public `syntra
 
 The historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto) grouped the envelope, handshake, RPC, cancellation, and notifications together; [error.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/error.proto) owned the shared error registry. A public layout organized by concern makes declarations easier to locate and dependencies easier to audit. It also needs an honest account of what those declarations cannot express: typed handshake rejection, capability negotiation, and session extensions have no concrete binding today.
 
-The original proposal kept the historical sources while awaiting a layout decision. That preservation plan is superseded by explicit user direction to remove the old tree and make `proto/syntra/v1` the sole source of truth. [ADR-002 §Decision](../specifications/decisions/ADR-002-protobuf-idl.md#decision), `SYN-ARCH-040`, and [serialization `SNTR-SER-001`](../specifications/core/serialization.md#1-protocol-requirements) identify that current representation root. This recorded layout decision does not resolve behavioral conflicts in the drafts or establish formal RFC acceptance.
+The original proposal kept the historical sources while awaiting a layout decision. That preservation plan is superseded by explicit user direction to remove the old tree and make `proto/syntra/v1` the sole source of truth. [ADR-002 §Decision](../specifications/decisions/ADR-002-protobuf-idl.md#decision), `SYN-ARCH-040`, and [serialization `SNTR-SER-001`](../specifications/wire-format.md) identify that current representation root. This recorded layout decision does not resolve behavioral conflicts in the drafts or establish formal RFC acceptance.
 
 ## 3. Proposal
 
@@ -61,7 +61,7 @@ Import paths are relative to the `proto` module root, e.g. `syntra/v1/rpc.proto`
 
 ### Representation diff and implemented authority-path change
 
-The declaration diff is relocation only: historical `session.proto` splits into envelope/handshake/rpc/events; historical `error.proto` becomes `errors.proto`. The two documentation-only files add no messages, enums, fields, or runtime extension points. The [reference](../specifications/schema/reference.md#message-and-field-reference) inventories every field. In particular the unchanged envelope remains:
+The declaration diff is relocation only: historical `session.proto` splits into envelope/handshake/rpc/events; historical `error.proto` becomes `errors.proto`. The two documentation-only files add no messages, enums, fields, or runtime extension points. The [reference](../proto/syntra/v1/) inventories every field. In particular the unchanged envelope remains:
 
 ```proto
 message Frame {
@@ -98,7 +98,7 @@ No new behavioral requirement IDs are allocated. Client and server obligations r
 
 ### State-machine delta and defaults
 
-There is no proposed state-machine change. The successful flow follows [handshake `SNTR-HS-001…005/010/020`](../specifications/core/handshake.md#1-state-machine). This diagram deliberately provides no invented failure packet:
+There is no proposed state-machine change. The successful flow follows [handshake `SNTR-HS-001…005/010/020`](../specifications/connection.md). This diagram deliberately provides no invented failure packet:
 
 ```mermaid
 sequenceDiagram
@@ -121,15 +121,15 @@ Draft defaults are a 1,048,576-byte serialized envelope (`SNTR-WIRE-006`), embed
 
 ### Encoding, presence, correlation, and cancellation
 
-Protobuf binary remains the encoding; transport framing is separate ([serialization `SNTR-SER-001/002`](../specifications/core/serialization.md#1-protocol-requirements), [framing `SNTR-WIRE-001`](../specifications/core/framing.md#1-protocol-requirements-envelope)). Serialization is non-canonical: interoperability compares decoded logical values, not serialized byte equality. Payload bytes themselves remain bit-exact.
+Protobuf binary remains the encoding; transport framing is separate ([serialization `SNTR-SER-001/002`](../specifications/wire-format.md), [framing `SNTR-WIRE-001`](../specifications/wire-format.md)). Serialization is non-canonical: interoperability compares decoded logical values, not serialized byte equality. Payload bytes themselves remain bit-exact.
 
 Unlabelled scalar/string/bytes/enum fields have implicit proto3 presence. Omitted and explicitly default-valued `timeout_ms`, credential, and ordinary payload fields cannot be distinguished after decoding. Message-valued oneof alternatives have explicit presence, and `RpcResult.outcome` distinguishes selected empty success bytes from an unset outcome. `Cancel{}` has no fields but selecting it in `Frame.body` is observable. A generated oneof enforces only the decoded case, not rejection of multiple alternatives in raw bytes (B4).
 
-`Frame.request_id` is the sole connection-scoped correlation ID, not authentication, durable identity, or an idempotency key ([RPC `SNTR-RPC-002/007/010`](../specifications/core/rpc.md#1-protocol-requirements)). Hello/ready/notification use zero; request/result/cancel use nonzero. Core permits reuse after terminal result, but security rejects stale IDs after completion (B3). `Cancel` requests best-effort cancellation without rolling back committed effects; terminal-result and deadline race policies need reconciliation (B10).
+`Frame.request_id` is the sole connection-scoped correlation ID, not authentication, durable identity, or an idempotency key ([RPC `SNTR-RPC-002/007/010`](../specifications/rpc.md)). Hello/ready/notification use zero; request/result/cancel use nonzero. Core permits reuse after terminal result, but security rejects stale IDs after completion (B3). `Cancel` requests best-effort cancellation without rolling back committed effects; terminal-result and deadline race policies need reconciliation (B10).
 
 ### Proposed error-category mapping
 
-These 14 user-facing categories are proposed mappings into the existing registry, not new enum declarations or additional numbers. Shorthand names below expand to `ERROR_CODE_*`. State and carrier availability still govern emission; a mapped code is not permission to send an illegal pre-ACTIVE `result`. [Errors `SNTR-ERR-001/002/020`](../specifications/core/errors.md#1-protocol-requirements) owns the registry and application-mapping policy.
+These 14 user-facing categories are proposed mappings into the existing registry, not new enum declarations or additional numbers. Shorthand names below expand to `ERROR_CODE_*`. State and carrier availability still govern emission; a mapped code is not permission to send an illegal pre-ACTIVE `result`. [Errors `SNTR-ERR-001/002/020`](../specifications/rpc.md) owns the registry and application-mapping policy.
 
 | # | Category (including descriptive aliases) | Existing registry mapping | Binding/rationale |
 |---|---|---|---|
@@ -154,9 +154,9 @@ The other existing codes, including `CANCELLED (1)`, `UNKNOWN (2)`, `NOT_FOUND (
 
 ### Capability, session, and event boundaries
 
-[Sessions `SNTR-SESS-001/003/006…008`](../specifications/core/sessions.md#1-protocol-requirements) explicitly defines no separate v1 session handshake and no implicit resumption. [Capabilities `SNTR-CAP-001…005`](../specifications/core/capabilities.md#1-protocol-requirements) requires a capability-specific RFC to choose identifiers and an explicit binding; examples in prose allocate no fields or methods. Documentation-only files therefore accurately describe the available contract.
+[Sessions `SNTR-SESS-001/003/006…008`](../specifications/connection.md) explicitly defines no separate v1 session handshake and no implicit resumption. [Capabilities `SNTR-CAP-001…005`](../specifications/rpc.md) requires a capability-specific RFC to choose identifiers and an explicit binding; examples in prose allocate no fields or methods. Documentation-only files therefore accurately describe the available contract.
 
-[Authentication `SNTR-AUTH-004/010`](../specifications/core/authentication.md#1-protocol-requirements) places optional follow-up authentication in application-defined RPCs after ACTIVE and prohibits same-connection reauthentication without an RFC. It does not authorize a new pre-ACTIVE auth-round message or a principal swap. [Events `SNTR-EVENT-002…004/008…010`](../specifications/core/events.md#1-protocol-requirements) leaves event/stream IDs, subscriptions, replay, cursors and cancellation bindings inside application payloads/RPCs. There is no core acknowledgment or durable stream-state record. B7/B11 lists the work needed before these can become concrete IDL.
+[Authentication `SNTR-AUTH-004/010`](../specifications/connection.md) places optional follow-up authentication in application-defined RPCs after ACTIVE and prohibits same-connection reauthentication without an RFC. It does not authorize a new pre-ACTIVE auth-round message or a principal swap. [Events `SNTR-EVENT-002…004/008…010`](../specifications/recovery.md) leaves event/stream IDs, subscriptions, replay, cursors and cancellation bindings inside application payloads/RPCs. There is no core acknowledgment or durable stream-state record. B7/B11 lists the work needed before these can become concrete IDL.
 
 ## 5. Alternatives considered
 
@@ -182,20 +182,18 @@ The pre-stable source transition is implemented by user direction: `proto/syntra
 
 ## 7. Security considerations
 
-The schemas contain sensitive credentials but no redaction or runtime enforcement. Generated debug/String/JSON/reflection output can disclose `ClientHello.credential`; [authentication security `SNTR-ASEC-001/003/011/024`](../specifications/security/authentication-security.md#1-protocol-requirements) governs retention, carriage and generic error messages. `RpcError.message` must not leak credentials, tokens, raw bytes, stack traces or private diagnostics (`SNTR-ERR-003`). `connection_id` and `request_id` grant no authority; a diagnostic ID is never a resume token (`SNTR-SESS-002`, `SNTR-ASEC-010`).
+The schemas contain sensitive credentials but no redaction or runtime enforcement. Generated debug/String/JSON/reflection output can disclose `ClientHello.credential`; [authentication security `SNTR-ASEC-001/003/011/024`](../specifications/security.md) governs retention, carriage and generic error messages. `RpcError.message` must not leak credentials, tokens, raw bytes, stack traces or private diagnostics (`SNTR-ERR-003`). `connection_id` and `request_id` grant no authority; a diagnostic ID is never a resume token (`SNTR-SESS-002`, `SNTR-ASEC-010`).
 
-Public traffic requires verified secure transport before credentials or application data, including TLS 1.3 and endpoint verification ([transport security `SNTR-TSEC-001…004/007/009`](../specifications/security/transport-security.md#1-protocol-requirements)). Opaque bytes remain uninterpreted and bit-preserved; application encryption neither replaces TLS nor adds core E2EE ([opaque payloads `SNTR-OPQ-001…006`](../specifications/security/opaque-payloads.md#1-protocol-requirements)).
+Public traffic requires verified secure transport before credentials or application data, including TLS 1.3 and endpoint verification ([transport security `SNTR-TSEC-001…004/007/009`](../specifications/security.md)). Opaque bytes remain uninterpreted and bit-preserved; application encryption neither replaces TLS nor adds core E2EE ([opaque payloads `SNTR-OPQ-001…006`](../specifications/security.md)).
 
-Runtime validators/adapters need allocation/size/depth/time/rate/concurrency bounds before dispatch and authorization before handler effects (`SNTR-SER-006/007`, `SNTR-ASEC-020…023/040/041`). Reserved-tag detection and raw oneof duplicate policy cannot be inferred from generated decoded objects (B4/B6). Replays of credentials, tokens, correlation IDs, operation keys, and events require separate defenses ([replay protection `SNTR-RPL-001/002/010…014`](../specifications/security/replay-protection.md#1-protocol-requirements--class-separation)); TLS does not prove idempotency or exactly-once execution. No implementation of these obligations is claimed by this RFC.
+Runtime validators/adapters need allocation/size/depth/time/rate/concurrency bounds before dispatch and authorization before handler effects (`SNTR-SER-006/007`, `SNTR-ASEC-020…023/040/041`). Reserved-tag detection and raw oneof duplicate policy cannot be inferred from generated decoded objects (B4/B6). Replays of credentials, tokens, correlation IDs, operation keys, and events require separate defenses ([replay protection `SNTR-RPL-001/002/010…014`](../specifications/security.md)); TLS does not prove idempotency or exactly-once execution. No implementation of these obligations is claimed by this RFC.
 
 ## 8. Test plan and acceptance criteria
 
-The checked schema/codec criteria below record the original execution before
-the old tree's removal; results are preserved as historical evidence in the
-[validation record](../specifications/schema/validation.md). Results for the
-updated archive-based 13-test Python suite (original 12 plus a sole-source
-regression check) remain pending. Unchecked runtime and review criteria
-remain pending; B9 layout authority is resolved by user direction.
+The checked schema/codec criteria below record the original execution claims,
+not current execution evidence. Use the [schema tooling guide](../docs/schema-tooling.md)
+to reproduce the current checks. Unchecked runtime and review criteria remain
+pending; B9 layout authority is resolved by user direction.
 
 - [x] Original representation audit: exact declaration comparison, package options, seven files; session/capabilities contain no declarations.
 - [x] Original tooling run: pinned versions, STANDARD lint/build/generation, real historical WIRE audit and expected FILE failures retained; initial snapshot and reproducible commands documented.
@@ -203,7 +201,7 @@ remain pending; B9 layout authority is resolved by user direction.
 - [x] Go/Rust codec fixtures: every body/outcome, selected empty success, empty cancel, arbitrary/non-UTF-8 payloads, unknown metadata/numeric enums, malformed inputs and raw-oneof limitations. Shared fixture decoding is not live socket interop or implemented error-reporting policy.
 - [ ] Post-deletion validation: execute the archive-based hash/declaration/WIRE/FILE checks and 13-test descriptor/tooling suite, verify the sole-source regression, and record actual results. Original run results are not evidence of this execution.
 - [ ] Runtime conformance fixtures, separate from codec smoke tests: state legality, no dispatch on malformed/unauthorized input, auth and revocation, request-ID reuse policy, timers/cancel races, reserved raw-tag rejection, size/depth/pre-allocation limits, capability confirmation, bounded queues and secure-transport failure behavior. Blocked expectations stay explicitly pending until §10 is resolved.
-- [ ] Interop: mandatory-only initiator/host, historical/current message compatibility and at least two transport profiles, following [core conformance](../specifications/core/conformance.md); the historical archive is not a second live source root, and no optional-feature claim is made without a named approved capability RFC.
+- [ ] Interop: mandatory-only initiator/host, historical/current message compatibility and at least two transport profiles, following [core conformance](../conformance/README.md); the historical archive is not a second live source root, and no optional-feature claim is made without a named approved capability RFC.
 - [ ] Resolve remaining protocol/security blockers and obtain maintainer/security review before describing the behavioral RFC as accepted or v1 as stable. The implemented user-directed layout decision and published migration notes do not establish those approvals.
 
 | Requirement trace | Planned evidence | Limitation |
@@ -212,7 +210,7 @@ remain pending; B9 layout authority is resolved by user direction.
 | `SNTR-ERR-001/005/900` | All enum values, zero-error negative case, unknown numeric fixture plus explicit reporting helper | Raw decoding alone does not sanitize/map/report errors |
 | `SNTR-WIRE-002…006/008/900`, `SNTR-SER-005…008` | Runtime validation negatives and raw-byte fixtures | B1/B4/B5/B6/B8 need approved expectations |
 | `SNTR-HS-900`, `SNTR-RPC-900/901`, `SNTR-EVENT-900`, `SNTR-CAP-900` | State-machine, correlation, deadlines, events and negotiation harness | B1/B2/B3/B7/B10 prevent a complete pass claim |
-| `SNTR-STEST-001…011/900`, `SNTR-RPL-900/901`, `SNTR-OPQ-900/901` | [Security test plan](../specifications/security/test-plan.md) and live secure-adapter tests | TLS, revocation, replay, resource isolation and diagnostic hygiene are not schema codec coverage |
+| `SNTR-STEST-001…011/900`, `SNTR-RPL-900/901`, `SNTR-OPQ-900/901` | [Security test plan](../conformance/README.md) and live secure-adapter tests | TLS, revocation, replay, resource isolation and diagnostic hygiene are not schema codec coverage |
 
 Schema/codec and Buf results are limited to the linked validation record.
 No transport/security runtime conformance result or maintainer approval is asserted.
@@ -251,37 +249,37 @@ leaving any listed disposition awaiting approval.
 
 ### B1. Typed handshake rejection
 
-[Handshake `SNTR-HS-003/004/011/012/020/030/040`](../specifications/core/handshake.md), [authentication `SNTR-AUTH-006/009`](../specifications/core/authentication.md), and [errors `SNTR-ERR-004`](../specifications/core/errors.md) require a typed terminal handshake failure. The only error carrier is `Frame.result → RpcResult.error`; [framing `SNTR-WIRE-003`](../specifications/core/framing.md) requires its ID to be nonzero, while hello/ready use zero and `SNTR-HS-012` forbids pre-ACTIVE results. `ServerReady` has no error outcome. Neither a zero-ID result nor an invented nonzero-ID handshake RPC is legal. Closure/local reporting does not satisfy the promised remote typed error. An approved carrier/state/profile binding is needed, including unsolicited connection/session failure signaling after ACTIVE when no RPC is available. The architecture §12.1 failure illustration does not allocate that binding.
+[Handshake `SNTR-HS-003/004/011/012/020/030/040`](../specifications/connection.md), [authentication `SNTR-AUTH-006/009`](../specifications/connection.md), and [errors `SNTR-ERR-004`](../specifications/rpc.md) require a typed terminal handshake failure. The only error carrier is `Frame.result → RpcResult.error`; [framing `SNTR-WIRE-003`](../specifications/wire-format.md) requires its ID to be nonzero, while hello/ready use zero and `SNTR-HS-012` forbids pre-ACTIVE results. `ServerReady` has no error outcome. Neither a zero-ID result nor an invented nonzero-ID handshake RPC is legal. Closure/local reporting does not satisfy the promised remote typed error. An approved carrier/state/profile binding is needed, including unsolicited connection/session failure signaling after ACTIVE when no RPC is available. The architecture §12.1 failure illustration does not allocate that binding.
 
 ### B2. Pre-ACTIVE event conflict
 
-[Events `SNTR-EVENT-005/900` and §4](../specifications/core/events.md) defaults to ignoring pre-ACTIVE notifications with a diagnostic without failing the handshake. [Handshake `SNTR-HS-012/900`](../specifications/core/handshake.md) requires failure/close, and [framing `SNTR-WIRE-003/011`](../specifications/core/framing.md) requires rejection. Select one behavior and align the fixtures; this RFC endorses neither conflicting expectation.
+[Events `SNTR-EVENT-005/900` and §4](../specifications/recovery.md) defaults to ignoring pre-ACTIVE notifications with a diagnostic without failing the handshake. [Handshake `SNTR-HS-012/900`](../specifications/connection.md) requires failure/close, and [framing `SNTR-WIRE-003/011`](../specifications/wire-format.md) requires rejection. Select one behavior and align the fixtures; this RFC endorses neither conflicting expectation.
 
 ### B3. Completed request-ID reuse conflict
 
-[Replay protection `SNTR-RPL-012/030/900`](../specifications/security/replay-protection.md) rejects stale IDs arriving after a terminal result. [RPC `SNTR-RPC-002/010`](../specifications/core/rpc.md) and [framing `SNTR-WIRE-010`](../specifications/core/framing.md) expressly permit reuse after terminal result. An old replay and permitted new attempt cannot be distinguished by ID alone. Approve reuse versus non-reuse semantics, exhaustion policy, bounded tracking lifetime and cross-connection rules before claiming replay conformance; adding an operation-ID field does not silently resolve this contradiction.
+[Replay protection `SNTR-RPL-012/030/900`](../specifications/security.md) rejects stale IDs arriving after a terminal result. [RPC `SNTR-RPC-002/010`](../specifications/rpc.md) and [framing `SNTR-WIRE-010`](../specifications/wire-format.md) expressly permit reuse after terminal result. An old replay and permitted new attempt cannot be distinguished by ID alone. Approve reuse versus non-reuse semantics, exhaustion policy, bounded tracking lifetime and cross-connection rules before claiming replay conformance; adding an operation-ID field does not silently resolve this contradiction.
 
 ### B4. Oneof raw-wire multiplicity
 
-[Framing `SNTR-WIRE-002/003`](../specifications/core/framing.md) says Protobuf enforces a single member. Generated oneofs expose one decoded case, but different alternatives can occur in the same encoded message; the last encountered alternative wins, and repeated message-valued occurrences can merge. That applies to both `Frame.body` and `RpcResult.outcome`. Post-decode inspection cannot prove only one alternative occurred on the wire. Decide whether the contract accepts standard merge semantics or requires bounded raw-wire validation, and define duplicate-same-field handling; do not claim generated codecs already reject multi-field input.
+[Framing `SNTR-WIRE-002/003`](../specifications/wire-format.md) says Protobuf enforces a single member. Generated oneofs expose one decoded case, but different alternatives can occur in the same encoded message; the last encountered alternative wins, and repeated message-valued occurrences can merge. That applies to both `Frame.body` and `RpcResult.outcome`. Post-decode inspection cannot prove only one alternative occurred on the wire. Decide whether the contract accepts standard merge semantics or requires bounded raw-wire validation, and define duplicate-same-field handling; do not claim generated codecs already reject multi-field input.
 
 ### B5. Unknown body versus metadata discriminator
 
-[Serialization `SNTR-SER-003/004/021`](../specifications/core/serialization.md), [framing `SNTR-WIRE-004`](../specifications/core/framing.md), and [versioning `SNTR-VER-004`](../specifications/core/versioning.md) require ignoring unknown metadata but rejecting unknown bodies. An unknown field carries a number and wire type, not membership in an old decoder's oneof descriptor. No future-body tag range, criticality flag or discriminator is specified. An unset known body plus unknown fields cannot distinguish absent body from future body; even alongside a known body, unknown metadata and a future alternative are indistinguishable by the current contract. Define classification and precedence without rejecting all unknown fields or inventing a discriminator here.
+[Serialization `SNTR-SER-003/004/021`](../specifications/wire-format.md), [framing `SNTR-WIRE-004`](../specifications/wire-format.md), and [versioning `SNTR-VER-004`](../specifications/wire-format.md) require ignoring unknown metadata but rejecting unknown bodies. An unknown field carries a number and wire type, not membership in an old decoder's oneof descriptor. No future-body tag range, criticality flag or discriminator is specified. An unset known body plus unknown fields cannot distinguish absent body from future body; even alongside a known body, unknown metadata and a future alternative are indistinguishable by the current contract. Define classification and precedence without rejecting all unknown fields or inventing a discriminator here.
 
 ### B6. Reserved tags are not runtime validation
 
-[Serialization `SNTR-SER-008`](../specifications/core/serialization.md) and [framing `SNTR-WIRE-008`](../specifications/core/framing.md) require rejecting wire occurrences of Frame tags 16/17. Protobuf `reserved` prevents schema reuse; ordinary binary codecs can skip, retain or discard those tags as unknown data rather than reject them. Names `event`/`resume`/`ack` are schema reservations, not binary wire strings. A bounded validator that observes raw fields before they are discarded, with explicit precedence over general unknown tolerance, needs design and tests. Schema compilation alone does not meet this requirement.
+[Serialization `SNTR-SER-008`](../specifications/wire-format.md) and [framing `SNTR-WIRE-008`](../specifications/wire-format.md) require rejecting wire occurrences of Frame tags 16/17. Protobuf `reserved` prevents schema reuse; ordinary binary codecs can skip, retain or discard those tags as unknown data rather than reject them. Names `event`/`resume`/`ack` are schema reservations, not binary wire strings. A bounded validator that observes raw fields before they are discarded, with explicit precedence over general unknown tolerance, needs design and tests. Schema compilation alone does not meet this requirement.
 
 ### B7. Capability and session extension mechanics and bounds
 
-[Capabilities `SNTR-CAP-001…005/010/020/021`](../specifications/core/capabilities.md) leaves handshake-extension versus application-RPC binding to an RFC. There are no concrete records, offers, selections, parameters, required-option markers or confirmation fields. Specify identifier and parameter byte lengths, list counts, total negotiation bytes, duplicate handling, unknown/required policy, confirmation/failure timing and per-connection scope. Negotiated frame/concurrency limit overrides also lack a binding. [Serialization `SNTR-SER-020`](../specifications/core/serialization.md) calls for a credential-length bound without assigning a field-specific maximum; method, connection-ID and diagnostic-text bounds need explicit treatment within the envelope budget too.
+[Capabilities `SNTR-CAP-001…005/010/020/021`](../specifications/rpc.md) leaves handshake-extension versus application-RPC binding to an RFC. There are no concrete records, offers, selections, parameters, required-option markers or confirmation fields. Specify identifier and parameter byte lengths, list counts, total negotiation bytes, duplicate handling, unknown/required policy, confirmation/failure timing and per-connection scope. Negotiated frame/concurrency limit overrides also lack a binding. [Serialization `SNTR-SER-020`](../specifications/wire-format.md) calls for a credential-length bound without assigning a field-specific maximum; method, connection-ID and diagnostic-text bounds need explicit treatment within the envelope budget too.
 
-[Sessions `SNTR-SESS-001/005…008`](../specifications/core/sessions.md), [authentication security `SNTR-ASEC-007/008`](../specifications/security/authentication-security.md), and [replay protection `SNTR-RPL-011`](../specifications/security/replay-protection.md) require an RFC before resume tokens, token size/lifetime/rotation/replay tracking, extension counts, transport/principal binding, expiry/close signaling and failure carriers can be claimed. No separate session messages exist. Documentation-only files are deliberate, not incomplete placeholder wire records.
+[Sessions `SNTR-SESS-001/005…008`](../specifications/connection.md), [authentication security `SNTR-ASEC-007/008`](../specifications/security.md), and [replay protection `SNTR-RPL-011`](../specifications/security.md) require an RFC before resume tokens, token size/lifetime/rotation/replay tracking, extension counts, transport/principal binding, expiry/close signaling and failure carriers can be claimed. No separate session messages exist. Documentation-only files are deliberate, not incomplete placeholder wire records.
 
 ### B8. Payload and envelope size conflict
 
-[RPC `SNTR-RPC-900`](../specifications/core/rpc.md) and [opaque payloads `SNTR-OPQ-900`](../specifications/security/opaque-payloads.md) ask for a 1 MiB payload round trip, while [framing `SNTR-WIRE-006`](../specifications/core/framing.md) caps the entire serialized Frame at 1 MiB. Tags, length varints, nesting, version, correlation and method/budget fields add bytes; even a result payload of exactly 1 MiB cannot fit the default envelope. Define payload-versus-frame fixtures and approved overrides, test exactly MAX and MAX+1 serialized bytes, and preserve allocation/depth bounds. This RFC neither raises the limit nor relabels payload size as frame size.
+[RPC `SNTR-RPC-900`](../specifications/rpc.md) and [opaque payloads `SNTR-OPQ-900`](../specifications/security.md) ask for a 1 MiB payload round trip, while [framing `SNTR-WIRE-006`](../specifications/wire-format.md) caps the entire serialized Frame at 1 MiB. Tags, length varints, nesting, version, correlation and method/budget fields add bytes; even a result payload of exactly 1 MiB cannot fit the default envelope. Define payload-versus-frame fixtures and approved overrides, test exactly MAX and MAX+1 serialized bytes, and preserve allocation/depth bounds. This RFC neither raises the limit nor relabels payload size as frame size.
 
 ### B9. Recorded layout decision and known source break
 
@@ -291,24 +289,24 @@ The FILE/source incompatibility is a known breaking difference, not an unresolve
 
 ### B10. Handler outcome, cancellation and deadline conflicts
 
-[Errors `SNTR-ERR-002/010`](../specifications/core/errors.md) says `UNAVAILABLE` is the only code implying unknown handler outcome, but [reliability `SNTR-REL-001/003/009`](../specifications/core/reliability.md) says error outcomes do not prove execution status, and [RPC `SNTR-RPC-004/005/031`](../specifications/core/rpc.md) permits expiry/cancellation without rollback. A committed effect can precede `CANCELLED` or `DEADLINE_EXCEEDED`. Cancellation says return `CANCELLED` unless already completed, while deadline enforcement says return `DEADLINE_EXCEEDED` on expiry. Define race precedence, terminal delivery versus local abandonment, late/unknown result treatment (`SNTR-WIRE-011` versus RPC §4), and safe-retry/unknown-outcome reporting. No error code proves non-execution or idempotency by itself.
+[Errors `SNTR-ERR-002/010`](../specifications/rpc.md) says `UNAVAILABLE` is the only code implying unknown handler outcome, but [reliability `SNTR-REL-001/003/009`](../specifications/rpc.md) says error outcomes do not prove execution status, and [RPC `SNTR-RPC-004/005/031`](../specifications/rpc.md) permits expiry/cancellation without rollback. A committed effect can precede `CANCELLED` or `DEADLINE_EXCEEDED`. Cancellation says return `CANCELLED` unless already completed, while deadline enforcement says return `DEADLINE_EXCEEDED` on expiry. Define race precedence, terminal delivery versus local abandonment, late/unknown result treatment (`SNTR-WIRE-011` versus RPC §4), and safe-retry/unknown-outcome reporting. No error code proves non-execution or idempotency by itself.
 
 ### B11. Requested additions deliberately deferred
 
 | Requested addition | Exact owning specification/requirements | Deferral rationale |
 |---|---|---|
 | `ServerHello`, `RpcResponse`, `Event` renames | Historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto); `SNTR-SER-001`, `SNTR-VER-001/003` | Existing public names are `ServerReady`, `RpcResult`, `Notification`; renames break symbol/generated API identity despite similar wire structure |
-| Auth challenge/response rounds or mechanism records | [Authentication `SNTR-AUTH-001…004/007/010`](../specifications/core/authentication.md), [security `SNTR-ASEC-002/003/004`](../specifications/security/authentication-security.md) | Follow-ups are application RPC payloads after ACTIVE; no pre-ACTIVE round types or principal mutation without a capability RFC |
-| Resume/close/session establishment and dedicated session errors | [Sessions `SNTR-SESS-001…008`](../specifications/core/sessions.md), `SNTR-HS-006/013`, `SNTR-ASEC-007…010`, `SNTR-RPL-011` | No separate session handshake/control contract; transport close and connection-bound lifetime only; carriers/security/bounds need B1/B7 |
-| Subscription/replay request/response, cursor, ack, stream-state records | [Events `SNTR-EVENT-002…010`](../specifications/core/events.md), [reliability `SNTR-REL-004/005/010`](../specifications/core/reliability.md), `SNTR-WIRE-008` | Application-owned RPCs/opaque payloads; no core identity, durable replay or acknowledgment promise; retired Frame tags/names stay reserved |
-| Capability/parameter/limit records | [Capabilities `SNTR-CAP-001…005/020/021`](../specifications/core/capabilities.md), [core open questions 1/3](../specifications/core/open-questions.md#blockers-for-stable-v1) | No approved binding, confirmation behavior or collection/length bounds; examples are not allocations (B7) |
-| Logical operation ID/idempotency fields | [RPC `SNTR-RPC-007/010`](../specifications/core/rpc.md), `SNTR-REL-004/010`, [replay `SNTR-RPL-013`](../specifications/security/replay-protection.md) | Operation keys belong inside opaque application payloads; correlation is not deduplication |
-| New error names/numbers or extra failure messages | [Errors `SNTR-ERR-001…005/020`](../specifications/core/errors.md), `SNTR-VER-003`, `SNTR-OPQ-020` | Existing registry is 0–16; category mapping adds no allocation; new carriers/semantics need approved behavior and registry review, not schema invention |
+| Auth challenge/response rounds or mechanism records | [Authentication `SNTR-AUTH-001…004/007/010`](../specifications/connection.md), [security `SNTR-ASEC-002/003/004`](../specifications/security.md) | Follow-ups are application RPC payloads after ACTIVE; no pre-ACTIVE round types or principal mutation without a capability RFC |
+| Resume/close/session establishment and dedicated session errors | [Sessions `SNTR-SESS-001…008`](../specifications/connection.md), `SNTR-HS-006/013`, `SNTR-ASEC-007…010`, `SNTR-RPL-011` | No separate session handshake/control contract; transport close and connection-bound lifetime only; carriers/security/bounds need B1/B7 |
+| Subscription/replay request/response, cursor, ack, stream-state records | [Events `SNTR-EVENT-002…010`](../specifications/recovery.md), [reliability `SNTR-REL-004/005/010`](../specifications/rpc.md), `SNTR-WIRE-008` | Application-owned RPCs/opaque payloads; no core identity, durable replay or acknowledgment promise; retired Frame tags/names stay reserved |
+| Capability/parameter/limit records | [Capabilities `SNTR-CAP-001…005/020/021`](../specifications/rpc.md), [core open questions 1/3](../SESSION-OPEN-QUESTIONS.md) | No approved binding, confirmation behavior or collection/length bounds; examples are not allocations (B7) |
+| Logical operation ID/idempotency fields | [RPC `SNTR-RPC-007/010`](../specifications/rpc.md), `SNTR-REL-004/010`, [replay `SNTR-RPL-013`](../specifications/security.md) | Operation keys belong inside opaque application payloads; correlation is not deduplication |
+| New error names/numbers or extra failure messages | [Errors `SNTR-ERR-001…005/020`](../specifications/rpc.md), `SNTR-VER-003`, `SNTR-OPQ-020` | Existing registry is 0–16; category mapping adds no allocation; new carriers/semantics need approved behavior and registry review, not schema invention |
 
 ## Appendix: References
 
-- [Schema reference](../specifications/schema/reference.md); historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto) and [error.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/error.proto).
-- [Architecture](../specifications/architecture.md), [RFC process](README.md), [governance](../GOVERNANCE.md), [ADR-002](../specifications/decisions/ADR-002-protobuf-idl.md), [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md).
-- [Core requirement index](../specifications/core/requirements.md), [core conformance draft](../specifications/core/conformance.md), [security test-plan draft](../specifications/security/test-plan.md). These drafts are pending approval; citations identify proposed normative owners, not acceptance.
+- [Schema reference](../docs/schema-tooling.md); historical [session.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/session.proto) and [error.proto](https://github.com/tinklehq/syntra/blob/92e5f281aa7c3adac9ba78588c1140b12d55c1d9/schema/syntra/v1/error.proto).
+- [Architecture](../specifications/wire-format.md#general-model), [RFC process](README.md), [governance](../GOVERNANCE.md), [ADR-002](../specifications/decisions/ADR-002-protobuf-idl.md), [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md).
+- [Core requirement index](../conformance/README.md), [core conformance draft](../conformance/README.md), [security test-plan draft](../conformance/README.md). These drafts are pending approval; citations identify proposed normative owners, not acceptance.
 - [Proto3 language guide](https://protobuf.dev/programming-guides/proto3/), [field presence](https://protobuf.dev/programming-guides/field_presence/), [wire encoding](https://protobuf.dev/programming-guides/encoding/), [Buf lint rules](https://buf.build/docs/lint/rules/), [Buf breaking categories](https://buf.build/docs/breaking/rules/).
-- [Buf configuration](../buf.yaml): v2, module `proto`, lint `STANDARD`, breaking `FILE`; [generation configuration](../specifications/schema/generation.md#pinned-generators-and-toolchains): Go plugin v1.36.6 revision 1, community Prost plugin v0.4.0 revision 1 (local `buf.gen.yaml` removed; smoke tests generate into ignored `.tmp/` only). [Pinned tools](../specifications/schema/generation.md), [baseline provenance and historical archive](../compatibility/v1-initial/README.md), and [original results plus pending post-deletion validation](../specifications/schema/validation.md) are recorded separately from remaining behavioral approval.
+- [Buf configuration](../buf.yaml): v2, module `proto`, lint `STANDARD`, breaking `FILE`; [generation configuration and pinned tools](../docs/schema-tooling.md), [baseline provenance](../compatibility/v1-initial/README.md), and [schema regression tests](../tests/schema/test_schema.py). These define reproducible checks, not behavioral approval.

@@ -16,6 +16,8 @@ as `path[:line]: message` so CI logs point at the defect.
 
 import base64
 import binascii
+import importlib.util
+import json
 import re
 import shutil
 import subprocess
@@ -29,14 +31,19 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = []
+_OWNER_SPEC = importlib.util.spec_from_file_location(
+    "conformance_owners", Path(__file__).with_name("sync-conformance-owners.py"))
+assert _OWNER_SPEC is not None and _OWNER_SPEC.loader is not None
+OWNERS = importlib.util.module_from_spec(_OWNER_SPEC)
+_OWNER_SPEC.loader.exec_module(OWNERS)
 
-REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+\b|\bSYN-ARCH-\d+\b|\bSYN-URP-\d+\b")
+REQ_PATTERN = re.compile(r"\bSNTR-[A-Z]+-\d+[A-Z]*\b|\bSYN-ARCH-\d+\b|\bSYN-URP-\d+\b")
 # Naming pattern for structured references (manifest rows, defined IDs).
 # Prose mentions keep the freeform REQ_PATTERN below. Reserved SYN-URP-008/009
 # are excluded from structured naming and rejected explicitly by the checks.
-REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+"
+REQ_NAMING = re.compile(r"^(SNTR-[A-Z]+-\d+[A-Z]*|SYN-ARCH-\d+"
                        r"|SYN-URP-(?:[1-9][0-9]{2,}|0(?:0[1-7]|[1-9][0-9])))$")
-BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+|SYN-ARCH-\d+|SYN-URP-\d+)\b")
+BOLD_DEF = re.compile(r"\*\*(SNTR-[A-Z]+-\d+[A-Z]*|SYN-ARCH-\d+|SYN-URP-\d+)\b")
 # Reserved recovery IDs (RFC 0006): SYN-URP-008/009 stay unassigned and are
 # intentionally NOT registered in requirements.yaml, but the conversation and
 # schema text may mention them as reserved.
@@ -63,14 +70,19 @@ def is_content_path(path):
     return True
 
 
-PROFILE_PATTERN = re.compile(r"\bSNTR-[A-Z0-9]+(?:-[A-Z0-9]+)*-V1\b")
-KNOWN_PROFILES = {
-    "SNTR-CORE-V1", "SNTR-SESS-V1", "SNTR-RPC-V1", "SNTR-EVENTS-V1",
-    "SNTR-TCP-V1", "SNTR-TLS-TCP-V1", "SNTR-HTTP-V1", "SNTR-HTTPS-H1-V1",
-    "SNTR-HTTPS-H2-V1", "SNTR-WS-V1", "SNTR-WSS-H1-V1",
-    "SNTR-SC1-WSS-V1",
+PROFILE_PATTERN = re.compile(r"\bSNTR-[A-Z0-9]+(?:-[A-Z0-9]+)*-V1\b|\bSYNTRA-1\.0-[A-Z]+\b")
+PROFILE_KINDS = {
+    "SNTR-CORE-V1": "MANDATORY_CORE",
+    "SNTR-SESS-V1": "MANDATORY_CORE",
+    "SNTR-RPC-V1": "MANDATORY_CORE",
+    "SNTR-EVENTS-V1": "OPTIONAL_CAPABILITY",
+    "SYNTRA-1.0-TCP": "TRANSPORT_PROFILE",
+    "SYNTRA-1.0-WS": "TRANSPORT_PROFILE",
+    "SYNTRA-1.0-WSS": "TRANSPORT_PROFILE",
 }
-KNOWN_CAPABILITIES = {"events-v1", "events-replay-v1", "resume-v1", "syntra.update-recovery/1", "syntra.reliable-session/1"}
+KNOWN_PROFILES = set(PROFILE_KINDS)
+CASE_ID = re.compile(r"^CONF-[A-Z]+-[0-9]+$")
+KNOWN_CAPABILITIES = {"syntra.update-recovery/1"}
 KNOWN_AUTOMATION = {"automated", "partially_automated", "manual", "not_testable"}
 KNOWN_ROLES = {"client", "server"}
 KNOWN_CONN_STATES = {"CONNECTED", "NEGOTIATING", "AUTHENTICATING", "ACTIVE", "CLOSING", "CLOSED"}
@@ -183,7 +195,13 @@ def load_manifest_cases():
         if not isinstance(data, dict):
             err(mf, "manifest file must be a map")
             continue
-        entries = data.get("cases", [])
+        entries = data.get("cases")
+        profiles = data.get("profile")
+        profiles = profiles if isinstance(profiles, list) else [profiles]
+        if not profiles or any(not _is_allowed_string(p, KNOWN_PROFILES) for p in profiles):
+            err(mf, f"manifest references unknown profile {data.get('profile')!r}")
+        if "selection_status" in data:
+            err(mf, "selection_status is not part of the current manifest format")
         if not isinstance(entries, list):
             err(mf, "cases must be a list of case maps")
             continue
@@ -205,8 +223,20 @@ def load_manifest_cases():
 
 
 def load_requirements():
-    data = yaml.safe_load((ROOT / "conformance" / "manifest" / "requirements.yaml").read_text())
-    return data.get("requirements", [])
+    path = ROOT / "conformance/manifest/requirements.yaml"
+    data = yaml.safe_load(path.read_text())
+    if not isinstance(data, dict) or not isinstance(data.get("requirements"), list):
+        err(path, "requirements file must contain a requirements list")
+        return []
+    rows = []
+    for row in data["requirements"]:
+        if not isinstance(row, dict):
+            err(path, "requirement entry must be a map")
+        elif not isinstance(row.get("requirement_id"), str):
+            err(path, "requirement entry must have a string requirement_id")
+        else:
+            rows.append(row)
+    return rows
 
 
 # --------------------------------------------------------------------------
@@ -214,14 +244,11 @@ def load_requirements():
 # --------------------------------------------------------------------------
 
 def check_requirements():
-    spec_files = sorted((ROOT / "specifications").rglob("*.md"))
     defined = {}  # id -> [(file, line)]
-    for f in spec_files:
-        if not is_content_path(f.relative_to(ROOT)):
-            continue
-        for i, line in enumerate(f.read_text().splitlines(), 1):
-            for m in BOLD_DEF.finditer(line):
-                defined.setdefault(m.group(1), []).append((f.relative_to(ROOT), i))
+    sections = {}
+    for rid, definitions in OWNERS.owner_definitions(ROOT).items():
+        defined[rid] = [(path, line) for path, line, _ in definitions]
+        sections[rid] = {heading for _, _, heading in definitions}
     for rid, locs in sorted(defined.items()):
         if not REQ_NAMING.match(rid):
             err(locs[0][0], f"requirement ID violates naming convention: {rid}", locs[0][1])
@@ -234,6 +261,9 @@ def check_requirements():
     seen_ids = set()
     for r in reqs:
         rid = r.get("requirement_id")
+        if not isinstance(rid, str):
+            err("conformance/manifest/requirements.yaml", f"bad requirement_id format: {rid!r}")
+            continue
         if rid in seen_ids:
             err("conformance/manifest/requirements.yaml", f"duplicate requirement_id {rid}")
         seen_ids.add(rid)
@@ -244,18 +274,42 @@ def check_requirements():
                 f"requirement_id {rid} is reserved and MUST NOT be registered")
         if rid not in defined:
             err("conformance/manifest/requirements.yaml",
-                f"requirement_id {rid} has no bold definition in specifications/")
+                f"requirement_id {rid} has no bold definition in a current owner")
         spec = r.get("specification")
-        if spec and not (ROOT / spec).exists():
+        if not isinstance(spec, str) or not spec:
+            err("conformance/manifest/requirements.yaml",
+                f"requirement_id {rid} needs a current owner path")
+        elif not (ROOT / spec).is_file():
             err("conformance/manifest/requirements.yaml",
                 f"requirement_id {rid} references missing document {spec}")
-        if r.get("automation_status") not in KNOWN_AUTOMATION:
+        elif spec and rid in defined and not any(str(p) == spec for p, _ in defined[rid]):
+            err("conformance/manifest/requirements.yaml",
+                f"requirement_id {rid} is not defined by its declared owner {spec}")
+        section = r.get("section")
+        if rid in sections and (not isinstance(section, str) or section not in sections[rid]):
+            err("conformance/manifest/requirements.yaml",
+                f"requirement_id {rid} has stale section {r.get('section')!r}")
+        if not _is_allowed_string(r.get("automation_status"), KNOWN_AUTOMATION):
             err("conformance/manifest/requirements.yaml",
                 f"requirement_id {rid} has invalid automation_status {r.get('automation_status')}")
-        for t in r.get("test_ids", []) or []:
-            if t not in cases:
+        tests = r.get("test_ids")
+        if not isinstance(tests, list):
+            err("conformance/manifest/requirements.yaml", f"requirement_id {rid} test_ids must be a list")
+            continue
+        if not tests:
+            if not _is_allowed_string(r.get("automation_status"), {"manual", "not_testable"}):
+                err("conformance/manifest/requirements.yaml", f"requirement_id {rid} without tests needs a manual/not_testable disposition")
+            if not isinstance(r.get("notes"), str) or not r["notes"].strip():
+                err("conformance/manifest/requirements.yaml", f"requirement_id {rid} without tests needs explanatory notes")
+        for t in tests:
+            if not isinstance(t, str) or not CASE_ID.fullmatch(t):
+                err("conformance/manifest/requirements.yaml", f"requirement_id {rid} has invalid test ID {t!r}")
+            elif t not in cases:
                 err("conformance/manifest/requirements.yaml",
                     f"requirement_id {rid} references unknown test {t}")
+            elif not isinstance(cases[t][1].get("requirement"), list) or rid not in cases[t][1]["requirement"]:
+                err("conformance/manifest/requirements.yaml",
+                    f"requirement_id {rid} references test {t} without a reciprocal requirement ref")
     # every defined spec ID should appear in requirements.yaml (no silent gaps)
     for rid in sorted(defined):
         if rid not in seen_ids:
@@ -268,10 +322,10 @@ def check_requirements():
 # Check: manifests
 # --------------------------------------------------------------------------
 
-# Documented two-observer expectation vocabulary (conformance/manifest/
-# README.md "Two-observer handshake-failure vocabulary"): detecting-side
+# Two-observer expectations follow specifications/connection.md and the
+# manifest schema: detecting-side
 # error discriminators and transport-native peer-observation entries.
-TRANSPORT_FAMILIES = {"tcp_tls", "ws_wss", "http_1_1", "https_h2"}
+TRANSPORT_FAMILIES = {"tcp_tls", "ws_wss"}
 PEER_SIGNALS = {"transport_close", "ws_close", "http_status", "connection_loss"}
 WS_CLOSE_CODES = {1000, 1001, 1002, 1003, 1007, 1008, 1009, 1011}
 GENERIC_LOCAL_REPORTS = {"generic_protocol_rejection", "generic_policy_rejection"}
@@ -343,8 +397,8 @@ def check_transport_expectation(mf, cid, tmap, error_codes):
                 f"{renv}")
 
 
-# Keys allowed inside an `expected.frames` entry (conformance/manifest/
-# README.md "expected.frames entries"): the emitted Syntra Frame's own
+# Keys allowed inside an `expected.frames` entry (conformance/README.md
+# and conformance/manifest/schema.yaml): the emitted Syntra Frame's own
 # fields plus the documented assertion helpers. Fixture metadata such as
 # `credentials` is not a Frame field and is rejected here.
 EXPECTED_FRAME_KEYS = {"request_id", "body", "payload_b64", "shape",
@@ -369,7 +423,7 @@ def check_expected_frames(mf, cid, label, frames):
             err(mf, f"case {cid} {label} frames[{i}] has unknown keys "
                     f"{sorted(map(str, unknown))}; expected.frames entries "
                     "carry only emitted-Frame keys plus documented assertion "
-                    "helpers (conformance/manifest/README.md "
+                    "helpers (conformance/README.md "
                     "\"expected.frames entries\")")
 
 
@@ -404,6 +458,8 @@ def check_manifests():
     reqs = load_requirements()
     req_ids = {r.get("requirement_id") for r in reqs}
     for cid, (mf, case) in sorted(cases.items()):
+        if not CASE_ID.fullmatch(cid):
+            err(mf, f"case {cid} has invalid case ID")
         for key in ("id", "requirement", "profile", "roles", "capabilities",
                     "mandatory", "preconditions", "input", "expected"):
             if key not in case:
@@ -418,8 +474,8 @@ def check_manifests():
         # present-but-null or otherwise non-list `requirement` is rejected
         # here so the null value cannot slip through the isinstance-only
         # skip.
-        if "requirement" in case and not isinstance(req_field, list):
-            err(mf, f"case {cid} requirement must be a list of requirement IDs")
+        if "requirement" in case and (not isinstance(req_field, list) or not req_field):
+            err(mf, f"case {cid} requirement must be a non-empty list of requirement IDs")
         for r in req_field if isinstance(req_field, list) else []:
             if not isinstance(r, str):
                 err(mf, f"case {cid} has malformed requirement ref {r!r}")
@@ -453,7 +509,13 @@ def check_manifests():
                     _is_allowed_string(t, TRANSPORT_FAMILIES) for t in at):
                 err(mf, f"case {cid} applicable_transports must be a non-empty "
                         f"list of known transport families "
-                        f"{sorted(TRANSPORT_FAMILIES)}")
+                         f"{sorted(TRANSPORT_FAMILIES)}")
+        if "applicable_profiles" in case:
+            ap = case["applicable_profiles"]
+            allowed = {"SYNTRA-1.0-TCP", "SYNTRA-1.0-WS", "SYNTRA-1.0-WSS"}
+            if not isinstance(ap, list) or not ap or any(
+                    not _is_allowed_string(p, allowed) for p in ap):
+                err(mf, f"case {cid} applicable_profiles must name canonical bindings")
         pre = case.get("preconditions")
         if not isinstance(pre, list) or not pre:
             err(mf, f"case {cid} needs a non-empty preconditions list")
@@ -586,6 +648,137 @@ def check_manifests():
         if not isinstance(r, str) or not REQ_NAMING.match(r):
             err(mf, f"case {cid} has malformed requirement ref {r}")
     print(f"manifests: {len(cases)} cases, {len(req_refs)} requirement refs")
+
+
+def manifest_reference(ref, base, registered_profiles):
+    """Validate a selector/reference before it can exclude any cases."""
+    if isinstance(ref, str):
+        path, filters = ref, {}
+    elif isinstance(ref, dict) and set(ref) == {"path", "select"}:
+        path, filters = ref["path"], ref["select"]
+    else:
+        raise ValueError("manifest reference must be a path string or a map with exactly path and select")
+    if not isinstance(path, str) or not path.strip() or "\\" in path or ":" in path:
+        raise ValueError("manifest path must be a non-empty relative path")
+    relative = Path(path)
+    if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+        raise ValueError("manifest path must stay within the conformance directory")
+    resolved = (base / relative).resolve()
+    if not resolved.is_relative_to(base.resolve()):
+        raise ValueError("manifest path must stay within the conformance directory")
+    if not isinstance(filters, dict) or set(filters) - {"mandatory", "capabilities", "profile"}:
+        raise ValueError("manifest select must be a map containing only mandatory, capabilities and profile")
+    if "mandatory" in filters and type(filters["mandatory"]) is not bool:
+        raise ValueError("manifest select.mandatory must be boolean")
+    if "capabilities" in filters:
+        caps = filters["capabilities"]
+        if not isinstance(caps, list) or any(not _is_allowed_string(c, KNOWN_CAPABILITIES) for c in caps):
+            raise ValueError("manifest select.capabilities must be a list of known capabilities")
+    if "profile" in filters:
+        pid = filters["profile"]
+        if not _is_allowed_string(pid, KNOWN_PROFILES) or pid not in registered_profiles:
+            raise ValueError("manifest select.profile must name a known registered profile")
+    return resolved, filters
+
+
+def selected_cases(profile, base=None, capabilities=(), carrier_profile=None,
+                   registered_profiles=None):
+    """Resolve selectors and declared gates; never execute or infer a verdict."""
+    base = Path(base) if base is not None else ROOT / "conformance"
+    registered_profiles = KNOWN_PROFILES if registered_profiles is None else registered_profiles
+    refs = profile.get("manifests")
+    if not isinstance(refs, list) or not refs:
+        raise ValueError(f"{profile['id']} manifests must be a non-empty list")
+    references = [manifest_reference(ref, base, registered_profiles) for ref in refs]
+    selected = {}
+    for path, filters in references:
+        data = yaml.safe_load(path.read_text())
+        if not isinstance(data, dict):
+            raise ValueError(f"manifest {path} must be a map")
+        if "selection_status" in data:
+            raise ValueError(f"{profile['id']} selects a non-current manifest {path}")
+        if not isinstance(data.get("cases"), list):
+            raise ValueError(f"manifest {path} cases must be a list")
+        for case in data["cases"]:
+            if not isinstance(case, dict):
+                raise ValueError(f"manifest {path} case must be a map")
+            if not set(case["capabilities"]) <= set(capabilities):
+                continue
+            if carrier_profile and "applicable_profiles" in case \
+                    and carrier_profile not in case["applicable_profiles"]:
+                continue
+            matches = True
+            for key, value in filters.items():
+                actual = case.get(key)
+                if key == "profile" and isinstance(actual, list):
+                    matches &= value in actual
+                else:
+                    matches &= actual == value
+            if matches:
+                selected[case["id"]] = case
+    return selected
+
+
+def check_profiles():
+    base = ROOT / "conformance"
+    try:
+        registry = yaml.safe_load((base / "profiles.yaml").read_text())
+    except (OSError, yaml.YAMLError) as exc:
+        err("conformance/profiles.yaml", f"cannot load profile registry: {exc}")
+        return
+    if not isinstance(registry, dict) or not isinstance(registry.get("profiles"), list):
+        err("conformance/profiles.yaml", "profile registry must contain a profiles list")
+        return
+    ids = set()
+    profiles = []
+    for profile in registry["profiles"]:
+        if not isinstance(profile, dict) or not isinstance(profile.get("id"), str):
+            err("conformance/profiles.yaml", "profile registration must be a map with a string id")
+            continue
+        pid = profile["id"]
+        if pid in ids or pid not in KNOWN_PROFILES:
+            err("conformance/profiles.yaml", f"duplicate or noncanonical profile {pid}")
+            continue
+        ids.add(pid)
+        profiles.append(profile)
+        if profile.get("kind") != PROFILE_KINDS[pid]:
+            err("conformance/profiles.yaml", f"incorrect kind for {pid}: expected {PROFILE_KINDS[pid]}")
+    missing = KNOWN_PROFILES - ids
+    if missing:
+        err("conformance/profiles.yaml", f"missing required profiles: {', '.join(sorted(missing))}")
+    canonical = {"SYNTRA-1.0-TCP": (1, True), "SYNTRA-1.0-WS": (2, False),
+                 "SYNTRA-1.0-WSS": (3, True)}
+    for profile in profiles:
+        pid = profile["id"]
+        caps = profile.get("capabilities", [])
+        if not isinstance(caps, list) or any(not _is_allowed_string(c, KNOWN_CAPABILITIES) for c in caps):
+            err("conformance/profiles.yaml", f"{pid} has undeclared capability prerequisites")
+            continue
+        try:
+            cases = selected_cases(profile, capabilities=caps, registered_profiles=ids)
+        except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
+            err("conformance/profiles.yaml", f"{pid}: {exc}")
+            continue
+        if not cases:
+            err("conformance/profiles.yaml", f"{pid} selects no cases")
+        for case in cases.values():
+            declared = case["profile"]
+            declared = declared if isinstance(declared, list) else [declared]
+            if PROFILE_KINDS[pid] == "TRANSPORT_PROFILE" and pid not in declared:
+                err("conformance/profiles.yaml", f"{pid} selects incompatible {case['id']}")
+        if PROFILE_KINDS[pid] == "TRANSPORT_PROFILE":
+            if pid not in canonical:
+                err("conformance/profiles.yaml", f"undefined 1.0 binding {pid}")
+                continue
+            carrier, production = canonical[pid]
+            if profile.get("carrier") != carrier or profile.get("production_allowed") is not production:
+                err("conformance/profiles.yaml", f"incorrect carrier/production policy for {pid}")
+            if profile.get("domain") != "syntra.1.0":
+                err("conformance/profiles.yaml", f"incorrect context domain for {pid}")
+            if carrier in (2, 3) and (profile.get("endpoint"), profile.get("subprotocol")) != (
+                    "/syntra/1.0/ws", "syntra.1.0"):
+                err("conformance/profiles.yaml", f"incorrect WS selection for {pid}")
+    print(f"profiles: {len(ids)} current test suite selectors")
 
 
 # --------------------------------------------------------------------------
@@ -739,7 +932,7 @@ def check_vectors():
     bytevec = yaml.safe_load((tv / "tcp" / "byte-vectors.yaml").read_text())
     max_frame = bytevec.get("default_max_frame_bytes", 1048576)
     json_vecs = {v["id"]: v for v in
-                 __import__("json").loads((tv / "tcp" / "vectors.json").read_text())["vectors"]}
+                 json.loads((tv / "tcp" / "vectors.json").read_text())["vectors"]}
     for unit in bytevec.get("units", []):
         uid = unit.get("id")
         wire = unit.get("wire_hex")
@@ -789,126 +982,94 @@ def check_vectors():
                 err("conformance/test-vectors/tcp/byte-vectors.yaml",
                     f"unit {uid} prefix declares {declared} but carries {len(payload)}")
 
-    http_fix = yaml.safe_load((tv / "http" / "fixtures.yaml").read_text())
-    frames = {f["id"]: f for f in http_fix.get("fixtures", [])}
-    for fid, f in frames.items():
-        try:
-            raw = base64.b64decode(f["frame_b64"], validate=True)
-        except (binascii.Error, ValueError):
-            err("conformance/test-vectors/http/fixtures.yaml",
-                f"fixture {fid} frame_b64 does not parse")
-            continue
-        if f.get("frame_length_bytes") != len(raw):
-            err("conformance/test-vectors/http/fixtures.yaml",
-                f"fixture {fid} frame_length_bytes != actual {len(raw)}")
-        try:
-            field_map(raw)
-        except ValueError as e:
-            err("conformance/test-vectors/http/fixtures.yaml",
-                f"fixture {fid} does not protobuf-decode: {e}")
-    for ex in http_fix.get("exchanges", []):
-        for m in re.finditer(r"Content-Length:\s*(\d+)", ex.get("request", "") + ex.get("response", "")):
-            pass  # lengths are asserted against fixtures below
-        for ref in re.finditer(r"body is (\d+) raw", ex.get("request", "")):
-            pass
-        # cross-check: exchanges that name a body_ref-equivalent length
-        req, resp = ex.get("request", ""), ex.get("response", "")
-        for text, label in ((req, "request"), (resp, "response")):
-            m = re.search(r"Content-Length:\s*(\d+)", text)
-            if m:
-                declared = int(m.group(1))
-                # find which fixture this exchange carries by matching known lengths
-                known = sorted({f.get("frame_length_bytes") for f in frames.values()})
-                if declared not in known and "1048577" not in text and declared != 0:
-                    # 1048577 = MAX+1 oversize fixture; 0 = empty error bodies
-                    err("conformance/test-vectors/http/fixtures.yaml",
-                        f"exchange {ex.get('id')} {label} Content-Length {declared} "
-                        f"matches no fixture length {known}")
-
-    ws_fix = yaml.safe_load((tv / "websocket" / "fixtures.yaml").read_text())
-    kinds = {"upgrade_request": ["GET ", "Sec-WebSocket-Key"],
-             "upgrade_response": ["101", "Sec-WebSocket-Accept"],
-             "binary_message": ["0x82", "protobuf(Frame)"],
-             "fragmented_message": ["0x02", "FIN=1"],
-             "ping_pong": ["0x89", "0x8A"],
-             "close_handshake": ["0x88", "Close"],
-             # close_codes mapping must enumerate every normative WS close
-             # code; 1000 (normal) lives on the close_handshake fixture.
-             "close_codes": ["1001", "1002", "1003", "1007", "1008",
-                             "1009", "1011"],
-             "oversize_boundary": ["1048576", "1048577"],
-             "no_length_prefix_negative_proof": ["protobuf(Frame)"]}
-    for fx in ws_fix.get("fixtures", []):
-        kind = fx.get("kind")
-        if kind not in kinds:
-            err("conformance/test-vectors/websocket/fixtures.yaml",
-                f"fixture {fx.get('id')} has unknown kind {kind}")
-            continue
-        blob = (fx.get("text", "") or "") + (fx.get("shape", "") or "") + \
-               (fx.get("rule", "") or "") + (fx.get("good", "") or "")
-        for needle in kinds[kind]:
-            if needle not in blob and needle not in str(fx.get("mapping", "")) \
-                    and needle not in str(fx.get("bad", "")):
-                err("conformance/test-vectors/websocket/fixtures.yaml",
-                    f"fixture {fx.get('id')} kind {kind} missing marker {needle!r}")
-    # SC1 v1 context/prologue fixtures: public encoding only, no keys/ciphertext.
-    sc1_path = tv / "sc1" / "context-vectors.yaml"
-    if sc1_path.exists():
-        sc1 = yaml.safe_load(sc1_path.read_text())
+    # Syntra 1.0 connection context/prologue: public encoding, no keys/ciphertext.
+    context_path = tv / "connection" / "context-vectors.yaml"
+    if context_path.exists():
+        context_fixture = yaml.safe_load(context_path.read_text())
         seen = set()
-        for v in sc1.get("vectors", []):
+        for v in context_fixture.get("vectors", []):
             vid = v.get("id")
             if not vid or vid in seen:
-                err(sc1_path, f"SC1 vector has missing/duplicate id {vid}")
+                err(context_path, f"connection vector has missing/duplicate id {vid}")
                 continue
             seen.add(vid)
             try:
                 ctx = binascii.unhexlify(v["context_hex"])
                 pro = binascii.unhexlify(v["prologue_hex"])
             except (binascii.Error, ValueError, KeyError):
-                err(sc1_path, f"vector {vid} has invalid hex")
+                err(context_path, f"vector {vid} has invalid hex")
                 continue
             if pro != ctx:
-                err(sc1_path, f"vector {vid} prologue differs from context")
-            if len(ctx) < 37:
-                err(sc1_path, f"vector {vid} shorter than the 37-byte fixed context")
+                err(context_path, f"vector {vid} prologue differs from context")
+            if len(ctx) < 34:
+                err(context_path, f"vector {vid} shorter than the 34-byte fixed context")
                 continue
-            scope_len = int.from_bytes(ctx[35:37], "big")
+            scope_len = int.from_bytes(ctx[32:34], "big")
             if not (1 <= scope_len <= 255):
-                err(sc1_path, f"vector {vid} scope length {scope_len} out of range")
-            if len(ctx) != 37 + scope_len:
-                err(sc1_path, f"vector {vid} length {len(ctx)} != 37 + scope length {scope_len}")
+                err(context_path, f"vector {vid} scope length {scope_len} out of range")
+            if len(ctx) != 34 + scope_len:
+                err(context_path, f"vector {vid} length {len(ctx)} != 34 + scope length {scope_len}")
             if v.get("context_bytes") != len(ctx):
-                err(sc1_path, f"vector {vid} context_bytes {v.get('context_bytes')} != {len(ctx)}")
+                err(context_path, f"vector {vid} context_bytes {v.get('context_bytes')} != {len(ctx)}")
             if v.get("m1_bytes") != len(ctx) + 48:
-                err(sc1_path, f"vector {vid} m1_bytes {v.get('m1_bytes')} != context + 48")
-            if ctx[:13] != b"syntra.sc1.v1":
-                err(sc1_path, f"vector {vid} domain is not syntra.sc1.v1")
-            if ctx[13] != v.get("mode") or ctx[14] != v.get("carrier"):
-                err(sc1_path, f"vector {vid} mode/carrier mismatch")
-            if ctx[13] not in (1, 2):
-                err(sc1_path, f"vector {vid} mode {ctx[13]} outside bootstrap 1/returning 2")
-            if ctx[14] not in (1, 2, 3):
-                err(sc1_path, f"vector {vid} carrier {ctx[14]} outside TCP 1/WS 2/WSS 3")
-            if int.from_bytes(ctx[15:19], "big") != v.get("server_key_id"):
-                err(sc1_path, f"vector {vid} server_key_id mismatch")
-            if int.from_bytes(ctx[19:27], "big") != v.get("epoch"):
-                err(sc1_path, f"vector {vid} epoch mismatch")
-            if ctx[27:35].hex() != v.get("handle_hex", "").lower():
-                err(sc1_path, f"vector {vid} handle mismatch")
+                err(context_path, f"vector {vid} m1_bytes {v.get('m1_bytes')} != context + 48")
+            if ctx[:10] != b"syntra.1.0":
+                err(context_path, f"vector {vid} domain is not syntra.1.0")
+            if ctx[10] != v.get("mode") or ctx[11] != v.get("carrier"):
+                err(context_path, f"vector {vid} mode/carrier mismatch")
+            if ctx[10] not in (1, 2):
+                err(context_path, f"vector {vid} mode {ctx[10]} outside bootstrap 1/returning 2")
+            if ctx[11] not in (1, 2, 3):
+                err(context_path, f"vector {vid} carrier {ctx[11]} outside TCP 1/WS 2/WSS 3")
+            if int.from_bytes(ctx[12:16], "big") != v.get("server_key_id"):
+                err(context_path, f"vector {vid} server_key_id mismatch")
+            if int.from_bytes(ctx[16:24], "big") != v.get("epoch"):
+                err(context_path, f"vector {vid} epoch mismatch")
+            if ctx[24:32].hex() != v.get("handle_hex", "").lower():
+                err(context_path, f"vector {vid} handle mismatch")
             try:
-                scope = ctx[37:37 + scope_len].decode("utf-8")
+                scope = ctx[34:34 + scope_len].decode("utf-8")
             except UnicodeDecodeError:
-                err(sc1_path, f"vector {vid} scope is not UTF-8")
+                err(context_path, f"vector {vid} scope is not UTF-8")
                 continue
             if scope != v.get("scope"):
-                err(sc1_path, f"vector {vid} scope mismatch")
-        for rec in sc1.get("negative_recipes", []):
+                err(context_path, f"vector {vid} scope mismatch")
+        for rec in context_fixture.get("negative_recipes", []):
             if rec.get("base") not in seen:
-                err(sc1_path, f"negative recipe {rec.get('id')} references unknown base")
+                err(context_path, f"negative recipe {rec.get('id')} references unknown base")
             if rec.get("expected") != "reject-before-noise":
-                err(sc1_path, f"negative recipe {rec.get('id')} has unexpected expectation")
-    print("vectors: protobuf/TCP/HTTP/WS/SC1 fixtures checked")
+                err(context_path, f"negative recipe {rec.get('id')} has unexpected expectation")
+    recovery = yaml.safe_load((ROOT / "conformance/manifest/recovery.yaml").read_text())
+    for case in recovery["cases"]:
+        if case["id"] in {"CONF-URP-011", "CONF-URP-012"}:
+            for frame in case["expected"].get("frames", []):
+                if frame["body"] == "notification":
+                    try:
+                        check_replay_complete_fixture(base64.b64decode(frame["payload_b64"], validate=True))
+                    except (ValueError, binascii.Error) as exc:
+                        err("conformance/manifest/recovery.yaml", f"{case['id']}: {exc}")
+    print("vectors: protobuf/inner-stream/public-context/recovery-wrapper fixtures checked (no runtime verdict)")
+
+
+def check_replay_complete_fixture(raw):
+    """Strict fixture-shape check derived from the current IDL, not a decoder fallback."""
+    messages, _ = parse_proto_model()
+    wrapper = messages["RecoveryNotification"]
+    completion = messages["RecoveryReplayComplete"]
+    fields = field_map(raw)
+    version = wrapper["profile_version"]
+    arm = wrapper["replay_complete"]
+    if set(fields) != {version, arm} or fields[version] != [(0, 1)] \
+            or len(fields[arm]) != 1 or fields[arm][0][0] != 2:
+        raise ValueError("expected versioned RecoveryNotification.replay_complete wrapper")
+    inner = field_map(fields[arm][0][1])
+    expected = {completion["profile_version"]: [(0, 1)],
+                completion["subscription_handle"]: [(2, b"handle-A")],
+                completion["generation"]: [(0, 7)],
+                completion["live_boundary_checkpoint"]: [(2, b"B")]}
+    if inner != expected:
+        raise ValueError("completion must preserve version 1, handle-A, generation 7 and boundary B")
+    return fields[arm][0][1]
 
 
 # --------------------------------------------------------------------------
@@ -936,10 +1097,16 @@ def collect_headers(md_path):
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 
 
-# Requirement/profile reference existence is enforced for normative and user
-# documentation. audits/ and rfcs/ deliberately discuss proposed, placeholder,
-# or conflicting identifiers, so they get naming-convention checks only.
-REF_EXISTENCE_SCOPE = ("specifications/", "conformance/", "docs/")
+def is_current_reference_path(path):
+    """Current docs, manifests and IDL use current IDs; process records do not.
+
+    Link targets/anchors in all content still resolve. Historical RFCs, ADRs,
+    decision records and audits may discuss the vocabulary of their own time.
+    """
+    path = Path(path).as_posix()
+    if path.startswith(("specifications/decisions/", "docs/decisions/")):
+        return False
+    return path.startswith(("specifications/", "conformance/", "docs/", "proto/"))
 
 
 def check_links():
@@ -982,31 +1149,31 @@ def check_links():
                             str(dest_rel), collect_headers(dest)):
                         err(rel, f"anchor #{anchor} not found in {dest_rel}", i)
     # requirement + profile references must resolve
-    defined = set()
-    for f in sorted((ROOT / "specifications").rglob("*.md")):
-        for m in BOLD_DEF.finditer(f.read_text()):
-            defined.add(m.group(1))
-    req_ids = {r.get("requirement_id") for r in load_requirements()}
-    defined |= req_ids
+    defined = set(OWNERS.owner_definitions(ROOT))
     for f in [x for x in md_files if x.suffix == ".md"] + \
-            list((ROOT / "conformance").rglob("*.yaml")):
+            list((ROOT / "conformance").rglob("*.yaml")) + \
+            list((ROOT / "conformance").rglob("*.json")) + \
+            list((ROOT / "proto").rglob("*.proto")):
         rel = f.relative_to(ROOT)
-        if not is_content_path(rel):
+        if not is_content_path(rel) or not is_current_reference_path(rel):
             continue
         try:
             text = f.read_text()
         except UnicodeDecodeError:
             continue
-        in_scope = str(rel).startswith(REF_EXISTENCE_SCOPE)
         for m in REQ_PATTERN.finditer(text):
             if m.group(0) in RESERVED_REQUIREMENTS:
                 continue
-            if m.group(0) not in defined and in_scope:
+            if m.group(0) not in defined:
                 err(rel, f"references undefined requirement {m.group(0)}")
         for m in PROFILE_PATTERN.finditer(text):
-            if m.group(0) not in KNOWN_PROFILES and in_scope:
+            if not profile_reference_known(m.group(0), rel):
                 err(rel, f"references unknown transport profile {m.group(0)}")
     print(f"links: {len(md_files)} markdown files checked")
+
+
+def profile_reference_known(profile, path=None):
+    return profile in KNOWN_PROFILES
 
 
 def check_rfcs():
@@ -1190,6 +1357,7 @@ def check_boundary():
 
 CHECKS = {
     "requirements": check_requirements,
+    "profiles": check_profiles,
     "manifests": check_manifests,
     "vectors": check_vectors,
     "links": check_links,

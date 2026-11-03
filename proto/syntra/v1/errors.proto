@@ -4,7 +4,7 @@ package syntra.v1;
 
 option go_package = "github.com/tinklehq/syntra/bindings/go/gen/syntra/v1;syntrav1";
 
-// ErrorCode is the existing registry, not transport-specific status codes
+// ErrorCode defines protocol failures independently of transport status codes
 // (SNTR-ERR-001/002). Consumers report unknown numeric values as UNKNOWN, never
 // success, retaining the original number diagnostically where possible
 // (SNTR-ERR-005). Generated enum getters alone do not implement that policy.
@@ -45,8 +45,7 @@ enum ErrorCode {
   ERROR_CODE_UNAUTHENTICATED = 16;
 }
 
-// RpcError is a public typed failure (SNTR-ERR-001/003/005). Additional error
-// categories have no numeric allocation pending registry approval (RFC 0001).
+// RpcError is a public typed failure (SNTR-ERR-001/003/005).
 message RpcError {
   // code is nonzero on emission; unknown received numbers map per SNTR-ERR-005.
   ErrorCode code = 1;

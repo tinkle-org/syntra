@@ -1,7 +1,9 @@
 # Architecture Decision Records
 
-This directory holds Syntra's architecture decision records (ADRs).
-Each ADR has an explicit owner and status. Amendments REQUIRE an RFC
+This directory holds dated architecture decision records (ADRs), not a second
+protocol reference. Records preserve the terminology, identifiers, and scope
+reviewed at their recorded revision. Read the [current protocol reference](../../README.md#detailed-description)
+for Syntra's single protocol contract. Each ADR has an explicit owner and status. Amendments REQUIRE an RFC
 (see `../../rfcs/README.md`) and maintainer approval (see
 `../../GOVERNANCE.md`).
 
@@ -19,10 +21,10 @@ Each ADR has an explicit owner and status. Amendments REQUIRE an RFC
 | [ADR-010](ADR-010-rust-reference-status.md) | Reference implementation status (non-normative; implementations external since 2026-10-27) | Accepted | Syntra maintainers |
 | [ADR-011](ADR-011-noise-device-authorization.md) | Shared secure channel and persistent device authorization | Accepted (RFC 0007) | Syntra maintainers |
 
-ADR-011 adds `SNTR-SC1-WSS-V1` as an additional secure profile. It does not
-mark ADR-008 superseded: SC1/WSS still requires verified outer TLS 1.3, and
-existing TLS-based profiles retain their identifiers and policy. Independent
-production security review and release evidence remain separate gates.
+ADR-008 and ADR-011 record an earlier additive-channel design and its original
+carrier policies. Their historical names and byte descriptions do not register
+additional current profiles. This editorial distinction changes no recorded
+acceptance status and grants no new protocol or release approval.
 
 Each ADR contains: Context, Decision, Alternatives considered,
 Consequences, Compatibility implications, Status.

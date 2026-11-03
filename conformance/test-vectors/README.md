@@ -1,27 +1,21 @@
-# Conformance test vectors — index and conventions
+# Conformance fixture guide
 
-Deterministic, implementation-neutral fixtures. All payloads use neutral
-methods (`/example.Echo/Echo`, `/example.KV/Get`, `/example.Events/Subscribe`)
-and opaque byte payloads. Hosts are `syntra.example` / `example.com`;
-credentials are throwaway (`opaque-test-credential-A`). No production name,
-credential, or key material appears anywhere in this directory.
+Deterministic, implementation-neutral inputs for the [test suite](../README.md).
+Methods and payloads are neutral echo/key-value/subscription fixtures; credentials
+are throwaway. No production keys or endpoints belong here.
 
-| Directory | Section | Contents |
+| Directory | Inputs | Assertion layer |
 |---|---|---|
-| `protobuf/` | §J | Golden logical encodings (human + hex + semantic fields), protoc-verified |
-| `tcp/` | §K | Exact `[length][protobuf]` wire bytes (`vectors.json`, `byte-vectors.yaml`) |
-| `http/` | §L | Request/response fixtures, status matrix, H2 sequence |
-| `websocket/` | §M | Upgrade, binary framing, fragmentation, Ping/Pong, close codes |
+| [`protobuf/`](protobuf/) | Hex and semantic fields for core messages | Decoded logical equality, not encoder byte equality |
+| [`tcp/`](tcp/) | u32BE length plus chosen Frame bytes | Authenticated inner stream on every carrier; not outer TCP framing |
+| [`connection/`](connection/) | Current context/prologue JSON/YAML pair and rejection recipes | Exact public encoding; no Noise ciphertext or cryptographic verdict |
 
-Conventions:
+Base64 uses the RFC 4648 standard alphabet. Hex has no prefix/separators;
+strip whitespace in grouped displays. Fixture IDs resolve to the retained files.
+The chosen inner prefix/payload and context encodings may be byte-exact without
+freezing general Protobuf serialization order. No frozen TLS exchange is needed;
+certificate cases reference harness-owned test PKI identities in the manifests.
 
-- Base64 is RFC 4648 §4 standard alphabet.
-- Protobuf assertions are **logical equality** (decoded fields), never byte
-  equality across encoders — except a TCP prefix plus its chosen fixture bytes,
-  which are byte-exact for that fixture.
-- No raw TLS byte vectors are defined (TLS is negotiated, not frozen).
-  Certificate fixtures are harness-named references (`test-pki:*`) owned by
-  `specifications/security/*`; no PEM or key bytes are embedded here.
-- Vector IDs are stable: `protobuf/GOLD-PROT-*`, `tcp/V1…V12`, `http/V-HTTP-*`
-  and `http/X-HTTP-*`, `websocket/VEC-WS-*`. Manifests cite them in
-  `vector_refs`; runners resolve them by ID, never by copying bytes by hand.
+Run `python3 scripts/validate-repo.py vectors` and
+`python3 scripts/migrate-conformance-1.0.py` from the repository root to check
+consistency and context-pair drift. Neither command executes peer behavior.

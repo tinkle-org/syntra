@@ -1,0 +1,61 @@
+# Candidate restricted WS binding. Registration does not assert execution.
+format_version: "1.0"
+profile: SYNTRA-1.0-WS
+cases:
+  - id: CONF-SCS-001
+    requirement: [SNTR-SCW-001, SNTR-SCW-002, SNTR-SC-003, SNTR-WS-003, SNTR-WS-011]
+    profile: SYNTRA-1.0-WS
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, explicit_restricted_ws_opt_in, verified_loopback_target_and_peer, verified_noise_pin, provisioned_returning_key]
+    input:
+      transport:
+        action: channel_handshake
+        path: /syntra/1.0/ws
+        subprotocol: syntra.1.0
+        carrier: 2
+        contexts: [SYNTRA-CONTEXT-06, SYNTRA-CONTEXT-03]
+        vectors: conformance/test-vectors/connection/context-vectors.yaml
+        outer_length: none
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { context_matches: true, prologue_matches: true, carrier: 2, production_allowed: false }
+    notes: "Separate bootstrap and returning runs. WS never infers WSS from Forwarded, X-Forwarded-Proto, Origin or socket wrapping."
+
+  - id: CONF-SCS-002
+    requirement: [SNTR-SCW-008, SNTR-SC-013, SNTR-WS-003]
+    profile: SYNTRA-1.0-WS
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [no_transport, production_configuration]
+    input:
+      transport: { action: connect, carrier: 2, explicit_restricted_ws_opt_in: false, production_claim: true }
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      frames: []
+      transport: { m1_sent: false, fallback: false }
+    notes: "Restricted carrier is rejected before credential release. The allowed encrypted TCP production candidate is not rejected by this WS-only policy test."
+
+  - id: CONF-SCS-003
+    requirement: [SNTR-SCW-002, SNTR-SC-003, SNTR-SC-010, SNTR-WS-011]
+    profile: SYNTRA-1.0-WS
+    roles: [server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, explicit_restricted_ws_opt_in]
+    input:
+      transport:
+        action: channel_handshake
+        contexts: [SYNTRA-CONTEXT-01, SYNTRA-CONTEXT-02]
+        vectors: conformance/test-vectors/connection/context-vectors.yaml
+        expected_carrier: 2
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      frames: []
+      transport: { rejected_before_noise: true, credential_lookup: false }
+    notes: "One independent TCP/WSS mismatch per run; no carrier negotiation or alias fallback."

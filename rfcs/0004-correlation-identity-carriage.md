@@ -372,15 +372,15 @@ Acceptance was recorded 2026-10-30 via
 
 ## Appendix: References
 
-- [RPC](../specifications/core/rpc.md),
-  [framing](../specifications/core/framing.md),
-  [errors](../specifications/core/errors.md),
-  [reliability](../specifications/core/reliability.md),
-  [sessions](../specifications/core/sessions.md).
-- [Replay protection](../specifications/security/replay-protection.md),
-  [authentication security](../specifications/security/authentication-security.md),
-  [HTTP](../specifications/transports/http.md),
-  [HTTPS](../specifications/transports/https.md).
+- [RPC](../specifications/rpc.md),
+  [framing](../specifications/wire-format.md),
+  [errors](../specifications/rpc.md),
+  [reliability](../specifications/rpc.md),
+  [sessions](../specifications/connection.md).
+- [Replay protection](../specifications/security.md),
+  [authentication security](../specifications/security.md),
+  [HTTP](../specifications/transports.md),
+  [HTTPS](../specifications/transports.md).
 - [RFC 0002](0002-auth-session-lifecycle.md),
   [RFC 0003](0003-handshake-failure-signaling.md),
   [RFC 0005](0005-negotiation-bounds-identifiers.md).

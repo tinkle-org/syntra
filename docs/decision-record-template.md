@@ -65,7 +65,7 @@ transition pending. A private conversation or this template is not ratification.
 | Baselines | Exact retained baseline paths/hashes and any separately authorized transition; no silent replacement |
 | Migration | Relevant MIGRATION/CHANGELOG references, rollout order and legacy treatment |
 | Activation | Exact owning spec/schema/registry/case changes; landed revision or pending follow-up |
-| Claims excluded | Profiles/features not accepted or not verified by this decision |
+| Claims excluded | Carriers/capabilities not accepted or not verified by this decision |
 
 The reviewed commit can precede the commit that adds this record; do not try
 to embed a commit's own SHA in itself. Link the activation/recording revision
@@ -79,7 +79,7 @@ to the reviewed behavior require renewed approval of that affected scope.
 | Repository/schema checks | Actual command, tool version, result and retained log reference |
 | Specification and suite pins | Full revisions used to define the executed requirements/cases |
 | Implementations | Repository/full commit, language/runtime/crypto versions and independence basis |
-| Matrix | Registered profile, capability, initiator/host roles and SC1 mode for each run |
+| Matrix | Test suite selector, carrier, capability, initiator/host roles, and bootstrap/returning mode for each run |
 | Case results | Case ID, verdict and immutable log/artifact reference; digest for retained artifacts |
 | Declared bounds | Count/byte/time limits and operational/mobile thresholds declared before runs |
 | Deployment/mobile review | Host lifecycle/persistence/proxy contract and actual device/OS/bridge evidence |

@@ -366,16 +366,16 @@ Acceptance was recorded 2026-10-30 via
 
 ## Appendix: References
 
-- [Capabilities](../specifications/core/capabilities.md),
-  [framing](../specifications/core/framing.md),
-  [RPC](../specifications/core/rpc.md),
-  [errors](../specifications/core/errors.md),
-  [authentication security](../specifications/security/authentication-security.md).
-- [Transport index](../specifications/README.md),
+- [Capabilities](../specifications/rpc.md),
+  [framing](../specifications/wire-format.md),
+  [RPC](../specifications/rpc.md),
+  [errors](../specifications/rpc.md),
+  [authentication security](../specifications/security.md).
+- [Transport index](../README.md),
   [profile registry](../conformance/profiles.yaml),
-  [claims](../conformance/claims.md),
-  [schema generation](../specifications/schema/generation.md),
-  [schema compatibility](../specifications/schema/compatibility.md).
+  [claims](../conformance/README.md),
+  [schema generation](../docs/schema-tooling.md),
+  [schema compatibility](../docs/schema-tooling.md).
 - [RFC 0001](0001-public-idl-layout.md),
   [RFC 0002](0002-auth-session-lifecycle.md),
   [RFC 0004](0004-correlation-identity-carriage.md),

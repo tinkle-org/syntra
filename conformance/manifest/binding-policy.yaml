@@ -1,0 +1,104 @@
+# Exact policy/budget probes. Registered specifications, not execution evidence.
+format_version: "1.0"
+profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS, SYNTRA-1.0-WS]
+cases:
+  - id: CONF-BIND-001
+    requirement: [SNTR-DAUTH-009, SNTR-SCW-008]
+    profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS]
+    roles: [server]
+    capabilities: []
+    mandatory: true
+    preconditions: [production_enrollment_store, no_listener_admission]
+    input:
+      transport:
+        action: validate_permitted_bindings
+        invalid_sets: [[], default, [SYNTRA-1.0-TCP, SYNTRA-1.0-TCP], [undefined-binding], [SYNTRA-1.0-WS]]
+        ws_target: loopback
+        one_variant_per_run: true
+    expected:
+      frames: []
+      transport: { configuration_accepted: false, listener_admitted: false, enrollment_issued: false, protected_dispatch: false }
+    notes: "Empty/default enables nothing, duplicates and unsupported entries fail, and production enrollment rejects WS even on loopback. Assert rejection before admission/material issuance; do not invent a wire error for invalid local configuration."
+
+  - id: CONF-BIND-002
+    requirement: [SNTR-DAUTH-009, SNTR-SCW-008, SNTR-SC-014]
+    profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [authorized_enrollment_fixture, verified_noise_pin, verified_tls_when_wss]
+    input:
+      transport:
+        action: allowed_production_bindings
+        permitted_sets: [[selected_profile], [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS]]
+        modes: [bootstrap, returning]
+        reopen_with_same_policy: true
+        fresh_channel_per_connection: true
+    expected:
+      connection_state: ACTIVE
+      session_state: active
+      transport: { selected_binding_allowed: true, persisted_policy_preserved: true, fresh_keys: true, implicit_binding_expansion: false, implicit_session_resume: false, automatic_rpc_replay: false }
+    notes: "Separate run per profile, permitted set and mode; selected_profile is the exact current profile ID, not a fourth binding. TCP-only and WSS-only permission each work independently; the explicitly authorized pair permits each under fresh authentication. WSS success still requires independent TLS validation."
+
+  - id: CONF-BIND-003
+    requirement: [SNTR-DAUTH-009, SNTR-DAUTH-019]
+    profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS]
+    roles: [server]
+    capabilities: []
+    mandatory: true
+    preconditions: [persisted_production_enrollment_fixture, no_listener_admission]
+    input:
+      transport:
+        action: reopen_enrollment_store_policy
+        persisted_set: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS]
+        reopen_variants: [missing_policy, empty_policy, tcp_only_policy, wss_only_policy, ws_added_policy]
+        one_variant_per_run: true
+    expected:
+      frames: []
+      transport: { store_opened: false, listener_admitted: false, silent_policy_migration: false, persisted_policy_mutated: false, enrollment_issued: false }
+    notes: "Missing, reduced, expanded or mismatched persisted policy fails closed before admission. Do not reinterpret policy ordering as a mismatch: these variants change the authorized set or omit it."
+
+  - id: CONF-BUDGET-001
+    requirement: [SNTR-SCW-012, SNTR-HS-003]
+    profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS, SYNTRA-1.0-WS]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [injectable_clocks, valid_selected_binding_policy, loopback_if_ws]
+    input:
+      transport:
+        action: total_establishment_budget
+        hard_maximum_ms: 15000
+        reject_configured_ms: [0, 15001]
+        phases: [resolve_or_accept, dial, tls_if_wss, upgrade_if_websocket, noise, core_readiness]
+        accumulate_phase_elapsed: true
+        keep_final_phase_pending_at_deadline: true
+        partial_input_before_deadline: true
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      frames: []
+      transport: { invalid_configuration_rejected: true, total_elapsed_ms_at_most: 15000, phase_reset: false, ready_sent: false, protected_dispatch: false }
+    notes: "Run invalid-configuration probes separately from the valid 15-second maximum timeout probe. An earlier caller/channel deadline may close sooner. Neither a phase transition nor partial input buys a fresh total budget. No received error envelope is inferred from a local timer."
+
+  - id: CONF-BUDGET-002
+    requirement: [SNTR-SCW-012, SNTR-SC-006, SNTR-DAUTH-015]
+    profile: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS, SYNTRA-1.0-WS]
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [transport_connected, injectable_clocks, valid_selected_binding_policy, loopback_if_ws]
+    input:
+      transport:
+        action: channel_and_first_hello_budget
+        hard_maximum_ms: 5000
+        reject_configured_ms: [0, 5001]
+        phases: [noise_m1, noise_m2, encrypted_hello_and_fresh_confirmation]
+        partial_progress_ms: [4000, 4900, 4999]
+        keep_confirmation_incomplete_at_deadline: true
+    expected:
+      connection_state: CLOSED
+      session_state: none
+      frames: []
+      transport: { invalid_configuration_rejected: true, elapsed_from_channel_start_ms_at_most: 5000, m2_resets_deadline: false, partial_record_resets_deadline: false, ready_sent: false, authenticated_device_update: false, protected_dispatch: false }
+    notes: "One absolute 5-second budget covers Noise and first encrypted hello/fresh confirmation. Run configuration failures independently. Completing M2 or receiving trickle records cannot reset it; timeout cannot establish a principal, emit ready or cause protected effects."

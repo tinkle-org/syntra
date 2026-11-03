@@ -1,5 +1,10 @@
 # Decision 0002 — SDD acceptance wave (RFCs 0001–0006, 0008, 0010)
 
+> Dated acceptance record. Names and profile identifiers below are preserved
+> as reviewed; they do not register additional current protocol options.
+> The [current protocol reference](../../README.md#detailed-description) describes
+> Syntra's single contract. This note changes no recorded approval or scope.
+
 Status: approved. Public decision record per
 [`docs/decision-record-template.md`](../decision-record-template.md).
 This record accepts the listed specification contracts in one MAJOR review
@@ -29,7 +34,7 @@ release, and it does not claim executed conformance evidence.
 | Approvals | oscarlaw — approval stated in this record and in the acceptance PR |
 | Self-review disclosure | Author and approver are the same person (oscarlaw), disclosed here per Sec. 3 |
 | Security relevance | Handshake/auth/credentials/errors/streams are in scope (RFCs 0003, 0004, 0010 and the corresponding owner edits). |
-| Human security review | Self-review by oscarlaw, disclosed; independent human security review is tracked as a release gate in `audits/v1-release-readiness.md` and `docs/v1-acceptance-package.md` and is NOT satisfied by this record |
+| Human security review | Self-review by oscarlaw, disclosed; independent human security review remains a release gate under [governance](../../GOVERNANCE.md) and the [release process](../../RELEASE.md) and is NOT satisfied by this record |
 | Independence | Self-review; no independent reviewer was available at acceptance time |
 | Normative objections | None recorded |
 | Advisory analysis | External review report (2026-10-29 session notes) used as advisory input only; advisory analysis is not a vote |

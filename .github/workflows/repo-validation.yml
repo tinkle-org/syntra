@@ -26,7 +26,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install validator dependencies
-        run: pip install pyyaml
+        run: pip install pyyaml==6.0.3
 
       - name: Repository regression tests (offline)
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
@@ -66,7 +66,7 @@ jobs:
 
       - uses: bufbuild/buf-setup-action@v1
         with:
-          version: "1.59.0"  # sole pinned toolchain; see specifications/schema/generation.md
+          version: "1.59.0"  # sole pinned toolchain; see docs/schema-tooling.md
           github_token: ${{ github.token }}
 
       - name: A3 buf format check
@@ -82,7 +82,7 @@ jobs:
         # Bootstrap baseline: the committed initial snapshot. Replaced only by
         # a reviewed PR that points at a newer committed Git baseline
         # (compatibility/ image or tagged-revision descriptor) per
-        # docs/schema-registry.md §9. Never an arbitrary branch, never a
+        # docs/schema-tooling.md. Never an arbitrary branch, never a
         # registry label — this repository has no BSR module identity.
         run: buf breaking --against 'compatibility/v1-initial/image.json'
 
@@ -96,7 +96,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install validator dependencies
-        run: pip install pyyaml
+        run: pip install pyyaml==6.0.3
 
       - uses: bufbuild/buf-setup-action@v1
         with:
@@ -107,9 +107,14 @@ jobs:
         run: python3 scripts/validate-repo.py requirements
 
       - name: A8 conformance manifest validation (IDs, profiles, expected blocks)
-        run: python3 scripts/validate-repo.py manifests
+        run: python3 scripts/validate-repo.py profiles manifests
 
-      - name: A9 test vector validation (hex, protobuf decode, TCP lengths)
+      - name: Current owner and public encoding fixture drift
+        run: |
+          python3 scripts/sync-conformance-owners.py
+          python3 scripts/migrate-conformance-1.0.py
+
+      - name: A9 test vector validation (hex, protobuf decode, inner lengths)
         run: python3 scripts/validate-repo.py vectors
 
       - name: full repository validation gate

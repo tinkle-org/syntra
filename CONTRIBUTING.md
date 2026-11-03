@@ -1,133 +1,109 @@
 # Contributing to Syntra
 
-Thank you for helping make Syntra an independent, specification-first
-protocol. This guide explains how to propose changes, how RFCs are
-reviewed, and what bars apply.
+Syntra is a pre-release protocol specification project. This repository owns
+the protocol reference, source IDL, conformance definitions, and validation
+tooling. It contains no protocol implementations.
 
-Related: [`GOVERNANCE.md`](GOVERNANCE.md) (who approves what),
-[`rfcs/README.md`](rfcs/README.md) (RFC lifecycle),
-[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md),
-[`SECURITY.md`](SECURITY.md).
+Related: [governance](GOVERNANCE.md), [RFC process](rfcs/README.md),
+[Code of Conduct](CODE_OF_CONDUCT.md), and [security reporting](SECURITY.md).
 
 ## 1. Ground rules
 
-1. **Specifications first.** Normative behavior lives in Markdown specs
-   and `.proto` files, not in code. Do not add behavior only in an
-   implementation.
-2. **Independent and generic.** Do not reference any private product,
-   company infrastructure, messenger, social platform, payment system,
-   proprietary server, database, cloud deployment, or unpublished
-   architecture. Do not add domain types such as chat messages,
-   conversations, contacts, profiles, or receipts. Generic principals,
-   endpoints, identities, opaque payloads, requests, responses, streams,
-   and events are the allowed abstractions.
-3. **No custom crypto.** Do not propose application-level encryption,
-   ratchets, or custom ciphers. Syntra MAY carry opaque encrypted bytes
-   but MUST NOT parse or decrypt them.
-4. **Examples stay neutral.** Use `echo`, generic key/value, or generic
-   event subscriptions.
-5. **Small, auditable changes.** Prefer narrow PRs. One RFC per change.
-6. **Code of Conduct applies** in all spaces.
+1. **Specifications first.** The current protocol reference is
+   [connection](specifications/connection.md),
+   [wire format](specifications/wire-format.md), [RPC](specifications/rpc.md),
+   [security](specifications/security.md),
+   [transports](specifications/transports.md), and
+   [recovery](specifications/recovery.md). Source IDL defines representation;
+   implementation behavior does not define the protocol.
+2. **Independent and generic.** Keep private products, infrastructure,
+   deployment details, and application-domain types out of protocol contracts.
+   Use neutral echo, key/value, and subscription examples.
+3. **Respect security boundaries.** Protocol channel security belongs to the
+   security specification. Application encryption formats, payload meaning,
+   and business policy belong to applications; do not introduce custom ciphers
+   or application ratchets into the protocol.
+4. **Small, auditable changes.** Prefer narrow PRs and one RFC per change.
+   The Code of Conduct applies in all project spaces.
 
 ## 2. Ways to contribute
 
-- **Fixes to non-normative text** (typos, clarifications with no
-  behavioral change): direct PR.
-- **Normative changes** (any MUST/SHOULD, wire field, state machine,
-  error code, transport mapping, security requirement): **RFC required.**
-  Open an RFC per `rfcs/README.md` before or alongside the PR.
-- **Schemas (`proto/syntra/v1/*.proto`)**: RFC required for any field change.
-  Run Buf lint + breaking-change detection (see Sec. 5).
-- **Conformance tests and fixtures** (`conformance/`): encouraged with
-  every normative PR. Use deterministic fixtures. Protocol behavior
-  changes go under `specifications/`; conformance changes go under
-  `conformance/`.
-- **Docs and examples**: welcome; must stay generic per Sec. 1.
-- **Generated language types**: not committed in this repository.
-  Language implementations are separate projects that own their generated
-  output, generated with the pinned template
-  (`specifications/schema/generation.md`). This repository's negative
-  boundaries still apply: no `gen/`, `generated/`, `crates/`, `bindings/`,
-  or `bindings/go/` roots, and no tracked `.tmp/` output (CI boundary
-  check fails on any of these).
+- Editorial corrections with no behavioral change may use a direct PR.
+- Normative changes require an RFC, including wire fields, state machines,
+  error semantics, carrier mappings, security requirements, and conformance
+  assertions. Schema changes follow the same review bar and compatibility checks.
+- Conformance definitions and fixtures should accompany changes to their
+  owning requirements. Follow the [conformance test guide](conformance/README.md).
+- Tooling and documentation improvements should respect the
+  [repository boundary](MIGRATION.md#10-repository-boundary).
+  Generated language output and protocol implementations are not committed here.
 
 ## 3. Proposing a change
 
-1. Search existing [Issues](https://github.com/tinklehq/syntra/issues)
-   and [RFCs](https://github.com/tinklehq/syntra/pulls) (use the `rfc`
-   label where applied) to avoid duplicates.
-2. For normative work: copy `rfcs/template.md` to
-   `rfcs/NNNN-short-title.md` (see `rfcs/README.md`) and open a PR
-   marked as RFC. Explain motivation, normative diff, alternatives,
-   compatibility, security, and test plan.
-3. Implement the spec/schema diff in the same PR or a linked PR.
-   Cross-reference both.
-4. Ensure every new MUST/MUST NOT has:
-   - a requirement ID (e.g., `SYN-HS-014`),
-   - separate client and server obligations where applicable,
-   - success + failure transitions,
-   - an example or sequence diagram where behavior is involved,
-   - security and compatibility notes,
-   - acceptance criteria and a conformance test link (or a tracked
-     placeholder issue if the suite does not yet cover it).
-5. Sign off your commits (see Sec. 6).
+1. Search existing [issues](https://github.com/tinkle-org/syntra/issues) and
+   [RFC PRs](https://github.com/tinkle-org/syntra/pulls) to avoid duplicates.
+2. For normative work, use [rfcs/template.md](rfcs/template.md) and the
+   [RFC lifecycle](rfcs/README.md). Explain motivation, proposed owner changes,
+   compatibility, security, and the verification plan.
+3. Link the RFC and proposed specification/schema/conformance changes.
+   Only an Accepted RFC may modify normative behavior; proposal text or CI
+   success does not grant acceptance.
+4. For each new normative requirement, provide a unique requirement ID,
+   applicable role obligations, success/failure behavior, security and
+   compatibility analysis, and testable acceptance criteria. Link conformance
+   coverage or an explicitly tracked gap.
+5. Update [CHANGELOG.md](CHANGELOG.md) under `Unreleased` for user-visible
+   changes and supply compatibility notes where required by governance.
 
 ## 4. RFC review and acceptance
 
-Full lifecycle: [`rfcs/README.md`](rfcs/README.md).
+Discussion and approvals take place publicly on the RFC or PR under
+[GOVERNANCE.md](GOVERNANCE.md) §3 and the published
+[maintainer roster](MAINTAINERS.md):
 
-Summary:
+- Non-normative changes may merge with one maintainer approval.
+- Normative changes require an Accepted RFC and explicit active-maintainer
+  approval. With exactly one active maintainer, that approval is sufficient
+  with author/self-approval disclosed. With two or more, two distinct active
+  maintainers must approve; with none, acceptance is blocked. No unresolved
+  normative maintainer objection is permitted. Silence, bot merges, and CI
+  success are not approvals.
+- Security-adjacent changes require security review. Exploitable findings use
+  the private process in [SECURITY.md](SECURITY.md).
+- Breaking changes require the major-version RFC and compatibility/migration
+  handling in governance §4. Governance and process changes use the normative
+  review bar.
 
-- Discussion happens on the RFC PR. Maintainers assign reviewers with
-  protocol and security perspective.
-- **Non-normative** changes: one maintainer approval may merge.
-- **Normative** changes: REQUIRE maintainer approval per
-  [`GOVERNANCE.md`](GOVERNANCE.md) Sec. 3 and the published
-  [`MAINTAINERS.md`](MAINTAINERS.md) roster (one active maintainer may accept
-  with disclosed self-approval; two or more require two distinct approvals;
-  no unresolved normative objection; security review for security-adjacent
-  changes).
-- **Breaking (wire-incompatible) changes**: REQUIRE an accepted major-
-  version RFC, migration notes, and a `CHANGELOG.md` entry. See
-  `GOVERNANCE.md` Sec. 4.
-- A protocol release becomes stable only per `GOVERNANCE.md` Sec. 5
-  (all normative specs + schemas + conformance suite green + tagged
-  release notes).
+Acceptance, freeze, and stable release authorization remain separate decisions.
+See governance §5 and [RELEASE.md](RELEASE.md); no document edit grants them.
 
 ## 5. Development checks
 
-Before requesting review:
+Run the checks appropriate to the changed material before requesting review:
 
-- [ ] Run `python3 scripts/validate-schema.py` for schema changes
-      (Buf v2 STANDARD/FILE; do not weaken checks to pass). The initial FILE
-      baseline is `compatibility/v1-initial/image.json`. RFC 0001 records
-      the user-directed layout decision and separate, known historical
-      FILE/source break. Historical comparisons read the hash-verified
-      `compatibility/v1-initial/historical.json` archive, without a Git
-      checkout or duplicate schema tree. This repository validates
-      specifications, schemas, and conformance definitions only:
-      `python3 scripts/validate-repo.py all` and `python3
-      scripts/validate-schema.py` are the gates; implementation tests are
-      out of scope for this repository (see `MIGRATION.md` §10).
-- [ ] Markdown uses BCP 14 keywords correctly (capitalized only for
-      normative force).
-- [ ] No private dependency or domain-specific term introduced
-      (`grep -ri` for product names, chat/contact/receipt terms).
-- [ ] Requirement IDs unique and indexed in the changed spec.
-- [ ] Proto comments match spec prose; `reserved` values untouched.
-- [ ] Tests or fixtures added/updated; negative tests included for
-      failures, timeouts, cancellation, oversized frames, unknown
-      fields/messages, unauthenticated access.
-- [ ] No implementation code in this repository; no panics on untrusted
-      input in any implementation is a bar owned by the separate language
-      implementation projects; bounds checked in schemas and conformance
-      fixtures.
-- [ ] `CHANGELOG.md` updated under `Unreleased` for user-visible changes.
+```sh
+python3 scripts/validate-repo.py all
+python3 scripts/validate-schema.py
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
 
-Schema/codec commands and pins are in `specifications/schema/generation.md`;
-`proto/syntra/v1` is the sole source of truth; the old schema tree is removed.
-The runtime conformance harness is still forthcoming. Never report tests as passed unless executed;
-paste command + result summary in the PR.
+The [schema tooling guide](docs/schema-tooling.md) documents prerequisites,
+Buf checks, compatibility baselines, and reproducible generation. The
+[conformance test guide](conformance/README.md) documents fixture authoring,
+owner synchronization, and evidence requirements.
+
+- Keep requirement IDs unique, indexed, and linked to appropriate cases.
+- Keep schema comments and fixtures consistent with their current owners.
+  Preserve field reservations; do not weaken compatibility checks or replace
+  baselines to hide a break.
+- Use BCP 14 keywords for normative requirements, with separate role
+  obligations and bounded failure behavior where applicable.
+- Include meaningful negative fixtures for affected failure paths.
+- Review changes for private data, credentials, and application-specific
+  dependencies. Keep generated output disposable and outside tracked sources.
+- Report exact commands and results. Static checks and fixture registration
+  are not executed protocol conformance or independent interoperability.
+
 ## 6. Sign-off (DCO)
 
 All commits REQUIRE a `Signed-off-by` trailer to certify the Developer
@@ -144,25 +120,21 @@ follows this guide.
 
 ## 7. Style
 
-- Specifications: RFC-style Markdown, BCP 14 keywords, requirement IDs,
-  client/server obligations separated, diagrams in fenced `text` blocks.
-- Protobuf: `proto3`, `package syntra.v1`, explicit field numbers,
-  `reserved` preserved, comments starting with the field's contract.
-- Repository tooling (Python/Shell): minimal dependencies, standard
-  library preferred, no private registries. Language implementation style
-  bars are owned by the separate implementation projects.
+- Specifications: RFC-style Markdown, BCP 14 keywords, requirement IDs, and
+  explicit role obligations. Use diagrams when they clarify behavior.
+- Protobuf: explicit field numbers, preserved reservations, and comments
+  consistent with the owning protocol text.
+- Repository tooling: minimal dependencies, standard library preferred,
+  no private registries.
 
 ## 8. What not to do
 
-- Do not invent contact addresses, endpoints, or credentials in docs.
-- Do not select a different license on behalf of maintainers (project is
-  Apache-2.0; see `LICENSE` and `GOVERNANCE.md` Sec. 7).
-- Do not resolve wire-compat or security questions by implementation
-  choice alone — open an RFC or record a blocker.
-- Do not delete or silently rewrite working code; propose migration in
-  `MIGRATION.md` style (inventory → classification → plan), except for the
-  explicit user-directed sole-source IDL migration recorded in `MIGRATION.md`
-  Sec. 8 and RFC 0001 B9.
+- Do not invent reporting contacts, deployment endpoints, or credentials.
+- Do not change the project license on behalf of maintainers.
+- Do not resolve protocol conflicts through implementation choices alone.
+  Open an RFC or record a blocker against the current owner.
+- Do not silently overwrite unrelated work or claim verification that was
+  not executed.
 
-Questions? See [`SUPPORT.md`](SUPPORT.md). For vulnerabilities, see
-[`SECURITY.md`](SECURITY.md) — never file public issues for them.
+Questions use [SUPPORT.md](SUPPORT.md). Vulnerabilities use
+[SECURITY.md](SECURITY.md), never public issues.

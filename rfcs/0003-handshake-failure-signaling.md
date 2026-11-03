@@ -266,15 +266,15 @@ Acceptance was recorded 2026-10-30 via
 
 ## Appendix: References
 
-- [Handshake](../specifications/core/handshake.md),
-  [errors](../specifications/core/errors.md),
-  [framing](../specifications/core/framing.md),
-  [events](../specifications/core/events.md).
-- [TLS/TCP](../specifications/transports/tls-tcp.md),
-  [HTTP](../specifications/transports/http.md),
-  [HTTPS](../specifications/transports/https.md),
-  [WS](../specifications/transports/websocket.md),
-  [WSS](../specifications/transports/secure-websocket.md).
-- [Authentication security](../specifications/security/authentication-security.md),
+- [Handshake](../specifications/connection.md),
+  [errors](../specifications/rpc.md),
+  [framing](../specifications/wire-format.md),
+  [events](../specifications/recovery.md).
+- [TLS/TCP](../specifications/transports.md),
+  [HTTP](../specifications/transports.md),
+  [HTTPS](../specifications/transports.md),
+  [WS](../specifications/transports.md),
+  [WSS](../specifications/transports.md).
+- [Authentication security](../specifications/security.md),
   [RFC 0002](0002-auth-session-lifecycle.md),
   [RFC 0007](0007-secure-channel-device-authorization.md).

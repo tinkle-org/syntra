@@ -18,8 +18,8 @@ records evidence; it grants no authority by itself.
 
 ## 1. Principles
 
-1. Specification authority is explicit
-   (`specifications/architecture.md` Sec. 8). Code follows spec.
+1. Specification authority is explicit in the
+   [protocol reference](README.md#detailed-description). Code follows spec.
 2. Independence: no private product, company, or infrastructure controls
    protocol behavior.
 3. Open review: normative changes happen in public via RFCs, with

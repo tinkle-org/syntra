@@ -1,5 +1,11 @@
 # RFC 0007: Secure channel and persistent device authorization
 
+> Historical design and acceptance record. The terminology, identifiers, and
+> byte layouts below belong to the reviewed revision. Read the
+> [current protocol reference](../README.md#detailed-description) for Syntra's
+> single protocol contract. This note changes no recorded acceptance status
+> and does not register an additional current profile.
+
 - RFC: 0007
 - Title: Transport-independent Noise secure channel with persistent device authorization
 - Author(s): oscarlaw
@@ -12,9 +18,9 @@
 Accepted 2026-10-29 under [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md)
 and [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md). The
 normative SC1 contract is §11 plus the activated owner documents:
-[secure-channel.md](../specifications/security/secure-channel.md),
-[device-authorization.md](../specifications/security/device-authorization.md),
-[noise-bindings.md](../specifications/transports/noise-bindings.md) and
+[secure-channel.md](../specifications/security.md),
+[device-authorization.md](../specifications/security.md),
+[noise-bindings.md](../specifications/transports.md) and
 [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md).
 Earlier experimental text in this RFC is historical where it conflicts with
 §11; the `syntra.sc1.draft1` bytes are not an alias for v1. Independent
@@ -60,11 +66,11 @@ Accepted requirements are owned by these companion documents:
 
 | Concern | Owning document | Requirement family |
 |---|---|---|
-| Shared secure channel | [secure-channel.md](../specifications/security/secure-channel.md) | `SNTR-SC-*` |
-| Persistent authorization | [device-authorization.md](../specifications/security/device-authorization.md) | `SNTR-DAUTH-*` |
-| Carrier mapping | [noise-bindings.md](../specifications/transports/noise-bindings.md) | `SNTR-SCW-*` |
+| Shared secure channel | [secure-channel.md](../specifications/security.md) | `SNTR-SC-*` |
+| Persistent authorization | [device-authorization.md](../specifications/security.md) | `SNTR-DAUTH-*` |
+| Carrier mapping | [noise-bindings.md](../specifications/transports.md) | `SNTR-SCW-*` |
 | Policy rationale | [ADR-011](../specifications/decisions/ADR-011-noise-device-authorization.md) | accepted amendment to ADR-008 |
-| Verification | [registered cases](../conformance/manifest/sc1-wss.yaml) and [acceptance plan](../conformance/plans/secure-channel.md) | `CONF-SCW-*`; registration is not execution |
+| Verification | [registered cases](../conformance/manifest/connection.yaml) and [acceptance plan](../specifications/security.md) | `CONF-SCW-*`; registration is not execution |
 
 ### Client and host obligations
 
@@ -163,7 +169,7 @@ intended Noise/hash context. `auth_id` is a collision-checked independent
 eight-byte lookup handle, not proof of identity. An authorization epoch belongs
 to credential lifecycle state. The implemented experimental draft-1 context has
 the exact domain, mode, carrier, server-key selector, epoch, handle and scope
-encoding specified in [the carrier contract](../specifications/transports/noise-bindings.md).
+encoding specified in [the carrier contract](../specifications/transports.md).
 It is carried in clear before M1 and supplied unchanged as the Noise prologue.
 The AK is an input to standard `psk0`, never the prologue. This encoding is
 concrete experimental behavior; acceptance and independent verification remain open.
@@ -193,9 +199,8 @@ record-assembly, frame-assembly and write deadlines, configurable only to shorte
 positive durations. Trickle input does not extend absolute deadlines. Dialing
 has one 10-second total budget across socket establishment, Upgrade, Noise and
 hello/ready, shortened by the caller's deadline; the core hello budget is
-separately 5 seconds. Aggregate admission, queue, server and shutdown defaults
-are specified in the [operational evidence ledger](../docs/sc1-implementation.md).
-Server admission defaults to 128 connections (maximum 4,096) and 16 handshakes
+separately 5 seconds. Server admission defaults to 128 connections
+(maximum 4,096) and 16 handshakes
 (maximum 256), with handshake slots held through the `ready` write. Server
 shutdown defaults to 5 seconds, configurable only to shorter positive durations.
 These implementation defaults are not new accepted core requirements.
@@ -277,20 +282,14 @@ No raw secrets or attacker-controlled private diagnostics belong in errors.
 
 ## 8. Test plan and acceptance criteria
 
-The [acceptance plan](../conformance/plans/secure-channel.md) traces every
+The [acceptance plan](../specifications/security.md) traces every
 proposed requirement to planned positive and negative cases. The accepted
 `SNTR-SC1-WSS-V1` profile and its `CONF-SCW-*` cases are registered;
 registration is not execution, and no `CONF-*` verdict is claimed.
-Separately, the
-[implementation evidence ledger](../docs/sc1-implementation.md) records executed
-local unit, race and native-core tests and six Docker integration groups:
-TCP/WS/WSS × NK/NKpsk0. Those groups exercise echo, 64 KiB and near-1 MiB
-payloads, 16 concurrent calls, cancellation/deadlines, authorization and bad-key
-rejection, verified TLS, stalled/reset connections, restart and shutdown.
-They use the same implementation and are not independent cryptographic or
-runtime interoperability evidence. Current profile expectations remain unchanged.
-The unchecked criteria below cover complete acceptance work; scoped execution
-of overlapping tests is recorded in the ledger and is not erased by that status.
+The unchecked criteria below describe the required acceptance work. This design
+record supplies no executed implementation or independent interoperability
+evidence. The [conformance test guide](../conformance/README.md) defines how
+actual execution evidence is recorded.
 
 - [ ] Accept the concrete experimental wire context/carrier schemas and publish
       independently derived deterministic vectors, not invented ciphertext.
@@ -378,7 +377,7 @@ This section is the accepted target and takes precedence over conflicting
 experimental descriptions in this RFC. It does not rewrite the historical
 evidence ledger, authorize a tag, or assert that every implementation supports
 the selected bytes. [Governance](../GOVERNANCE.md) and the
-[acceptance package](../docs/v1-acceptance-package.md) still own freeze and
+[acceptance package](../conformance/README.md#independent-interoperability-and-acceptance-evidence) still own freeze and
 release decisions. The mobile release target requires SC1 and recovery; neither
 turns a Core-only implementation into an SC1 implementation.
 
@@ -501,8 +500,8 @@ meaning and separate configuration. A failed v1 attempt does not trigger legacy
 or plaintext fallback. Both implementations migrate against the same accepted
 spec revision; source/API and behavioral changes receive release notes.
 
-The [context fixtures](../conformance/plans/sc1-context-v1.json) freeze public
-encoding examples only. [Acceptance scenarios](../conformance/plans/mobile-v1.md)
+The [context fixtures](../conformance/test-vectors/connection/context-vectors.json) freeze public
+encoding examples only. [Acceptance scenarios](../conformance/README.md)
 require independently derived Noise vectors with test-only static/ephemeral
 inputs, both role pairings and real sockets. No ciphertext is fabricated here.
 Public context lint is neither cryptographic validation nor conformance.
@@ -554,7 +553,7 @@ establish the external carrier. This amends RFC 0009 D4 as recorded in its
 **Profile and requirements.** The accepted profile identifier is
 `SNTR-SC1-WSS-V1`. Carrier-specific normative requirements are
 `SNTR-SCW-001`–`SNTR-SCW-012` in
-[noise-bindings.md](../specifications/transports/noise-bindings.md). Baseline
+[noise-bindings.md](../specifications/transports.md). Baseline
 WSS profiles, identifiers and frame mappings are unchanged; an SC1 pass does
 not certify them, and a baseline WSS pass does not certify SC1.
 
@@ -573,6 +572,6 @@ release gates under RFC 0009 D5. Acceptance does not authorize a tag.
 - [Noise Protocol Framework, revision 34](https://noiseprotocol.org/noise.html):
   §§3, 5–7, 9, 11.2–11.4, 13–14.
 - [Governance](../GOVERNANCE.md) §§3–5 and [RFC process](README.md).
-- [Current transport security](../specifications/security/transport-security.md),
-  [authentication](../specifications/core/authentication.md), and
-  [sessions](../specifications/core/sessions.md).
+- [Current transport security](../specifications/security.md),
+  [authentication](../specifications/connection.md), and
+  [sessions](../specifications/connection.md).

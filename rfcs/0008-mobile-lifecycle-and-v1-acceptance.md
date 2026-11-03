@@ -258,7 +258,7 @@ trust anchors, retry permissions or unlimited timer extensions.
 
 ## 8. Test plan and acceptance criteria
 
-The [mobile acceptance plan](../conformance/plans/mobile-v1.md) defines positive,
+The [mobile acceptance plan](../conformance/README.md) defines positive,
 negative and crash cases, with role and evidence requirements. It is not an
 executable manifest or PASS record. On acceptance translate each case to
 permanent requirement/case IDs and runner assertions before implementation.
@@ -301,7 +301,7 @@ requires independent accepted contracts.
 
 ## Appendix: References
 
-- [SDD delivery record](../docs/mobile-v1-delivery.md).
+- [SDD delivery record](../conformance/README.md#independent-interoperability-and-acceptance-evidence).
 - [Protocol Buffers encoding](https://protobuf.dev/programming-guides/encoding/):
   ordinary scalar last-value/message-merge behavior and non-canonical ordering.
 - [MTProto engine](https://github.com/TelegramMessenger/mtproto-engine/tree/da4b2170210aab0430c4ff18c032991f3030cf45):

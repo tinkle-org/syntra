@@ -1,5 +1,10 @@
 # ADR-011: Shared secure channel and persistent device authorization
 
+> Historical decision record. The additive-channel names and byte descriptions
+> below identify the reviewed revision. They are not additional current profiles.
+> Use the [current protocol reference](../../README.md#detailed-description) for
+> Syntra's single protocol contract. Recorded acceptance status is unchanged.
+
 - Status: Accepted (2026-10-29) — accepted with RFC 0007
 - Date: 2026-10-27
 - Owner: Syntra maintainers (see `GOVERNANCE.md` and `MAINTAINERS.md`)
@@ -25,7 +30,7 @@ The accepted v1 carrier profile is `SNTR-SC1-WSS-V1`: canonical
 subprotocol `syntra.sc1.v1`. TCP and plaintext WS mappings remain restricted
 development carriers. UDP is deferred. The exact bytes, limits and admission
 rules are owned by [RFC 0007 §11](../../rfcs/0007-secure-channel-device-authorization.md#114-accepted-decisions-2026-10-29)
-and [noise-bindings.md](../transports/noise-bindings.md).
+and [noise-bindings.md](../transports.md).
 
 Keep the core independent of carrier/socket libraries and credential stores.
 Application policy owns enrollment, protected storage, generic principal
@@ -78,5 +83,5 @@ deprecation decision.
 
 Accepted. Independent production security review and the RFC 0009 D5 release
 evidence remain separate gates. See
-[the acceptance plan](../../conformance/plans/secure-channel.md) and
+[the acceptance plan](../security.md) and
 [RFC 0007 §11.4](../../rfcs/0007-secure-channel-device-authorization.md#114-accepted-decisions-2026-10-29).
