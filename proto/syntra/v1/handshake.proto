@@ -20,8 +20,9 @@ message ClientHello {
 
 // ServerReady confirms acceptance and establishes the connection's principal
 // binding (SNTR-HS-004, SNTR-AUTH-007). The selected version is Frame.version.
-// There is no separate ServerHello or resumable-session handle. Capability/limit
-// negotiation and typed handshake rejection need an approved binding (RFC 0001).
+// Optional capabilities negotiate through RPC after ACTIVE. Handshake failure uses
+// a typed local cause and native termination, with no rejection envelope
+// (SNTR-HS-030/040). See specifications/connection.md.
 message ServerReady {
   // connection_id is an opaque UTF-8 diagnostic identifier, never an
   // authenticator or resume token (SNTR-SESS-002, SNTR-ASEC-010).

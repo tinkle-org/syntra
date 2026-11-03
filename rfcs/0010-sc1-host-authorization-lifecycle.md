@@ -1,5 +1,11 @@
 # RFC 0010: SC1 host enrollment and authorization lifecycle
 
+> Historical design and acceptance record. The title and profile identifiers
+> below identify the reviewed revision, not an optional current channel.
+> Read the [current protocol reference](../README.md#detailed-description) for
+> Syntra's single protocol contract. This note changes no recorded acceptance
+> status and grants no new approval.
+
 - RFC: 0010
 - Title: SC1 host enrollment and authorization lifecycle
 - Author(s): oscarlaw
@@ -35,7 +41,7 @@ binding before `ready`, revocation propagation, rotation and compromise
 recovery explicit host implementation obligations (RFC 0007 §11.2 items 2–3)
 but left their operational shape to deployment documentation. This RFC fixes
 that shape as accepted requirement families `SNTR-DAUTH-011`–`SNTR-DAUTH-024`
-in [device-authorization.md](../specifications/security/device-authorization.md):
+in [device-authorization.md](../specifications/security.md):
 who may enroll; how AKs and handles are issued; the staged provisioning
 transaction and its idempotency/cleanup rules; the pre-`ready` authorization
 sequence and principal binding; the decided revocation-propagation policy
@@ -65,10 +71,10 @@ problems follow.
    The existing contract records exactly these gaps: a "not an exact
    1-second revocation SLA" and the acceptance plan's "rotation overlap and
    deployment-wide guarantees remain open"
-   ([secure-channel.md §1](../conformance/plans/secure-channel.md)).
+   ([secure-channel.md §1](../specifications/security.md)).
 2. **Unbounded staleness.** The security suite carried a standing blocker:
    the revocation-propagation maximum was deployment-documented with no
-   suite-wide upper bound ([open-questions.md](../specifications/security/open-questions.md)
+   suite-wide upper bound ([open-questions.md](../SESSION-OPEN-QUESTIONS.md)
    `Blockers for stable v1` item 2), and no decision existed for hosts whose
    revocation store is unavailable (item 3). A valid AK handshake proves key
    possession only; the acceptance rule in RFC 0007 §11.2 still needs
@@ -87,12 +93,12 @@ inside the accepted RFC 0007 contract instead of reopening it.
 
 Normative diff, in plain language: add requirement families
 `SNTR-DAUTH-011`–`SNTR-DAUTH-024` to
-[device-authorization.md](../specifications/security/device-authorization.md)
+[device-authorization.md](../specifications/security.md)
 as a new §5, close the revocation blockers in
-[open-questions.md](../specifications/security/open-questions.md), add
-host-lifecycle threats to [threat-model.md](../specifications/security/threat-model.md),
+[open-questions.md](../SESSION-OPEN-QUESTIONS.md), add
+host-lifecycle threats to [threat-model.md](../specifications/security.md),
 and add planned lifecycle cases, transaction fault matrices and revocation
-time-budget checks to [secure-channel.md](../conformance/plans/secure-channel.md).
+time-budget checks to [secure-channel.md](../specifications/security.md).
 No text of `SNTR-DAUTH-001`–`SNTR-DAUTH-010` changes; existing IDs, sections
 §1–§4 and their meaning are preserved.
 
@@ -638,7 +644,7 @@ apply unchanged.
 ## 7. Security considerations
 
 This RFC is the operational complement to the threat rows added in
-[threat-model.md §5](../specifications/security/threat-model.md):
+[threat-model.md §5](../specifications/security.md):
 T11 host-store compromise, T12 enrollment abuse, T13 revocation lag, T14
 lost-device recovery and rotation abuse, T15 secret leakage. Key residual
 positions:
@@ -657,7 +663,7 @@ positions:
   (staged, superseded, revoked) introduce no new peer-visible signal. Handle
   collisions are resolved privately per `SNTR-DAUTH-012`; collision redraw
   attempts are bounded and rate-limited within the standing
-  [authentication-security](../specifications/security/authentication-security.md)
+  [authentication-security](../specifications/security.md)
   limits.
 - **Diagnostics hygiene.** No new diagnostics surface is opened. Lifecycle
   events and enrollment decisions are deployment bookkeeping; the existing
@@ -681,7 +687,7 @@ positions:
 - [ ] Conformance tests (positive + negative + fixtures): planned prose
       cases `PLAN-DAUTH-011`–`PLAN-DAUTH-024` plus the transaction fault
       matrices and revocation time-budget checks in
-      [secure-channel.md](../conformance/plans/secure-channel.md) §§7–8. The
+      [secure-channel.md](../specifications/security.md) §§7–8. The
       prose cases are mapped and their executable rows are **registered** in
       `conformance/manifest/sc1-wss.yaml` as `CONF-SCW-025`–`CONF-SCW-042`
       (supplemental splits `039`–`042` included), but all are **not
@@ -757,7 +763,7 @@ execution, and executed evidence remains gated by the recorded runs.
 ## 10. Unresolved questions and blockers
 
 1. **Channel-binding construction** (unchanged, kept open,
-   [authentication-security.md](../specifications/security/authentication-security.md)
+   [authentication-security.md](../specifications/security.md)
    `SNTR-ASEC-002`). The credential-security baseline explicitly does not
    claim channel binding; if stable v1 claims channel binding (for example,
    a TLS exporter bound to credentials), its exporter construction,
@@ -803,19 +809,19 @@ Files edited by RFC 0010's companion wave, with responsibility:
 - [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md) (accepted):
   bootstrap governance and release-scope authority for v1; cited here only
   as governance, not as SC1 wire authority.
-- [device-authorization.md](../specifications/security/device-authorization.md)
-  (`SNTR-DAUTH-001`–`SNTR-DAUTH-024`), [secure-channel.md](../specifications/security/secure-channel.md)
+- [device-authorization.md](../specifications/security.md)
+  (`SNTR-DAUTH-001`–`SNTR-DAUTH-024`), [secure-channel.md](../specifications/security.md)
   (`SNTR-SC-001`–`SNTR-SC-015`) and
-  [noise-bindings.md](../specifications/transports/noise-bindings.md)
+  [noise-bindings.md](../specifications/transports.md)
   (`SNTR-SCW-001`–`SNTR-SCW-012`): accepted owners of the profile.
-- [open-questions.md](../specifications/security/open-questions.md),
-  [threat-model.md](../specifications/security/threat-model.md),
-  [authentication-security.md](../specifications/security/authentication-security.md)
+- [open-questions.md](../SESSION-OPEN-QUESTIONS.md),
+  [threat-model.md](../specifications/security.md),
+  [authentication-security.md](../specifications/security.md)
   (the credential/session/token rules, `SNTR-ASEC-002` channel binding is the
   open item): security companions this RFC's sections cross-reference.
-- [secure-channel.md acceptance plan](../conformance/plans/secure-channel.md):
+- [secure-channel.md acceptance plan](../specifications/security.md):
   planned lifecycle cases and matrices; the executable registration lives in
-  [sc1-wss.yaml](../conformance/manifest/sc1-wss.yaml) (`CONF-SCW-025`–`042`,
+  [connection.yaml](../conformance/manifest/connection.yaml) (`CONF-SCW-025`–`042`,
   registered in the acceptance wave, not executed).
 - [GOVERNANCE.md](../GOVERNANCE.md) Sec. 3 and the
   [RFC process](README.md): acceptance quorum and disclosed self-approval.

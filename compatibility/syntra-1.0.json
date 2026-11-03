@@ -1,0 +1,52 @@
+{
+  "format_version": "1.0",
+  "status": "candidate-sdd",
+  "protocol": "Syntra 1.0",
+  "domain_ascii": "syntra.1.0",
+  "core_wire_version": 1,
+  "protobuf_package": "syntra.v1",
+  "input_paths": {
+    "connection_context_json": "conformance/test-vectors/connection/context-vectors.json",
+    "connection_context_yaml": "conformance/test-vectors/connection/context-vectors.yaml",
+    "connection_manifest": "conformance/manifest/connection.yaml",
+    "connection_vector_tests": "tests/test_connection_vectors.py"
+  },
+  "websocket_endpoint": "/syntra/1.0/ws",
+  "websocket_subprotocol": "syntra.1.0",
+  "channel_limits": {
+    "authorization_key_bytes": 32,
+    "aead_tag_bytes": 16,
+    "max_plaintext_bytes": 65519,
+    "max_ciphertext_bytes": 65535,
+    "max_serialized_frame_bytes": 1048576,
+    "max_records_per_direction": 4294967296,
+    "max_age_seconds": 86400
+  },
+  "context_layout": {
+    "domain": [0, 10], "mode": [10, 11], "carrier": [11, 12],
+    "server_key_id": [12, 16], "epoch": [16, 24], "handle": [24, 32],
+    "scope_length_u16be": [32, 34], "scope": [34, null],
+    "scope_bytes": [1, 255], "context_bytes": [35, 289],
+    "m1_bytes": [83, 337], "m2_bytes": 48
+  },
+  "carriers": {
+    "SYNTRA-1.0-TCP": {"code": 1, "binding": "tcp-u16be", "production_allowed": true},
+    "SYNTRA-1.0-WS": {"code": 2, "binding": "websocket-h1-binary", "production_allowed": false, "scope": "loopback-development-only"},
+    "SYNTRA-1.0-WSS": {"code": 3, "binding": "websocket-h1-binary-verified-tls13", "production_allowed": true}
+  },
+  "requirement_sources": [
+    "specifications/connection.md",
+    "specifications/wire-format.md",
+    "specifications/rpc.md",
+    "specifications/security.md",
+    "specifications/transports.md",
+    "specifications/recovery.md",
+    "conformance/README.md"
+  ],
+  "evidence": {
+    "context_vectors": "public-encoding-only",
+    "runtime_case_execution": "not-asserted",
+    "independent_interoperability": "not-asserted",
+    "review_freeze": "not-asserted"
+  }
+}

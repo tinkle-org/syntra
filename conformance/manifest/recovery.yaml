@@ -1,19 +1,6 @@
-# Portable recovery cases. RFC 0006 is accepted; its §11 decision amendment is
-# authoritative. Case reconciliation per conformance/plans/update-recovery.md §4
-# and RFC 0006 §11.8: CONF-URP-001/002/003/007 retain their intent (with scoped
-# identity, fresh-round fencing, and durable-safe resume added); CONF-URP-004/011
-# were corrected to the §11 shapes (replay pages delivered in the correlated
-# RpcResult, fixed-boundary rounds with a fresh handle for the second gap);
-# CONF-URP-005/006 were extended (snapshot transfer shape, no-wire completion,
-# same-G local install, coordinated S0 binding); CONF-URP-009/010 were replaced
-# (true scoped provider loss with next_generation trailer fencing; subscriber-
-# local saturation with terminated=true and ASCII local-queue-exhausted, no
-# next_generation); CONF-URP-012..017 are new §11 coverage. Requirement traces
-# use the accepted SYN-URP-* IDs (SYN-URP-008/009 reserved, unassigned) plus
-# meaningful SNTR-* core IDs.
-# Registration is NOT execution: every case below is a planned, not-executed
-# executable specification. No verdict here is an execution result. Prose
-# companion: ../recovery_profile/recovery.md.
+# Update-recovery tests. Protocol owner: specifications/recovery.md.
+# SYN-URP-008/009 remain reserved and unassigned.
+# Registration is not execution; authoring and evidence rules: conformance/README.md.
 # Optionality rule: any case whose capabilities are unadvertised MUST yield
 # UNSUPPORTED (correct UNIMPLEMENTED refusal) or SKIP — never FAIL.
 format_version: "1.0"
@@ -45,7 +32,7 @@ cases:
           - {request_id: 1, body: result, shape: RecoveryNegotiateResponse, note: "selected_version 1 confirmed with the deployment bounds; the profile is confirmed on this connection only"}
           - {request_id: 3, body: result, shape: RecoverySubscribeResponse, note: "fresh connection-scoped handle with a newly captured boundary"}
       notes: "Runner-driven paired control on a fresh connection to the same recovery-capable host, bound principal, authorization scope, and stream selector as the case-level probe connection."
-    notes: "Mandatory-only fallback and per-connection negotiation isolation on one recovery-capable Host: both connections target the same host, bound principal, authorization scope, and stream selector, and the Host's mandatory service continues on the unconfirmed connection. UNCONFIRMED PROBE CONNECTION: no Negotiate is run and the profile is not confirmed; the runner deliberately injects the otherwise valid initial-subscription RecoverySubscribeRequest — profile_version 1, a non-empty stream_selector within bounds, and the valid empty start_checkpoint initial-subscription sentinel (SYN-URP-021: start_checkpoint MAY be empty; empty means initial subscription) — as a negative test, because a conforming initiator MUST NOT send profile operations before confirmation (SYN-URP-001); this injection is therefore runner-driven only. The host replies UNIMPLEMENTED (SYN-URP-010: the operation belongs to a profile not confirmed on this connection, and an unknown operation is likewise UNIMPLEMENTED), so the refusal is attributed to the confirmation gate by the paired control rather than by the error code alone. No handle and no checkpoint are created on the unconfirmed connection, including by the checkpoint_issued_for_handle path, because Subscribe itself requires confirmation. request_id 3 is nonzero and admitted as increasing on its connection (RFC 0004), so the refusal is not a request-ID violation. CONTROL CONNECTION (runner-driven, fresh connection to the same host): Negotiate (request_id 1) returns selected_version 1 with the confirmed deployment bounds, confirming the profile on that connection only, and the exact same valid Subscribe payload (request_id 3) then succeeds with a fresh connection-scoped handle and a newly captured boundary, so the confirmation gate is the sole delta; request IDs are independently valid within each connection. Negotiation and confirmation on the control connection never enable the profile on the unconfirmed one; partial acceptance falls back to mandatory-only plus previously confirmed options (SYN-URP-001). The durable known-safe resumption shape is CONF-URP-015's coverage. RFC 0006 §11.1 release-bundle inclusion does not relax the per-connection gate. SKIP when unclaimed. Registered; not yet executed."
+    notes: "Paired negotiation-isolation probe against one recovery-capable host with the same bound principal, authorization scope and stream selector. On the unconfirmed connection the runner injects the otherwise valid initial Subscribe payload (profile_version 1, bounded non-empty selector, empty initial start_checkpoint); conforming initiators never emit it before confirmation. The host returns UNIMPLEMENTED without issuing a handle or checkpoint, while mandatory service remains available. On a fresh control connection, Negotiate with request_id 1 confirms selected_version 1 and deployment bounds; the exact same Subscribe payload under increasing nonzero request_id 3 succeeds with a fresh connection-scoped handle and newly captured boundary. The paired success attributes refusal to the confirmation gate rather than payload or ID failure. Control confirmation never enables the probe connection. Partial negotiation acceptance leaves mandatory-only plus previously confirmed options; release-bundle inclusion never relaxes the per-connection gate. Durable known-safe recovery is exercised separately by CONF-URP-015. SKIP when unclaimed. Registered; not executed."
 
   - id: CONF-URP-002
     requirement: [SYN-URP-003, SYN-URP-004, SNTR-EVENT-007, SNTR-REL-005]
@@ -217,7 +204,7 @@ cases:
       frames:
         - {request_id: 1, body: result, payload_b64: "CAESCGhhbmRsZS1BGghjdXJzb3ItSyIJY3Vyc29yLUsxKgJtMTIBQjosCAESCGhhbmRsZS1BGAciCGN1cnNvci1LKgljdXJzb3ItSzEyB2dlbmVyaWM="}
         - {request_id: 2, body: result, payload_b64: "CAESCGhhbmRsZS1BGgljdXJzb3ItSzEiAUIqADIBQjolCAESCGhhbmRsZS1BGAciCWN1cnNvci1LMSoBQjIHZ2VuZXJpYw=="}
-        - {request_id: 0, body: notification, payload_b64: "CAESCGhhbmRsZS1BGAciAUI="}
+        - {request_id: 0, body: notification, shape: RecoveryNotification, payload_b64: "CAEaEQgBEghoYW5kbGUtQRgHIgFC"}
         - {request_id: 5, body: request, shape: RecoverySubscribeRequest, note: "subscribe with start_checkpoint=c2 after retiring handle-A"}
       hygiene: {absent_from: [moving_boundary, silent_truncation, same_handle_second_round, obsolete_boundary_replay]}
     notes: "Fixed-boundary round and fresh-handle second gap: replay from the durable known-safe checkpoint c1 returns pages as one RecoveryReplayPage payload per correlated RpcResult (never a page Notification), held live batches release only after a validated completion matching connection+handle-A+generation 7+version+exact boundary B (`replay_complete` at boundary B for handle-A), and the boundary never moves during the round. After durable progress c2 beyond boundary B, a subsequent gap retires handle-A locally (held queue and cursors cleared) and a fresh Subscribe(start_checkpoint=c2) yields a new handle with a NEWLY captured boundary; recovery runs toward the new boundary, never toward the obsolete one, with no same-handle second round and no marker reset (expected request frame carries a RecoverySubscribeRequest, not a same-handle Replay reset). SKIP when unclaimed. Registered; not yet executed."
@@ -234,7 +221,7 @@ cases:
       connection_state: ACTIVE
       session_state: unchanged
       frames:
-        - {request_id: 0, body: notification, payload_b64: "CAESCGhhbmRsZS1BGAciAUI="}
+        - {request_id: 0, body: notification, shape: RecoveryNotification, payload_b64: "CAEaEQgBEghoYW5kbGUtQRgHIgFC"}
       retry: "repeat the exact preceding Replay (or same CatchUp) payload with fresh RPC request IDs under documented finite attempts and an absolute deadline; never a same-handle second round or marker reset"
       hygiene: {absent_from: [idle_as_caught_up, tight_loop, rerun_effects]}
     notes: "Lost completion and bounded exact retry: while the round stays current, the host returns the retained page/acceptance verbatim without advancing pagination and re-emits the round's completion (same handle, same generation, same boundary — expected payload is the re-emitted RecoveryReplayComplete for handle-A boundary B); duplicate completions are idempotent and do not re-offer data. On retry or deadline budget exhaustion the initiator retires the handle locally (queue, cursors, pending offers cleared) and starts a fresh round through a new Subscribe from the durable known-safe checkpoint — no same-handle second round and no marker reset. SKIP when unclaimed. Registered; not yet executed."

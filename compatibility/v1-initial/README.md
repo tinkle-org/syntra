@@ -33,9 +33,9 @@ python3 -m unittest discover -s tests/schema -p 'test_*.py' -v
 The test runner reads `historical.json` directly, runs the separate historical
 WIRE audit, and verifies that FILE reports the owning-file changes. It needs
 neither a Git checkout nor a duplicate source tree, and never edits either
-descriptor archive. The updated descriptor/tooling suite has 13 checks
-(the original 12 plus a sole-source regression check); post-deletion results
-are pending in the [validation record](../../specifications/schema/validation.md).
+descriptor archive. The [schema tooling guide](../../docs/schema-tooling.md)
+describes the current checks and toolchain. Baselines are validation inputs,
+not audit reports, execution records, or release approvals.
 
 To reproduce this initial image **only at its reviewed source snapshot**:
 

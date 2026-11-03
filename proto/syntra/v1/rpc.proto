@@ -15,12 +15,12 @@ message RpcRequest {
   // payload accepts arbitrary bytes, including empty/non-UTF-8 (SNTR-RPC-003).
   bytes payload = 2;
   // timeout_ms is a relative millisecond budget; zero selects the bounded host
-  // default. This existing scalar has implicit presence, not an absolute clock.
+  // default. This scalar has implicit presence, not an absolute clock.
   uint32 timeout_ms = 3;
 }
 
-// RpcResult is the published RPC response name (SNTR-RPC-002/006). Renaming it
-// RpcResponse would change schema identity and generated APIs; see RFC 0001.
+// RpcResult completes one correlated RPC with a success payload or typed failure
+// (SNTR-RPC-002/006).
 message RpcResult {
   // outcome is selected even for a successful zero-byte result (SNTR-WIRE-007).
   // Missing outcome is representable by codecs but is not protocol success.

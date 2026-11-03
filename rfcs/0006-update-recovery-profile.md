@@ -24,7 +24,7 @@
 > each change. The owning profile, IDL comments, and registered recovery
 > manifest cases have been aligned to §11 in the acceptance PR (registration
 > is not execution). The
-> [acceptance plan](../conformance/plans/update-recovery.md) remains prose:
+> [acceptance plan](../specifications/recovery.md) remains prose:
 > not an executable or registered conformance-manifest run.
 
 ## 1. Summary

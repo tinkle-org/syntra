@@ -41,10 +41,10 @@ contain later amendments that disagree with earlier text and their owners.
 Some acceptance lists also combine contract review with downstream release
 execution, obscuring when independent implementers have an authoritative target.
 
-The [delivery plan](../docs/mobile-v1-delivery.md) selects SC1 and recovery,
+The [delivery plan](../conformance/README.md#independent-interoperability-and-acceptance-evidence) selects SC1 and recovery,
 while the historical release checklist lists all seven baseline transports.
 The [interop matrix](../conformance/interoperability/matrix.yaml) permits
-single-transport Core claims, but [core conformance](../specifications/core/conformance.md)
+single-transport Core claims, but [core conformance](../conformance/README.md)
 requires two transports for every claim. An explicit release-scope decision is
 needed, not an accidental extra implementation dependency.
 
@@ -205,7 +205,7 @@ checker, or changed validator expectations.
 | D4 | RELEASE.md current checklist; delivery plan; conformance claims, profile selection and interop matrix; core conformance fixture rules and SNTR-WIRE-901 wording/trace where needed |
 | D5 | Governance stable criteria; release checklist; conformance declaration/schema and evidence validation; mobile/security plans; reviewed stable-promotion workflow/configuration |
 
-The [acceptance package](../docs/v1-acceptance-package.md) tracks the next
+The [acceptance package](../conformance/README.md#independent-interoperability-and-acceptance-evidence) tracks the next
 increments. Every wire/behavior/IDL activation remains paired with its owning
 RFC, requirement-to-case trace and compatibility decision. No requirement or
 case is retired merely to reduce the evidence needed for a claim.
@@ -352,10 +352,10 @@ core RFCs remain pending their own decisions.
 
 - [Governance](../GOVERNANCE.md), [RFC process](README.md), and
   [contribution rules](../CONTRIBUTING.md).
-- [Release process](../RELEASE.md), [current readiness](../audits/v1-release-readiness.md),
-  and [delivery plan](../docs/mobile-v1-delivery.md).
+- [Release process](../RELEASE.md) and
+  [verification requirements](../conformance/README.md#independent-interoperability-and-acceptance-evidence).
 - [Decision-record template](../docs/decision-record-template.md) and
-  [acceptance package](../docs/v1-acceptance-package.md).
-- [Mobile acceptance](../conformance/plans/mobile-v1.md),
-  [SC1 plan](../conformance/plans/secure-channel.md), and
-  [recovery plan](../conformance/plans/update-recovery.md).
+  [acceptance package](../conformance/README.md#independent-interoperability-and-acceptance-evidence).
+- [Mobile acceptance](../conformance/README.md),
+  [SC1 plan](../specifications/security.md), and
+  [recovery plan](../specifications/recovery.md).

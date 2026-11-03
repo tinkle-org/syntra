@@ -1,7 +1,22 @@
-# TCP framing test vectors
+# Authenticated inner-frame stream fixtures
 
-Exact byte vectors for the `SNTR-TCP-V1` stream framing (`specifications/transports/tcp.md` §13). The complete table with expected handling lives in the spec; this directory provides the machine-readable copy.
+This directory tests the u32BE length plus serialized `Frame` stream inside
+authenticated channel plaintext on every current carrier. The directory name
+is a fixture path, not a carrier selector. These bytes are never sent directly
+to a TCP socket or WebSocket message as an unprotected Syntra connection.
+The outer TCP prefix is u16BE; WebSocket messages have no outer length prefix.
+See [wire format](../../../specifications/wire-format.md) and
+[transports](../../../specifications/transports.md) for the protocol rules.
 
-- [`vectors.json`](vectors.json) — V1–V9 with `wire_hex` (length prefix + payload as transmitted), expected decodings, and handling. V1, V2, and empty-payload decodings were verified with `buf convert` against `compatibility/v1-initial/image.json`.
-- Canonical encodings assume field-ordered Protobuf output; parsers MUST also accept field-reordered equivalents (V2 proves this for the `hello` unit) and MUST NOT assume byte-identical output across encoders.
-- V4 is a construction recipe (1,048,576-byte valid `Frame`); V6–V8 require no following payload bytes — rejection happens on the prefix or at EOF.
+- [`vectors.json`](vectors.json) contains V1–V9 with exact chosen fixture bytes.
+- [`byte-vectors.yaml`](byte-vectors.yaml) adds request, result and notification
+  units. Matching IDs in both files carry identical bytes.
+- V1/V2 decode to the same logical hello despite different field order. This
+  does not require byte-identical Protobuf re-encoding.
+- V4 is a maximum-size construction recipe. All independent field limits and
+  validation/state/authentication conditions still apply.
+- V6 is rejected on its oversized inner prefix before allocating the body.
+  V7/V8 close at EOF with incomplete prefix/body; no resynchronization occurs.
+
+Static validation checks lengths and fixture consistency. It is not evidence
+that a peer has executed the handling assertions.

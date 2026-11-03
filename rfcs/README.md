@@ -1,5 +1,11 @@
 # RFC Process
 
+The numbered RFCs are dated design and decision records. They preserve the
+names, wire identifiers, and scope reviewed at their recorded revision. The
+[current protocol reference](../README.md#detailed-description) describes the
+single Syntra protocol; historical profile registrations are not current
+protocol options. This distinction changes no recorded approval status.
+
 RFCs (Requests for Comments) are how Syntra makes normative decisions in
 public. Any wire, behavioral, transport, or security change starts here.
 
@@ -13,7 +19,7 @@ stable releases).
   stream, capability, version, or compatibility rule.
 - Any `.proto` field change (addition, deprecation, option change).
 - Any transport profile addition/change or security requirement.
-- Any exception to an ADR or to `specifications/architecture.md`.
+- Any exception to an ADR or to the [protocol reference](../README.md#detailed-description).
 - Any wire-incompatible (breaking) change — always major-version RFC.
 
 Direct PRs (no RFC) are only for non-normative fixes: typos,

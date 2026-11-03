@@ -10,6 +10,7 @@ from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "validate-repo.py"
 SPEC = importlib.util.spec_from_file_location("syntra_validate_repo", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
 VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATOR)
 
@@ -78,6 +79,22 @@ class ValidateManifestScalarsTests(unittest.TestCase):
             self.assertTrue(VALIDATOR._is_local_report("generic_protocol_rejection", set()))
         case["expected"]["transport"]["peer_observation"]["tcp_tls"]["local_report"] = "generic_protocol_rejection"
         self.assertEqual(self.check_case(case), "")
+
+    def test_unallocated_alphanumeric_case_id_is_rejected(self):
+        case = make_case()
+        case["id"] = "CONF-SESS-R01"
+        self.assertIn("invalid case ID", self.check_case(case))
+        case["id"] = "CONF-SESS-R02"
+        self.assertIn("invalid case ID", self.check_case(case))
+
+    def test_exact_carrier_applicability_is_checked(self):
+        case = make_case()
+        case["applicable_profiles"] = ["SYNTRA-1.0-WSS"]
+        self.assertEqual(self.check_case(case), "")
+        for bad in ([], None, ["SNTR-WSS-H1-V1"], ["SYNTRA-1.0-UDP"], [["SYNTRA-1.0-TCP"]]):
+            VALIDATOR.ERRORS.clear()
+            case["applicable_profiles"] = bad
+            self.assertIn("applicable_profiles", self.check_case(case))
 
     def test_bad_top_level_error_code_is_recorded(self):
         for bad in (["FAILED_PRECONDITION"], {"value": "FAILED_PRECONDITION"}, 123, None):
@@ -158,7 +175,7 @@ class ValidateManifestScalarsTests(unittest.TestCase):
         case = make_case()
         case["applicable_transports"] = ["tcp_tls", "ws_wss"]
         self.assertEqual(self.check_case(case), "")
-        for bad in (None, [], "tcp_tls", [""], "http_1_1"):
+        for bad in (None, [], "tcp_tls", [""], "http_1_1", ["http_1_1"], ["https_h2"]):
             with self.subTest(bad=bad):
                 VALIDATOR.ERRORS.clear()
                 case = make_case()
@@ -178,7 +195,9 @@ class ValidateManifestScalarsTests(unittest.TestCase):
     def test_bad_capability_values_are_recorded(self):
         # Unhashable members (nested maps/sequences) and non-list values must
         # produce recorded errors instead of TypeError at membership/iteration.
-        for bad in ([{"id": 1}], 7, "resumable", [["x"]]):
+        for bad in ([{"id": 1}], 7, "resumable", [["x"]],
+                    ["events-v1"], ["events-replay-v1"], ["resume-v1"],
+                    ["syntra.reliable-session/1"]):
             with self.subTest(bad=bad):
                 VALIDATOR.ERRORS.clear()
                 case = make_case()
@@ -187,14 +206,14 @@ class ValidateManifestScalarsTests(unittest.TestCase):
 
     def test_bad_requirement_values_are_recorded(self):
         # Non-list `requirement` (scalar) and nested sequences inside it.
-        for bad in (5, "SNTR-RPC-002", [["SNTR-RPC-002"]]):
+        for bad in (None, [], 5, "SNTR-RPC-002", [["SNTR-RPC-002"]]):
             with self.subTest(bad=bad):
                 VALIDATOR.ERRORS.clear()
                 case = make_case()
                 case["requirement"] = bad
                 result = self.check_case(case)
                 self.assertTrue(
-                    "must be a list" in result or "malformed requirement ref" in result,
+                    "must be a non-empty list" in result or "malformed requirement ref" in result,
                     result)
 
     def test_malformed_collected_requirement_ref_is_recorded(self):

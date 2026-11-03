@@ -1,6 +1,6 @@
 """Descriptor/tooling checks, not a Syntra runtime or transport validator.
 
-Uses Python's standard library and Buf; all subprocesses have bounded waits.
+Uses Python's standard library, PyYAML and Buf; subprocesses have bounded waits.
 Historical declarations come from the archived immutable descriptor
 compatibility/v1-initial/historical.json, generated from the actual unchanged
 sources at commit 92e5f281aa7c3adac9ba78588c1140b12d55c1d9 before the old
@@ -8,12 +8,15 @@ schema tree was removed. Baseline archive files are never rewritten.
 """
 
 import hashlib
+import base64
 import json
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 import unittest
+
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -176,10 +179,48 @@ class SchemaTests(unittest.TestCase):
         # Individual cited IDs (ranges are prose shorthand) must have definitions.
         definitions = set()
         for path in (ROOT / "specifications").rglob("*.md"):
-            definitions.update(re.findall(r"\*\*(SNTR-[A-Z]+-\d+)\*\*", path.read_text()))
+            definitions.update(re.findall(r"\*\*(SNTR-[A-Z]+-\d+[A-Z]*)\*\*", path.read_text()))
         for path in (ROOT / "proto").rglob("*.proto"):
-            for requirement in re.findall(r"SNTR-[A-Z]+-\d+", path.read_text()):
+            for requirement in re.findall(r"\bSNTR-[A-Z]+-\d+[A-Z]*\b", path.read_text()):
                 self.assertIn(requirement, definitions, f"{path}: {requirement}")
+
+    def test_recovery_completion_wrappers_against_actual_idl(self):
+        cases = yaml.safe_load((ROOT / "conformance/manifest/recovery.yaml").read_text())["cases"]
+        expected = {"profileVersion": 1, "replayComplete": {
+            "profileVersion": 1, "subscriptionHandle": "aGFuZGxlLUE=",
+            "generation": "7", "liveBoundaryCheckpoint": "Qg=="}}
+        for cid in ("CONF-URP-011", "CONF-URP-012"):
+            case = next(c for c in cases if c["id"] == cid)
+            raw = base64.b64decode(next(f["payload_b64"] for f in case["expected"]["frames"]
+                                       if f["body"] == "notification"), validate=True)
+            decoded = subprocess.run([
+                "buf", "convert", self.new_path, "--type", "syntra.v1.RecoveryNotification",
+                "--from", "-#format=binpb", "--to", "-#format=json"],
+                input=raw, capture_output=True, cwd=ROOT, timeout=60)
+            self.assertEqual(decoded.returncode, 0, decoded.stderr.decode())
+            self.assertEqual(json.loads(decoded.stdout), expected)
+            encoded = subprocess.run([
+                "buf", "convert", self.new_path, "--type", "syntra.v1.RecoveryNotification",
+                "--from", "-#format=json", "--to", "-#format=binpb"],
+                input=json.dumps(expected).encode(), capture_output=True, cwd=ROOT, timeout=60)
+            self.assertEqual(encoded.returncode, 0, encoded.stderr.decode())
+            self.assertEqual(encoded.stdout, raw)
+
+    def test_scalar_merge_fixture_against_actual_idl(self):
+        case = next(c for c in yaml.safe_load((ROOT / "conformance/manifest/core.yaml").read_text())["cases"]
+                    if c["id"] == "CONF-CORE-011")
+        decoded = []
+        for frame in case["input"]["frames"]:
+            result = subprocess.run([
+                "buf", "convert", self.new_path, "--type", "syntra.v1.Frame",
+                "--from", "-#format=binpb", "--to", "-#format=json"],
+                input=base64.b64decode(frame["raw_b64"], validate=True),
+                capture_output=True, cwd=ROOT, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            decoded.append(json.loads(result.stdout))
+        self.assertEqual(decoded[0], {"version": 1, "requestId": "7", "request": {
+            "method": "/example.Echo/Echo", "payload": "aGVsbG8=", "timeoutMs": 500}})
+        self.assertEqual(decoded[1], {"version": 1, "requestId": "7", "cancel": {}})
 
     def test_no_domain_types_or_transport_dependencies(self):
         source = "\n".join(path.read_text() for path in (ROOT / "proto").rglob("*.proto"))

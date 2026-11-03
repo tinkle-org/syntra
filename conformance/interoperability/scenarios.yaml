@@ -1,13 +1,17 @@
 # Cross-implementation scenarios (machine-readable companions to matrix.yaml)
 format_version: "1.0"
+specification: conformance/README.md
+profiles: [SYNTRA-1.0-TCP, SYNTRA-1.0-WSS, SYNTRA-1.0-WS]
+status: not-executed
 scenarios:
   - id: XIMPL-HELLO-ECHO-EVENT
     name: "hello, echo, concurrent echo, event, graceful close"
     steps:
+      - { actor: both, action: "establish the selected canonical protected carrier, in separate bootstrap and returning runs", expect: "exact syntra.1.0 context, actual carrier code and authenticated confirmation; WSS TLS validation precedes M1" }
       - { actor: initiator, action: "send hello (task fixture credential bytes, throwaway)", expect: "ready with fresh connection_id" }
       - { actor: initiator, action: "send request id 7 /example.Echo/Echo payload hello", expect: "result id 7 payload hello" }
       - { actor: initiator, action: "send requests id 8 and id 9 concurrently", expect: "results id 8 and id 9 in any order, no cross-delivery" }
-      - { actor: host, action: "emit notification payload event-1 (only where events-v1 claimed; else skip with reason)", expect: "initiator delivers event without completing any RPC" }
+      - { actor: host, action: "emit notification payload event-1 after explicit application stream setup; otherwise skip with reason", expect: "initiator delivers event without completing any RPC" }
       - { actor: either, action: "initiate graceful close", expect: "CLOSING then CLOSED; no new RPCs; per-connection state discarded" }
     swap_roles: true
     logs_required: ["wire trace both legs", "per-ID verdicts", "implementation versions and bounds"]
@@ -16,7 +20,7 @@ scenarios:
     name: "unknown method, duplicate ID, oversize prefix"
     steps:
       - { actor: initiator, action: "send request id 11 /example.Unknown/Call", expect: "result id 11 error UNIMPLEMENTED; connection usable" }
-      - { actor: initiator, action: "send duplicate request id 7 while 7 outstanding", expect: "FAILED_PRECONDITION for the duplicate; original completes once" }
-      - { actor: initiator, action: "send oversize prefix (MAX+1) with no payload", expect: "rejection on the prefix alone; immediate close (TCP/TLS) or 413/Close-1009 (HTTP/WS bindings)" }
+      - { actor: initiator, action: "hold request id 7 pending with the CONF-RPC-004 barrier; inject duplicate 7", expect: "detecting host records local FAILED_PRECONDITION; native termination, no invented RpcResult; no duplicate dispatch" }
+      - { actor: initiator, action: "send authenticated inner u32BE prefix MAX+1 without frame payload", expect: "reject before allocation above the frame limit; native termination; no protected dispatch" }
     swap_roles: false
     logs_required: ["wire trace", "allocation proof for the oversize row (no payload-sized allocation)"]

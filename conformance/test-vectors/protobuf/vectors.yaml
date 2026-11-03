@@ -1,27 +1,15 @@
-# Golden Protobuf vectors (Section J) — known valid encodings, verified with
+# Golden Protobuf vectors — known valid encodings, verified with
 # `protoc --decode=syntra.v1.Frame` against proto/syntra/v1/*.proto.
 #
-# Task-name mapping (the task's informal names vs the v1 IDL):
-#   ClientHello   -> syntra.v1.ClientHello (hello field 10 of Frame)
-#   ServerHello   -> DOES NOT EXIST in v1. The host emits exactly one terminal
-#                    outcome: ServerReady on success, or a handshake error + close.
-#                    GOLD-PROT-READY-01 is the success half.
-#   Authentication-> No separate message. Carriage IS ClientHello.credential
-#                    (opaque bytes) plus optional post-ACTIVE generic RPCs.
-#                    GOLD-PROT-HELLO-01 shows the credential on the wire.
-#   RpcRequest    -> syntra.v1.RpcRequest (request field 12 of Frame)
-#   RpcResponse   -> syntra.v1.RpcResult (result field 13 of Frame; the published
-#                    response name is RpcResult, never renamed)
-#   RpcError      -> syntra.v1.RpcError (error outcome of RpcResult)
-#   Event         -> syntra.v1.Notification (notification field 15 of Frame)
-#   ProtocolError -> No separate message. A typed RpcError/handshake error where
-#                    an RPC/handshake context exists, else connection closure.
+# Frame bodies are ClientHello, ServerReady, RpcRequest, RpcResult, Cancel,
+# and Notification. RpcError is a RpcResult outcome. Authentication credentials
+# are opaque ClientHello bytes; GOLD-PROT-AUTHN-01 isolates their carriage.
 #
 # IMPORTANT: these are known VALID encodings of the stated logical messages.
 # They DO NOT imply that all conforming serializers must emit byte-identical
 # output for semantically equivalent messages (SNTR-SER-002/901). Runners MUST
-# compare decoded fields (logical equality), never raw bytes — except the TCP
-# framing prefix + chosen fixture bytes, which are byte-exact for that fixture.
+# compare decoded fields (logical equality), never raw bytes — except the
+# authenticated inner-stream prefix + chosen fixture, which are byte-exact.
 format_version: "1.0"
 encoding: "proto3 binary wire format; fields below are (field_number: value); request_id 0 is omitted on the wire by implicit presence"
 vectors:

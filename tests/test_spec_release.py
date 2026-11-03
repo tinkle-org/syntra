@@ -19,7 +19,7 @@ SHA = "a" * 40
 BODY = "\n".join((
     "Release-Tag: v1.0",
     f"Release-Commit: {SHA}",
-    "Release-Scope: SC1/WSS and recovery",
+    "Release-Scope: Syntra over WSS and update recovery",
     "Release-Freeze: https://example.invalid/freeze",
     "Release-Evidence: https://example.invalid/evidence",
     "Release-Security: https://example.invalid/review",

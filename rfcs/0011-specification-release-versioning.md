@@ -10,8 +10,8 @@
 - Relates to: [GOVERNANCE.md](../GOVERNANCE.md) §§3–5/8,
   [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md) §§3 D3/D5,
   [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md),
-  [versioning.md](../specifications/core/versioning.md),
-  [RELEASE.md](../RELEASE.md), and [schema-registry.md](../docs/schema-registry.md)
+  [versioning.md](../specifications/wire-format.md),
+  [RELEASE.md](../RELEASE.md), and [schema-tooling.md](../docs/schema-tooling.md)
 - Reviewers: Pending maintainer assignment and public review
 
 This document is a proposal, not an accepted governance decision, a
@@ -318,7 +318,7 @@ information.
 
 - [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md),
   [decision record template](../docs/decision-record-template.md), and
-  [current release readiness](../audits/v1-release-readiness.md).
+  [release process](../RELEASE.md).
 - [RFC Editor errata](https://www.rfc-editor.org/series/rfc-errata/),
   [Semantic Versioning 2.0](https://semver.org/spec/v2.0.0.html), and
   [Matrix specification release process](https://github.com/matrix-org/matrix-spec/blob/main/meta/releasing.md).
