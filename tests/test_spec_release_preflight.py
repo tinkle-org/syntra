@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import yaml
 
@@ -44,6 +45,12 @@ class TagValidationTests(unittest.TestCase):
 
 class GitPreflightTests(unittest.TestCase):
     def setUp(self):
+        # Trace2 observers can write notes asynchronously after Git exits, racing
+        # temporary-repository cleanup. Isolate fixture and preflight subprocesses
+        # for the full fixture lifetime without changing the user's Git config.
+        trace_environment = mock.patch.dict(os.environ, {"GIT_TRACE2_EVENT": "0"})
+        trace_environment.start()
+        self.addCleanup(trace_environment.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
@@ -114,6 +121,33 @@ class GitPreflightTests(unittest.TestCase):
     def test_trusted_head_must_be_the_checked_out_commit(self):
         with self.assertRaisesRegex(PREFLIGHT.PreflightError, "checked-out HEAD"):
             PREFLIGHT.verify_candidate(self.repo, "v1.0", self.first, self.first)
+
+
+class GitTraceIsolationTests(unittest.TestCase):
+    def test_fixture_and_preflight_do_not_notify_external_trace_observers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "events.jsonl"
+            with mock.patch.dict(os.environ, {"GIT_TRACE2_EVENT": str(trace)}):
+                # Positive control: native Git really emits events to this sink.
+                subprocess.run(["git", "--version"], cwd=directory, check=True,
+                               capture_output=True, timeout=15)
+                self.assertGreater(trace.stat().st_size, 0)
+                trace.unlink()
+
+                fixture = GitPreflightTests("test_ancestor_and_head_are_accepted_without_writing")
+                try:
+                    fixture.setUp()
+                    with self.subTest(path="fixture Git commands"):
+                        self.assertFalse(trace.exists(), "fixture Git leaked Trace2 events")
+                    trace.unlink(missing_ok=True)
+
+                    PREFLIGHT.verify_candidate(fixture.repo, "v1.0-rc1",
+                                               fixture.first, fixture.second)
+                    with self.subTest(path="preflight Git commands"):
+                        self.assertFalse(trace.exists(), "preflight Git leaked Trace2 events")
+                finally:
+                    self.assertTrue(fixture.doCleanups())
+                self.assertEqual(os.environ["GIT_TRACE2_EVENT"], str(trace))
 
 
 class WorkflowSafetyTests(unittest.TestCase):
