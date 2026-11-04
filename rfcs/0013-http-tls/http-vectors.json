@@ -1,0 +1,30 @@
+{
+  "status": "pending-adoption",
+  "scope": "structural-HTTP-only-synthetic-bodies-not-valid-Noise",
+  "vectors": [
+    {"id": "R13-H01", "operation": "send", "direction": "request", "start_line": "POST /syntra/1.0/http/send HTTP/1.1", "headers": [["Host", "example.invalid:80"], ["Content-Length", "17"], ["Content-Type", "application/octet-stream"], ["Cache-Control", "no-store"], ["Accept", "application/octet-stream"], ["Syntra-Route", "0000000000000000000000000000000000000000000000000000000000000000"], ["Syntra-Upload", "0"]], "body_hex": "0000000000000000000000000000000000", "expected": "accept"},
+    {"id": "R13-H02", "operation": "send", "direction": "response", "start_line": "HTTP/1.1 204 No Content", "headers": [["Cache-Control", "no-store"], ["Syntra-Upload", "0"]], "body_hex": "", "expected": "accept", "attests": {"complete_carrier_record_input": true, "noise_authenticated": false, "runtime_consumed": false, "effects": false}},
+    {"id": "R13-H03", "operation": "poll", "direction": "response", "start_line": "HTTP/1.1 204 No Content", "headers": [["Cache-Control", "no-store"], ["Syntra-Poll", "0"]], "body_hex": "", "expected": "accept"},
+    {"id": "R13-H04", "operation": "poll", "direction": "response", "start_line": "HTTP/1.1 200 OK", "headers": [["Content-Length", "17"], ["Content-Type", "application/octet-stream"], ["Cache-Control", "no-store"], ["Syntra-Poll", "0"]], "body_hex": "0000000000000000000000000000000000", "expected": "accept"},
+    {"id": "R13-H05", "operation": "send", "direction": "response", "start_line": "HTTP/1.1 204 No Content", "headers": [["Content-Length", "0"], ["Cache-Control", "no-store"], ["Syntra-Upload", "0"]], "body_hex": "", "expected": "reject", "reason": "204-content-length"},
+    {"id": "R13-H06", "base": "R13-H01", "append_headers": [["Content-Length", "17"]], "expected": "reject", "reason": "duplicate-content-length"},
+    {"id": "R13-H07", "base": "R13-H01", "append_headers": [["Transfer-Encoding", "chunked"]], "expected": "reject", "reason": "transfer-encoding"},
+    {"id": "R13-H08", "base": "R13-H01", "replace_headers": {"Content-Length": "16"}, "expected": "reject", "reason": "body-count-mismatch"},
+    {"id": "R13-H09", "base": "R13-H01", "replace_headers": {"Syntra-Upload": "00"}, "expected": "reject", "reason": "noncanonical-counter"},
+    {"id": "R13-H10", "base": "R13-H01", "replace_headers": {"Syntra-Route": "A000000000000000000000000000000000000000000000000000000000000000"}, "expected": "reject", "reason": "noncanonical-route"},
+    {"id": "R13-H11", "base": "R13-H01", "replace_headers": {"Host": "other.invalid:80"}, "expected": "reject", "reason": "wrong-authority"},
+    {"id": "R13-H12", "base": "R13-H01", "append_headers": [["Authorization", "fixture-not-a-credential"]], "expected": "reject", "reason": "ambient-credential-header"},
+    {"id": "R13-H13", "base": "R13-H01", "append_headers": [["Syntra-Unknown", "1"]], "expected": "reject", "reason": "unnegotiated-header"},
+    {"id": "R13-H14", "base": "R13-H01", "append_headers": [["Origin", "null"]], "expected": "reject", "reason": "opaque-origin"},
+    {"id": "R13-H15", "operation": "connect", "direction": "response", "start_line": "HTTP/1.1 200 Connection Established", "headers": [["Content-Length", "123"], ["Transfer-Encoding", "chunked"]], "body_hex": "", "read_ahead_hex": "160303", "expected": "tunnel", "reason": "ignore-connect-cl-te-preserve-tunnel-bytes"},
+    {"id": "R13-H16", "operation": "connect", "direction": "response", "start_line": "HTTP/1.1 407 Proxy Authentication Required", "headers": [["Content-Length", "0"]], "body_hex": "", "expected": "reject", "reason": "no-automatic-proxy-challenge"},
+    {"id": "R13-H17", "operation": "open", "direction": "request", "start_line": "POST /syntra/1.0/http/open HTTP/1.1", "headers": [["Host", "example.invalid:80"], ["Content-Length", "83"], ["Content-Type", "application/octet-stream"], ["Cache-Control", "no-store"], ["Accept", "application/octet-stream"]], "body_hex": "73796e7472612e312e3001040000000000000000000000000000000000000000000161", "append_zero_bytes": 48, "expected": "accept", "reason": "public-context-with-synthetic-not-valid-Noise-flight"},
+    {"id": "R13-H18", "operation": "open", "direction": "response", "start_line": "HTTP/1.1 201 Created", "headers": [["Content-Length", "48"], ["Content-Type", "application/octet-stream"], ["Cache-Control", "no-store"], ["Syntra-Route", "0000000000000000000000000000000000000000000000000000000000000000"]], "body_hex": "", "append_zero_bytes": 48, "expected": "accept", "reason": "synthetic-not-valid-Noise-M2"},
+    {"id": "R13-H19", "operation": "poll", "direction": "request", "start_line": "POST /syntra/1.0/http/poll HTTP/1.1", "headers": [["Host", "example.invalid:80"], ["Content-Length", "0"], ["Cache-Control", "no-store"], ["Accept", "application/octet-stream"], ["Syntra-Route", "0000000000000000000000000000000000000000000000000000000000000000"], ["Syntra-Poll", "0"]], "body_hex": "", "expected": "accept"},
+    {"id": "R13-H20", "operation": "close", "direction": "request", "start_line": "POST /syntra/1.0/http/close HTTP/1.1", "headers": [["Host", "example.invalid:80"], ["Content-Length", "0"], ["Cache-Control", "no-store"], ["Accept", "application/octet-stream"], ["Syntra-Route", "0000000000000000000000000000000000000000000000000000000000000000"]], "body_hex": "", "expected": "accept"},
+    {"id": "R13-H21", "operation": "close", "direction": "response", "start_line": "HTTP/1.1 204 No Content", "headers": [["Cache-Control", "no-store"]], "body_hex": "", "expected": "accept"},
+    {"id": "R13-H22", "base": "R13-H03", "append_headers": [["Transfer-Encoding", "chunked"]], "expected": "reject", "reason": "204-transfer-encoding"},
+    {"id": "R13-H23", "base": "R13-H01", "replace_headers": {"Content-Length": "65535"}, "append_zero_bytes": 65518, "expected": "accept", "reason": "MAX-record-structural-body-not-valid-Noise"},
+    {"id": "R13-H24", "base": "R13-H01", "replace_headers": {"Content-Length": "65536"}, "append_zero_bytes": 65519, "expected": "reject", "reason": "MAX-plus-one-record-body"}
+  ]
+}

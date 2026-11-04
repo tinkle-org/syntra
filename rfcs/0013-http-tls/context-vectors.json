@@ -1,0 +1,23 @@
+{
+  "status": "pending-adoption",
+  "source": "conformance/test-vectors/connection/context-vectors.json",
+  "transformation": "base-context-with-proposed-carrier-only",
+  "scope": "public-context-encoding-only-not-Noise-ciphertext",
+  "prologue_equals_context": true,
+  "contexts": [
+    {"id": "R13-CONTEXT-01", "base": "SYNTRA-CONTEXT-01", "carrier": 4, "context_hex": "73796e7472612e312e3001040000000000000000000000000000000000000000000161"},
+    {"id": "R13-CONTEXT-02", "base": "SYNTRA-CONTEXT-05", "carrier": 4, "context_hex": "73796e7472612e312e3002040102030400000000000000010102030405060708000f6578616d706c652e73657276696365"},
+    {"id": "R13-CONTEXT-03", "base": "SYNTRA-CONTEXT-01", "carrier": 5, "context_hex": "73796e7472612e312e3001050000000000000000000000000000000000000000000161"},
+    {"id": "R13-CONTEXT-04", "base": "SYNTRA-CONTEXT-05", "carrier": 5, "context_hex": "73796e7472612e312e3002050102030400000000000000010102030405060708000f6578616d706c652e73657276696365"}
+  ],
+  "negative_recipes": [
+    {"id": "R13-N01", "base": "R13-CONTEXT-01", "changes": {"carrier": 6}, "expected": "reject-before-noise"},
+    {"id": "R13-N02", "base": "R13-CONTEXT-03", "changes": {"carrier": 3}, "expected": "reject-before-noise"},
+    {"id": "R13-N03", "base": "R13-CONTEXT-01", "changes": {"epoch": 1}, "expected": "reject-before-noise"},
+    {"id": "R13-N04", "base": "R13-CONTEXT-02", "changes": {"handle_hex": "0000000000000000"}, "expected": "reject-before-noise"},
+    {"id": "R13-N05", "base": "R13-CONTEXT-03", "changes": {"scope": ""}, "expected": "reject-before-noise"},
+    {"id": "R13-N06", "base": "R13-CONTEXT-04", "changes": {"mode": 0}, "expected": "reject-before-noise"},
+    {"id": "R13-N07", "base": "R13-CONTEXT-02", "changes": {"carrier": 5}, "expected_carrier": 4, "expected": "reject-before-lookup"},
+    {"id": "R13-N08", "base": "R13-CONTEXT-04", "changes": {"carrier": 4}, "expected_carrier": 5, "expected": "reject-before-lookup"}
+  ]
+}

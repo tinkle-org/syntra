@@ -1,0 +1,34 @@
+# Local traceability only; proposed SNTR IDs are not registered allocations.
+format_version: '1.0'
+status: pending-adoption
+runtime_verdict: NOT_EXECUTED
+requirements:
+  - {requirement_id: R13-01, proposed_requirement_id: SNTR-HPC-001, owner: specifications/transports.md, test_ids: [R13-T01]}
+  - {requirement_id: R13-02, proposed_requirement_id: SNTR-HPC-002, owner: specifications/transports.md, test_ids: [R13-T02]}
+  - {requirement_id: R13-03, proposed_requirement_id: SNTR-HPC-003, owner: specifications/transports.md, test_ids: [R13-T03]}
+  - {requirement_id: R13-04, proposed_requirement_id: SNTR-HPC-004, owner: specifications/transports.md, test_ids: [R13-T02]}
+  - {requirement_id: R13-05, proposed_requirement_id: SNTR-HPC-005, owner: specifications/transports.md, test_ids: [R13-T04]}
+  - {requirement_id: R13-06, proposed_requirement_id: SNTR-HPC-006, owner: specifications/transports.md, test_ids: [R13-T04]}
+  - {requirement_id: R13-07, proposed_requirement_id: SNTR-HPC-007, owner: specifications/transports.md, test_ids: [R13-T05, R13-T14]}
+  - {requirement_id: R13-08, proposed_requirement_id: SNTR-HPC-008, owner: specifications/transports.md, test_ids: [R13-T05]}
+  - {requirement_id: R13-09, proposed_requirement_id: SNTR-HPC-009, owner: specifications/transports.md, test_ids: [R13-T06]}
+  - {requirement_id: R13-10, proposed_requirement_id: SNTR-HPC-010, owner: specifications/transports.md, test_ids: [R13-T06]}
+  - {requirement_id: R13-11, proposed_requirement_id: SNTR-HPC-011, owner: specifications/transports.md, test_ids: [R13-T06]}
+  - {requirement_id: R13-12, proposed_requirement_id: SNTR-HPC-012, owner: specifications/transports.md, test_ids: [R13-T07]}
+  - {requirement_id: R13-13, proposed_requirement_id: SNTR-HPC-013, owner: specifications/transports.md, test_ids: [R13-T07]}
+  - {requirement_id: R13-14, proposed_requirement_id: SNTR-HPC-014, owner: specifications/transports.md, test_ids: [R13-T08]}
+  - {requirement_id: R13-15, proposed_requirement_id: SNTR-HPC-015, owner: specifications/transports.md, test_ids: [R13-T08]}
+  - {requirement_id: R13-16, proposed_requirement_id: SNTR-HPC-016, owner: specifications/transports.md, test_ids: [R13-T03, R13-T09]}
+  - {requirement_id: R13-17, proposed_requirement_id: SNTR-HPC-017, owner: specifications/transports.md, test_ids: [R13-T09, R13-T14]}
+  - {requirement_id: R13-18, proposed_requirement_id: SNTR-HPC-018, owner: specifications/security.md, test_ids: [R13-T10]}
+  - {requirement_id: R13-19, proposed_requirement_id: SNTR-HPC-019, owner: specifications/security.md, test_ids: [R13-T10]}
+  - {requirement_id: R13-20, proposed_requirement_id: SNTR-HPC-020, owner: specifications/security.md, test_ids: [R13-T10]}
+  - {requirement_id: R13-21, proposed_requirement_id: SNTR-HPC-021, owner: specifications/security.md, test_ids: [R13-T10]}
+  - {requirement_id: R13-22, proposed_requirement_id: SNTR-HPC-022, owner: specifications/transports.md, test_ids: [R13-T11]}
+  - {requirement_id: R13-23, proposed_requirement_id: SNTR-HPC-023, owner: specifications/transports.md, test_ids: [R13-T12]}
+  - {requirement_id: R13-24, proposed_requirement_id: SNTR-HPC-024, owner: specifications/transports.md, test_ids: [R13-T12]}
+  - {requirement_id: R13-25, proposed_requirement_id: SNTR-HPC-025, owner: specifications/transports.md, test_ids: [R13-T12]}
+  - {requirement_id: R13-26, proposed_requirement_id: SNTR-HPC-026, owner: specifications/transports.md, test_ids: [R13-T13]}
+  - {requirement_id: R13-27, proposed_requirement_id: SNTR-HPC-027, owner: specifications/transports.md, test_ids: [R13-T13]}
+  - {requirement_id: R13-28, proposed_requirement_id: SNTR-HPC-028, owner: specifications/transports.md, test_ids: [R13-T13]}
+  - {requirement_id: R13-29, proposed_requirement_id: SNTR-HPC-029, owner: specifications/security.md, test_ids: [R13-T14]}
