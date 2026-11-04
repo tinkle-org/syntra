@@ -1,0 +1,29 @@
+tests/test_spec_release_preflight.py
+  s_ec232f80b8000b::t_06a87e710c1345 9,126-150
+  s_ec232f80b8000b::t_8b12d2261e0f60 48-53
+  s_6a2b263e21525c::t_1576b11cdc98cf 151-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f5e781a63c82851af24d85c7f831c1bb413d8549",
+  "prompts": {},
+  "sessions": {
+    "s_6a2b263e21525c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e57ad8778ffe11rRHT3snOKrOz",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_ec232f80b8000b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e57d9b0b6ffegvpA2KqI39jMJU",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
