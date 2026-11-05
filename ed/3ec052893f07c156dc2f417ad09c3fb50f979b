@@ -1,0 +1,21 @@
+tests/test_spec_release_preflight.py
+  s_ec232f80b8000b::t_c6833cf69f66d1 48,128-129,131
+tests/test_http_candidate.py
+  s_ec232f80b8000b::t_c6833cf69f66d1 23-24,26,33,43,55,64,69,83,96,124,131,150,171,189,200,227,239,259,293,306,320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed3ec052893f07c156dc2f417ad09c3fb50f979b",
+  "prompts": {},
+  "sessions": {
+    "s_ec232f80b8000b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e57d9b0b6ffegvpA2KqI39jMJU",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
