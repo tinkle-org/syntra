@@ -25,6 +25,7 @@
     {"id": "R13-H21", "operation": "close", "direction": "response", "start_line": "HTTP/1.1 204 No Content", "headers": [["Cache-Control", "no-store"]], "body_hex": "", "expected": "accept"},
     {"id": "R13-H22", "base": "R13-H03", "append_headers": [["Transfer-Encoding", "chunked"]], "expected": "reject", "reason": "204-transfer-encoding"},
     {"id": "R13-H23", "base": "R13-H01", "replace_headers": {"Content-Length": "65535"}, "append_zero_bytes": 65518, "expected": "accept", "reason": "MAX-record-structural-body-not-valid-Noise"},
-    {"id": "R13-H24", "base": "R13-H01", "replace_headers": {"Content-Length": "65536"}, "append_zero_bytes": 65519, "expected": "reject", "reason": "MAX-plus-one-record-body"}
+    {"id": "R13-H24", "base": "R13-H01", "replace_headers": {"Content-Length": "65536"}, "append_zero_bytes": 65519, "expected": "reject", "reason": "MAX-plus-one-record-body"},
+    {"id": "R13-H25", "base": "R13-H01", "append_headers": [["Connection", "keep-alive, close"]], "expected": "reject", "reason": "connection-close-token"}
   ]
 }

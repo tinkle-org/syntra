@@ -69,16 +69,19 @@ LIMITS = {
 
 
 def require(condition, message):
+    """Raise ValueError unless the candidate invariant holds."""
     if not condition:
         raise ValueError(message)
 
 
 def exact(actual, expected, message):
+    """Compare JSON-normalized values so bool and int cannot alias."""
     # JSON serialization distinguishes bool/int, unlike Python dict equality.
     require(json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True), message)
 
 
 def unique_pairs(pairs):
+    """Collect mapping pairs while rejecting duplicate keys."""
     result = {}
     for key, value in pairs:
         require(key not in result, f"duplicate key {key}")
@@ -87,10 +90,11 @@ def unique_pairs(pairs):
 
 
 class UniqueYaml(yaml.SafeLoader):
-    pass
+    """YAML loader that rejects duplicate mapping keys."""
 
 
 def unique_yaml(loader, node):
+    """Construct a mapping with duplicate-key detection."""
     return unique_pairs((loader.construct_object(k), loader.construct_object(v))
                         for k, v in node.value)
 
@@ -99,6 +103,7 @@ UniqueYaml.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, uniqu
 
 
 def read_bounded(root, relative):
+    """Read a repository-relative file with path, symlink, and size bounds."""
     parts = PurePosixPath(relative)
     require(not parts.is_absolute() and ".." not in parts.parts, "input path escapes root")
     path = root
@@ -113,21 +118,29 @@ def read_bounded(root, relative):
 
 
 def load(root, relative):
+    """Load bounded JSON or YAML with duplicate-key detection."""
     text = read_bounded(root, relative).decode("utf-8")
     return (json.loads(text, object_pairs_hook=unique_pairs) if relative.endswith(".json")
             else yaml.load(text, Loader=UniqueYaml))
 
 
 def context_encoder(root):
-    spec = importlib.util.spec_from_file_location(
-        "r13_context_source", root / "scripts/migrate-conformance-1.0.py")
-    require(spec is not None and spec.loader is not None, "missing context encoder")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    """Load the canonical context encoder without writing bytecode."""
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "r13_context_source", root / "scripts/migrate-conformance-1.0.py")
+        require(spec is not None and spec.loader is not None, "missing context encoder")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
     return module.encode_context
 
 
 def validate_contract(data):
+    """Validate candidate constants, HTTP mapping, and adoption gates."""
     top_fields = {
         "format_version": 1, "kind": "rfc-candidate", "status": "pending-adoption",
         "protocol": "Syntra 1.0", "base_revision": BASE, "domain_ascii": "syntra.1.0",
@@ -189,6 +202,7 @@ def validate_contract(data):
 
 
 def validate_contexts(data, base, encode):
+    """Validate derived public contexts and negative recipes."""
     require(data["status"] == "pending-adoption", "context authority label")
     require(data["source"] == "conformance/test-vectors/connection/context-vectors.json", "context source")
     require(data["transformation"] == "base-context-with-proposed-carrier-only", "context transformation")
@@ -285,7 +299,8 @@ def lint_http_shape(item):
     require(fields.get("cache-control") == "no-store", "cache policy")
     require(not set(fields) & {"transfer-encoding", "content-encoding", "trailer", "expect", "upgrade", "te",
                                "authorization", "cookie", "proxy-authorization", "set-cookie"}, "forbidden header")
-    require(fields.get("connection", "").lower() != "close", "connection retirement")
+    connection_tokens = [token.strip().lower() for token in fields.get("connection", "").split(",")]
+    require("close" not in connection_tokens, "connection retirement")
     require("origin" not in fields or fields["origin"] == "https://client.invalid", "fixture Origin allowlist")
     if status == 204:
         require(not body and "content-length" not in fields and "content-type" not in fields, "204 framing")
@@ -315,9 +330,10 @@ def lint_http_shape(item):
 
 
 def validate_http(data):
+    """Validate structural HTTP fixtures and ACK semantics."""
     require(data["status"] == "pending-adoption" and data["scope"] == "structural-HTTP-only-synthetic-bodies-not-valid-Noise", "HTTP fixture scope")
     rows = materialize_http(data["vectors"])
-    require(set(rows) == {f"R13-H{n:02d}" for n in range(1, 25)}, "HTTP fixture coverage")
+    require(set(rows) == {f"R13-H{n:02d}" for n in range(1, 26)}, "HTTP fixture coverage")
     for item in rows.values():
         try:
             outcome = lint_http_shape(item)
@@ -356,6 +372,7 @@ def validate_tls_variants(case):
 
 
 def validate_cases(data, rfc):
+    """Validate case coverage, traces, and direction-specific expectations."""
     require(data["status"] == "pending-adoption" and data["runtime_verdict"] == "NOT_EXECUTED", "case authority/verdict")
     definitions = set(re.findall(r"\*\*(R13-[0-9]{2}) \(", rfc))
     require(definitions == {f"R13-{n:02d}" for n in range(1, 30)}, "RFC requirement definitions")
@@ -370,11 +387,14 @@ def validate_cases(data, rfc):
         require(refs and len(refs) == len(set(refs)) and set(refs) <= definitions, "case requirement refs")
         covered.update(refs)
         require(case["input"]["action"] and case["input"]["variants"], "missing test stimuli")
-        for key in ("positive_expected", "negative_expected"):
-            require(case[key] and all(type(v) is bool for v in case[key].values()), "test assertions")
+        require(case["positive_expected"] and all(v is True for v in case["positive_expected"].values()),
+                "positive expectations must be True")
+        require(case["negative_expected"] and all(v is False for v in case["negative_expected"].values()),
+                "negative expectations must be False")
         if case["id"] == "R13-T10":
             validate_tls_variants(case)
         # The RFC's table and machine trace must agree reciprocally.
+        require(re.fullmatch(r"R13-T(?:0[1-9]|1[0-4])", case["id"]) is not None, "candidate case ID")
         row = re.search(rf"^\| {case['id']} \| ([^|]+)\|", rfc, re.MULTILINE)
         require(row is not None and set(re.findall(r"R13-[0-9]{2}", row[1])) == set(refs), "RFC/case trace drift")
     require(seen == {f"R13-T{n:02d}" for n in range(1, 15)} and covered == definitions, "candidate case/requirement coverage")
@@ -384,6 +404,7 @@ def validate_cases(data, rfc):
 
 
 def validate_profiles(data, contract, current):
+    """Validate the isolated carrier registry without claiming allocation."""
     require(data["status"] == "pending-adoption", "registry authority label")
     seen, codes = set(), set()
     for profile in data["profiles"]:
@@ -407,6 +428,7 @@ def validate_profiles(data, contract, current):
 
 
 def validate_requirements(data, cases, current):
+    """Validate local requirement IDs and reciprocal case traces."""
     require(data["status"] == "pending-adoption" and data["runtime_verdict"] == "NOT_EXECUTED", "requirement authority/verdict")
     active = {row["requirement_id"] for row in current["requirements"]}
     seen, proposed = set(), set()
@@ -426,14 +448,17 @@ def validate_requirements(data, cases, current):
 
 
 def git(root, *args):
+    """Run a bounded Git command for base and worktree verification."""
     return subprocess.check_output(["git", *args], cwd=root, timeout=30)
 
 
 def sha(raw):
+    """Return the SHA-256 hex digest for fingerprint inputs."""
     return hashlib.sha256(raw).hexdigest()
 
 
 def verify_base(root):
+    """Verify active inputs against immutable base Git blobs."""
     result = {}
     schema_paths = git(root, "ls-tree", "-r", "--name-only", BASE, "--", "proto").decode().splitlines()
     require(len(schema_paths) == 8, "base schema inventory")
@@ -445,6 +470,7 @@ def verify_base(root):
 
 
 def validate(root=ROOT):
+    """Validate the isolated candidate and report its static fingerprint."""
     head = git(root, "rev-parse", "HEAD").decode().strip()
     files = {path: sha(read_bounded(root, path)) for path in SOURCE_FILES}
     base_hashes = verify_base(root)
@@ -478,11 +504,12 @@ def validate(root=ROOT):
         "worktree_fingerprint_sha256": sha(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()),
         "fingerprint_encoding": "path-to-raw-sha256-json-sorted-compact-v1",
         "coverage": {"proposed_carriers": 2, "contexts": 4, "context_negatives": 8,
-                     "http_shapes": 24, "case_groups": 14, "requirements": 29},
+                      "http_shapes": 25, "case_groups": 14, "requirements": 29},
     }
 
 
 def main():
+    """Parse candidate validation modes and report isolated results."""
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--record-worktree", action="store_true", help="emit fingerprint JSON to stdout; no writes")
@@ -497,7 +524,7 @@ def main():
     if args.record_worktree:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
-        print("isolated RFC0013 static checks passed: 4 contexts, 8 negatives, 24 HTTP shapes, 14 case groups")
+        print("isolated RFC0013 static checks passed: 4 contexts, 8 negatives, 25 HTTP shapes, 14 case groups")
         print("adoption BLOCKED; runtime/formal conformance NOT_EXECUTED; active carriers remain 1/2/3")
 
 

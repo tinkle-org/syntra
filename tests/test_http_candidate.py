@@ -141,7 +141,7 @@ class HttpCandidateTests(unittest.TestCase):
         self.assertEqual(C.lint_http_shape(rows["R13-H02"]), "accept")
         self.assertFalse(rows["R13-H02"]["attests"]["noise_authenticated"])
         self.assertFalse(rows["R13-H02"]["attests"]["runtime_consumed"])
-        for name in ("R13-H05", "R13-H06", "R13-H07", "R13-H09", "R13-H10", "R13-H12", "R13-H14"):
+        for name in ("R13-H05", "R13-H06", "R13-H07", "R13-H09", "R13-H10", "R13-H12", "R13-H14", "R13-H25"):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 C.lint_http_shape(rows[name])
         self.assertEqual(C.lint_http_shape(rows["R13-H15"]), "tunnel")
@@ -158,7 +158,10 @@ class HttpCandidateTests(unittest.TestCase):
         row = C.materialize_http(C.load(ROOT, f"{C.BUNDLE}/http-vectors.json")["vectors"])["R13-H01"]
         for header in (["Injected\r\nName", "1"], ["X-Test", "bad\r\nvalue"],
                        ["X-Test", "x" * 4096], ["Syntra-Poll", "0"],
-                       ["Content-Encoding", "identity"]):
+                       ["Content-Encoding", "identity"],
+                       ["Connection", "keep-alive, close"],
+                       ["Connection", "Close"],
+                       ["Connection", " keep-alive , CLOSE "]):
             changed = copy.deepcopy(row)
             changed["headers"].append(header)
             with self.subTest(header=header[0]), self.assertRaises(ValueError):
@@ -182,7 +185,8 @@ class HttpCandidateTests(unittest.TestCase):
         cases = C.load(ROOT, f"{C.BUNDLE}/cases.yaml")
         rfc = C.read_bounded(ROOT, "rfcs/0013-http-tls-carriers.md").decode()
         C.validate_cases(cases, rfc)
-        for change in ("missing-case", "unknown-requirement", "pass-verdict", "remove-role"):
+        for change in ("missing-case", "unknown-requirement", "pass-verdict", "remove-role",
+                       "inverted-positive", "inverted-negative", "bad-case-id"):
             changed = copy.deepcopy(cases)
             if change == "missing-case":
                 changed["cases"].pop()
@@ -190,6 +194,14 @@ class HttpCandidateTests(unittest.TestCase):
                 changed["cases"][0]["requirements"].append("R13-99")
             elif change == "pass-verdict":
                 changed["runtime_verdict"] = "PASS"
+            elif change == "inverted-positive":
+                key = next(iter(changed["cases"][0]["positive_expected"]))
+                changed["cases"][0]["positive_expected"][key] = False
+            elif change == "inverted-negative":
+                key = next(iter(changed["cases"][0]["negative_expected"]))
+                changed["cases"][0]["negative_expected"][key] = True
+            elif change == "bad-case-id":
+                changed["cases"][0]["id"] = "R13-T01|.*"
             else:
                 changed["cases"][0]["roles"] = ["client"]
             with self.subTest(change=change), self.assertRaises(ValueError):

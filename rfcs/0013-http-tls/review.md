@@ -7,7 +7,8 @@ drafter/tooling contributor. This is advisory self-analysis, not human security
 review, independent review, maintainer acceptance or executed conformance.
 The [consent record](../../docs/decisions/0003-http-tls-consent.md) retains the
 approval source and missing public evidence. The worktree report hashes the
-actual reviewed candidate inputs without claiming they were committed.
+candidate inputs present when the report runs, without claiming they were
+committed. This review does not record that fingerprint.
 
 Revision note, 2026-11-04: the composition contracts and test definitions were
 revised as language-neutral technical requirements. The additional dispositions

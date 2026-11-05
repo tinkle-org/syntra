@@ -21,8 +21,8 @@ carrier allowlist; the current fixture generator still admits only 1/2/3. Existi
 context bytes, vector IDs/recipes and authoritative Git blobs are not rewritten.
 These derived fixtures demonstrate public encoding agreement only. HTTP fixture
 lint is not an HTTP peer, TLS/provider implementation or cryptographic test.
-The 24 HTTP shapes cover all four operations in both directions plus framing
-faults, MAX/MAX+1 bodies and CONNECT. `append_zero_bytes` is a bounded fixture
+The 25 HTTP shapes cover all four operations in both directions plus framing
+faults, MAX/MAX+1 bodies, connection retirement and CONNECT. `append_zero_bytes` is a bounded fixture
 recipe for synthetic opaque bytes, not valid Noise data or on-wire compression.
 
 From the upstream repository root:
@@ -35,6 +35,10 @@ python3 scripts/validate-repo.py all
 python3 scripts/validate-schema.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 ```
+
+Candidate validation verifies immutable base Git blobs and needs the pinned
+base commit. Use a full-history checkout: `git fetch --unshallow` for a
+shallow clone, or clone without a depth limit.
 
 The first command validates this isolated proposal. `--record-worktree` emits
 JSON with per-file SHA-256, base Git-blob verification, HEAD, dirty state, null
