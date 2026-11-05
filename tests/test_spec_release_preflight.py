@@ -45,6 +45,7 @@ class TagValidationTests(unittest.TestCase):
 
 class GitPreflightTests(unittest.TestCase):
     def setUp(self):
+        """Create a two-commit fixture with external Trace2 observers disabled."""
         # Trace2 observers can write notes asynchronously after Git exits, racing
         # temporary-repository cleanup. Isolate fixture and preflight subprocesses
         # for the full fixture lifetime without changing the user's Git config.
@@ -124,7 +125,10 @@ class GitPreflightTests(unittest.TestCase):
 
 
 class GitTraceIsolationTests(unittest.TestCase):
+    """Verify fixture-scoped Trace2 suppression and environment restoration."""
+
     def test_fixture_and_preflight_do_not_notify_external_trace_observers(self):
+        """Check observer isolation against a working Trace2 file sink."""
         with tempfile.TemporaryDirectory() as directory:
             trace = Path(directory) / "events.jsonl"
             with mock.patch.dict(os.environ, {"GIT_TRACE2_EVENT": str(trace)}):

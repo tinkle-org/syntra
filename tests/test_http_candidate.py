@@ -20,13 +20,17 @@ SPEC.loader.exec_module(C)
 
 
 class HttpCandidateTests(unittest.TestCase):
+    """Exercise isolated proposal validation without claiming runtime conformance."""
+
     def setUp(self):
+        """Load candidate inputs, canonical contexts, and the context encoder."""
         self.contract = C.load(ROOT, f"{C.BUNDLE}/contract.json")
         self.contexts = C.load(ROOT, f"{C.BUNDLE}/context-vectors.json")
         self.base = C.load(ROOT, "conformance/test-vectors/connection/context-vectors.json")
         self.encode = C.context_encoder(ROOT)
 
     def test_isolated_bundle_and_active_base_are_consistent(self):
+        """Check fingerprint coverage and the report's non-release authority."""
         report = C.validate(ROOT)
         self.assertEqual(report["kind"], "worktree-not-release")
         self.assertIsNone(report["source"]["candidate_revision"])
@@ -36,6 +40,7 @@ class HttpCandidateTests(unittest.TestCase):
         self.assertEqual(set(report["files_sha256"]), set(C.SOURCE_FILES))
 
     def test_candidate_validation_jobs_fetch_pinned_base_history(self):
+        """Require full Git history in jobs that validate pinned base blobs."""
         for workflow, job in (("repo-validation.yml", "docs"),
                               ("repo-validation.yml", "conformance"),
                               ("release-please.yml", "validate")):
@@ -47,6 +52,7 @@ class HttpCandidateTests(unittest.TestCase):
                                  "candidate validation needs the pinned base Git objects")
 
     def test_base_guard_rejects_active_owner_edits_without_writing_files(self):
+        """Reject a simulated edit to an active specification input."""
         read = C.read_bounded
         target = C.BASE_FILES[0]
         with mock.patch.object(C, "read_bounded", side_effect=lambda root, path:
@@ -55,10 +61,12 @@ class HttpCandidateTests(unittest.TestCase):
                 C.verify_base(ROOT)
 
     def test_worktree_report_rejects_source_changes_during_validation(self):
+        """Reject candidate inputs that change while validation is running."""
         original = C.read_bounded
         reads = 0
 
         def changing(root, path):
+            """Simulate a candidate file changing after its initial fingerprint."""
             nonlocal reads
             raw = original(root, path)
             if path == C.SOURCE_FILES[0]:
@@ -72,6 +80,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate(ROOT)
 
     def test_consent_does_not_satisfy_public_or_human_review(self):
+        """Reject elevated, mistyped, or unrecognized adoption gates."""
         for gate in ("public_approval", "human_security_review", "accepted", "active", "freeze", "release_authorized"):
             changed = copy.deepcopy(self.contract)
             changed["authority"][gate] = True
@@ -84,6 +93,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_contract(changed)
 
     def test_contract_rejects_bad_mapping_or_security_constants(self):
+        """Reject drift in HTTP mappings, limits, and TLS trust boundaries."""
         for field, value in (("send_ack_requires_decryption", True),
                              ("send_ack_requires_runtime_consumption", True),
                              ("automatic_rpc_replay", True), ("streams", 3),
@@ -111,12 +121,14 @@ class HttpCandidateTests(unittest.TestCase):
             C.validate_contract(changed)
 
     def test_current_encoder_still_rejects_unadopted_carriers_by_default(self):
+        """Keep proposed carriers opt-in for isolated context encoding only."""
         for code in (4, 5):
             case = dict(self.base["contexts"][0], carrier=code)
             with self.assertRaises(ValueError):
                 self.encode(case)
             self.assertEqual(len(self.encode(case, permitted_carriers=(4, 5))), 35)
     def test_public_context_bytes_and_negative_recipes(self):
+        """Check context bytes, negative recipes, and UTF-8 scope bounds."""
         C.validate_contexts(self.contexts, self.base, self.encode)
         changed = copy.deepcopy(self.contexts)
         changed["contexts"][0]["context_hex"] += "00"
@@ -135,6 +147,7 @@ class HttpCandidateTests(unittest.TestCase):
                 self.encode(dict(case, scope="é" * 128), permitted_carriers=(4, 5))
 
     def test_http_shapes_and_ack_are_structural_not_authentication(self):
+        """Check HTTP fixture coverage without treating ACKs as authentication."""
         data = C.load(ROOT, f"{C.BUNDLE}/http-vectors.json")
         C.validate_http(data)
         rows = C.materialize_http(data["vectors"])
@@ -155,6 +168,7 @@ class HttpCandidateTests(unittest.TestCase):
             C.lint_http_shape(rows["R13-H24"])
 
     def test_http_fixture_mutations_and_bounds_fail_closed(self):
+        """Reject unsafe headers, invalid mutation bases, and oversized fills."""
         row = C.materialize_http(C.load(ROOT, f"{C.BUNDLE}/http-vectors.json")["vectors"])["R13-H01"]
         for header in (["Injected\r\nName", "1"], ["X-Test", "bad\r\nvalue"],
                        ["X-Test", "x" * 4096], ["Syntra-Poll", "0"],
@@ -172,6 +186,7 @@ class HttpCandidateTests(unittest.TestCase):
             C.materialize_http([dict(row, append_zero_bytes=65537)])
 
     def test_registry_does_not_enable_claims_or_conflict_with_active_codes(self):
+        """Keep proposed carrier entries isolated, unclaimable, and Noise-bound."""
         profiles = C.load(ROOT, f"{C.BUNDLE}/profiles.yaml")
         current = C.load(ROOT, "conformance/profiles.yaml")
         C.validate_profiles(profiles, self.contract, current)
@@ -182,6 +197,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_profiles(changed, self.contract, current)
 
     def test_cases_have_reciprocal_trace_without_execution_claim(self):
+        """Reject case trace drift, invalid IDs, and inverted expectations."""
         cases = C.load(ROOT, f"{C.BUNDLE}/cases.yaml")
         rfc = C.read_bounded(ROOT, "rfcs/0013-http-tls-carriers.md").decode()
         C.validate_cases(cases, rfc)
@@ -208,6 +224,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_cases(changed, rfc)
 
     def test_canonical_snapshot_adoption_retains_consent_gates(self):
+        """Keep pending review and activation gates explicit in candidate docs."""
         readme = " ".join(C.read_bounded(ROOT, f"{C.BUNDLE}/README.md").decode().split())
         for wording in (
                 "public acceptance",
@@ -219,6 +236,7 @@ class HttpCandidateTests(unittest.TestCase):
                 self.assertIn(wording, readme)
 
     def test_tls_variants_have_separate_wss_and_https_groups(self):
+        """Confine paired-stream TLS assertions to the HTTPS carrier group."""
         cases = C.load(ROOT, f"{C.BUNDLE}/cases.yaml")
         tls = next(case for case in cases["cases"] if case["id"] == "R13-T10")
         variants = tls["input"]["variants"]
@@ -238,6 +256,7 @@ class HttpCandidateTests(unittest.TestCase):
         self.assertEqual(cases["runtime_verdict"], "NOT_EXECUTED")
 
     def test_tls_variant_scope_mutations_are_rejected(self):
+        """Reject malformed TLS groups, scenario coverage, and assertions."""
         cases = C.load(ROOT, f"{C.BUNDLE}/cases.yaml")
         rfc = C.read_bounded(ROOT, "rfcs/0013-http-tls-carriers.md").decode()
         C.validate_cases(cases, rfc)
@@ -271,6 +290,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_cases(changed, rfc)
 
     def test_requirement_owner_mapping_is_local_collision_free_and_reciprocal(self):
+        """Reject requirement ID collisions, owner drift, and broken case traces."""
         requirements = C.load(ROOT, f"{C.BUNDLE}/requirements.yaml")
         cases = C.load(ROOT, f"{C.BUNDLE}/cases.yaml")
         active = C.load(ROOT, "conformance/manifest/requirements.yaml")
@@ -283,6 +303,7 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_requirements(changed, cases, active)
 
     def test_duplicate_keys_path_escape_symlinks_and_file_caps_rejected(self):
+        """Reject ambiguous mappings and unsafe or oversized file inputs."""
         with self.assertRaises(ValueError):
             json.loads('{"a":1,"a":2}', object_pairs_hook=C.unique_pairs)
         with self.assertRaises(ValueError):
@@ -296,6 +317,7 @@ class HttpCandidateTests(unittest.TestCase):
                     C.read_bounded(root, name)
 
     def test_adoption_command_is_explicitly_blocked(self):
+        """Require the adoption command to fail with the pending-gates message."""
         result = subprocess.run([sys.executable, "scripts/check-http-candidate.py", "--require-adoption"],
                                 cwd=ROOT, capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 2, result.stderr)
