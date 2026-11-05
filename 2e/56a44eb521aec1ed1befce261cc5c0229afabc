@@ -1,0 +1,45 @@
+tests/test_http_candidate.py
+  s_ec232f80b8000b::t_0cfb5ffdb973f3 144
+  s_ec232f80b8000b::t_d8eda371556530 161-164
+  s_ec232f80b8000b::t_9e837fc406665e 188-189,197-204
+rfcs/0013-http-tls/review.md
+  s_ec232f80b8000b::t_f0c12b6e8c48b3 10-11
+rfcs/0013-http-tls/README.md
+  s_ec232f80b8000b::t_530783139e7f7b 39-42
+  s_ec232f80b8000b::t_72cee2c25d662d 24-25
+scripts/check-http-candidate.py
+  s_ec232f80b8000b::t_82bd6c8adcc876 128-138,143
+  s_ec232f80b8000b::t_45c764f2d5fa0e 302-303
+  s_ec232f80b8000b::t_c5f88853bafe5b 527
+  s_ec232f80b8000b::t_918ccd702aefd9 431
+  s_ec232f80b8000b::t_76b6c26ea4e5f2 121
+  s_ec232f80b8000b::t_390e0db81d8948 512
+  s_ec232f80b8000b::t_cc72518dda49c7 72,78,84,93,97
+  s_ec232f80b8000b::t_f96a924409b92e 407
+  s_ec232f80b8000b::t_3ef0ea03260ce6 390-393,397
+  s_ec232f80b8000b::t_a1d97a6c3ea63e 473
+  s_ec232f80b8000b::t_c5c2605582e368 106
+  s_ec232f80b8000b::t_36872f903afd6b 451,456,461
+  s_ec232f80b8000b::t_6cfe4efee1f446 333,336
+  s_ec232f80b8000b::t_e6895da3348a44 205
+  s_ec232f80b8000b::t_11836951b4aa1e 507
+  s_ec232f80b8000b::t_31cb9f22058402 375
+rfcs/0013-http-tls/http-vectors.json
+  s_ec232f80b8000b::t_5f802b6b869a15 28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2e56a44eb521aec1ed1befce261cc5c0229afabc",
+  "prompts": {},
+  "sessions": {
+    "s_ec232f80b8000b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e57d9b0b6ffegvpA2KqI39jMJU",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
