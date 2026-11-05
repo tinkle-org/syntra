@@ -114,3 +114,10 @@ bootstrap transition is recorded in
 [Decision 0001](../docs/decisions/0001-bootstrap-ratification.md). The
 acceptance/freeze/release milestones remain separate. Publishing or merging an
 RFC does not accept another RFC.
+
+## Draft proposals
+
+- [RFC 0013: Noise-protected HTTP carriers and trusted TLS streams](0013-http-tls-carriers.md)
+  proposes HTTP/HTTPS carriage and a trusted in-process TLS-provider boundary.
+  Maintainer consent is recorded; public approval and human security review are
+  pending. It is not accepted and does not change the current reference or registry.

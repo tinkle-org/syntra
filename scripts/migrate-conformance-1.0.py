@@ -16,8 +16,12 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def encode_context(case):
-    """Encode a current, valid public context; reject invalid source fields."""
+def encode_context(case, *, permitted_carriers=(1, 2, 3)):
+    """Encode public context; proposal tools may supply an isolated allowlist.
+
+    The current generator always uses the default 1/2/3 set. A tool-only
+    allowlist neither registers a carrier nor changes current fixture inputs.
+    """
     def uint(name, bits):
         value = case[name]
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < 1 << bits:
@@ -25,7 +29,7 @@ def encode_context(case):
         return value
     mode, carrier = uint("mode", 8), uint("carrier", 8)
     key, epoch = uint("server_key_id", 32), uint("epoch", 64)
-    if mode not in (1, 2) or carrier not in (1, 2, 3):
+    if mode not in (1, 2) or carrier not in permitted_carriers:
         raise ValueError(f"{case['id']}: unsupported mode/carrier")
     handle = bytes.fromhex(case["handle_hex"])
     if len(handle) != 8:

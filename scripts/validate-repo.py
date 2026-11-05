@@ -1355,6 +1355,21 @@ def check_boundary():
     print("boundary: repository boundary checked")
 
 
+def check_http_candidate():
+    """Validate the isolated proposal without registering active requirements."""
+    spec = importlib.util.spec_from_file_location(
+        "http_candidate", ROOT / "scripts/check-http-candidate.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        module.validate(ROOT)
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, subprocess.SubprocessError) as exc:
+        err("rfcs/0013-http-tls", str(exc))
+        return
+    print("http-candidate: isolated proposal checked; adoption blocked, runtime NOT_EXECUTED")
+
+
 CHECKS = {
     "requirements": check_requirements,
     "profiles": check_profiles,
@@ -1364,6 +1379,7 @@ CHECKS = {
     "rfcs": check_rfcs,
     "markdown": check_markdown,
     "boundary": check_boundary,
+    "http-candidate": check_http_candidate,
 }
 
 

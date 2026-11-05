@@ -1,0 +1,127 @@
+# Authored test definitions, not harness execution or current CONF registration.
+format_version: '1.0'
+status: pending-adoption
+runtime_verdict: NOT_EXECUTED
+cases:
+  - id: R13-T01
+    requirements: [R13-01]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: context_and_binding, variants: [valid_context, wrong_carrier, wrong_mode, wrong_scope, wrong_selector, empty_permitted_set]}
+    positive_expected: {context_and_prologue_exact: true, noise_required: true}
+    negative_expected: {lookup_before_admission: false, dispatch: false, fallback: false}
+  - id: R13-T02
+    requirements: [R13-02, R13-04]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: origin_selection, variants: [canonical_authority, query, fragment, userinfo, wrong_path, wrong_authority, duplicate_origin, null_origin, redirect, alt_svc, cookie, authorization, policy_snapshot_retained, selected_generation_withdrawn]}
+    positive_expected: {exact_descriptor_only: true, immutable_selected_generation: true, current_validity_checks_preserved: true}
+    negative_expected: {cross_origin_disclosure: false, automatic_redirect: false, identity_from_origin: false, admission_after_generation_withdrawal: false}
+  - id: R13-T03
+    requirements: [R13-03, R13-16]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: bounded_h1_framing, vectors: http-vectors.json, variants: [every_split, max_and_max_plus_one, duplicate_cl, te_cl, obs_fold, bad_length, compressed, multiple_records, pipelined]}
+    positive_expected: {complete_body_only: true, bounded_read_ahead: true}
+    negative_expected: {resynchronization: false, oversized_allocation: false, partial_dispatch: false}
+  - id: R13-T04
+    requirements: [R13-05, R13-06]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: open_handshake, vectors: context-vectors.json, variants: [fresh_m1_m2, wrong_pin, wrong_m2, lost_201, replay_m1, entropy_failure, route_collision_exhaustion]}
+    positive_expected: {fresh_handshake: true, reserved_pair: true}
+    negative_expected: {hello_after_failed_m2: false, m1_principal_authority: false, leaked_permit: false}
+  - id: R13-T05
+    requirements: [R13-07, R13-08]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: route_ownership, variants: [one_d_binding, unknown_h, first_poll_race, duplicate_d, wrong_h_on_u, wrong_owner, restart, abandoned_open]}
+    positive_expected: {one_atomic_binding: true}
+    negative_expected: {route_authenticates: false, state_resumption: false, unrelated_slot_invalidation: false, unbounded_lookup: false}
+  - id: R13-T06
+    requirements: [R13-09, R13-10, R13-11]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: admitted_record_ack, variants: [complete_slot_commit, blocked_driver, full_slot, retire_before_commit, auth_fails_after_ack, fragmented_hello_ready, concurrent_16_rpcs, reverse_completion, notification_cancel, bad_counter, empty_poll]}
+    positive_expected: {ack_after_complete_carrier_input: true, ack_without_driver_decryption: true, authenticate_before_plaintext: true, output_ordered_once: true}
+    negative_expected: {ack_partial_or_unreserved_input: false, ack_proves_authentication: false, ack_proves_effect: false, duplicate_admission: false, empty_poll_nonce_use: false}
+  - id: R13-T07
+    requirements: [R13-12, R13-13]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: uncertain_exchange, variants: [every_io_split_fault, lost_ack, cancelled_poll, duplicated_library_request, invalid_aead, frame_spans_polls, retired_output, expired_unsent_request, live_request_remaining_timeout, output_owner_handoff, selected_success_after_call_deadline, selected_cancelled_result, selected_deadline_exceeded_result]}
+    positive_expected: {original_unit_gate_once: true, immutable_partial_write: true, remaining_timeout_encoded_before_emission: true, host_selected_terminal_outcome_preserved: true}
+    negative_expected: {ciphertext_retry: false, nonce_reuse: false, rpc_replay: false, new_generation_delivery: false, expired_unsent_request_consumes_nonce: false, handoff_restarts_output_allowance: false, call_deadline_alone_discards_selected_result: false}
+  - id: R13-T08
+    requirements: [R13-14, R13-15]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: native_error_and_close, variants: [each_native_error, malformed_success, eof, rst, connection_close, lost_close_response, incomplete_shutdown, graceful_multirecord_drain, drain_cutoff, security_abort_during_drain]}
+    positive_expected: {terminal_precedence_preserved: true, incomplete_owner_retained: true, bounded_teardown: true, required_direction_progress_retained_during_drain: true}
+    negative_expected: {fabricated_rpc_result: false, close_proves_effects_stopped: false, admission_stop_alone_retires_pair: false}
+  - id: R13-T09
+    requirements: [R13-16, R13-17]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: budgets_and_fairness, variants: [poll_hold_gap, slow_headers_body, output_stall, partial_frame, channel_age, suspend, item_byte_caps, source_principal_global_caps, handler_stall, open_processing_handoff, second_stream_setup, required_recovery_after_core_ready, earlier_output_or_outage_cutoff]}
+    positive_expected: {absolute_deadlines: true, cancellation_revocation_progress: true, bounded_memory: true, original_elapsed_origin_preserved: true, earliest_applicable_cutoff_enforced: true, setup_and_outage_io_gates_through_local_readiness: true}
+    negative_expected: {trickle_renews_deadline: false, empty_poll_renews_authority: false, departed_execution_quota_release: false, phase_handoff_restarts_allowance: false, io_after_cutoff: false}
+  - id: R13-T10
+    requirements: [R13-18, R13-19, R13-20, R13-21]
+    roles: [client, server]
+    carriers: [3, 5]
+    modes: [bootstrap, returning]
+    input:
+      action: actual_tls_provider
+      variants:
+        - carriers: [3]
+          scenarios: [verified_h1, explicit_h1_absent_alpn, wrong_chain_name_sni, expired_revoked, tls12, early_data, alpn_h2, forged_evidence, selected_policy_withdrawal, resumed_ticket_current_policy, forwarded_claim]
+          positive_expected: {single_verified_stream: true}
+          negative_expected: {d_stream_required: false}
+        - carriers: [5]
+          scenarios: [verified_h1, explicit_h1_absent_alpn, wrong_chain_name_sni, expired_revoked, tls12, early_data, alpn_h2, forged_evidence, selected_policy_withdrawal, resumed_ticket_current_policy, forwarded_claim, wrong_d_identity, wrong_d_policy_generation, equal_authority_deadline_different_generation, policy_replacement_between_handshakes]
+          positive_expected: {independent_u_d_verification: true}
+          negative_expected: {mixed_generation_pair_accepted: false}
+    positive_expected: {actual_in_process_tls: true, independent_noise_pin: true, stream_bound_evidence: true, explicit_h1_absent_alpn_accepted: true, immutable_policy_snapshot_binding: true}
+    negative_expected: {m1_before_verification: false, ticket_bypasses_current_policy: false, forwarded_claim_is_tls: false, withdrawn_generation_accepted: false}
+  - id: R13-T11
+    requirements: [R13-22]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: owned_reactor_tasks, variants: [partial_io, spurious_readiness, concurrent_accepts, stuck_workers, cancel_at_thread_handoff, late_callback, close_timeout, owned_failure_with_complete_cleanup, reconnect_owner_failure_during_shutdown, incomplete_then_completed_cleanup]}
+    positive_expected: {registered_before_handoff: true, worker_permit_until_exit: true, stop_and_join_observable: true, aggregate_report_preserves_observed_failure: true, incomplete_outcome_distinguishable_from_later_completion: true, bounded_outcome_accounting: true}
+    negative_expected: {detached_writer: false, cancellation_is_task_completion: false, retired_callback_admission: false, zero_failure_count_after_observed_failure: false, replacement_attempt_after_stop: false}
+  - id: R13-T12
+    requirements: [R13-23, R13-24, R13-25]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: independent_proxy_tunnel, variants: [socks_ipv4_ipv6_domain, configured_method, rfc1929_protected_hop, basic_protected_hop, unprotected_secret_authentication, absolute_form_forward_route, each_rejection_truncation, connect_any_2xx, connect_cl_te_read_ahead, proxy407, proxy_redirect]}
+    positive_expected: {endpoint_identity_independent: true, tunnel_read_ahead_preserved: true}
+    negative_expected: {origin_receives_proxy_secret: false, automatic_challenge: false, direct_fallback: false, proxy_secret_before_protected_hop: false, absolute_form_forwarding: false}
+  - id: R13-T13
+    requirements: [R13-26, R13-27, R13-28]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: generation_and_outage, variants: [finite_rotation, mixed_carrier_set, endpoint_scoped_credential_decision, shared_credential_explicitly_authorized_for_both, withdrawn_selection_before_credential_release, one_dialer, jitter_zero_max, arithmetic_exhaustion, repeated_ready_then_loss, continuous_active_reset, local_ready_at_outage_second_110_active_through_140, local_ready_at_110_loss_at_125, required_recovery_stalls_past_outage_cutoff, required_recovery_delays_active_reset_start, pause_budget_expiry, independent_pause_scopes, network_hint_while_application_paused, resume_restart, trust_block, old_callbacks]}
+    positive_expected: {fresh_connection_on_resume: true, paused_time_counted: true, attempts_bounded: true, credential_release_authorized_for_selected_descriptor: true, all_pause_scopes_must_clear: true, locally_ready_io_survives_outage_cutoff: true, reset_interval_starts_after_required_recovery: true}
+    negative_expected: {same_cipher_state: false, transferred_rpc_subscription: false, ready_resets_outage: false, duplicate_resume_dialer: false, automatic_cross_carrier_failover: false, network_hint_clears_application_pause: false, credential_release_for_withdrawn_selection: false, replacement_after_unreset_outage_exhaustion: false, required_recovery_extends_original_allowance: false}
+  - id: R13-T14
+    requirements: [R13-07, R13-17, R13-29]
+    roles: [client, server]
+    carriers: [4, 5]
+    modes: [bootstrap, returning]
+    input: {action: current_host_policy, variants: [explicit_empty_credential_policy, same_principal_mismatch, revoked_idle, expiry_during_write, deny_by_default, overload_isolation, log_scan]}
+    positive_expected: {host_verifies_credential: true, current_validity_checks: true, secret_redaction: true}
+    negative_expected: {empty_credential_implies_channel_principal: false, delivery_after_cutoff: false, http_ack_renews_authority: false}
