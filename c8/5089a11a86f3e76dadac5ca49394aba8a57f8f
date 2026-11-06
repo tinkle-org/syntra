@@ -1,0 +1,32 @@
+scripts/check-http-candidate.py
+  s_a87e2b6553c7a8::t_688d56f58ae4a8 219-224
+  s_86fc30afefa7d2::t_092ecb23d5f3c6 225
+tests/test_http_candidate.py
+  s_86fc30afefa7d2::t_784315d4a8aba9 190-204
+  s_a87e2b6553c7a8::t_5a9c1204438801 205-225
+  s_86fc30afefa7d2::t_092ecb23d5f3c6 172-173,177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c85089a11a86f3e76dadac5ca49394aba8a57f8f",
+  "prompts": {},
+  "sessions": {
+    "s_86fc30afefa7d2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e4e72addaffeFACDDshCrrPJEJ",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_a87e2b6553c7a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e4e6954c1ffeiy527IoUB1XQaE",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
