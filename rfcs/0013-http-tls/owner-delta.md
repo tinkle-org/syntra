@@ -1,10 +1,16 @@
 # Owner activation delta for RFC 0013
 
-Status: pending adoption. These are staged edit instructions, not changes to
-current authority. Public acceptance and applicable human security review are
-required before applying them. [Decision 0003](../../docs/decisions/0003-http-tls-consent.md)
-does not clear those gates. The [machine contract](contract.json) fixes the
-candidate constants; the RFC owns the proposed obligations.
+Status: accepted-unadopted. These are staged edit instructions, not authorization
+to change canonical owners, pins or ciphers. Sole maintainer oscarlaw's
+[public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+of reviewed source `cfab7655c348f1d04f4e1d57e28cc1a634478854` records completed
+human protocol/security self-review and disclosed self-approval, not independent
+review. [Decision 0004](../../docs/decisions/0004-rfc-0011-0014-acceptance.md)
+succeeds [Decision 0003](../../docs/decisions/0003-http-tls-consent.md)'s pending
+acceptance disposition. Canonical adoption and publisher activation are deferred;
+applying the instructions below requires separate authorization. The
+[machine contract](contract.json) fixes the unchanged candidate constants; the
+RFC owns the accepted design obligations.
 
 ## Transport owner
 
@@ -58,7 +64,7 @@ success, replay, deadline or cancellation semantics.
 
 ## Requirement and case promotion
 
-The local R13 labels are not registered normative IDs. At acceptance, allocate
+The local R13 labels are not registered normative IDs. At canonical adoption, allocate
 the proposed `SNTR-HPC-001` through `SNTR-HPC-029` identifiers if still free,
 mapping R13-01 through R13-29 respectively, with no reuse of existing IDs.
 Promote the case groups to actual numeric CONF IDs through review, preserving
@@ -120,8 +126,9 @@ and generation. Traffic keys, nonces, callbacks, RPCs and selected outputs do no
 migrate on failover or pause/resume. TLS providers perform actual verification
 in the endpoint TCB, not remote evidence injection.
 
-Until public/human gates clear, use only the isolated worktree report, not a
-canonical HTTP release reference. Evidence identifies the exact reviewed RFC and
+Despite recorded acceptance and human self-review, use only the isolated worktree
+report until canonical adoption, not a canonical HTTP release reference. Evidence
+identifies the exact reviewed RFC and
 bundle fingerprint, base revision, role, carrier, mode, parameters and observed
 case results. After synchronization, canonical specification snapshots can
 identify adopted inputs; publication still requires an actual reviewed commit

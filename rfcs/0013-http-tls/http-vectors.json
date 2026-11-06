@@ -1,5 +1,5 @@
 {
-  "status": "pending-adoption",
+  "status": "accepted-unadopted",
   "scope": "structural-HTTP-only-synthetic-bodies-not-valid-Noise",
   "vectors": [
     {"id": "R13-H01", "operation": "send", "direction": "request", "start_line": "POST /syntra/1.0/http/send HTTP/1.1", "headers": [["Host", "example.invalid:80"], ["Content-Length", "17"], ["Content-Type", "application/octet-stream"], ["Cache-Control", "no-store"], ["Accept", "application/octet-stream"], ["Syntra-Route", "0000000000000000000000000000000000000000000000000000000000000000"], ["Syntra-Upload", "0"]], "body_hex": "0000000000000000000000000000000000", "expected": "accept"},

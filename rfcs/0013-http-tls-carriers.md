@@ -3,12 +3,16 @@
 - RFC: 0013
 - Title: Noise-protected HTTP carriers and trusted TLS streams
 - Author(s): Syntra contributors
-- Status: Draft
+- Status: Accepted
 - Date: 2026-11-03
-- Target version: Syntra 1.0 pre-release, subject to compatibility decision
+- Target version: Syntra 1.0 pre-release; optional additive design, canonical adoption deferred
 - Relates to: [transports](../specifications/transports.md), [security](../specifications/security.md), [connection](../specifications/connection.md), [RPC](../specifications/rpc.md), [carrier registry](../conformance/profiles.yaml), [RFC process](README.md)
-- Reviewers: Human protocol/security reviewer unassigned; AI advisory review recorded separately
-- Maintainer consent: oscarlaw confirmed approval with self-approval disclosed; public decision pending
+- Reviewers: oscarlaw; human protocol/security self-review completed and
+  self-approval disclosed; AI advisory review is not a vote or independent review
+- Decision: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md)
+  and [public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+- Reviewed revision: `cfab7655c348f1d04f4e1d57e28cc1a634478854`
+- Activation: UNADOPTED; canonical owners, registry, fixtures, and candidate inputs unchanged
 
 ## 1. Summary
 
@@ -25,14 +29,23 @@ This proposal specifies wire behavior, role obligations and observable
 composition boundaries. It does not prescribe a programming language, package
 layout, callable interface or scheduling framework.
 
-This document is a proposal, not a protocol authority. Its BCP 14 keywords
-describe proposed obligations only. Requirement labels beginning `R13-` and test
-labels beginning `R13-T` are local to this draft, not registered requirements or
-conformance cases. The sole active maintainer's confirmation is recorded in
-[Decision 0003](../docs/decisions/0003-http-tls-consent.md), including self-approval.
-The public RFC/PR decision and human security review required by governance
-remain pending. Implementations cannot ship this behavior or cite this draft for a
-conformance claim under the [RFC lifecycle](README.md#lifecycle).
+This document records an accepted optional additive pre-release design, not yet
+active canonical protocol behavior. Its BCP 14 obligations define the design to
+be adopted; the current [transport](../specifications/transports.md),
+[security](../specifications/security.md), and other canonical owners remain
+authoritative until synchronized adoption. Requirement labels beginning `R13-`
+and test labels beginning `R13-T` remain local review references, not registered
+requirements or conformance cases. The proposed context values 4/5 and isolated
+fixtures/cases remain unclaimable. Acceptance neither activates them nor supplies
+executed carrier/provider/proxy evidence or publication authorization.
+
+[Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md) records the
+[public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+and completed human protocol/security self-review by oscarlaw, the sole active
+maintainer, with self-approval disclosed. This completes the design-review gates
+left open by [Decision 0003](../docs/decisions/0003-http-tls-consent.md); it is not
+independent human security review. Historical proposal wording below does not
+override this acceptance disposition or activate conflicting owner text.
 
 ## 2. Motivation
 
@@ -54,9 +67,11 @@ HTTP request/response is not an available binding at that revision. This draft
 proposes the additional mapping without changing the current reference, source
 IDL, registry, candidate contract or accepted vectors.
 
-Repository issue/PR searches for `HTTP TLS carrier` found no issue and returned
-related PRs 12, 15, 16, 18 and 23; none supplies acceptance of this proposal.
-Reviewers still need to check concurrent proposals before assigning numbers.
+During proposal preparation, repository issue/PR searches for `HTTP TLS carrier`
+found no issue and returned related PRs 12, 15, 16, 18 and 23; none supplied
+acceptance. The later public decision linked above accepts the design, while
+authoritative allocation still requires checking concurrent proposals and
+synchronizing canonical owners.
 
 ## 3. Proposal
 
@@ -96,9 +111,9 @@ numbers, reservations, recovery service paths and `profile_version` fields stay
 unchanged. There is no HTTP credential header, synthesized hello, new ready
 field, close envelope or HTTP-specific RPC session.
 
-### 3.2 Owner edits requiring acceptance
+### 3.2 Canonical adoption remaining after acceptance
 
-| Owner | Proposed follow-up after acceptance |
+| Owner | Required adoption follow-up |
 |---|---|
 | `specifications/transports.md` | Define bytes 4/5, HTTP mapping, association, limits and proxy/failure rules; preserve existing carrier bytes and common encoding |
 | `specifications/security.md` | Permit explicitly authorized HTTP/HTTPS enrollment bindings; define trusted in-process TLS termination; retain rejection of forwarded assertions |
@@ -110,9 +125,12 @@ field, close envelope or HTTP-specific RPC session.
 
 The isolated [candidate bundle](0013-http-tls/README.md) contains the machine
 contract, proposed registry/case definitions, context and HTTP fixtures, and owner
-deltas for review. It does not activate current owners or register claimable
-carriers. Activation needs a public decision, human security review and
-synchronized owners; downstream input pins are separate, reviewed changes.
+deltas. It does not activate current owners or register claimable carriers.
+The public decision supplies design acceptance, compatibility disposition, and
+disclosed human security self-review. Activation still needs synchronized
+owners, registry, fixtures, and candidate inputs, with the verification below;
+downstream input pins are separate, reviewed changes. No new operations outside
+this design or automatic cross-carrier failover are approved.
 
 ### 3.3 Connection sequence
 
@@ -791,7 +809,7 @@ HTTP success MUST NOT renew authority or imply exactly-once effects.
 
 The following table summarizes the proposed composition contracts. Requirement
 IDs identify the obligations above; this summary adds no language-specific
-interfaces, packaging requirements or permission to ship draft behavior.
+interfaces, packaging requirements or permission to claim unadopted behavior.
 
 | Boundary | Technical contract | Requirement trace |
 |---|---|---|
@@ -841,20 +859,24 @@ another carrier. Carrier selection remains explicit configuration, never hello,
 HTTP status or ALPN negotiation. The permitted-binding set does not expand merely
 because software supports more variants.
 
-The proposed TLS-provider boundary changes the meaning of acceptable local
-direct-host evidence for HTTPS/WSS. It requires explicit security review of
-the current prohibition on caller-terminated WSS streams. The fixed H1 mapping
+The accepted TLS-provider design changes the meaning of acceptable local
+direct-host evidence for HTTPS/WSS. The public decision records human security
+self-review of that boundary; the current prohibition on caller-terminated WSS
+streams remains authoritative until canonical adoption. The fixed H1 mapping
 does not reuse per-exchange credential/session semantics from another mapping.
 No existing field, tag or reserved byte is repurposed and no dual-format fallback
 is introduced.
 
-The target is additive pre-release work, but this is not a compatibility verdict.
-Maintainers need to classify carrier additions, enrollment-policy persistence
-and the TLS trust-boundary change against accepted decisions as well as current
-owners. If deemed wire-incompatible, governance's major-version RFC requirement
-blocks activation under Syntra 1.0. Candidate generation and downstream pinning
-wait for that disposition. This proposal neither changes a baseline nor grants
-release compatibility by passing Buf.
+The [public compatibility disposition](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+accepts the reviewed scope as explicitly selected, optional additive pre-release
+work with existing default behavior retained. That disposition covers the
+specified carrier additions, enrollment-policy treatment, and trusted in-process
+TLS-provider boundary; unchanged Protobuf bytes alone are not its security
+basis. Canonical adoption remains deferred and isolated candidate generation is
+not authoritative registration. Downstream pinning requires the adopted inputs
+and separate review. Later incompatible or security-weakening expansions require
+a separate decision under governance; acceptance grants no such expansion,
+baseline rewrite, automatic carrier failover, or release authorization.
 
 ## 7. Security considerations
 
@@ -910,13 +932,15 @@ IDs and registers role-specific manifests/fixtures under the conformance guide.
 | R13-T13 | R13-26, R13-27, R13-28 | Finite same-carrier rotation with selected-descriptor/generation credential decisions, one dialer, jitter/arithmetic bounds, five-attempt/120-second defaults, ready/loss cycles before active reset, late local readiness with live I/O past outage cutoff but no replacement after loss, required-recovery-gated reset, pause through outage expiry, independent pause scopes and network hints, explicit resume/restart, trust block and stale callbacks; no carried RPC/subscription/cipher state |
 | R13-T14 | R13-07, R13-17, R13-29 | Host-owned empty-credential policy, same-principal mismatch, expiry/revocation while poll/write idle, default deny, overload isolation and secret-log/access-log scanning; no protected delivery after cutoff |
 
-Acceptance evidence still required:
+Design acceptance recorded; activation and evidence work remaining:
 
-- [ ] Public protocol/security review resolving §10, including handle-race/HTTP
-  uncertainty and trusted-provider trust-boundary analysis.
-- [ ] Compatibility/version decision and collision-free authoritative allocations.
-- [ ] Active-maintainer acceptance with reviewed revision and public approval
-  evidence; disclose author/self-approval if applicable.
+- [x] Public protocol/security design review by oscarlaw, with human self-review
+  and self-approval disclosed in the public decision at the reviewed revision.
+- [x] Compatibility disposition: optional additive pre-release design with existing
+  default behavior retained; canonical adoption deferred.
+- [x] Sole-active-maintainer acceptance, reviewed revision, and public evidence
+  recorded in [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md).
+- [ ] Recheck concurrent allocations and register collision-free authoritative bindings.
 - [ ] Synchronized owner requirements, registered cases and fixtures after acceptance.
 - [ ] Independent HTTP/HTTPS wire peer or independent packet-fixture verification;
   local round trips alone are insufficient.
@@ -928,7 +952,7 @@ Acceptance evidence still required:
 
 Repository validation for this proposal uses the documented toolchain:
 Python 3.14, PyYAML 6.0.3 and Buf 1.59.0. These are static/tooling checks and do
-not execute any R13-T scenario or grant normative approval:
+not execute any R13-T scenario or establish canonical adoption:
 
 ```sh
 python3 scripts/validate-repo.py all
@@ -937,8 +961,9 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 git diff --check
 ```
 
-Actual command results belong in the review report, bound to the base revision
-and this uncommitted draft. Formal conformance remains NOT_EXECUTED.
+Actual command results belong in the review report, bound to the exact candidate
+revision or worktree fingerprint and base revision. Acceptance records no new
+execution results. Formal conformance remains NOT_EXECUTED.
 
 ## 9. Drawbacks and risks
 
@@ -956,39 +981,37 @@ computing base and needs independent review. Browser APIs cannot promise the
 fixed H1 stream-pair controls described here. Local unit tests cannot establish
 those deployment or security properties.
 
-## 10. Unresolved questions and blockers
+## 10. Post-acceptance activation and evidence gates
 
-1. **TBD — blocker: public acceptance record.** The user confirmed “Approve as
-   maintainer” as oscarlaw, the sole listed active maintainer, with self-approval
-   disclosed. [Decision 0003](../docs/decisions/0003-http-tls-consent.md) records
-   that consent and its limits. It supplies no public RFC/PR approval link or
-   reviewed candidate commit. Governance §3 requires public approval; this draft
-   cannot manufacture it. Material corrections, including the carrier-input
-   acknowledgment rule, need review of the resulting exact content.
-2. **TBD — blocker: human security review.** The
-   [advisory review](0013-http-tls/review.md) records AI analysis and corrections;
-   it is not a human review or an approval vote. Assign human reviewers for HTTP without
-   outer TLS, H association/first-poll denial of service, native parser/retry
-   controls, resource limits, proxy trust and the in-process TLS-provider boundary.
-   The proposed numbers and failure rules are concrete review inputs, not approved
-   security parameters. Exploitable findings follow the private security process.
-3. **TBD — blocker: compatibility and authority.** Record whether all proposed
-   changes are admissible as Syntra 1.0 additive pre-release work under accepted
-   decisions. Resolve conflicts through governance, not implementation choices.
-   Recheck bytes 4/5 against concurrent proposals; assign authoritative bindings
-   only through acceptance and owner synchronization. No registry reservation is
-   made by this draft.
-4. **TBD — blocker: execution and independent evidence.** R13-T01 through
-   R13-T14 now have isolated machine definitions and static fixture checks, not
-   runtime verdicts. Activation needs registered, reviewable role/case coverage
-   and recorded execution at the real carrier/provider/proxy
-   and persistence boundaries. Formal conformance, independent interoperability,
-   device validation and security verdicts are not supplied by this edit.
-5. **TBD — blocker: activation, freeze and release.** After acceptance, land
-   synchronized reference/registry/fixture/candidate changes, then review
-   downstream implementation and immutable Git-blob pins. Specification freeze
-   and release authorization require separate public decisions and the evidence
-   in governance/release policy. Neither gate is cleared by drafting this RFC.
+1. **Design acceptance complete.** The public decision accepts this RFC at
+   `cfab7655c348f1d04f4e1d57e28cc1a634478854`, including the carrier-input
+   acknowledgment, limits, and failure rules, with oscarlaw's human
+   protocol/security self-review and self-approval disclosed. No additional
+   maintainer vote is required under the current roster. Later material design
+   changes need applicable review; acceptance does not preapprove them.
+2. **Security evidence remains separate.** The
+   [advisory review](0013-http-tls/review.md) remains AI analysis, not a human
+   vote. The completed human self-review is not an independent security-review
+   pass and does not waive independent human release review. Executed review of
+   actual carrier, TLS-provider, proxy, resource, and ownership boundaries is
+   still required for applicable claims. Exploitable findings follow the
+   private security process.
+3. **Compatibility accepted; authority unadopted.** The selected scope is
+   optional additive pre-release work, not a required change to existing peers
+   or defaults. Recheck bytes 4/5 against concurrent proposals and synchronize
+   canonical owners, registry, fixtures, and candidate inputs before treating
+   them as allocated or claimable. Local R13 labels remain local until registration.
+4. **Execution and independent evidence pending.** R13-T01 through R13-T14 have
+   isolated machine definitions and static fixture checks, not runtime verdicts.
+   Activation needs registered, reviewable role/case coverage and recorded
+   execution at the real carrier/provider/proxy and persistence boundaries.
+   Formal conformance, independent interoperability, device validation, and
+   independent security verdicts are not supplied by acceptance.
+5. **Activation, freeze, and release pending.** Land synchronized
+   reference/registry/fixture/candidate changes, then review downstream
+   implementation and immutable Git-blob pins. Specification freeze and release
+   authorization require separate public decisions and the evidence in
+   governance/release policy. No release, tag, or publication is authorized here.
 
 ## Appendix: References
 

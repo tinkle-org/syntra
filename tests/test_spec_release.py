@@ -269,6 +269,14 @@ class PublicationTests(unittest.TestCase):
             self.publish()
         self.assertEqual(self.api.writes, [])
 
+    def test_design_acceptance_without_activation_never_writes(self):
+        """Keep design-only RFC acceptance from enabling the manual publisher."""
+        (RELEASE.ROOT / "rfcs/0011-specification-release-versioning.md").write_text(
+            "- Status: Accepted (design only; activation deferred)\n")
+        with self.assertRaises(RELEASE.ReleaseError):
+            self.publish()
+        self.assertEqual(self.api.writes, [])
+
     def test_existing_tag_requires_explicit_recovery_at_the_same_sha(self):
         self.api.ref = {"object": {"sha": SHA, "type": "commit"}}
         self.api.release = dict(RELEASE.release_record("v1.0", SHA, 42, "Reviewed changes."),

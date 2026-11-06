@@ -1,6 +1,6 @@
 # Authored test definitions, not harness execution or current CONF registration.
 format_version: '1.0'
-status: pending-adoption
+status: accepted-unadopted
 runtime_verdict: NOT_EXECUTED
 cases:
   - id: R13-T01

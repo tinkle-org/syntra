@@ -6,17 +6,24 @@ artifact publisher.
 
 ## 1. Current publication status
 
-[RFC 0011](rfcs/0011-specification-release-versioning.md) is in **Discussion**.
-Its proposed two-component tags and manual publication procedure are not
-active policy. Until public acceptance and activation, the process on `main`
-remains authoritative: [release-please.yml](.github/workflows/release-please.yml)
+[RFC 0011](rfcs/0011-specification-release-versioning.md) is **Accepted (design
+only; activation deferred)** under [Decision 0004](docs/decisions/0004-rfc-0011-0014-acceptance.md)
+and the [public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+at reviewed revision `cfab7655c348f1d04f4e1d57e28cc1a634478854`.
+Its two-component tags and manual publication procedure are accepted design,
+not active publication policy. **Release Please remains the active publisher;
+the prepared manual publisher remains disabled for publication.** Until separate
+process activation, [release-please.yml](.github/workflows/release-please.yml)
 and its configuration maintain document-release PRs and publish three-component
 prerelease tags and GitHub Releases after validation and release-PR merge.
 
 Current development notes stay under `Unreleased` in
 [CHANGELOG.md](CHANGELOG.md). No stable release or completed evidence is
-declared by this document. The prepared manual publisher rejects publication
-unless RFC 0011 is marked Accepted on trusted `main` following a public decision.
+declared by this document. RFC 0011's qualified status deliberately does not
+match the exact bare Accepted-status guard in [scripts/spec-release.py](scripts/spec-release.py).
+Acceptance does not remove that lock, retire Release Please, or make
+publisher-specific supersession effective. No workflow is changed by this record.
+Administrative protections are not asserted configured or tested.
 
 ## 2. Authority and release scope
 
@@ -34,6 +41,11 @@ Use the [conformance test guide](conformance/README.md) for declarations,
 per-case verdicts, independent role pairings, and applicable security,
 recovery, mobile, and operational evidence. Repository validation and candidate
 tags do not satisfy those execution or review gates.
+
+The acceptance decision records oscarlaw's human protocol/security self-review
+with self-approval disclosed. It does not satisfy the separate independent human
+security-review gate for the initial stable bundle, establish a freeze, or
+authorize publication.
 
 ## 3. Validation and preparation
 
@@ -58,8 +70,11 @@ repository material, not a protocol implementation.
 
 **Conditional procedure:** this section describes the prepared
 [spec-release.yml](.github/workflows/spec-release.yml) workflow and
-[publisher](scripts/spec-release.py) for activation after RFC 0011 acceptance.
-It does not authorize a release or change the active process in §1.
+[publisher](scripts/spec-release.py). RFC 0011 design acceptance is complete;
+activation is deferred. This procedure requires separately reviewed process
+activation, including synchronized owner text and verified administrative
+controls, before use. It does not authorize a release or change the active
+process in §1.
 
 ### Administrative setup
 

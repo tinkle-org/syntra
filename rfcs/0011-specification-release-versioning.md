@@ -1,36 +1,43 @@
 # RFC 0011: Specification release versioning and publication
 
-- RFC: 0011 (draft number; subject to assignment at acceptance)
+- RFC: 0011
 - Title: Specification release versioning and publication
-- Author(s): Pending public attribution
-- Status: Discussion
+- Author(s): Syntra contributors
+- Status: Accepted (design only; activation deferred)
 - Date: 2026-10-31
 - Target version: Pre-stable release-process decision; first stable release
   proposed as Syntra 1.0
 - Relates to: [GOVERNANCE.md](../GOVERNANCE.md) §§3–5/8,
   [RFC 0009](0009-v1-bootstrap-governance-and-release-scope.md) §§3 D3/D5,
   [ADR-009](../specifications/decisions/ADR-009-versioning-compatibility.md),
-  [versioning.md](../specifications/wire-format.md),
+  [wire format](../specifications/wire-format.md),
   [RELEASE.md](../RELEASE.md), and [schema-tooling.md](../docs/schema-tooling.md)
-- Reviewers: Pending maintainer assignment and public review
+- Reviewers: oscarlaw; human protocol/security self-review completed and
+  self-approval disclosed in the public decision
+- Decision: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md)
+  and [public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+- Reviewed revision: `cfab7655c348f1d04f4e1d57e28cc1a634478854`
 
-This document is a proposal, not an accepted governance decision, a
-specification freeze, or authorization to publish a release. The existing
-governance, Release Please process, and RFC 0009 release gates remain in force
-until this proposal is accepted and its changes are activated. Nothing here
-claims that a release, interoperability result, or security review exists.
+This release-process design is accepted; activation is deferred. Acceptance
+does not activate the prepared manual publisher or retire Release Please.
+The existing publication process and RFC 0009 release gates remain in force;
+publisher-specific supersession takes effect only on process activation.
+The public decision records human self-review, not independent security review,
+a specification freeze, interoperability results, or release authorization.
 
 ## 1. Summary
 
-Propose maintainer-selected two-component specification releases, such as
-Syntra 1.0 and 1.1, identified by Git tags `v1.0` and `v1.1`. The tag and its
+The accepted design specifies maintainer-selected two-component specification
+releases, such as Syntra 1.0 and 1.1, identified by Git tags `v1.0` and `v1.1`. The tag and its
 exact commit SHA are the normative release identity; the same authorized
 publication action also records a corresponding GitHub Release with no
 release assets as a non-normative discovery and evidence record. Release
 candidates use a maturity suffix, such as `v1.0-rc1`, mirrored by the GitHub
 prerelease flag; the suffix is not a third protocol-version component.
-Propose replacing Release Please with a manual, authorization-gated
-publishing workflow after this RFC is accepted.
+
+Replacement of Release Please with a manual, authorization-gated publishing
+workflow requires separate process activation; it is not authorized by
+acceptance alone.
 The existing integer wire version, schema package, profiles, and downstream
 implementation versions remain distinct. This proposal changes no peer or
 wire behavior.
@@ -51,8 +58,8 @@ specification-release baseline.
 
 ## 3. Proposal
 
-The proposed owner edits, if accepted, are in §4. All statements in this
-section are proposed policy; they do not activate themselves.
+The owner edits needed for activation are in §4. This section records the
+accepted design, not active publication policy; it does not activate itself.
 
 ### D1. Specification release identifiers
 
@@ -121,8 +128,8 @@ Changes affecting the frozen scope require renewed review and any affected
 verification. Acceptance, a green repository check, or an RC tag alone does
 not establish stable release readiness.
 
-This RFC would supersede only RFC 0009 D5's instruction to keep
-Release Please in prerelease mode. It would not relax D5's independent
+Only on process activation does this RFC supersede RFC 0009 D5's instruction
+to keep Release Please in prerelease mode. It does not relax D5's independent
 pure-Go/Rust role and mode matrix, required recovery/mobile and operational
 evidence, or independent human security review for the selected initial
 bundle. The general bootstrap fixture alternative does not replace those
@@ -130,8 +137,8 @@ bundle-specific gates.
 
 ### D5. Publication safeguards
 
-After public acceptance, replace Release Please with a manually dispatched
-workflow that validates an explicitly selected tag, full commit SHA, and
+At separately authorized process activation, replace Release Please with a
+manually dispatched workflow that validates an explicitly selected tag, full commit SHA, and
 public decision. It must run trusted workflow code from the protected main
 branch, verify that the target is a merged main-branch ancestor, and rerun
 repository, schema, regression, and workflow checks against that exact
@@ -140,14 +147,15 @@ CI workflow is path-filtered.
 
 The publisher verifies the binding between version, target SHA, public
 decision and active maintainer approvals, and rechecks the decision before
-writes. The proposed format in `RELEASE.md` uses a maintainer-authored
+writes. The accepted design's format in `RELEASE.md` uses a maintainer-authored
 `SYNTRA-APPROVE` comment bound to the SHA-256 of the decision body; a later
 `SYNTRA-OBJECT` blocks publication until that maintainer approves the current
 body. Changing the body invalidates approvals. With the current single
 maintainer, one explicit approval suffices with self-review disclosed. Human
 review remains responsible for evidence, independence, applicable verdicts,
-and objections outside the structured format. The format and implementation
-require review before acceptance.
+and objections outside the structured format. The public acceptance covers the
+format and reviewed design with human self-review disclosed; it does not
+establish operational verification of the implementation or its deployment.
 
 Run validation without publication credentials. Restrict the publishing
 identity and `v*` tag namespace, and require an administratively configured
@@ -185,16 +193,16 @@ snapshot; no release assets exist in this policy, and a future asset bundle
 
 ## 4. Detailed design and activation map
 
-The proposed change affects release labels, documentation, workflow and
+The accepted design affects release labels, documentation, workflow and
 release authorization only. No message fields, framing, state transitions,
 timeouts, resource budgets, profiles, requirement IDs, or peer behavior are
 added or changed. Existing schema baselines and reserved fields remain intact.
 
-The changes prepared in this branch are proposed for activation on acceptance:
+Acceptance does not activate the changes prepared in this branch. The following
+work remains for separately reviewed process activation:
 
-1. Update `GOVERNANCE.md`, `RELEASE.md`, `docs/schema-registry.md`,
-   `docs/schema-release-checklist.md`, `README.md`, and
-   `docs/implementer-guide.md`. Correct active status and version references
+1. Synchronize `GOVERNANCE.md`, `RELEASE.md`, `docs/schema-tooling.md`,
+   `README.md`, and `docs/implementer-guide.md`. Correct active status and version references
    while preserving dated history. Amend ADR-009 or its owner text only to
    the extent actually approved by the decision.
 2. Preserve the repository and schema validation workflows. Add a
@@ -211,9 +219,12 @@ The changes prepared in this branch are proposed for activation on acceptance:
    baseline exists. Never rewrite the initial compatibility archive merely
    to make validation pass.
 
-The publication workflow is prepared in this branch but refuses to publish
-while this RFC remains Draft. Its read-only validation job does not itself
-verify release authority or produce a conformance result.
+The publication workflow is prepared in this branch but remains disabled for
+publication. The qualified status line above deliberately does not match the
+exact bare Accepted-status guard in `scripts/spec-release.py`. Do not remove
+that activation lock as an acceptance-record correction. The read-only
+validation job does not itself verify release authority or produce a conformance
+result. No administrative protections are asserted configured or tested here.
 
 ## 5. Alternatives considered
 
@@ -260,14 +271,20 @@ tags, explicit environment configuration, and fail-closed handling. Validate
 untrusted inputs without shell interpolation and do not execute target
 scripts in a write-privileged publication job.
 
-Security-adjacent review of the workflow and authorization format is required
-before activation. This process change does not authorize security fallback,
-weaken production transport policy, or waive independent security review.
+The public decision records oscarlaw's completed human protocol/security
+self-review of the reviewed design, including the workflow and authorization
+format. Activation still requires verification of the actual administrative
+protections and publication controls. Self-review does not satisfy the separate
+independent human security-review gate for the initial stable bundle. This
+process change does not authorize security fallback or weaken transport policy.
 
 ## 8. Test plan and acceptance criteria
 
-- [ ] Public maintainer decision covers this RFC and the exact governance diff;
-      self-review and security review are disclosed as applicable.
+- [x] Public maintainer decision accepts the design at the reviewed revision;
+      human protocol/security self-review and self-approval are disclosed in
+      [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md) and the
+      [public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482).
+      Publisher activation and publisher-specific supersession are deferred.
 - [ ] Candidate version syntax, numeric ordering, malformed identifiers,
       full-SHA validation, ancestry and duplicate-tag handling are tested.
 - [ ] Automated approval checks reject missing, stale, duplicated, revoked,
@@ -290,7 +307,7 @@ SemVer. Errata and a new minor release are less convenient than editing a
 published tag. Manual authorization and a sole maintainer concentrate
 responsibility; a protected environment does not prove independent review or
 all evidence. Automated approval parsing adds a security-sensitive component
-that needs its own review and regression tests before it can publish.
+that needs operational verification and regression tests before it can publish.
 Immutable releases make a mistaken publication hard to retract: deleting
 the record frees deletion of its tag but the tag name can never be reused,
 and the attested binding persists. The record write adds a second
@@ -300,19 +317,23 @@ but non-normative, and the release body itself stays editable after
 publication, so only the attested tag-and-commit binding is integrity
 information.
 
-## 10. Unresolved questions and blockers
+## 10. Post-acceptance activation and release gates
 
-1. Public maintainer approval and security review of this RFC and its owner
-   changes are pending; no authority is inferred from drafting it.
-2. The proposed machine-readable approval/objection format and its trusted
-   active-roster source require maintainer and security review. GitHub
-   environment approval alone is not the complete quorum record.
+1. Public design acceptance and human protocol/security self-review are recorded
+   at the reviewed revision. No further maintainer vote is required under the
+   current sole-maintainer roster; this does not authorize process activation
+   or approve later material changes.
+2. Verify the prepared publisher's approval/objection handling, trusted
+   active-roster source, and deployment controls before activation. Keep the
+   qualified status lock and existing Release Please publisher until the
+   separately reviewed activation. GitHub environment approval alone is not
+   the complete quorum record.
 3. The administrator must choose and verify a publishing identity compatible
    with tag rulesets and configure the environment, repository protections,
    and the immutable-release setting.
 4. The first stable bundle still lacks its required freeze, independent
    interoperability and security review, recovery/mobile evidence, and final
-   authorization. This proposal cannot satisfy those gates.
+   authorization. Design acceptance cannot satisfy those gates.
 
 ## Appendix: References
 

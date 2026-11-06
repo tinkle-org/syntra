@@ -65,3 +65,23 @@ Static fixture validation proves consistency of authored public bytes and
 expected assertions only. R13-T01 through R13-T14 need real per-role execution,
 negative fault injection and independent evidence; their runtime verdict is
 NOT_EXECUTED. No exploitable deployed implementation was examined or approved.
+
+## Succession note — 2026-11-06
+
+The dated advisory analysis above is retained as written, including its then-open
+human-review and approval statements. Those pending design-acceptance statements
+are succeeded by [Decision 0004](../../docs/decisions/0004-rfc-0011-0014-acceptance.md)
+and sole maintainer oscarlaw's
+[public approval comment](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+for reviewed source `cfab7655c348f1d04f4e1d57e28cc1a634478854`. The maintainer
+confirmed completed human protocol/security self-review and disclosed
+self-approval. This is not independent review, and this advisory document does
+not become a human review merely by linking that decision.
+
+The current bundle status is accepted-unadopted. Acceptance covers the design
+only; canonical adoption and publisher activation are deferred. No active owner,
+pin, cipher, fixture byte, runtime verdict, freeze or release authority is changed
+by that acceptance. Deployment testing and independent execution evidence remain
+required. All runtime/formal conformance remains NOT_EXECUTED. The static checker
+checks bounded local reference consistency and fingerprints the acceptance
+record; it does not verify GitHub authorization or conduct a security review.

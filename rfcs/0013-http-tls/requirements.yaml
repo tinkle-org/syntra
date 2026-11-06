@@ -1,6 +1,6 @@
 # Local traceability only; proposed SNTR IDs are not registered allocations.
 format_version: '1.0'
-status: pending-adoption
+status: accepted-unadopted
 runtime_verdict: NOT_EXECUTED
 requirements:
   - {requirement_id: R13-01, proposed_requirement_id: SNTR-HPC-001, owner: specifications/transports.md, test_ids: [R13-T01]}
