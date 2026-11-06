@@ -117,6 +117,11 @@ RFC does not accept another RFC.
 
 ## Draft proposals
 
+- [RFC 0014: Scoped terminal receipt and authorization retirement](0014-scoped-terminal-receipt.md)
+  proposes one request-bound result after an authority-proven terminal
+  transition, with pre-mutation output fencing and bounded closure. Public
+  acceptance, compatibility disposition and human security review are pending.
+  It changes no current owner, wire contract or implementation behavior.
 - [RFC 0013: Noise-protected HTTP carriers and trusted TLS streams](0013-http-tls-carriers.md)
   proposes HTTP/HTTPS carriage and a trusted in-process TLS-provider boundary.
   Maintainer consent is recorded; public approval and human security review are
