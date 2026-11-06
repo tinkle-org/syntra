@@ -1,0 +1,84 @@
+rfcs/0013-http-tls/http-vectors.json
+  s_ab785f4f79b034::t_57886240a54a35 2
+rfcs/0013-http-tls/contract.json
+  s_ab785f4f79b034::t_57886240a54a35 4,13-15,21-24
+  s_ab785f4f79b034::t_34f61d712d5018 25
+CHANGELOG.md
+  s_e09e54c90a2c06::t_bc674b8ee4e432 11-15,29-31
+rfcs/0013-http-tls/requirements.yaml
+  s_ab785f4f79b034::t_57886240a54a35 3
+rfcs/0013-http-tls/README.md
+  s_ab785f4f79b034::t_8585802de501af 1,3-14,35,38-42,47-51,55-61,64-67,88-92,94-95
+RELEASE.md
+  s_23953c4d817ffc::t_9e1373498ed1fa 9-16,22-26,45-49,73-77
+rfcs/0013-http-tls/review.md
+  s_ab785f4f79b034::t_8585802de501af 68-87
+docs/decisions/0003-http-tls-consent.md
+  s_e09e54c90a2c06::t_bc674b8ee4e432 3-9
+tests/test_http_candidate.py
+  s_ab785f4f79b034::t_c7db1e9a3cc008 92-108,188-190,192-223
+  s_e09e54c90a2c06::t_5cc52527cb530d 16-18,191
+  s_ab785f4f79b034::t_faadd8123b176c 19-23,46-59,62-64,79,81-87,109-128,130-131,139-187,224-238,371,375-377,465,469-471
+rfcs/0012-protocol-reference-scope.md
+  s_23953c4d817ffc::t_9e1373498ed1fa 6,10-14,21-24,93,95-102
+rfcs/0013-http-tls/owner-delta.md
+  s_ab785f4f79b034::t_8585802de501af 3-13,67,129-131
+rfcs/README.md
+  s_e09e54c90a2c06::t_bc674b8ee4e432 118-129,131-135
+tests/test_spec_release.py
+  s_e09e54c90a2c06::t_8bb27b4bb185cd 272-279
+rfcs/0014-scoped-terminal-receipt.md
+  s_e09e54c90a2c06::t_bc674b8ee4e432 6,8,10-12,29-36,124,354,359-366,390,419-422,435-436,448-466
+  s_e09e54c90a2c06::t_5cc52527cb530d 393
+scripts/check-http-candidate.py
+  s_ab785f4f79b034::t_57886240a54a35 24-29,36,48-49,150,152,155,212-220,223,351,393,425,449,496,504-505,516,518-519,538,545
+rfcs/0013-http-tls/profiles.yaml
+  s_ab785f4f79b034::t_57886240a54a35 3
+rfcs/0013-http-tls/cases.yaml
+  s_ab785f4f79b034::t_57886240a54a35 3
+rfcs/0013-http-tls-carriers.md
+  s_23953c4d817ffc::t_9e1373498ed1fa 6,8,10-15,32-48,70-74,114,116,128-133,812,862-865,870-879,935,937-943,955,964-966,984-1014
+SESSION-OPEN-QUESTIONS.md
+  s_23953c4d817ffc::t_c0a52de4d6fb3d 24
+  s_23953c4d817ffc::t_9e1373498ed1fa 19-23,25-29
+rfcs/0013-http-tls/context-vectors.json
+  s_ab785f4f79b034::t_57886240a54a35 2
+rfcs/0011-specification-release-versioning.md
+  s_23953c4d817ffc::t_c0a52de4d6fb3d 30-31,37,39-40,140-141,150,204-205,310
+  s_23953c4d817ffc::t_9e1373498ed1fa 3,6,13,15-26,38,61-62,131-132,156-158,196,201-202,222-227,274-279,283-287,320-330,336
+  s_e09e54c90a2c06::t_5cc52527cb530d 5
+docs/decisions/0004-rfc-0011-0014-acceptance.md
+  s_e09e54c90a2c06::t_bc674b8ee4e432 1-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ac28038dfa218f7227571fa48fb2fd3bcfc83a6",
+  "prompts": {},
+  "sessions": {
+    "s_23953c4d817ffc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e4e85329fffe98JKb8UXd1xhap",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_ab785f4f79b034": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e4e8532b4ffeMvMxBJK34kwGVh",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    },
+    "s_e09e54c90a2c06": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e533070cdffef93Y8a9Nv7ZnH0",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
