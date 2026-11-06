@@ -216,6 +216,13 @@ def validate_acceptance_reference(root, reference):
     require(reference["public_approval_url"] in record and
             reference["reviewed_revision"] in record,
             "acceptance record missing exact public URL or reviewed revision")
+    sections = re.findall(r"^### RFC 0013:[^\n]*(?:\n|$)(.*?)(?=^#{1,3} |\Z)",
+                          record, re.MULTILINE | re.DOTALL)
+    require(len(sections) == 1, "acceptance record must contain exactly one RFC 0013 section")
+    disposition = re.match(r"\s*\*\*(.*?)\*\*", sections[0], re.DOTALL)
+    exact(" ".join(disposition[1].split()) if disposition else None,
+          "Accepted as an optional additive pre-release design; canonical adoption deferred.",
+          "RFC 0013 disposition must be Accepted with canonical adoption deferred")
 
 
 def validate_contexts(data, base, encode):

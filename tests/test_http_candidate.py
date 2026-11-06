@@ -169,11 +169,12 @@ class HttpCandidateTests(unittest.TestCase):
                 C.validate_acceptance_reference(root, reference)
             record = root / reference["record_path"]
             record.parent.mkdir(parents=True)
-            for text in ("", reference["public_approval_url"], reference["reviewed_revision"]):
+            for text in ("", reference["public_approval_url"], reference["reviewed_revision"],
+                         reference["public_approval_url"] + "\n" + reference["reviewed_revision"]):
                 record.write_text(text)
                 with self.subTest(text=text), self.assertRaises(ValueError):
                     C.validate_acceptance_reference(root, reference)
-            record.write_text(reference["public_approval_url"] + "\n" + reference["reviewed_revision"])
+            record.write_bytes(C.read_bounded(ROOT, reference["record_path"]))
             C.validate_acceptance_reference(root, reference)
 
     def test_bundle_status_labels_remain_accepted_unadopted(self):
@@ -185,6 +186,42 @@ class HttpCandidateTests(unittest.TestCase):
                 self.assertEqual(data["status"], "accepted-unadopted")
                 if "runtime_verdict" in data:
                     self.assertEqual(data["runtime_verdict"], "NOT_EXECUTED")
+
+    def test_rejected_decision_disposition_with_retained_references_is_rejected(self):
+        """Do not report accepted authority from references to a rejected design."""
+        read = C.read_bounded
+        path = ACCEPTANCE_REFERENCE["record_path"]
+        record = read(ROOT, path)
+        disposition = b"**Accepted as an optional additive pre-release design; canonical adoption\ndeferred.**"
+        self.assertEqual(record.count(disposition), 1)
+        changed = record.replace(disposition, b"**Rejected.**")
+        for key in ("public_approval_url", "reviewed_revision"):
+            self.assertIn(ACCEPTANCE_REFERENCE[key].encode(), changed)
+        with mock.patch.object(C, "read_bounded", side_effect=lambda root, name:
+                               changed if name == path else read(root, name)):
+            with self.assertRaisesRegex(ValueError, "RFC 0013 disposition must be Accepted"):
+                C.validate(ROOT)
+
+    def test_acceptance_record_rejects_duplicate_rfc_0013_sections(self):
+        """Count every RFC 0013 heading regardless of disposition formatting."""
+        record = C.read_bounded(ROOT, ACCEPTANCE_REFERENCE["record_path"])
+        for disposition in (b"Rejected.", b"**Rejected.**", b""):
+            duplicate = b"### RFC 0013: Conflicting disposition\n\n" + disposition + b"\n\n"
+            for changed in (duplicate + record, record + b"\n" + duplicate):
+                with self.subTest(disposition=disposition, prepended=changed.startswith(duplicate)):
+                    with mock.patch.object(C, "read_bounded", return_value=changed):
+                        with self.assertRaisesRegex(ValueError, "exactly one RFC 0013 section"):
+                            C.validate_acceptance_reference(ROOT, ACCEPTANCE_REFERENCE)
+
+    def test_acceptance_disposition_cannot_come_from_another_section(self):
+        """Keep the accepted disposition inside the sole RFC 0013 section."""
+        record = C.read_bounded(ROOT, ACCEPTANCE_REFERENCE["record_path"])
+        changed = record.replace(b"**Accepted as an optional additive pre-release design;",
+                                 b"### RFC 9999: Unrelated\n\n**Accepted as an optional additive pre-release design;")
+        self.assertNotEqual(changed, record)
+        with mock.patch.object(C, "read_bounded", return_value=changed):
+            with self.assertRaisesRegex(ValueError, "RFC 0013 disposition must be Accepted"):
+                C.validate_acceptance_reference(ROOT, ACCEPTANCE_REFERENCE)
 
     def test_reviewed_fixture_bytes_and_contract_constants_are_preserved(self):
         """Allow only status labels in fixtures and acceptance metadata in the contract."""
