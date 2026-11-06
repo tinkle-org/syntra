@@ -1,0 +1,22 @@
+rfcs/README.md
+  s_e09e54c90a2c06::t_f8483746eba8cf 120-124
+rfcs/0014-scoped-terminal-receipt.md
+  s_e09e54c90a2c06::t_f8483746eba8cf 1-173,183-259,264-394,396-400,402-412,415-416,420-423,431-467
+  s_e09e54c90a2c06::t_ae821a7d0f1bfb 174-182,260-263,395,401,413-414,417-419,424-430
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cfab7655c348f1d04f4e1d57e28cc1a634478854",
+  "prompts": {},
+  "sessions": {
+    "s_e09e54c90a2c06": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_e533070cdffef93Y8a9Nv7ZnH0",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "oscarlaw <oscarlaw2010@gmail.com>"
+    }
+  }
+}
