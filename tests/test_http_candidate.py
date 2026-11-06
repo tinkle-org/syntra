@@ -57,7 +57,8 @@ class HttpCandidateTests(unittest.TestCase):
                          "local-reference-consistency-only-not-GitHub-authorization")
         self.assertEqual(report["source"]["base_revision"],
                          "3f7e8ea037fefcc5c86101d23e7722c83e28a0d3")
-        self.assertEqual(len(report["base_git_blobs_sha256"]), len(C.BASE_FILES) + 8)
+        # Original schema inventory plus the append-only RPC case owner.
+        self.assertEqual(len(report["base_git_blobs_sha256"]), len(C.BASE_FILES) + 8 + 1)
         self.assertEqual(set(report["files_sha256"]), set(C.SOURCE_FILES))
         record = ACCEPTANCE_REFERENCE["record_path"]
         self.assertIn(record, report["files_sha256"])

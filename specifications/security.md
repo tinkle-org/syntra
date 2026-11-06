@@ -638,3 +638,61 @@ the protocol's security limits.
 
 Syntra defines no universal enrollment RPC, application E2EE or logical-session
 resumption. Only the carriers listed in [transports](transports.md) are supported.
+
+## 9. Terminal-transition authority
+
+The [scoped terminal receipt](connection.md#6-scoped-terminal-receipt) is a narrow
+exception to the protected-delivery cutoff in `SNTR-DAUTH-018` and `SNTR-ASEC-006`:
+an independently justified, one-use terminal-only permission for the exact
+withdrawing operation. It never continues application authority, permits new
+admission or relaxes `SNTR-DAUTH-017/019`, enrollment disposal boundaries,
+channel-age/record limits or generic failure disclosure. Ordinary external
+withdrawal remains fail-closed. The earlier security bounds may shorten, never
+extend, the [terminal budget](transports.md#8-terminal-only-output).
+
+**SNTR-TRC-003** — The authoritative-transition adapter MUST provide evidence
+that the reserved operation conditionally committed the exact terminal transition
+from the expected active authority revision. It MUST bind the transition to the
+host-created reservation, operation and authorization binding, and to all
+application conditions represented by the fixed receipt. An unconditional
+revoke, application completion reporting success, or an already-withdrawn row
+MUST NOT grant ownership to a later operation.
+
+The application owns persistence and conditional transition semantics, without
+a prescribed database. Syntra trusts a correctly configured in-process adapter;
+it cannot prove durability from a completion value. A synthetic authority fixture
+proves only its own behavior, not application persistence.
+
+**SNTR-TRC-004** — Writer, receive and supervision gates MUST share one
+terminal-operation coordinator and distinguish these authoritative observations
+without exposing their private details on the wire:
+
+| Observation | Behavior after reservation |
+|---|---|
+| Expected binding still active | Keep ordinary traffic fenced; do not emit success |
+| Exact owned transition committed, receipt conditions met, no superseding denial | Eligible for one reserved result within its original budget |
+| External withdrawal, owner/revision mismatch, expiry or superseding hard denial | Abort; no terminal-result exception |
+| Store error, timeout, stale evidence or unresolved cause | Fail closed; no terminal-result exception |
+
+The durable ownership record MUST bridge the interval between commit and
+application completion: a supervisor observing the transition first must be
+able to classify that same committed operation. A generic lookup error MUST NOT
+be converted to an owned transition. Prior sticky failures MUST NOT be cleared
+by late application success or delayed validity reads.
+
+**SNTR-TRC-005** — External hard withdrawal visible to the required authoritative
+observation, or already observed locally before the serialized carrier handoff,
+MUST invalidate receipt eligibility. An otherwise idempotent external revoke
+must advance a denial revision or provide equivalent evidence when it supersedes
+an owned transition. A permanent first-owner tombstone alone MUST NOT imply the
+absence of a later denial. Changes after the last authoritative observation may
+race the first handoff as well as later bytes, under `SNTR-TRC-011`; later observed
+denial MUST abort remaining I/O. Every other affected connection MUST use ordinary
+withdrawal without inheriting permission.
+
+A local mutex cannot establish which independent authority writer caused an
+invalidity result. Operation-aware evidence is required to enable this path.
+Private ownership, authority-store and failure details remain local and do not
+enter the reserved result, errors or diagnostics accessible to the peer. Retaining
+connection-local cryptographic state solely for the bounded attempt does not
+restore a retired binding or authorize replacement keys.

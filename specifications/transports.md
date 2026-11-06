@@ -541,3 +541,70 @@ the selected carrier and [connection](connection.md).
 
 **SNTR-TLS-020** — Initiators MUST fail closed and revalidate configured TLS
 identity before secrets wherever that outer layer is required.
+
+## 8. Terminal-only output
+
+Only the [scoped terminal transition](connection.md#6-scoped-terminal-receipt)
+may permit its reserved result after its exact owned withdrawal. This is the
+narrow exception to §7's protected-output prohibition, not a denial drain or
+permission to complete unrelated output after withdrawal. Carrier selection,
+context bytes, framing, encryption and trust checks remain unchanged. Raw frame
+drivers, record adapters and custom byte pumps need the entire fence,
+observation and handoff contract or reject reservation before mutation. Support
+for this operation cannot activate an otherwise unsupported carrier.
+
+**SNTR-TRC-006** — Before allowing the application transition to start, host and
+driver reservation MUST stop new protected admission and ordinary egress on
+that connection, suppress unstarted ordinary output, reserve bounded writer/
+result capacity and establish a complete outbound-frame boundary. Sibling calls
+and subscriptions MUST lose delivery eligibility; cancellation does not imply
+their effects stopped. Failure to establish the boundary within budget MUST
+close without starting the terminal mutation.
+
+The fence covers runtime queues, notifications, recovery, selected replies and
+driver-buffered output. Independent embedder ingress checks and authority
+supervisors participate in the same coordination; driver support alone cannot
+prevent an independent socket close. Inbound protected requests are never
+dispatched after the fence. Malformed input, authentication failures and carrier
+loss retain terminal precedence. A hard denial during quiescence aborts rather
+than finishing ordinary output under the exception.
+
+**SNTR-TRC-007** — A partially emitted ordinary frame MUST finish within the
+pre-mutation budget or force abort. It MUST NOT be dropped and followed by a
+receipt. Once encryption consumes a nonce, the exact ciphertext MUST finish in
+order or the connection MUST abort; drivers MUST NOT splice frames, skip nonces,
+re-encrypt replacements or restart an entire partially emitted unit. These rules
+also apply to a partial receipt. Quiescence is pre-mutation, never permission to
+finish unrelated protected output after withdrawal to reach a receipt in a FIFO.
+
+**SNTR-TRC-009** — Host and driver MUST set the final deadline to the earlier of
+the initiating request deadline and **five seconds** after reservation begins.
+The final quarter of that initial remaining budget, capped at **250 ms**, MUST
+be reserved for teardown. Quiescence, authority I/O, application completion,
+selection and result writing MUST finish before that teardown tail. Insufficient
+clock resolution or remaining budget MUST reject reservation before mutation.
+Deadlines MUST NOT be extended by retries, progress, repeated callers or adapter
+completion. Earlier security, channel-age and record limits remain binding.
+
+These budgets apply across all records and carrier fragmentation of the receipt;
+applications may impose stricter limits. Conservative elapsed/deadline semantics
+include suspension. Detected clock discontinuity closes instead of buying more
+time. Application work surviving its budget remains accounted without postponing
+carrier closure.
+
+**SNTR-TRC-011** — Driver and authority adapter MUST consume receipt eligibility
+once, at the final validated handoff to the sole carrier writer, bound to the
+exact result and original connection. The handoff MUST use a fresh,
+operation-aware authority observation; cached generic validity alone is
+insufficient. Checks and blocked-I/O repolls MUST keep external denial, unknown
+authority, deadline and hard transport failures fail-closed. A local lock MUST
+NOT be held across an application transaction or unbounded authority I/O.
+
+The adapter declares freshness/read/close bounds within existing security limits.
+Observation and carrier I/O are not a distributed atomic transaction. A later
+superseding event can race bytes already handed to the carrier; those bytes
+cannot be recalled. There is no instantaneous distributed cutoff, rollback of
+emitted bytes or permission for a longer cached allow. An application needing
+atomic remote permission consumption needs a stronger coordinated authority
+contract. After completion or failure the carrier closes and channel state is
+retired, with [retained cleanup ownership](connection.md#6-scoped-terminal-receipt).

@@ -8,6 +8,13 @@ no stable release is declared here. Release authorization follows
 
 ### Changed
 
+- Adopt accepted RFC 0014 in the connection, RPC, security and transport owners:
+  thirteen `SNTR-TRC-*` requirements and fourteen reciprocal `CONF-TRC-*` case
+  groups, all NOT_EXECUTED. The host-local exception remains disabled by default,
+  uses the existing correlated result and preserves ordinary withdrawal. SDK and
+  application evidence remain pending. Source IDL and carrier allocations are
+  unchanged. RFC 0013's guard retains every original base byte and permits only
+  exact hash-pinned RFC 0014 appendices; HTTP adoption remains inactive.
 - Accepted RFCs 0011–0014 under [Decision 0004](docs/decisions/0004-rfc-0011-0014-acceptance.md)
   with sole-maintainer approval and human self-review disclosed. RFC 0012
   ratifies the existing reference; RFC 0011 publisher activation, RFC 0013

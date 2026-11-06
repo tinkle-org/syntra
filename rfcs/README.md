@@ -131,5 +131,7 @@ review, implementation evidence, freeze and publication remain separate.
   is accepted but unadopted. Its isolated carrier definitions and fixtures do
   not register claimable support or establish executed conformance.
 - [RFC 0014: Scoped terminal receipt and authorization retirement](0014-scoped-terminal-receipt.md)
-  is accepted as an optional default-disabled design. Canonical owner adoption,
-  matching SDK implementation and application integration remain pending.
+  is Implementing following acceptance as an optional default-disabled design.
+  Canonical owners and requirement/case definitions are adopted. Matching SDK
+  implementation/evidence and application integration remain pending; registration
+  does not activate a host or establish executed conformance.

@@ -3,13 +3,13 @@
 - RFC: 0014
 - Title: Scoped terminal receipt and authorization retirement
 - Author(s): Syntra contributors
-- Status: Accepted
+- Status: Implementing
 - Date: 2026-11-05
 - Target version: Optional additive pre-release behavior; default-disabled
 - Relates to: [connection](../specifications/connection.md), [RPC](../specifications/rpc.md), [security](../specifications/security.md), [transports](../specifications/transports.md), [RFC process](README.md), [Go issue 17](https://github.com/tinkle-org/syntra-go/issues/17)
 - Reviewers: oscarlaw (sole maintainer; completed human self-review and self-approval disclosed)
 - Acceptance: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md), [public approval](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482), reviewed revision `cfab7655c348f1d04f4e1d57e28cc1a634478854`
-- Activation: Canonical owner and SDK adoption pending; ordinary withdrawal remains unchanged
+- Activation: Canonical owners and conformance definitions adopted; SDK implementation/evidence pending; host operation default-disabled
 
 ## 1. Summary
 
@@ -27,13 +27,15 @@ deadlines, and shutdown. This proposal does not define an account service,
 logout method, database, persistence format or new key-destruction wire method.
 
 This design is accepted under Decision 0004, with completed human protocol/security
-self-review and self-approval disclosed. It is not an implemented or activated
-exception to the current owners. Labels beginning `R14-` and `R14-T` remain local
-until canonical requirement/case adoption; none is registered or claimable yet.
-No current specification owner, schema, compatibility input or SDK behavior is
-changed by this status update. Independent release security review, actual
-implementation evidence and publication authorization remain separate. Passing
-document validation cannot establish runtime support.
+self-review and self-approval disclosed. The four canonical owners now adopt the
+exception as `SNTR-TRC-001` through `SNTR-TRC-013`; the numeric suffix maps exactly
+to local labels `R14-01` through `R14-13`. Registered cases `CONF-TRC-001` through
+`CONF-TRC-014` map exactly to `R14-T01` through `R14-T14` and remain **NOT_EXECUTED**.
+Canonical adoption is complete; matching SDK implementation and evidence remain
+pending. No schema change or automatic host activation is supplied. Independent
+release security review, actual implementation evidence and publication
+authorization remain separate. Passing document validation cannot establish
+runtime support or formal conformance.
 
 ## 2. Motivation
 
@@ -121,17 +123,17 @@ The authority transition is not atomic with carrier I/O. A response can be
 lost after commit. A new connection authenticates afresh and cannot replay the
 reserved result or carry the old reservation.
 
-### 3.4 Canonical owner adoption work
+### 3.4 Canonical owner adoption and implementation work
 
-| Owner | Proposed change |
+| Owner | Adoption / remaining work |
 |---|---|
-| `specifications/connection.md` | Define the opt-in terminal-only substate and narrow exception to unfinished-call withdrawal; preserve ordinary withdrawal |
-| `specifications/rpc.md` | Define reservation, first-terminal selection, exact-result delivery eligibility and unknown outcomes |
-| `specifications/security.md` | Define owned-transition evidence, competing denial, freshness, connection isolation and retention limits |
-| `specifications/transports.md` | Define writer barriers, terminal-only handoff, output budgets and abort behavior |
-| Conformance requirements and manifests | Register accepted IDs and role-specific positive/negative cases only after acceptance |
-| `MIGRATION.md` and `CHANGELOG.md` | Record reviewed compatibility disposition and behavior actually activated |
-| SDK design and input records | Reconcile APIs and reviewed input provenance with the accepted revision |
+| [Connection §6](../specifications/connection.md#6-scoped-terminal-receipt) | Adopted: requirements 001, 002, 012; opt-in substate, exact request ownership and retained cleanup |
+| [RPC §7](../specifications/rpc.md#7-scoped-terminal-result) | Adopted: requirements 008, 010, 013; fixed result, terminal selection and unknown outcomes |
+| [Security §9](../specifications/security.md#9-terminal-transition-authority) | Adopted: requirements 003, 004, 005; conditional ownership, classified observation and competing denial |
+| [Transports §8](../specifications/transports.md#8-terminal-only-output) | Adopted: requirements 006, 007, 009, 011; barriers, irreversible output, budgets and one-use handoff |
+| [Requirement registry](../conformance/manifest/requirements.yaml) and [RPC cases](../conformance/manifest/rpc.yaml) | Registered reciprocal IDs and positive/negative definitions; NOT_EXECUTED |
+| `MIGRATION.md` and `CHANGELOG.md` | Record canonical adoption and optional additive compatibility; no runtime activation claimed |
+| SDK design and input records | Pending: reconcile APIs, implementation evidence and reviewed input provenance |
 
 No `.proto` diff is proposed. Existing envelope version, fields, reservations,
 RPC result correlation, carrier identifiers and cryptographic context remain
@@ -322,8 +324,8 @@ otherwise unaccepted carrier or weakens encryption and trust policy.
 
 Preserves the smallest security surface. Local sign-out can still complete,
 while remote effects remain unknown on lost responses. This remains the
-default and is the only available behavior until this proposal is accepted
-and implemented. Its drawback is the healthy-path terminal receipt conflict.
+default at hosts without explicit compatible support and method policy. Its
+drawback is the healthy-path terminal receipt conflict.
 
 ### 5.2 Application withdrawal followed by a new key-retirement wire exchange
 
@@ -387,8 +389,11 @@ cannot force a remote peer to delete information it already retained.
 
 ## 8. Test plan and acceptance criteria
 
-All rows are adoption cases, currently **NOT_EXECUTED**. They are not registered
-conformance cases and do not imply production application durability.
+All rows are now registered conformance definitions, currently **NOT_EXECUTED**,
+and do not imply production application durability. Translate `R14-Tnn` to
+`CONF-TRC-0nn` and `R14-nn` to `SNTR-TRC-0nn` in the canonical registries. The
+table retains the accepted local labels so the original acceptance trace remains
+auditable. Registration is not a formal conformance claim.
 
 | Local case | Coverage | Requirement labels |
 |---|---|---|
@@ -423,7 +428,7 @@ verification from sharing an internal driver.
 
 ### Post-acceptance implementation gate
 
-- [ ] Accepted owner edits and registered requirement/case mappings synchronized.
+- [x] Accepted owner edits and registered requirement/case mappings synchronized.
 - [ ] Both SDK implementations pass their isolated runtime and transport suites.
 - [ ] Go server with Rust client and Rust server with Go client observe the result.
 - [ ] Forced loss remains unknown without replay or revived authority.
@@ -432,8 +437,9 @@ verification from sharing an internal driver.
 
 - [ ] The application proves its real durable transition and integration separately.
 
-The latter gates remain future evidence obligations. Design acceptance does not
-satisfy them or the separate independent release-security review gate.
+The unchecked gates remain future evidence obligations. Design acceptance and
+canonical registration do not satisfy them or the separate independent
+release-security review gate.
 
 ## 9. Drawbacks and risks
 
