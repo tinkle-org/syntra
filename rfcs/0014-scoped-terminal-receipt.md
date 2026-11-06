@@ -3,12 +3,13 @@
 - RFC: 0014
 - Title: Scoped terminal receipt and authorization retirement
 - Author(s): Syntra contributors
-- Status: Draft
+- Status: Accepted
 - Date: 2026-11-05
-- Target version: Optional pre-release behavior; compatibility disposition pending review
+- Target version: Optional additive pre-release behavior; default-disabled
 - Relates to: [connection](../specifications/connection.md), [RPC](../specifications/rpc.md), [security](../specifications/security.md), [transports](../specifications/transports.md), [RFC process](README.md), [Go issue 17](https://github.com/tinkle-org/syntra-go/issues/17)
-- Reviewers: Protocol maintainer and human security reviewer unassigned
-- Acceptance: Not requested or recorded; implementation and publication remain gated
+- Reviewers: oscarlaw (sole maintainer; completed human self-review and self-approval disclosed)
+- Acceptance: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md), [public approval](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482), reviewed revision `cfab7655c348f1d04f4e1d57e28cc1a634478854`
+- Activation: Canonical owner and SDK adoption pending; ordinary withdrawal remains unchanged
 
 ## 1. Summary
 
@@ -25,13 +26,14 @@ receipt meaning. Syntra owns request correlation, output fencing, encryption,
 deadlines, and shutdown. This proposal does not define an account service,
 logout method, database, persistence format or new key-destruction wire method.
 
-This document is a proposal, not protocol authority. BCP 14 keywords describe
-proposed obligations only. Labels beginning `R14-` and `R14-T` are local to
-this draft, not registered requirements or conformance cases. The draft changes
-no current specifications, schemas, compatibility inputs or SDK behavior. Public
-acceptance and security review under the [RFC lifecycle](README.md#lifecycle)
-are prerequisites to activating the proposed exception. Passing document
-validation or model tests cannot establish acceptance or implementation support.
+This design is accepted under Decision 0004, with completed human protocol/security
+self-review and self-approval disclosed. It is not an implemented or activated
+exception to the current owners. Labels beginning `R14-` and `R14-T` remain local
+until canonical requirement/case adoption; none is registered or claimable yet.
+No current specification owner, schema, compatibility input or SDK behavior is
+changed by this status update. Independent release security review, actual
+implementation evidence and publication authorization remain separate. Passing
+document validation cannot establish runtime support.
 
 ## 2. Motivation
 
@@ -119,7 +121,7 @@ The authority transition is not atomic with carrier I/O. A response can be
 lost after commit. A new connection authenticates afresh and cannot replay the
 reserved result or carry the old reservation.
 
-### 3.4 Proposed owner edits after acceptance
+### 3.4 Canonical owner adoption work
 
 | Owner | Proposed change |
 |---|---|
@@ -349,17 +351,19 @@ different application result, not confirmed terminal completion.
 
 ## 6. Compatibility
 
-The proposal retains the existing wire representation and ordinary client
+The accepted design retains the existing wire representation and ordinary client
 result handling. Disabled hosts behave as before; mixed-version peers can
 still observe ordinary success or an unknown outcome. Clients cannot infer
 support from the endpoint, a connection error or a diagnostic identifier.
 
-Wire-byte compatibility is not sufficient to approve changed withdrawal
-semantics. Review must decide whether the opt-in exception is compatible under
-[governance](../GOVERNANCE.md#4-how-breaking-changes-are-handled), including
-security and failure behavior. If classified as breaking, the major-version
-and migration requirements apply. This draft assigns no release version,
-changes no dependency pins and grants no publication authorization.
+The public decision classifies the design as optional additive pre-release
+behavior under [governance](../GOVERNANCE.md#4-how-breaking-changes-are-handled):
+existing defaults and ordinary withdrawal stay intact, no new peer exchange is
+required, and only the independently justified terminal-result permission is
+added. This disposition considers security and failure semantics, not merely
+unchanged wire bytes. An incompatible or security-weakening expansion requires
+a separate decision and applicable major-version handling. No release version,
+dependency-pin change or publication authorization is supplied here.
 
 ## 7. Security considerations
 
@@ -383,10 +387,10 @@ cannot force a remote peer to delete information it already retained.
 
 ## 8. Test plan and acceptance criteria
 
-All rows are proposed cases, currently **NOT_EXECUTED**. They are not registered
+All rows are adoption cases, currently **NOT_EXECUTED**. They are not registered
 conformance cases and do not imply production application durability.
 
-| Draft case | Coverage | Requirement labels |
+| Local case | Coverage | Requirement labels |
 |---|---|---|
 | R14-T01 | Disabled/unsupported preflight rejects before effects | R14-01, R14-02 |
 | R14-T02 | Wrong call, generation, principal, scope or binding cannot reserve/use | R14-02, R14-03 |
@@ -412,8 +416,10 @@ verification from sharing an internal driver.
 
 ### Review and acceptance gate
 
-- [ ] Protocol and human security review completed; no unresolved objections.
-- [ ] Public acceptance and compatibility/version decision recorded.
+- [x] Sole maintainer confirmed completed human protocol/security self-review;
+      self-approval is disclosed, not independent review.
+- [x] Public acceptance and optional additive pre-release compatibility disposition
+      recorded in Decision 0004; no objection by that maintainer recorded.
 
 ### Post-acceptance implementation gate
 
@@ -426,8 +432,8 @@ verification from sharing an internal driver.
 
 - [ ] The application proves its real durable transition and integration separately.
 
-The latter gates are future evidence obligations, not work completed by drafting
-this proposal or a substitute for its review and public acceptance.
+The latter gates remain future evidence obligations. Design acceptance does not
+satisfy them or the separate independent release-security review gate.
 
 ## 9. Drawbacks and risks
 
@@ -439,21 +445,25 @@ when an attempted mutation fails. A short budget may be too small for an
 application dependency; that application must keep the default or use separate
 receipt reconciliation, not stretch the security limits silently.
 
-## 10. Unresolved questions and blockers
+## 10. Acceptance disposition and remaining adoption work
 
-1. **TBD — blocker:** public protocol acceptance, human security review and
-   compatibility/version disposition have not occurred.
-2. **TBD — blocker:** review the 1,024-byte ceiling, five-second absolute cap
-   and quarter-budget/250-ms teardown tail against platform clock resolution,
-   native carrier cancellation and application authority latency.
-3. **TBD — blocker:** specify concrete SDK adapter contracts for owned commit
-   evidence and superseding denial, including data lifetime and monotonically
-   ordered revisions. A callback boolean is not an acceptable implementation.
-4. **TBD — blocker:** prove writer-barrier and final-handoff linearization in
-   each SDK, including independent embedder monitors, custom drivers and
-   carrier-buffered output. The remote-observation race must remain explicit.
-5. **TBD — blocker:** establish whether any explicit peer negotiation is
-   required by compatibility review. No new capability or message is allocated.
+1. Public acceptance, completed human self-review and compatibility disposition
+   are recorded in Decision 0004. No further maintainer quorum is required under
+   the current roster; independent release review remains separate.
+2. The 1,024-byte ceiling, five-second cap and quarter-budget/250-ms teardown
+   tail are accepted limits. Each implementation must prove conservative clock,
+   cancellation and authority-latency handling within them or reject unsupported
+   use; it must not silently increase the limits.
+3. Concrete SDK adapter contracts for owned commit evidence, superseding denial,
+   data lifetime and ordered authority revisions are implementation work within
+   the accepted requirements. A callback boolean remains insufficient.
+4. Each SDK must prove writer-barrier/final-handoff coordination, including
+   embedder monitors, custom drivers and carrier-buffered output, and document
+   the last-observation race. These proofs are enablement gates, not claimed here.
+5. The approved scope uses an existing correlated result without a new required
+   peer exchange. No capability or message is allocated. Any additional wire
+   negotiation or broader authority exception requires a separately reviewed
+   decision rather than an undocumented implementation choice.
 
 ## Appendix: References
 

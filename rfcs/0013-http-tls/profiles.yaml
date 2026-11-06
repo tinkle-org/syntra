@@ -1,6 +1,6 @@
 # Proposed carriers only; not loaded by current conformance selection.
 format_version: '1.0'
-status: pending-adoption
+status: accepted-unadopted
 profiles:
   - id: SYNTRA-1.0-HTTP
     kind: CARRIER

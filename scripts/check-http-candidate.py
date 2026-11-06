@@ -21,12 +21,19 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE = "rfcs/0013-http-tls"
 BASE = "3f7e8ea037fefcc5c86101d23e7722c83e28a0d3"
+STATUS = "accepted-unadopted"
+ACCEPTANCE_REFERENCE = {
+    "public_approval_url": "https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482",
+    "reviewed_revision": "cfab7655c348f1d04f4e1d57e28cc1a634478854",
+    "record_path": "docs/decisions/0004-rfc-0011-0014-acceptance.md",
+}
 MAX_FILE = 1024 * 1024
 FILES = ("README.md", "contract.json", "profiles.yaml", "cases.yaml",
          "requirements.yaml", "context-vectors.json", "http-vectors.json", "owner-delta.md", "review.md")
 SOURCE_FILES = tuple(f"{BUNDLE}/{name}" for name in FILES) + (
     "rfcs/0013-http-tls-carriers.md", "rfcs/README.md",
     "docs/decisions/0003-http-tls-consent.md",
+    ACCEPTANCE_REFERENCE["record_path"],
     "scripts/check-http-candidate.py", "scripts/migrate-conformance-1.0.py",
     "scripts/validate-repo.py", "tests/test_http_candidate.py")
 BASE_FILES = tuple(f"specifications/{name}.md" for name in (
@@ -38,8 +45,8 @@ BASE_FILES = tuple(f"specifications/{name}.md" for name in (
     "CONTRIBUTING.md", "GOVERNANCE.md", "MAINTAINERS.md")
 GATES = {
     "maintainer_consent_reported": True, "self_approval_disclosed": True,
-    "public_approval": False, "human_security_review": False,
-    "accepted": False, "active": False, "freeze": False,
+    "public_approval": True, "human_security_review": True,
+    "accepted": True, "active": False, "freeze": False,
     "release_authorized": False, "formal_conformance": "NOT_EXECUTED",
 }
 LIMITS = {
@@ -140,11 +147,12 @@ def context_encoder(root):
 
 
 def validate_contract(data):
-    """Validate candidate constants, HTTP mapping, and adoption gates."""
+    """Validate accepted design constants without granting canonical adoption."""
     top_fields = {
-        "format_version": 1, "kind": "rfc-candidate", "status": "pending-adoption",
+        "format_version": 1, "kind": "rfc-candidate", "status": STATUS,
         "protocol": "Syntra 1.0", "base_revision": BASE, "domain_ascii": "syntra.1.0",
         "core_wire_version": 1, "protobuf_package": "syntra.v1", "authority": GATES,
+        "acceptance_reference": ACCEPTANCE_REFERENCE,
         "limits": LIMITS, "browser_support_claimed": False,
         "pause": "retire-generation-bounded-stop",
         "resume": "fresh-attempt-with-remaining-budget",
@@ -201,9 +209,18 @@ def validate_contract(data):
     }, "TLS-provider boundary drift")
 
 
+def validate_acceptance_reference(root, reference):
+    """Check bounded local reference consistency, not GitHub authorization."""
+    exact(reference, ACCEPTANCE_REFERENCE, "acceptance reference drift")
+    record = read_bounded(root, reference["record_path"]).decode("utf-8")
+    require(reference["public_approval_url"] in record and
+            reference["reviewed_revision"] in record,
+            "acceptance record missing exact public URL or reviewed revision")
+
+
 def validate_contexts(data, base, encode):
     """Validate derived public contexts and negative recipes."""
-    require(data["status"] == "pending-adoption", "context authority label")
+    require(data["status"] == STATUS, "context authority label")
     require(data["source"] == "conformance/test-vectors/connection/context-vectors.json", "context source")
     require(data["transformation"] == "base-context-with-proposed-carrier-only", "context transformation")
     require(data["scope"] == "public-context-encoding-only-not-Noise-ciphertext", "context scope")
@@ -331,7 +348,7 @@ def lint_http_shape(item):
 
 def validate_http(data):
     """Validate structural HTTP fixtures and ACK semantics."""
-    require(data["status"] == "pending-adoption" and data["scope"] == "structural-HTTP-only-synthetic-bodies-not-valid-Noise", "HTTP fixture scope")
+    require(data["status"] == STATUS and data["scope"] == "structural-HTTP-only-synthetic-bodies-not-valid-Noise", "HTTP fixture scope")
     rows = materialize_http(data["vectors"])
     require(set(rows) == {f"R13-H{n:02d}" for n in range(1, 26)}, "HTTP fixture coverage")
     for item in rows.values():
@@ -373,7 +390,7 @@ def validate_tls_variants(case):
 
 def validate_cases(data, rfc):
     """Validate case coverage, traces, and direction-specific expectations."""
-    require(data["status"] == "pending-adoption" and data["runtime_verdict"] == "NOT_EXECUTED", "case authority/verdict")
+    require(data["status"] == STATUS and data["runtime_verdict"] == "NOT_EXECUTED", "case authority/verdict")
     definitions = set(re.findall(r"\*\*(R13-[0-9]{2}) \(", rfc))
     require(definitions == {f"R13-{n:02d}" for n in range(1, 30)}, "RFC requirement definitions")
     seen, covered = set(), set()
@@ -405,7 +422,7 @@ def validate_cases(data, rfc):
 
 def validate_profiles(data, contract, current):
     """Validate the isolated carrier registry without claiming allocation."""
-    require(data["status"] == "pending-adoption", "registry authority label")
+    require(data["status"] == STATUS, "registry authority label")
     seen, codes = set(), set()
     for profile in data["profiles"]:
         name, code = profile["id"], profile["carrier"]
@@ -429,7 +446,7 @@ def validate_profiles(data, contract, current):
 
 def validate_requirements(data, cases, current):
     """Validate local requirement IDs and reciprocal case traces."""
-    require(data["status"] == "pending-adoption" and data["runtime_verdict"] == "NOT_EXECUTED", "requirement authority/verdict")
+    require(data["status"] == STATUS and data["runtime_verdict"] == "NOT_EXECUTED", "requirement authority/verdict")
     active = {row["requirement_id"] for row in current["requirements"]}
     seen, proposed = set(), set()
     for row in data["requirements"]:
@@ -476,6 +493,7 @@ def validate(root=ROOT):
     base_hashes = verify_base(root)
     contract = load(root, f"{BUNDLE}/contract.json")
     validate_contract(contract)
+    validate_acceptance_reference(root, contract["acceptance_reference"])
     validate_profiles(load(root, f"{BUNDLE}/profiles.yaml"), contract,
                       load(root, "conformance/profiles.yaml"))
     validate_contexts(load(root, f"{BUNDLE}/context-vectors.json"),
@@ -483,7 +501,8 @@ def validate(root=ROOT):
                       context_encoder(root))
     validate_http(load(root, f"{BUNDLE}/http-vectors.json"))
     rfc = read_bounded(root, "rfcs/0013-http-tls-carriers.md").decode()
-    require("- Status: Draft\n" in rfc, "pending RFC cannot assert acceptance")
+    exact(re.findall(r"^- Status: (.*)$", rfc, re.MULTILINE), ["Accepted"],
+          "RFC status must be Accepted; canonical adoption remains pending")
     cases = load(root, f"{BUNDLE}/cases.yaml")
     validate_cases(cases, rfc)
     validate_requirements(load(root, f"{BUNDLE}/requirements.yaml"), cases,
@@ -494,7 +513,10 @@ def validate(root=ROOT):
     require(head == git(root, "rev-parse", "HEAD").decode().strip(), "HEAD changed during validation")
     return {
         "format_version": 1, "kind": "worktree-not-release",
+        "status": STATUS,
         "scope": "isolated-RFC0013-not-canonical-inputs", "authority": GATES,
+        "acceptance_reference": contract["acceptance_reference"],
+        "acceptance_reference_validation": "local-reference-consistency-only-not-GitHub-authorization",
         "source": {"base_revision": BASE, "head": head,
                    "dirty": bool(git(root, "status", "--porcelain", "--untracked-files=all")),
                    "candidate_revision": None},
@@ -513,14 +535,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--record-worktree", action="store_true", help="emit fingerprint JSON to stdout; no writes")
-    mode.add_argument("--require-adoption", action="store_true", help="fail closed while public/human gates are pending")
+    mode.add_argument("--require-adoption", action="store_true", help="fail closed while canonical adoption is pending")
     args = parser.parse_args()
     try:
         report = validate()
     except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, subprocess.SubprocessError) as exc:
         parser.exit(1, f"HTTP candidate invalid: {exc}\n")
     if args.require_adoption:
-        parser.exit(2, "BLOCKED: public approval, human security review and canonical activation are pending; no release pin\n")
+        parser.exit(2, "BLOCKED: canonical adoption pending; public approval and human security self-review recorded; activation and publisher authorization deferred; no release pin\n")
     if args.record_worktree:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:

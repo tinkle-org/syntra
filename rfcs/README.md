@@ -115,14 +115,21 @@ bootstrap transition is recorded in
 acceptance/freeze/release milestones remain separate. Publishing or merging an
 RFC does not accept another RFC.
 
-## Draft proposals
+## Latest acceptance and adoption states
 
-- [RFC 0014: Scoped terminal receipt and authorization retirement](0014-scoped-terminal-receipt.md)
-  proposes one request-bound result after an authority-proven terminal
-  transition, with pre-mutation output fencing and bounded closure. Public
-  acceptance, compatibility disposition and human security review are pending.
-  It changes no current owner, wire contract or implementation behavior.
+[Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md) records
+the sole maintainer's public acceptance of RFCs 0011–0014, with completed human
+protocol/security self-review and self-approval disclosed. Independent release
+review, implementation evidence, freeze and publication remain separate.
+
+- [RFC 0011: Specification release versioning and publication](0011-specification-release-versioning.md)
+  is accepted as a design; publisher activation is deferred. Existing publisher
+  behavior and all release-specific authorization gates remain unchanged.
+- [RFC 0012: Protocol reference scope](0012-protocol-reference-scope.md) is
+  accepted as ratification of the already-landed six-page reference.
 - [RFC 0013: Noise-protected HTTP carriers and trusted TLS streams](0013-http-tls-carriers.md)
-  proposes HTTP/HTTPS carriage and a trusted in-process TLS-provider boundary.
-  Maintainer consent is recorded; public approval and human security review are
-  pending. It is not accepted and does not change the current reference or registry.
+  is accepted but unadopted. Its isolated carrier definitions and fixtures do
+  not register claimable support or establish executed conformance.
+- [RFC 0014: Scoped terminal receipt and authorization retirement](0014-scoped-terminal-receipt.md)
+  is accepted as an optional default-disabled design. Canonical owner adoption,
+  matching SDK implementation and application integration remain pending.

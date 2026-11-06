@@ -1,5 +1,12 @@
 # Decision 0003: HTTP/TLS maintainer consent and pending adoption
 
+Historical consent record. Its pending acceptance/review disposition is
+superseded by [Decision 0004](0004-rfc-0011-0014-acceptance.md) and the
+[public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482).
+The dated fields below retain the evidence available at preparation time; this
+does not retroactively assert review of the earlier candidate. Canonical
+adoption, independent release review and publication remain separate.
+
 Status: pending public decision. This record preserves actual user consent; it
 does not assert RFC acceptance, human security review, freeze or release approval.
 It follows the [decision-record template](../decision-record-template.md).

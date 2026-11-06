@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "kind": "rfc-candidate",
-  "status": "pending-adoption",
+  "status": "accepted-unadopted",
   "protocol": "Syntra 1.0",
   "base_revision": "3f7e8ea037fefcc5c86101d23e7722c83e28a0d3",
   "domain_ascii": "syntra.1.0",
@@ -10,13 +10,18 @@
   "authority": {
     "maintainer_consent_reported": true,
     "self_approval_disclosed": true,
-    "public_approval": false,
-    "human_security_review": false,
-    "accepted": false,
+    "public_approval": true,
+    "human_security_review": true,
+    "accepted": true,
     "active": false,
     "freeze": false,
     "release_authorized": false,
     "formal_conformance": "NOT_EXECUTED"
+  },
+  "acceptance_reference": {
+    "public_approval_url": "https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482",
+    "reviewed_revision": "cfab7655c348f1d04f4e1d57e28cc1a634478854",
+    "record_path": "docs/decisions/0004-rfc-0011-0014-acceptance.md"
   },
   "proposed_carriers": {
     "SYNTRA-1.0-HTTP": {

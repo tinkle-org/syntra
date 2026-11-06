@@ -3,19 +3,25 @@
 - RFC: 0012
 - Title: Protocol reference scope
 - Author(s): Syntra contributors
-- Status: Draft
+- Status: Accepted
 - Date: 2026-11-03
 - Target version: Syntra 1.0 pre-release
 - Relates to: [protocol overview](../README.md), [wire format](../specifications/wire-format.md), [conformance guide](../conformance/README.md)
-- Reviewers: Unassigned; maintainer review required
+- Reviewers: oscarlaw; human protocol/security self-review completed and
+  self-approval disclosed in the public decision
+- Decision: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md)
+  and [public acceptance](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+- Reviewed revision: `cfab7655c348f1d04f4e1d57e28cc1a634478854`
 
 ## 1. Summary
 
 The reference describes the current protocol independently of a language,
 runtime, code organization, or test harness. Six pages cover representation,
 establishment, RPC, security, transports, and update recovery. Supporting guides
-describe schema tooling and verification. This proposal does not claim acceptance
-or release authorization.
+describe schema tooling and verification. Acceptance ratifies the six-page
+reference already landed at `3f7e8ea037fefcc5c86101d23e7722c83e28a0d3`;
+it introduces no new wire, cryptographic, carrier, or SDK behavior. It does not
+claim runtime results, independent security review, a freeze, or release authorization.
 
 ## 2. Motivation
 
@@ -84,7 +90,13 @@ guarantee. Review the retained ordering, expiry, authorization, output, and reco
 rules together with their fixtures. Do not turn missing coverage into a passing
 claim or infer security from a document build.
 
-## 10. Unresolved questions and blockers
+## 10. Acceptance and remaining evidence gates
 
-Maintainer review of the requirement-scope changes is required before acceptance.
-No approval is implied by preparing the reference or by passing repository checks.
+The [public decision](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482)
+accepts the requirement-scope changes at the reviewed revision, with oscarlaw's
+human protocol/security self-review and self-approval disclosed. Ordered output,
+bounded work, once-only outcomes, cryptographic state safety, and the security
+obligations in §7 remain intact; acceptance is not permission to remove them.
+Later material changes need their own applicable review. Executed conformance,
+independent interoperability/security evidence, specification freeze, and release
+authorization remain separate gates under [RELEASE.md](../RELEASE.md).

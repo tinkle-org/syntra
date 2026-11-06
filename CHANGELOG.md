@@ -8,6 +8,11 @@ no stable release is declared here. Release authorization follows
 
 ### Changed
 
+- Accepted RFCs 0011–0014 under [Decision 0004](docs/decisions/0004-rfc-0011-0014-acceptance.md)
+  with sole-maintainer approval and human self-review disclosed. RFC 0012
+  ratifies the existing reference; RFC 0011 publisher activation, RFC 0013
+  canonical carrier adoption and RFC 0014 terminal-receipt implementation
+  remain separate work. No freeze, conformance result or release is claimed.
 - Remove obsolete development and readiness reports from the documentation;
   current tooling and verification requirements remain in their supporting guides.
 - Use Syntra/channel terminology throughout the current reference, context
@@ -21,6 +26,6 @@ no stable release is declared here. Release authorization follows
 - Separated the [schema tooling guide](docs/schema-tooling.md) and
   [conformance test guide](conformance/README.md) from protocol requirements
   and from executed implementation evidence.
-- Documented the active prerelease publisher and the proposed manual
-  specification-release procedure. RFC 0011 remains in Discussion; its
-  publication policy requires public acceptance before activation.
+- Documented the active prerelease publisher and the accepted manual
+  specification-release design. RFC 0011 publisher activation is deferred;
+  the existing publisher and release-specific authorization gates remain intact.
