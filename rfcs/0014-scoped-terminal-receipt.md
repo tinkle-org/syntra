@@ -3,13 +3,13 @@
 - RFC: 0014
 - Title: Scoped terminal receipt and authorization retirement
 - Author(s): Syntra contributors
-- Status: Implementing
+- Status: Implemented
 - Date: 2026-11-05
 - Target version: Optional additive pre-release behavior; default-disabled
 - Relates to: [connection](../specifications/connection.md), [RPC](../specifications/rpc.md), [security](../specifications/security.md), [transports](../specifications/transports.md), [RFC process](README.md), [Go issue 17](https://github.com/tinkle-org/syntra-go/issues/17)
 - Reviewers: oscarlaw (sole maintainer; completed human self-review and self-approval disclosed)
 - Acceptance: [Decision 0004](../docs/decisions/0004-rfc-0011-0014-acceptance.md), [public approval](https://github.com/tinkle-org/syntra/pull/25#issuecomment-6688499482), reviewed revision `cfab7655c348f1d04f4e1d57e28cc1a634478854`
-- Activation: Canonical owners and conformance definitions adopted; SDK implementation/evidence pending; host operation default-disabled
+- Activation: Canonical owners and conformance definitions adopted; formal conformance NOT_EXECUTED; host operation default-disabled
 
 ## 1. Summary
 
@@ -31,11 +31,14 @@ self-review and self-approval disclosed. The four canonical owners now adopt the
 exception as `SNTR-TRC-001` through `SNTR-TRC-013`; the numeric suffix maps exactly
 to local labels `R14-01` through `R14-13`. Registered cases `CONF-TRC-001` through
 `CONF-TRC-014` map exactly to `R14-T01` through `R14-T14` and remain **NOT_EXECUTED**.
-Canonical adoption is complete; matching SDK implementation and evidence remain
-pending. No schema change or automatic host activation is supplied. Independent
-release security review, actual implementation evidence and publication
-authorization remain separate. Passing document validation cannot establish
-runtime support or formal conformance.
+**Implemented** means this specification repository has adopted the canonical
+owner definitions and registered conformance coverage. Rust and Go implementation
+code exists, with passing unit/TCP evidence maintained in their SDK repositories;
+the Rust implementation is the behavioral reference (see §4.6). No schema change
+or automatic host activation is supplied. Formal conformance remains
+**NOT_EXECUTED**; production durable application integration, independent release
+security review and publication authorization remain separate gates. Passing
+document validation cannot establish runtime support or formal conformance.
 
 ## 2. Motivation
 
@@ -133,7 +136,7 @@ reserved result or carry the old reservation.
 | [Transports §8](../specifications/transports.md#8-terminal-only-output) | Adopted: requirements 006, 007, 009, 011; barriers, irreversible output, budgets and one-use handoff |
 | [Requirement registry](../conformance/manifest/requirements.yaml) and [RPC cases](../conformance/manifest/rpc.yaml) | Registered reciprocal IDs and positive/negative definitions; NOT_EXECUTED |
 | `MIGRATION.md` and `CHANGELOG.md` | Record canonical adoption and optional additive compatibility; no runtime activation claimed |
-| SDK design and input records | Pending: reconcile APIs, implementation evidence and reviewed input provenance |
+| SDK design and input records | Existing Rust/Go implementations; SDK repositories own API review, implementation evidence and reviewed input provenance; integration and enablement obligations remain separate |
 
 No `.proto` diff is proposed. Existing envelope version, fields, reservations,
 RPC result correlation, carrier identifiers and cryptographic context remain
@@ -306,11 +309,11 @@ reconciliation remain application responsibilities.
 
 ### 4.6 Language adapters
 
-The Go runtime can supply a private request handle through the handler context,
-with optional transport coordination forwarded through ownership wrappers.
-The Rust runtime can supply an additive handler-context hook and carry trusted
-output metadata through the native pump. Names and signatures require SDK API
-review; none is defined by this RFC or available in the current SDKs.
+The [Rust implementation](https://github.com/tinkle-org/syntra-rs), including
+`crates/syntra-runtime/src/host_terminal.rs`, is the behavioral reference.
+The [Go implementation](https://github.com/tinkle-org/syntra-go) also includes
+terminal-receipt support in `terminal_receipt.go`. Language-specific API contracts,
+review and unit/TCP evidence belong to those repositories, not this RFC.
 
 The core remains portable. Record adapters may inherit support only when they
 participate in the entire fence/observation/handoff contract. Raw frame drivers,
@@ -426,7 +429,7 @@ verification from sharing an internal driver.
 - [x] Public acceptance and optional additive pre-release compatibility disposition
       recorded in Decision 0004; no objection by that maintainer recorded.
 
-### Post-acceptance implementation gate
+### SDK and integration enablement gates
 
 - [x] Accepted owner edits and registered requirement/case mappings synchronized.
 - [ ] Both SDK implementations pass their isolated runtime and transport suites.
@@ -437,9 +440,11 @@ verification from sharing an internal driver.
 
 - [ ] The application proves its real durable transition and integration separately.
 
-The unchecked gates remain future evidence obligations. Design acceptance and
-canonical registration do not satisfy them or the separate independent
-release-security review gate.
+The unchecked gates remain separate evidence obligations, not a statement that
+SDK implementation is absent. Existing SDK unit/TCP evidence does not by itself
+satisfy the registered formal conformance composition or the production durable
+application gate. The specification-local Implemented status does not close
+these gates, satisfy independent release-security review or authorize publication.
 
 ## 9. Drawbacks and risks
 
@@ -461,8 +466,8 @@ receipt reconciliation, not stretch the security limits silently.
    cancellation and authority-latency handling within them or reject unsupported
    use; it must not silently increase the limits.
 3. Concrete SDK adapter contracts for owned commit evidence, superseding denial,
-   data lifetime and ordered authority revisions are implementation work within
-   the accepted requirements. A callback boolean remains insufficient.
+   data lifetime and ordered authority revisions remain SDK-owned contracts
+   constrained by the accepted requirements. A callback boolean remains insufficient.
 4. Each SDK must prove writer-barrier/final-handoff coordination, including
    embedder monitors, custom drivers and carrier-buffered output, and document
    the last-observation race. These proofs are enablement gates, not claimed here.

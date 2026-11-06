@@ -85,9 +85,10 @@ class TerminalReceiptAdoptionTests(unittest.TestCase):
         read = C.read_bounded
         path = "rfcs/0014-scoped-terminal-receipt.md"
         rfc = read(ROOT, path)
-        self.assertEqual(rfc.count(b"- Status: Implementing\n"), 1)
+        status_lines = re.findall(rb"^- Status:[^\n]*(?:\n|$)", rfc, re.MULTILINE)
+        self.assertEqual(len(status_lines), 1)
         for status in (b"Accepted", b"Implementing", b"Implemented"):
-            changed = rfc.replace(b"- Status: Implementing", b"- Status: " + status)
+            changed = rfc.replace(status_lines[0], b"- Status: " + status + b"\n")
             with self.subTest(status=status), mock.patch.object(
                     C, "read_bounded", side_effect=lambda root, name:
                     changed if name == path else read(root, name)):
@@ -98,12 +99,12 @@ class TerminalReceiptAdoptionTests(unittest.TestCase):
         read = C.read_bounded
         path = "rfcs/0014-scoped-terminal-receipt.md"
         rfc = read(ROOT, path)
+        status_lines = re.findall(rb"^- Status:[^\n]*(?:\n|$)", rfc, re.MULTILINE)
+        self.assertEqual(len(status_lines), 1)
         for status in (b"Draft", b"Discussion", b"Review", b"Rejected", b"Withdrawn",
                        b"Superseded", b"Active", b"Accepted (design only)", b"",
                        b"Implementing\n- Status: Implementing", b"Accepted\n- Status: Draft"):
-            changed = rfc.replace(b"- Status: Implementing", b"- Status: " + status)
-            if not status:
-                changed = rfc.replace(b"- Status: Implementing\n", b"")
+            changed = rfc.replace(status_lines[0], b"- Status: " + status + b"\n" if status else b"")
             # A broken inventory must not obscure the missing acceptance gate.
             changed = changed.replace(b"**R14-01 (", b"**R14-99 (")
             with self.subTest(status=status), mock.patch.object(
