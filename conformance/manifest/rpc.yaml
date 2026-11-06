@@ -602,7 +602,7 @@ cases:
     capabilities: []
     mandatory: false
     applicable_profiles: [SYNTRA-1.0-TCP]
-    preconditions: [two_independent_implementations, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, synthetic_conditional_authority_adapter]
+    preconditions: [two_independent_implementations, different_programming_languages, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, synthetic_conditional_authority_adapter]
     input:
       faults:
         terminal_receipt:

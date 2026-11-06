@@ -52,12 +52,12 @@ BASE_FILES = tuple(f"specifications/{name}.md" for name in (
 # markers alone never authorize content. Updating a pin is an explicit reviewed
 # tooling change, not a rebaseline mode or an approval/execution claim.
 TERMINAL_APPENDICES = {
-    "specifications/connection.md": "90c2f110b3113dca11d6dea6e11a5caf4bc82695483ae8ce8d54a9c528d4fe65",
+    "specifications/connection.md": "1e8870bd6dbd0b49c738be8d53503968ecefdd1686ea9f0f61801c7e63c7daa8",
     "specifications/rpc.md": "6cfd3937bc955f94e3673db95a41cdb3f40306d868ecaa7b251b87e8c1f626d6",
     "specifications/security.md": "81ede9de6502133af520848b5667941a22ade75ba0351c6c9457b7c64ccb10b5",
     "specifications/transports.md": "f4fb202ff5d1e7d232f8fe292dac6e2e2912ef468717fc012a428cede06de111",
     "conformance/manifest/requirements.yaml": "eaf56c3c6c2bc683d3cedc949ede5ac56493a45031da712381bbee384926d3ee",
-    "conformance/manifest/rpc.yaml": "c43d9f93d222a68a71392b47c04a1e67d3a888146d0ce5666bbae5d585a09d45",
+    "conformance/manifest/rpc.yaml": "c0858550a792a2afea9df57874f198ca5a46cca59f41514489397040ab32750a",
 }
 TERMINAL_OWNERS = {
     "connection": (1, 2, 12), "rpc": (8, 10, 13),
@@ -523,13 +523,29 @@ def verify_base(root):
 
 
 def validate_terminal_adoption(root):
-    """Check the accepted RFC0014 ID translation, owners and reciprocal traces.
+    """Check RFC0014 acceptance, ID translation, owners and reciprocal traces.
 
     This is static adoption validation, never a protocol runner. Exact appendix
     pins in verify_base protect the requirement text and every case assertion;
     these independent checks prevent trace mistakes from being hidden by a pin.
+    Local decision consistency does not authenticate public approval.
     """
     rfc = read_bounded(root, "rfcs/0014-scoped-terminal-receipt.md").decode()
+    statuses = re.findall(r"^- Status: (.*)$", rfc, re.MULTILINE)
+    require(len(statuses) == 1 and statuses[0] in ("Accepted", "Implementing", "Implemented"),
+            "RFC0014 status must be Accepted, Implementing or Implemented")
+    record = read_bounded(root, ACCEPTANCE_REFERENCE["record_path"]).decode()
+    require(ACCEPTANCE_REFERENCE["public_approval_url"] in record and
+            ACCEPTANCE_REFERENCE["reviewed_revision"] in record,
+            "RFC0014 acceptance record missing exact public URL or reviewed revision")
+    sections = re.findall(r"^### RFC 0014:[^\n]*(?:\n|$)(.*?)(?=^#{1,3} |\Z)",
+                          record, re.MULTILINE | re.DOTALL)
+    require(len(sections) == 1, "RFC0014 acceptance record must contain exactly one RFC 0014 section")
+    disposition = re.match(r"\s*\*\*(.*?)\*\*", sections[0], re.DOTALL)
+    exact(" ".join(disposition[1].split()) if disposition else None,
+          "Accepted as an optional, default-disabled pre-release terminal-result design; "
+          "canonical and SDK adoption pending.",
+          "RFC0014 acceptance disposition must match Decision 0004")
     definitions = re.findall(r"\*\*(R14-[0-9]{2}) \(", rfc)
     exact(sorted(definitions), [f"R14-{n:02d}" for n in range(1, 14)],
           "RFC0014 accepted requirement inventory drift")
@@ -560,6 +576,18 @@ def validate_terminal_adoption(root):
         scenario = case["input"]["faults"]["terminal_receipt"]
         exact(scenario["rfc_case"], f"R14-T{n:02d}", "RFC0014 case alias drift")
         require(scenario["barrier"] and scenario["variants"], "RFC0014 missing structured stimuli")
+        if n == 14:
+            exact(case["preconditions"], [
+                "two_independent_implementations", "different_programming_languages",
+                "explicit_terminal_method_policy", "coordinated_runtime_driver_authority_adapter",
+                "synthetic_conditional_authority_adapter",
+            ], "RFC0014 composition precondition drift")
+            exact(scenario.get("compose_cases"), [f"CONF-TRC-{r:03d}" for r in range(1, 14)],
+                  "RFC0014 composition case drift")
+            exact(scenario["variants"], [
+                {"setup": "implementation_A_host_B_client", "expect": "full_positive_and_negative_suite"},
+                {"setup": "implementation_B_host_A_client", "expect": "full_positive_and_negative_suite"},
+            ], "RFC0014 composition pairing drift")
         for label, value in (("positive_assertions", True), ("negative_assertions", False)):
             assertions = case["expected"]["transport"][label]
             require(assertions and all(type(v) is bool and v is value for v in assertions.values()),

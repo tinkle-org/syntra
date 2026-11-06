@@ -15,6 +15,10 @@ no stable release is declared here. Release authorization follows
   application evidence remain pending. Source IDL and carrier allocations are
   unchanged. RFC 0013's guard retains every original base byte and permits only
   exact hash-pinned RFC 0014 appendices; HTTP adoption remains inactive.
+- Clarify RFC 0014's pre-mutation partial-frame barrier and cross-language
+  composition prerequisite. Check its accepted lifecycle status and Decision 0004
+  disposition before adoption traces, and guard the complete bidirectional case
+  composition. These are static checks; protocol execution remains NOT_EXECUTED.
 - Accepted RFCs 0011–0014 under [Decision 0004](docs/decisions/0004-rfc-0011-0014-acceptance.md)
   with sole-maintainer approval and human self-review disclosed. RFC 0012
   ratifies the existing reference; RFC 0011 publisher activation, RFC 0013

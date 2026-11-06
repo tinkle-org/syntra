@@ -310,9 +310,10 @@ fault dimensions independently as the case notes require, using deterministic
 barriers and injected clocks, not sleeps.
 
 Run existing withdrawal, correlation, cancellation, deadline and loss suites as
-well. `CONF-TRC-014` composes the thirteen groups in both independent TCP role
-directions, including fragmentation and forced loss. Custom drivers and portable
-builds require their own runs; TCP does not prove other permitted carriers.
+well. `CONF-TRC-014` composes the thirteen groups in both independent,
+cross-language TCP role directions, including fragmentation and forced loss.
+Custom drivers and portable builds require their own runs; TCP does not prove
+other permitted carriers.
 Synthetic authority proves neither production persistence nor client storage.
 Maintain distinct evidence for selection, queue admission, write, peer receipt,
 durable storage and joined cleanup.
@@ -326,9 +327,11 @@ are permitted: four owner sections, thirteen requirement rows and the fourteen
 RPC case groups. Their complete suffixes are SHA-256 pinned in the checker;
 there is no generic marker bypass, baseline replacement or regeneration option.
 An edit to old text/rows, extra appendix content, changed limits, ID drift or an
-HTTP mapping addition fails. Separate semantic checks validate the RFC's accepted
-case trace, canonical owner mapping and reciprocal edges. Pin changes require
-explicit review; pins themselves do not prove approval or protocol execution.
+HTTP mapping addition fails. Separate semantic checks require an accepted RFC
+lifecycle status and the accepting Decision 0004 disposition before validating
+the case trace, canonical owner mapping, reciprocal edges and cross-language
+composition. Pin changes require explicit review; pins themselves do not prove
+approval or protocol execution.
 
 The HTTP candidate's accepted-unadopted metadata, activation/claimability gates,
 profiles, context vectors, schema and compatibility inputs remain intact.

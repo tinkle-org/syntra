@@ -247,7 +247,7 @@ for application work surviving its budget without postponing carrier closure.
 | State | Allowed work | Exit |
 |---|---|---|
 | `ACTIVE` | Ordinary current-authority policy | Valid reserve or ordinary withdrawal |
-| `RESERVED/FENCED` | Bounded barrier and exact operation; no ordinary admission/egress | Exact owned commit or abort |
+| `RESERVED/FENCED` | Bounded barrier: finish only an already-partially-written ordinary frame within the pre-mutation budget/deadline and absent hard denial, then the exact operation; no ordinary admission or new ordinary egress | Exact owned commit or abort |
 | `OWNED_COMMIT` | Validate durable receipt conditions and terminal selection | Select once or abort |
 | `RECEIPT_ONLY` | Only the selected result's ordered record sequence | Completion, deadline or hard failure |
 | `CLOSED` | Retained cleanup/accounting only | No reopen or transfer |
