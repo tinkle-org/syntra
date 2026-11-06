@@ -318,3 +318,46 @@ confirm only supported behavior for this principal and connection, applying the
 capability's operation/version/field rules. Confirmation MUST be integrity-protected
 and MUST NOT transfer to another connection, resume a session, authorize another
 principal or weaken authentication, bounds or security.
+
+## 7. Scoped terminal result
+
+The optional [terminal connection transition](connection.md#6-scoped-terminal-receipt)
+is the only exception to §4's withdrawal output cutoff. Its one fixed result
+remains an ordinary correlated `RpcResult`, with unchanged version, request ID,
+envelope validation and payload opacity. It allocates no capability identifier,
+negotiation, field, error code or peer exchange. Method policy is host-local;
+neither a method name nor a client assertion establishes support or authority.
+
+**SNTR-TRC-008** — Before mutation, the host MUST copy and validate a predeclared
+non-sensitive success payload. Only its existing correlated `RpcResult` may
+become eligible after the exact owned commit. The complete serialized `Frame`
+MUST be at most **1,024 bytes**, excluding the four-byte inner length prefix.
+The limit cannot be raised by configuration. The result MUST NOT carry
+credentials, key material, recovered protected data, unrelated state,
+notifications or another call's output. The application supplies receipt
+meaning; Syntra does not interpret application payloads.
+
+**SNTR-TRC-010** — Reservation MUST NOT select success. Existing first-terminal
+and deadline precedence MUST remain intact. A prior cancellation, timeout,
+withdrawal or selected result MUST NOT be replaced by the reserved success,
+even if the durable operation subsequently commits. Suppressing output
+eligibility does not rewrite an already-selected outcome. Cancellation of an
+already-selected or completed call MUST follow the existing ignore rule; it
+does not become a new terminal outcome or abort trigger. Hard denial, output
+deadline and carrier failure still defeat delivery independently of
+request-cancellation selection.
+
+**SNTR-TRC-013** — Both roles MUST report a selected result, queue admission,
+completed local write, client receipt, durable client storage and joined closure
+as different facts. Loss or timeout MUST NOT imply operation rollback, authorize
+automatic replay, or be synthesized into success. Receipt delivery does not
+prove that the same connection's cleanup already joined. Clients MUST continue
+to correlate and validate the ordinary result and treat loss as an unknown
+outcome unless independently authorized reconciliation resolves it.
+
+An optional local completion observer can report write completion and cleanup
+status separately; it adds no peer acknowledgement. An application operation-
+status service or reconciliation path is outside this protocol. Receipt loss
+after commit remains possible; no guaranteed delivery or exactly-once effect is
+implied. [Authority evidence](security.md#9-terminal-transition-authority) and
+[bounded handoff](transports.md#8-terminal-only-output) govern eligibility.

@@ -35,7 +35,10 @@ SOURCE_FILES = tuple(f"{BUNDLE}/{name}" for name in FILES) + (
     "docs/decisions/0003-http-tls-consent.md",
     ACCEPTANCE_REFERENCE["record_path"],
     "scripts/check-http-candidate.py", "scripts/migrate-conformance-1.0.py",
-    "scripts/validate-repo.py", "tests/test_http_candidate.py")
+    "scripts/validate-repo.py", "tests/test_http_candidate.py",
+    "rfcs/0014-scoped-terminal-receipt.md", "tests/test_terminal_receipt_adoption.py",
+    "conformance/manifest/rpc.yaml", "conformance/manifest/requirements.yaml",
+    *(f"specifications/{name}.md" for name in ("connection", "rpc", "security", "transports")))
 BASE_FILES = tuple(f"specifications/{name}.md" for name in (
     "transports", "security", "connection", "rpc", "wire-format", "recovery")) + (
     "compatibility/syntra-1.0.json", "conformance/profiles.yaml",
@@ -43,6 +46,26 @@ BASE_FILES = tuple(f"specifications/{name}.md" for name in (
     "conformance/test-vectors/connection/context-vectors.yaml",
     "conformance/manifest/requirements.yaml", "conformance/manifest/schema.yaml",
     "CONTRIBUTING.md", "GOVERNANCE.md", "MAINTAINERS.md")
+# The original BASE and every pre-existing byte remain immutable. These six
+# exact appendices implement only accepted RFC0014, not RFC0013 adoption. Pins
+# cover the entire suffix, including prose, IDs, cases and registry metadata;
+# markers alone never authorize content. Updating a pin is an explicit reviewed
+# tooling change, not a rebaseline mode or an approval/execution claim.
+TERMINAL_APPENDICES = {
+    "specifications/connection.md": "1e8870bd6dbd0b49c738be8d53503968ecefdd1686ea9f0f61801c7e63c7daa8",
+    "specifications/rpc.md": "6cfd3937bc955f94e3673db95a41cdb3f40306d868ecaa7b251b87e8c1f626d6",
+    "specifications/security.md": "81ede9de6502133af520848b5667941a22ade75ba0351c6c9457b7c64ccb10b5",
+    "specifications/transports.md": "f4fb202ff5d1e7d232f8fe292dac6e2e2912ef468717fc012a428cede06de111",
+    "conformance/manifest/requirements.yaml": "eaf56c3c6c2bc683d3cedc949ede5ac56493a45031da712381bbee384926d3ee",
+    "conformance/manifest/rpc.yaml": "c0858550a792a2afea9df57874f198ca5a46cca59f41514489397040ab32750a",
+}
+TERMINAL_OWNERS = {
+    "connection": (1, 2, 12), "rpc": (8, 10, 13),
+    "security": (3, 4, 5), "transports": (6, 7, 9, 11),
+}
+TERMINAL_TRACES = ((1, 2), (2, 3), (3, 8, 11), (3, 4), (4, 5, 11), (4, 5),
+                   (5, 6), (6, 7), (7, 11), (8, 9), (10, 12), (9, 12), (11, 13),
+                   tuple(range(1, 14)))
 GATES = {
     "maintainer_consent_reported": True, "self_approval_disclosed": True,
     "public_approval": True, "human_security_review": True,
@@ -482,15 +505,111 @@ def sha(raw):
 
 
 def verify_base(root):
-    """Verify active inputs against immutable base Git blobs."""
+    """Preserve every base byte, allowing only exact RFC0014 appendices."""
     result = {}
     schema_paths = git(root, "ls-tree", "-r", "--name-only", BASE, "--", "proto").decode().splitlines()
     require(len(schema_paths) == 8, "base schema inventory")
-    for path in (*BASE_FILES, *schema_paths):
+    for path in (*BASE_FILES, *schema_paths, "conformance/manifest/rpc.yaml"):
         original = git(root, "show", f"{BASE}:{path}")
-        require(read_bounded(root, path) == original, f"active input changed before adoption: {path}")
+        current = read_bounded(root, path)
+        if path in TERMINAL_APPENDICES:
+            require(current.startswith(original) and
+                    sha(current[len(original):]) == TERMINAL_APPENDICES[path],
+                    f"active input changed before adoption: {path} (only exact RFC0014 appendix permitted)")
+        else:
+            require(current == original, f"active input changed before adoption: {path}")
         result[path] = sha(original)
     return result
+
+
+def validate_terminal_adoption(root):
+    """Check RFC0014 acceptance, ID translation, owners and reciprocal traces.
+
+    This is static adoption validation, never a protocol runner. Exact appendix
+    pins in verify_base protect the requirement text and every case assertion;
+    these independent checks prevent trace mistakes from being hidden by a pin.
+    Local decision consistency does not authenticate public approval.
+    """
+    rfc = read_bounded(root, "rfcs/0014-scoped-terminal-receipt.md").decode()
+    statuses = re.findall(r"^- Status: (.*)$", rfc, re.MULTILINE)
+    require(len(statuses) == 1 and statuses[0] in ("Accepted", "Implementing", "Implemented"),
+            "RFC0014 status must be Accepted, Implementing or Implemented")
+    record = read_bounded(root, ACCEPTANCE_REFERENCE["record_path"]).decode()
+    require(ACCEPTANCE_REFERENCE["public_approval_url"] in record and
+            ACCEPTANCE_REFERENCE["reviewed_revision"] in record,
+            "RFC0014 acceptance record missing exact public URL or reviewed revision")
+    sections = re.findall(r"^### RFC 0014:[^\n]*(?:\n|$)(.*?)(?=^#{1,3} |\Z)",
+                          record, re.MULTILINE | re.DOTALL)
+    require(len(sections) == 1, "RFC0014 acceptance record must contain exactly one RFC 0014 section")
+    disposition = re.match(r"\s*\*\*(.*?)\*\*", sections[0], re.DOTALL)
+    exact(" ".join(disposition[1].split()) if disposition else None,
+          "Accepted as an optional, default-disabled pre-release terminal-result design; "
+          "canonical and SDK adoption pending.",
+          "RFC0014 acceptance disposition must match Decision 0004")
+    definitions = re.findall(r"\*\*(R14-[0-9]{2}) \(", rfc)
+    exact(sorted(definitions), [f"R14-{n:02d}" for n in range(1, 14)],
+          "RFC0014 accepted requirement inventory drift")
+    rfc_rows = re.findall(r"^\| (R14-T[0-9]{2}) \|[^|]+\| ([^|]+)\|", rfc, re.MULTILINE)
+    exact(sorted(cid for cid, _ in rfc_rows), [f"R14-T{n:02d}" for n in range(1, 15)],
+          "RFC0014 accepted case inventory drift")
+    rfc_traces = dict(rfc_rows)
+    cases = [c for c in load(root, "conformance/manifest/rpc.yaml")["cases"]
+             if c["id"].startswith("CONF-TRC-")]
+    exact(sorted(c["id"] for c in cases), [f"CONF-TRC-{n:03d}" for n in range(1, 15)],
+          "RFC0014 case inventory drift")
+    for case in cases:
+        n = int(case["id"].removeprefix("CONF-TRC-"))
+        refs = TERMINAL_TRACES[n - 1]
+        exact(case["requirement"], [f"SNTR-TRC-{r:03d}" for r in refs], "RFC0014 case trace drift")
+        trace = rfc_traces[f"R14-T{n:02d}"].strip()
+        if n == 14:
+            exact(trace, "R14-01 through R14-13", "RFC0014 accepted requirement range drift")
+            labels = list(range(1, 14))
+        else:
+            labels = [int(r) for r in re.findall(r"R14-([0-9]{2})", trace)]
+        exact(sorted(labels), sorted(refs), "RFC0014 accepted RFC/case trace drift")
+        exact(case["roles"], ["client", "server"], "RFC0014 role drift")
+        exact(case["capabilities"], [], "RFC0014 must not allocate capability")
+        exact(case["mandatory"], n == 1, "RFC0014 default/opt-in execution gate drift")
+        require("NOT_EXECUTED" in case["notes"] and "verdict" not in case and "results" not in case,
+                "RFC0014 registration is not execution")
+        scenario = case["input"]["faults"]["terminal_receipt"]
+        exact(scenario["rfc_case"], f"R14-T{n:02d}", "RFC0014 case alias drift")
+        require(scenario["barrier"] and scenario["variants"], "RFC0014 missing structured stimuli")
+        if n == 14:
+            exact(case["preconditions"], [
+                "two_independent_implementations", "different_programming_languages",
+                "explicit_terminal_method_policy", "coordinated_runtime_driver_authority_adapter",
+                "synthetic_conditional_authority_adapter",
+            ], "RFC0014 composition precondition drift")
+            exact(scenario.get("compose_cases"), [f"CONF-TRC-{r:03d}" for r in range(1, 14)],
+                  "RFC0014 composition case drift")
+            exact(scenario["variants"], [
+                {"setup": "implementation_A_host_B_client", "expect": "full_positive_and_negative_suite"},
+                {"setup": "implementation_B_host_A_client", "expect": "full_positive_and_negative_suite"},
+            ], "RFC0014 composition pairing drift")
+        for label, value in (("positive_assertions", True), ("negative_assertions", False)):
+            assertions = case["expected"]["transport"][label]
+            require(assertions and all(type(v) is bool and v is value for v in assertions.values()),
+                    "RFC0014 positive/negative assertion drift")
+    rows = [r for r in load(root, "conformance/manifest/requirements.yaml")["requirements"]
+            if r["requirement_id"].startswith("SNTR-TRC-")]
+    exact(sorted(r["requirement_id"] for r in rows), [f"SNTR-TRC-{n:03d}" for n in range(1, 14)],
+          "RFC0014 requirement inventory drift")
+    owners = {n: f"specifications/{owner}.md" for owner, numbers in TERMINAL_OWNERS.items()
+              for n in numbers}
+    for owner, numbers in TERMINAL_OWNERS.items():
+        text = read_bounded(root, f"specifications/{owner}.md").decode()
+        exact(sorted(re.findall(r"\*\*(SNTR-TRC-[0-9]+)\*\*", text)),
+              sorted(f"SNTR-TRC-{n:03d}" for n in numbers), "RFC0014 owner definitions drift")
+    for row in rows:
+        rid = row["requirement_id"]
+        n = int(rid.removeprefix("SNTR-TRC-"))
+        exact(row["specification"], owners[n], "RFC0014 requirement owner drift")
+        exact(row["test_ids"], sorted(c["id"] for c in cases if rid in c["requirement"]),
+              "RFC0014 nonreciprocal case trace")
+        exact(row["automation_status"], "partially_automated", "RFC0014 review disposition drift")
+        require("NOT_EXECUTED" in row["notes"], "RFC0014 requirement registration is not execution")
 
 
 def validate(root=ROOT):
@@ -498,6 +617,7 @@ def validate(root=ROOT):
     head = git(root, "rev-parse", "HEAD").decode().strip()
     files = {path: sha(read_bounded(root, path)) for path in SOURCE_FILES}
     base_hashes = verify_base(root)
+    validate_terminal_adoption(root)
     contract = load(root, f"{BUNDLE}/contract.json")
     validate_contract(contract)
     validate_acceptance_reference(root, contract["acceptance_reference"])

@@ -258,6 +258,38 @@ class ProfileSelectionTests(unittest.TestCase):
             self.assertNotIn("CONF-SESS-R01", selected)
             self.assertFalse(any(cid.startswith(("CONF-HTTP-", "CONF-HTTPS-")) for cid in selected))
 
+    def test_terminal_receipt_selection_preserves_refusal_on_every_carrier_and_role(self):
+        """Check definition selection, not host enablement or runtime verdicts."""
+        shared = {f"CONF-TRC-{n:03d}" for n in range(1, 14)}
+        for suite in ("SNTR-CORE-V1", "SNTR-RPC-V1"):
+            # Without a carrier, the selector inventories all definitions.
+            inventory = VALIDATOR.selected_cases(self.profiles[suite])
+            self.assertEqual({cid for cid in inventory if cid.startswith("CONF-TRC-")},
+                             shared | {"CONF-TRC-014"})
+            # Preserve broad default applicability, especially mandatory refusal;
+            # the selector does not itself apply the runner's coarse-family gate.
+            for cid in shared | {"CONF-TRC-014"}:
+                self.assertNotIn("applicable_transports", inventory[cid])
+                if cid in shared:
+                    self.assertNotIn("applicable_profiles", inventory[cid])
+            self.assertEqual(inventory["CONF-TRC-014"]["applicable_profiles"], ["SYNTRA-1.0-TCP"])
+            for carrier in ("SYNTRA-1.0-TCP", "SYNTRA-1.0-WS", "SYNTRA-1.0-WSS"):
+                selected = VALIDATOR.selected_cases(self.profiles[suite], carrier_profile=carrier)
+                expected = shared | ({"CONF-TRC-014"} if carrier == "SYNTRA-1.0-TCP" else set())
+                # Roles are gated after profile selection, as the runner contract requires.
+                for role in ("client", "server"):
+                    with self.subTest(suite=suite, carrier=carrier, role=role):
+                        cases = {cid: case for cid, case in selected.items()
+                                 if cid.startswith("CONF-TRC-") and role in case["roles"]}
+                        self.assertEqual(set(cases), expected)
+                        self.assertEqual({cid for cid, case in cases.items() if case["mandatory"]},
+                                         {"CONF-TRC-001"})
+                        for case in cases.values():
+                            self.assertEqual(case["capabilities"], [])
+                            self.assertIn("NOT_EXECUTED", case["notes"])
+                            self.assertNotIn("verdict", case)
+                            self.assertNotIn("results", case)
+
     def test_schema_uses_numeric_case_ids_in_all_reference_positions(self):
         schema = yaml.safe_load((ROOT / "conformance/manifest/schema.yaml").read_text())["schema"]
         pattern = re.compile(schema["case_id"]["pattern"])

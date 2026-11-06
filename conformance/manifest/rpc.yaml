@@ -275,3 +275,347 @@ cases:
         - { request_id: 22, body: result, payload_b64: "cnBjLXAyMg==" }
         - { request_id: 21, body: result, payload_b64: "cnBjLXAyMQ==" }
     notes: "16 simultaneously outstanding RPCs with distinct opaque payloads rpc-p21...rpc-p36 and exactly one correlated terminal result per request. Each result payload equals its requester's payload exactly, so cross-delivery fails. Initiator sends all 16 without awaiting responses. The reverse_completion_order fault holds all results behind all_admitted, then releases them in descending request_id order. Correlation is solely by request_id, never FIFO. No lower capacity floor may be negotiated; work above the documented maximum is rejected with RESOURCE_EXHAUSTED."
+
+  # RFC0014 adoption: R14-T01..T14 -> CONF-TRC-001..014; NOT_EXECUTED.
+  # Only refusal/default coverage is mandatory for hosts without explicit support.
+  # Other groups require explicit terminal-operation harness setup, not negotiation.
+  - id: CONF-TRC-001
+    requirement: [SNTR-TRC-001, SNTR-TRC-002]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: true
+    preconditions: [active_session, synthetic_conditional_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T01
+          barrier: before_application_transition
+          variants:
+            - { setup: default_disabled, expect: reject_before_mutation }
+            - { setup: missing_runtime_driver_or_authority_support, expect: reject_before_mutation }
+            - { setup: missing_method_policy, expect: reject_before_mutation }
+            - { setup: unauthenticated_or_not_pending, expect: reject_before_mutation }
+            - { setup: bootstrap_participation_only, expect: reject_before_mutation }
+            - { setup: ordinary_external_withdrawal, expect: ordinary_withdrawal_close }
+    expected:
+      transport:
+        positive_assertions: { reservation_refused: true, ordinary_withdrawal_preserved: true }
+        negative_assertions: { mutation_started: false, ordinary_send_fallback: false, graceful_drain_fallback: false, automatic_enablement: false }
+    notes: "R14-T01 NOT_EXECUTED. Client observes only ordinary outcomes/closure; server inspection proves preflight had no effects. Explicit support is never inferred from carrier, method name or registration. No positive receipt support is required by this refusal group."
+
+  - id: CONF-TRC-002
+    requirement: [SNTR-TRC-002, SNTR-TRC-003]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T02
+          barrier: reservation_binding
+          variants:
+            - { setup: exact_private_pending_call, expect: one_reservation }
+            - { setup: wrong_call_generation_request_principal_scope_enrollment_or_operation, expect: reject }
+            - { setup: public_request_id_diagnostic_id_or_peer_value_only, expect: reject }
+            - { setup: transfer_to_another_connection, expect: reject }
+            - { setup: second_or_repeated_reservation, expect: reject_without_deadline_renewal }
+    expected:
+      transport:
+        positive_assertions: { private_exact_binding_required: true, one_reservation_per_connection: true }
+        negative_assertions: { transferable_permission: false, public_metadata_authority: false, deadline_renewal: false }
+    notes: "R14-T02 NOT_EXECUTED. Server proves private ownership independently of identical public IDs; client must not receive another call's result. Repeat each wrong-binding dimension independently."
+
+  - id: CONF-TRC-003
+    requirement: [SNTR-TRC-003, SNTR-TRC-008, SNTR-TRC-011]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      frames:
+        - { request_id: 7, body: request, method: "/example.KV/Retire", payload_b64: "", timeout_ms: 5000 }
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T03
+          barrier: exact_conditional_commit_then_fresh_handoff
+          fixed_result: { request_id: 7, body: result, payload_b64: "b2s=" }
+          variants:
+            - { setup: exact_owned_commit_all_receipt_conditions, expect: one_correlated_result_then_close }
+            - { setup: unconditional_revoke_or_completion_success_only, expect: no_receipt }
+            - { setup: already_withdrawn_or_wrong_revision_or_receipt_conditions, expect: no_receipt }
+            - { setup: second_handoff, expect: no_second_result }
+            - { setup: fresh_returning_after_withdrawal, expect: deny_before_ready }
+    expected:
+      transport:
+        positive_assertions: { healthy_variant_one_exact_result: true, original_connection_only: true, state_retired_after_close: true }
+        negative_assertions: { success_before_commit: false, second_result: false, fresh_returning_authorized: false }
+    notes: "R14-T03 NOT_EXECUTED. Expected emitted Frame for the healthy variant is the fixed_result only; negatives emit none of it. Client validates version, request_id and exact payload. Synthetic conditional persistence is not production durability evidence."
+
+  - id: CONF-TRC-004
+    requirement: [SNTR-TRC-003, SNTR-TRC-004]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T04
+          barrier: durable_commit_before_application_completion
+          release_after: supervisor_operation_aware_observation
+          variants:
+            - { setup: exact_owner_visible_before_completion, expect: classify_owned_commit }
+            - { setup: still_active, expect: fenced_without_success }
+            - { setup: different_owner_or_generic_invalidity_only, expect: abort }
+    expected:
+      transport:
+        positive_assertions: { durable_owner_bridges_completion_gap: true, shared_gate_classification: true }
+        negative_assertions: { still_active_success: false, invalidity_implies_ownership: false, wire_authority_diagnostics: false }
+    notes: "R14-T04 NOT_EXECUTED. Hold application completion while writer, receive and supervisor gates classify the same durable operation. Client sees no success for an active or unclassified transition."
+
+  - id: CONF-TRC-005
+    requirement: [SNTR-TRC-004, SNTR-TRC-005, SNTR-TRC-011]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, declared_freshness_read_close_bounds]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T05
+          barrier: final_observation_then_serialized_handoff
+          variants:
+            - { setup: exact_owned_commit_no_denial, expect: eligible_once }
+            - { setup: external_denial_visible_to_final_read, expect: abort_before_handoff }
+            - { setup: locally_observed_denial_before_handoff, expect: abort_before_handoff }
+            - { setup: idempotent_external_revoke_after_owned_commit, expect: superseding_denial_not_first_owner_allow }
+            - { setup: superseding_change_after_last_observation, expect: declared_race_then_abort_remaining_io_when_observed }
+            - { setup: blocked_io_repoll_denial_unknown_or_timeout, expect: abort_remaining_io }
+    expected:
+      transport:
+        positive_assertions: { fresh_operation_aware_gate: true, superseding_revision_checked: true, declared_race_bound_observed: true }
+        negative_assertions: { observed_denial_allows_handoff: false, permanent_owner_implies_no_later_denial: false, unbounded_authority_io_under_lock: false, recall_of_emitted_bytes_claimed: false }
+    notes: "R14-T05 NOT_EXECUTED. Deterministically place denial on each side of observation/handoff. Record already-handed bytes separately; do not demand impossible atomic database/carrier cutoff. Client may observe loss after commit."
+
+  - id: CONF-TRC-006
+    requirement: [SNTR-TRC-004, SNTR-TRC-005]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T06
+          barrier: authority_failure_before_delayed_completion
+          release_after: irreversible_abort
+          variants:
+            - { setup: fresh_owned_evidence_without_prior_failure, expect: eligible }
+            - { setup: store_error_timeout_stale_or_unresolved_cause, expect: fail_closed }
+            - { setup: prior_failure_then_late_success_or_delayed_active_read, expect: remain_aborted }
+            - { setup: expiry_or_owner_revision_mismatch, expect: abort }
+    expected:
+      transport:
+        positive_assertions: { sticky_abort: true, bounded_close: true }
+        negative_assertions: { generic_lookup_error_is_owned_commit: false, late_success_clears_failure: false, stale_allow: false }
+    notes: "R14-T06 NOT_EXECUTED. Repeat every failure independently; client receives no synthetic receipt and cannot infer a private store diagnosis from closure."
+
+  - id: CONF-TRC-007
+    requirement: [SNTR-TRC-005, SNTR-TRC-006]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, paired_affected_connection]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T07
+          barrier: fence_before_application_transition
+          variants:
+            - { setup: queued_selected_reply_notification_recovery_and_driver_output, expect: suppress_unstarted_ordinary_output }
+            - { setup: sibling_call_subscription_or_new_protected_input, expect: no_delivery_or_dispatch_after_fence }
+            - { setup: exact_reserved_result_after_commit, expect: sole_eligible_output }
+            - { setup: other_affected_connection_same_principal, expect: ordinary_withdrawal_no_inherited_permission }
+    expected:
+      transport:
+        positive_assertions: { all_output_layers_fenced: true, other_connection_withdrawn: true, surviving_effects_accounted: true }
+        negative_assertions: { unrelated_delivery: false, new_dispatch: false, cross_connection_receipt: false, cancellation_proves_effects_stopped: false }
+    notes: "R14-T07 NOT_EXECUTED. Inspect all queued output classes and both connections; enabling the exact call cannot turn a connection/principal into a blanket permit."
+
+  - id: CONF-TRC-008
+    requirement: [SNTR-TRC-006, SNTR-TRC-007]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T08
+          barrier: partially_emitted_ordinary_frame_before_mutation
+          variants:
+            - { setup: finish_exact_ciphertext_within_premutation_budget, expect: full_frame_boundary_before_mutation }
+            - { setup: boundary_stall_or_capacity_failure, expect: close_without_mutation }
+            - { setup: hard_denial_during_quiescence, expect: abort_without_finishing_under_exception }
+            - { setup: malformed_input_authentication_failure_or_carrier_loss, expect: terminal_precedence }
+    expected:
+      transport:
+        positive_assertions: { boundary_precedes_effect: true, capacity_reserved_before_effect: true }
+        negative_assertions: { drop_partial_then_receipt: false, postwithdrawal_ordinary_drain: false, mutation_on_failed_barrier: false, nonce_skip_or_reencryption: false }
+    notes: "R14-T08 NOT_EXECUTED. Repeat cuts in frame prefix/body and record prefix/ciphertext. Server records mutation start only after a complete outbound-frame boundary; client never sees a spliced stream."
+
+  - id: CONF-TRC-009
+    requirement: [SNTR-TRC-007, SNTR-TRC-011]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T09
+          barrier: receipt_nonce_consumed_then_partial_write
+          variants:
+            - { setup: partial_write_progress_within_budget, expect: exact_ciphertext_in_order }
+            - { setup: blocked_repoll_then_denial_unknown_deadline_or_loss, expect: abort_remaining_io }
+            - { setup: attempt_second_handoff_or_replacement_ciphertext, expect: reject }
+    expected:
+      transport:
+        positive_assertions: { one_use_handoff: true, exact_ciphertext_or_abort: true }
+        negative_assertions: { whole_unit_replay_on_prefix: false, nonce_skip: false, reencryption: false, replacement_or_splice: false }
+    notes: "R14-T09 NOT_EXECUTED. Include multiple records and packet fragmentation. Capture handed bytes separately from peer-validated receipt; a partial receipt is not success."
+
+  - id: CONF-TRC-010
+    requirement: [SNTR-TRC-008, SNTR-TRC-009]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, injected_elapsed_clock]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T10
+          barrier: preflight_then_each_budget_boundary
+          serialized_frame_bytes: [1024, 1025]
+          request_remaining_ms: [80, 5000, 9000]
+          expected_total_ms: [80, 5000, 5000]
+          expected_teardown_tail_ms: [20, 250, 250]
+          variants:
+            - { setup: nonsensitive_fixed_frame_1024_with_sufficient_budget, expect: eligible_after_owned_commit }
+            - { setup: frame_1025_or_sensitive_unrelated_payload, expect: reject_before_mutation }
+            - { setup: unsupported_clock_resolution_or_insufficient_budget, expect: reject_before_mutation }
+            - { setup: expiry_during_quiescence_authority_completion_selection_or_write, expect: close_by_original_deadline }
+            - { setup: suspend_clock_discontinuity_age_or_record_exhaustion, expect: earlier_limit_close }
+            - { setup: repeated_attempt_progress_or_completion, expect: no_extension }
+    expected:
+      transport:
+        positive_assertions: { frame_overhead_counted_prefix_excluded: true, payload_copied_before_mutation: true, tail_reserved_from_initial_budget: true, stricter_limits_honored: true }
+        negative_assertions: { configured_larger_limit: false, sensitive_or_other_output: false, deadline_reset: false, late_write: false }
+    notes: "R14-T10 NOT_EXECUTED. Test payload mutation after reservation cannot change copied output; the application predeclares sensitivity. Test all budget phases and multi-record output. No production clock behavior is established by an injected clock."
+
+  - id: CONF-TRC-011
+    requirement: [SNTR-TRC-010, SNTR-TRC-012]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, injected_elapsed_clock]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T11
+          barrier: terminal_candidate_selection
+          variants:
+            - { setup: cancel_selected_before_owned_success, expect: cancellation_immutable }
+            - { setup: cancel_after_selected_success_or_completed_call, expect: cancel_ignored }
+            - { setup: deadline_tie_or_expired_candidate, expect: deadline_precedence }
+            - { setup: prior_withdrawal_or_selected_other_result_then_late_commit, expect: no_replacement }
+            - { setup: duplicate_completion, expect: no_second_result }
+            - { setup: hard_denial_output_deadline_or_carrier_failure_after_selection, expect: delivery_defeated_without_reselection }
+    expected:
+      transport:
+        positive_assertions: { first_terminal_preserved: true, cleanup_owner_retained: true }
+        negative_assertions: { reservation_selects_success: false, cancel_after_success_aborts_by_itself: false, late_commit_rewrites_terminal: false, suppression_rewrites_selected_outcome: false }
+    notes: "R14-T11 NOT_EXECUTED. Run each order deterministically on both role-local selection gates. Server selection is not client receipt; cancellation never proves rollback."
+
+  - id: CONF-TRC-012
+    requirement: [SNTR-TRC-009, SNTR-TRC-012]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, injected_elapsed_clock]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T12
+          barrier: cleanup_installed_before_application_start
+          variants:
+            - { setup: drop_waiter_during_authority_or_application_work, expect: retained_owner_closes_on_original_budget }
+            - { setup: stalled_io_or_noncooperative_effect, expect: carrier_closes_effect_remains_accounted }
+            - { setup: handler_returns_before_output_completion, expect: no_handler_return_dependency_cycle }
+            - { setup: effect_eventually_stops, expect: execution_accounting_released_then }
+    expected:
+      transport:
+        positive_assertions: { close_owner_survives_waiter: true, bounded_teardown: true, accounting_tracks_actual_execution: true }
+        negative_assertions: { restarted_budget: false, abandoned_close: false, late_output: false, premature_execution_release: false }
+    notes: "R14-T12 NOT_EXECUTED. Client disappearance cannot defer durable withdrawal or host cleanup. Record carrier closure separately from joined cleanup and still-running effects."
+
+  - id: CONF-TRC-013
+    requirement: [SNTR-TRC-011, SNTR-TRC-013]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    preconditions: [active_session, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T13
+          barrier: commit_selection_handoff_write_receive_store_close_join
+          variants:
+            - { setup: healthy_valid_correlated_result, expect: client_success_independent_of_cleanup_join }
+            - { setup: loss_at_each_boundary_after_commit, expect: unobserved_result_unknown_without_replay }
+            - { setup: timeout_before_client_selection, expect: timeout_not_synthesized_success }
+            - { setup: wrong_version_request_id_or_invalid_result, expect: ordinary_validation_not_success }
+    expected:
+      transport:
+        positive_assertions: { distinct_selection_queue_write_receipt_storage_join_records: true, ordinary_result_correlation: true, original_connection_handoff_only: true }
+        negative_assertions: { local_write_proves_client_receipt: false, receipt_proves_durable_storage_or_join: false, loss_means_rollback: false, automatic_replay_or_synthetic_success: false }
+    notes: "R14-T13 NOT_EXECUTED. Record role-local observations and loss without adding a peer acknowledgement. Independently authorized application reconciliation is outside this fixture."
+
+  - id: CONF-TRC-014
+    requirement: [SNTR-TRC-001, SNTR-TRC-002, SNTR-TRC-003, SNTR-TRC-004, SNTR-TRC-005, SNTR-TRC-006, SNTR-TRC-007, SNTR-TRC-008, SNTR-TRC-009, SNTR-TRC-010, SNTR-TRC-011, SNTR-TRC-012, SNTR-TRC-013]
+    profile: SNTR-RPC-V1
+    roles: [client, server]
+    capabilities: []
+    mandatory: false
+    applicable_profiles: [SYNTRA-1.0-TCP]
+    preconditions: [two_independent_implementations, different_programming_languages, explicit_terminal_method_policy, coordinated_runtime_driver_authority_adapter, synthetic_conditional_authority_adapter]
+    input:
+      faults:
+        terminal_receipt:
+          rfc_case: R14-T14
+          barrier: repeat_registered_terminal_scenarios_per_leg
+          compose_cases: [CONF-TRC-001, CONF-TRC-002, CONF-TRC-003, CONF-TRC-004, CONF-TRC-005, CONF-TRC-006, CONF-TRC-007, CONF-TRC-008, CONF-TRC-009, CONF-TRC-010, CONF-TRC-011, CONF-TRC-012, CONF-TRC-013]
+          variants:
+            - { setup: implementation_A_host_B_client, expect: full_positive_and_negative_suite }
+            - { setup: implementation_B_host_A_client, expect: full_positive_and_negative_suite }
+          fragmentation: [outer_prefix, ciphertext, inner_prefix, frame, multiple_records]
+          forced_loss: [after_commit, during_partial_receipt, after_local_write_before_peer_receipt]
+    expected:
+      transport:
+        positive_assertions: { independent_per_leg_evidence_required: true, healthy_receipt_then_retirement: true, forced_loss_unknown: true }
+        negative_assertions: { one_leg_proves_reverse: false, tcp_proves_other_carriers: false, synthetic_authority_proves_application_durability: false, default_autoactivation: false }
+    notes: "R14-T14 NOT_EXECUTED. Composition definition only, not a harness or interoperability result. Pin both implementations and all per-leg bounds/logs; custom drivers and portable builds need separate runs, and other permitted carriers need independent composition evidence."

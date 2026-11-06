@@ -319,3 +319,61 @@ Complete authenticated frames indicate transport progress, not authorization
 renewal, application completion or durable checkpoint acknowledgment. Carrier
 liveness follows [transports](transports.md); Syntra has no additional mandatory
 heartbeat.
+
+## 6. Scoped terminal receipt
+
+[RFC 0014](../rfcs/0014-scoped-terminal-receipt.md) supplies one optional,
+default-disabled exception to `SNTR-AUTH-008/009`, unfinished-call settlement in
+`SNTR-HS-006`, and §5's ordinary withdrawal cutoff. Only the already-admitted
+request owning the exact durable withdrawal may attempt its reserved success.
+All thirteen `SNTR-TRC-*` requirements apply together: [RPC](rpc.md#7-scoped-terminal-result),
+[security](security.md#9-terminal-transition-authority), and
+[transports](transports.md#8-terminal-only-output) define the other obligations.
+Ordinary withdrawal, including external revocation, remains unchanged. This is
+not a general drain, renewed application authority or a client-driven second
+phase. No peer acknowledgement can postpone withdrawal.
+
+**SNTR-TRC-001** — The host's terminal-result operation MUST be disabled by default.
+A host enabling it MUST provide compatible runtime, driver and authoritative-
+transition adapters and explicit method policy. Unsupported configurations MUST
+fail reservation before starting the mutation. Missing support MUST NOT fall
+back to ordinary sending or graceful draining.
+
+**SNTR-TRC-002** — Reservation MUST be available only to an authenticated,
+method-authorized, still-pending request. The host MUST privately bind it to the
+actual connection generation, call ownership, request ID, principal, scope,
+enrollment binding and application operation. Diagnostic connection IDs,
+peer-supplied values and public request IDs alone MUST NOT construct or transfer
+this permission. A connection permits at most one reservation; repeated attempts
+MUST NOT renew its deadline. Bootstrap participation alone is insufficient.
+
+The host-local transition is:
+
+| Substate | Allowed work | Exit |
+|---|---|---|
+| `ACTIVE` | Ordinary current-authority policy | Valid reservation or ordinary withdrawal |
+| `RESERVED/FENCED` | Bounded barrier: finish only an already-partially-written ordinary frame within the pre-mutation budget/deadline and absent hard denial, then the exact operation; no ordinary admission or new ordinary egress | Exact owned commit or abort |
+| `OWNED_COMMIT` | Validate durable receipt conditions and terminal selection | Select once or abort |
+| `RECEIPT_ONLY` | Only the selected result's ordered record sequence | Completion, deadline or hard failure |
+| `CLOSED` | Retained cleanup/accounting only | No reopen or transfer |
+
+These are local substates, not new wire connection-state values. Reservation
+precedes the application transition, and does not itself select success. Any
+failure after reservation follows an irreversible terminal path; ordinary
+service does not resume. Withdrawal ends the application binding even while
+bounded receipt-only channel state remains. Fresh connections authenticate
+afresh and cannot inherit or replay the reservation. Closed or suspended cipher
+state cannot be restored for a receipt.
+
+**SNTR-TRC-012** — The host runtime MUST install one host-owned cleanup
+continuation before starting application work that may outlive the initiating
+handler. Dropping a waiter MUST NOT abandon close responsibility, restart its
+budget, or permit late output. An initiating handler MUST NOT wait for an output
+action that depends on that handler returning. Surviving effects MUST retain
+their actual execution accounting until they stop.
+
+Applications own durable authority transitions, receipt meaning, protected-store
+clearing and independently authorized reconciliation. Syntra owns request
+correlation, output fencing, encryption, deadlines and shutdown. This contract
+defines no application method, persistence format or language API. Adoption in
+this reference does not establish SDK support or activate host policy.

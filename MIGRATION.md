@@ -30,3 +30,20 @@ behavior or compatibility follow [GOVERNANCE.md](GOVERNANCE.md) and the
 [RFC process](rfcs/README.md). Record current user-visible changes under
 `Unreleased` in [CHANGELOG.md](CHANGELOG.md), and use
 [RELEASE.md](RELEASE.md) for publication procedure.
+
+## RFC 0014 canonical adoption
+
+[RFC 0014](rfcs/0014-scoped-terminal-receipt.md), accepted by Decision 0004,
+is adopted in the existing connection, RPC, security and transport owners. Its
+compatibility disposition is optional additive pre-release behavior: the
+host-local terminal-result operation is disabled by default and ordinary
+withdrawal remains the contract without explicit compatible support and method
+policy. There is no new peer exchange, capability, field, carrier, schema pin or
+generated artifact. Existing peers continue ordinary result validation and may
+observe success or an unknown outcome.
+
+Canonical requirements and positive/negative cases are registered; they supply
+no SDK execution, application durability, formal conformance or publication
+claim. SDK adoption and real application integration require separate evidence
+against the adopted requirements. No release or dependency repinning follows
+from this documentation change.

@@ -278,3 +278,61 @@ Owner discovery reads the six protocol pages, this guide, and the optional
 schema-tooling guide. `--write` on the sync scripts updates only their described
 metadata/fixture outputs; review registry membership and test edges separately.
 Schema validation and repository-boundary gates remain independent checks in CI.
+
+## Scoped terminal-receipt definitions
+
+[RFC 0014](../rfcs/0014-scoped-terminal-receipt.md) is canonically adopted as
+`SNTR-TRC-001` through `SNTR-TRC-013` in the four existing owners.
+[`rpc.yaml`](manifest/rpc.yaml) registers `CONF-TRC-001` through `CONF-TRC-014`;
+their numeric suffixes map one-to-one to accepted local cases `R14-T01` through
+`R14-T14`. All fourteen groups are **NOT_EXECUTED**. The requirement rows' partial
+automation disposition describes authored assertions plus required adapter,
+platform and application review; no harness or execution is supplied here.
+
+The existing RPC selector loads these cases without registering a new selector
+or capability. `CONF-TRC-001` is mandatory refusal/default coverage; unsupported
+hosts reject before mutation and retain ordinary withdrawal. The remaining
+groups are optional operation-specific definitions requiring explicit host
+support, method policy and coordinated runtime/driver/authority setup. A runner
+records that setup and executes them for an operation-inclusive claim. Merely
+loading the manifest, enabling a carrier or matching an application method name
+cannot enable the host operation. These cases allocate no wire negotiation.
+
+`input.faults.terminal_receipt` describes harness-local structured stimuli, never
+wire fields: `rfc_case` is the accepted alias; `barrier` and `release_after` order
+the named boundary; `variants` are independently executed setups with expected
+dispositions. `fixed_result` describes only the healthy variant's response.
+`expected.transport.positive_assertions` must hold; `negative_assertions` must
+remain false in their applicable variants. Mixed positive/negative groups do not
+assert a single common emitted Frame list. Record each variant's observations;
+a group passes only when all its applicable variants pass. Expand combined
+fault dimensions independently as the case notes require, using deterministic
+barriers and injected clocks, not sleeps.
+
+Run existing withdrawal, correlation, cancellation, deadline and loss suites as
+well. `CONF-TRC-014` composes the thirteen groups in both independent,
+cross-language TCP role directions, including fragmentation and forced loss.
+Custom drivers and portable builds require their own runs; TCP does not prove
+other permitted carriers.
+Synthetic authority proves neither production persistence nor client storage.
+Maintain distinct evidence for selection, queue admission, write, peer receipt,
+durable storage and joined cleanup.
+
+### Unrelated HTTP adoption guard
+
+`scripts/check-http-candidate.py` retains RFC 0013's original base revision
+`3f7e8ea037fefcc5c86101d23e7722c83e28a0d3`. Every pre-existing byte in its guarded
+inputs is still compared to that immutable Git blob. Only six exact appendices
+are permitted: four owner sections, thirteen requirement rows and the fourteen
+RPC case groups. Their complete suffixes are SHA-256 pinned in the checker;
+there is no generic marker bypass, baseline replacement or regeneration option.
+An edit to old text/rows, extra appendix content, changed limits, ID drift or an
+HTTP mapping addition fails. Separate semantic checks require an accepted RFC
+lifecycle status and the accepting Decision 0004 disposition before validating
+the case trace, canonical owner mapping, reciprocal edges and cross-language
+composition. Pin changes require explicit review; pins themselves do not prove
+approval or protocol execution.
+
+The HTTP candidate's accepted-unadopted metadata, activation/claimability gates,
+profiles, context vectors, schema and compatibility inputs remain intact.
+`--require-adoption` still exits 2 for RFC 0013 after successful static checks.
